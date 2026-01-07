@@ -1,0 +1,158 @@
+/**
+ * Provisioning Station Design System - Base Styles
+ */
+
+/* ========================================
+   Base Layer Styles
+   ======================================== */
+
+@layer base {
+  /* Reset */
+  *,
+  *::before,
+  *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  /* Root Element */
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-body text-text-primary leading-normal;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Headings */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-text-primary;
+  }
+
+  h1 { @apply text-xl; }
+  h2 { @apply text-lg; }
+  h3 { @apply text-base font-semibold; }
+
+  /* Links */
+  a {
+    @apply text-primary no-underline transition-colors duration-200;
+  }
+
+  a:hover {
+    @apply text-primary-hover;
+  }
+
+  /* Tables */
+  table {
+    @apply w-full border-collapse;
+  }
+
+  /* Form Elements */
+  input,
+  select,
+  textarea,
+  button {
+    font-family: inherit;
+    font-size: inherit;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    @apply outline-none;
+  }
+
+  /* Buttons */
+  button {
+    @apply cursor-pointer;
+  }
+
+  button:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+
+  /* Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-text-muted;
+  }
+}
+
+/* ========================================
+   Utility Layer Extensions
+   ======================================== */
+
+@layer utilities {
+  /* Animation: Fade In */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Text Truncate */
+  .text-truncate {
+    @apply overflow-hidden whitespace-nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* Focus Ring */
+  .focus-ring {
+    @apply focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none;
+  }
+
+  /* Markdown Content Styling */
+  .markdown-content h1 {
+    @apply text-xl font-bold mb-4 mt-6;
+  }
+  .markdown-content h2 {
+    @apply text-lg font-semibold mb-3 mt-5;
+  }
+  .markdown-content h3 {
+    @apply text-base font-semibold mb-2 mt-4;
+  }
+  .markdown-content p {
+    @apply mb-3 leading-relaxed;
+  }
+  .markdown-content ul, .markdown-content ol {
+    @apply mb-3 pl-6;
+  }
+  .markdown-content li {
+    @apply mb-1;
+  }
+  .markdown-content code {
+    @apply bg-gray-100 px-1 py-0.5 rounded text-sm;
+  }
+  .markdown-content pre {
+    @apply bg-gray-100 p-3 rounded-lg overflow-x-auto mb-3;
+  }
+  .markdown-content pre code {
+    @apply bg-transparent p-0;
+  }
+}

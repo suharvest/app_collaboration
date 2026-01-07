@@ -1,0 +1,134 @@
+/**
+ * Provisioning Station - Main Application Entry
+ */
+
+import './main.css';
+import { router } from './modules/router.js';
+import { i18n, t } from './modules/i18n.js';
+import { toast } from './modules/toast.js';
+
+// Import pages
+import { renderSolutionsPage } from './pages/solutions.js';
+import { renderSolutionDetailPage } from './pages/solution-detail.js';
+import { renderDeployPage, cleanupDeployPage } from './pages/deploy.js';
+import { renderDeploymentsPage } from './pages/deployments.js';
+import { renderSettingsPage } from './pages/settings.js';
+
+// Initialize application
+function initApp() {
+  // Initialize i18n
+  i18n.updateDOM();
+
+  // Setup language toggle
+  const langToggle = document.getElementById('lang-toggle');
+  const currentLangEl = document.getElementById('current-lang');
+
+  if (langToggle && currentLangEl) {
+    currentLangEl.textContent = i18n.locale.toUpperCase();
+
+    langToggle.addEventListener('click', () => {
+      i18n.toggle();
+      currentLangEl.textContent = i18n.locale.toUpperCase();
+    });
+  }
+
+  // Setup navigation
+  setupNavigation();
+
+  // Setup router
+  setupRouter();
+
+  // Start router
+  router.init();
+}
+
+function setupNavigation() {
+  const navItems = document.querySelectorAll('.nav-item[data-page]');
+
+  navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const page = item.dataset.page;
+      router.navigate(page);
+    });
+  });
+}
+
+function setupRouter() {
+  // Register routes
+  router
+    .register('solutions', renderSolutionsPage)
+    .register('solution', renderSolutionDetailPage)
+    .register('deploy', renderDeployPage)
+    .register('deployments', renderDeploymentsPage)
+    .register('settings', renderSettingsPage);
+
+  // Before each navigation
+  router.beforeEach((to, params, from) => {
+    // Cleanup previous page if needed
+    if (from === 'deploy') {
+      cleanupDeployPage();
+    }
+    return true;
+  });
+
+  // After each navigation
+  router.afterEach((to, params) => {
+    // Update page title
+    updatePageTitle(to);
+
+    // Update active nav item
+    updateActiveNavItem(to);
+  });
+}
+
+function updatePageTitle(route) {
+  const titles = {
+    solutions: 'nav.solutions',
+    solution: 'nav.solutions',
+    deploy: 'deploy.title',
+    deployments: 'nav.deployments',
+    settings: 'nav.settings',
+  };
+
+  const titleKey = titles[route] || 'nav.solutions';
+  const pageTitle = document.getElementById('page-title');
+
+  if (pageTitle) {
+    pageTitle.textContent = t(titleKey);
+    pageTitle.setAttribute('data-i18n', titleKey);
+  }
+
+  document.title = `${t(titleKey)} - SenseCraft Solution`;
+}
+
+function updateActiveNavItem(route) {
+  const navItems = document.querySelectorAll('.nav-item[data-page]');
+
+  navItems.forEach(item => {
+    const page = item.dataset.page;
+    const isActive = page === route ||
+                     (route === 'solution' && page === 'solutions') ||
+                     (route === 'deploy' && page === 'solutions');
+
+    item.classList.toggle('active', isActive);
+  });
+}
+
+// Wait for DOM to be ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
+
+// Handle errors
+window.addEventListener('error', (event) => {
+  console.error('Application error:', event.error);
+  toast.error('An error occurred. Please check the console.');
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled promise rejection:', event.reason);
+  toast.error('An error occurred. Please check the console.');
+});

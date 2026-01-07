@@ -1,0 +1,94 @@
+"""
+FastAPI application entry point
+"""
+
+import asyncio
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+from .config import settings
+from .routers import solutions, devices, deployments, websocket
+from .services.solution_manager import solution_manager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events"""
+    # Startup
+    print(f"Starting {settings.app_name} v{settings.app_version}")
+    print(f"Solutions directory: {settings.solutions_dir}")
+
+    # Ensure directories exist
+    settings.logs_dir.mkdir(parents=True, exist_ok=True)
+    settings.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load solutions
+    await solution_manager.load_solutions()
+    print(f"Loaded {len(solution_manager.solutions)} solutions")
+
+    yield
+
+    # Shutdown
+    print("Shutting down...")
+
+
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    description="IoT Solution Provisioning Platform for Seeed Studio products",
+    lifespan=lifespan,
+)
+
+# CORS middleware (for local development)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(solutions.router)
+app.include_router(devices.router)
+app.include_router(deployments.router)
+app.include_router(websocket.router)
+
+# Serve static frontend files
+frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+if frontend_dist.exists():
+    app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")
+
+    @app.get("/")
+    async def serve_frontend():
+        return FileResponse(frontend_dist / "index.html")
+
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "app": settings.app_name,
+        "version": settings.app_version,
+    }
+
+
+def main():
+    """CLI entry point"""
+    import uvicorn
+    uvicorn.run(
+        "provisioning_station.main:app",
+        host=settings.host,
+        port=settings.port,
+        reload=settings.debug,
+    )
+
+
+if __name__ == "__main__":
+    main()

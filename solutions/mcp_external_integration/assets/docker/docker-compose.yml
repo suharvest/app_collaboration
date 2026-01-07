@@ -1,0 +1,39 @@
+version: "3.8"
+
+services:
+  backend:
+    image: seeedstudio/warehouse-backend:latest
+    container_name: mcp_warehouse_backend
+    ports:
+      - "2124:2124"
+    environment:
+      - DB_PATH=/data/warehouse.db
+      - INIT_MOCK_DATA=${INIT_MOCK_DATA:-false}
+      - ENABLE_SECURITY_HEADERS=${ENABLE_SECURITY_HEADERS:-true}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    volumes:
+      - warehouse_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2124/api/dashboard/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  frontend:
+    image: seeedstudio/warehouse-frontend:latest
+    container_name: mcp_warehouse_frontend
+    ports:
+      - "2125:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  warehouse_data:
+    driver: local
