@@ -1,0 +1,1085 @@
+/**
+ * Provisioning Station Design System - Component Classes
+ */
+
+@layer components {
+  /* ============================================
+     1. LAYOUT - Core App Structure
+     ============================================ */
+
+  .app-wrapper {
+    @apply flex h-screen w-screen;
+  }
+
+  .sidebar {
+    width: 260px;
+    @apply bg-sidebar border-r border-border flex flex-col flex-shrink-0;
+    transition: width 0.3s;
+  }
+
+  .main-content {
+    @apply flex-1 flex flex-col min-w-0 bg-body;
+  }
+
+  .content-scroll-area {
+    @apply flex-1 overflow-y-auto p-6;
+  }
+
+  .page-header {
+    @apply mb-6;
+  }
+
+  .page-title {
+    @apply text-xl font-semibold text-text-primary;
+  }
+
+  /* ============================================
+     2. NAVIGATION - Sidebar Navigation
+     ============================================ */
+
+  .logo-area {
+    height: 64px;
+    @apply flex items-center px-5 gap-3 border-b border-transparent;
+  }
+
+  .logo-icon {
+    @apply w-8 h-8 bg-primary text-white rounded-md flex items-center justify-center;
+  }
+
+  .logo-text .brand {
+    @apply font-bold text-base text-text-primary;
+  }
+
+  .side-nav {
+    @apply py-5 px-3 flex flex-col gap-2 flex-1;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 py-3 px-4 rounded-lg
+           text-text-secondary text-sm font-medium
+           transition-all duration-200 cursor-pointer
+           w-full text-left bg-transparent border-none no-underline;
+  }
+
+  .nav-item:hover {
+    @apply bg-hover text-text-primary;
+  }
+
+  .nav-item.active {
+    @apply bg-primary-light text-primary font-semibold;
+  }
+
+  /* ============================================
+     3. HEADER - Top Header Bar
+     ============================================ */
+
+  .top-header {
+    height: 64px;
+    @apply bg-sidebar border-b border-border flex items-center justify-between px-6 flex-shrink-0;
+  }
+
+  .breadcrumb {
+    @apply flex items-center;
+  }
+
+  .current-page-title {
+    @apply font-semibold text-lg text-text-primary;
+  }
+
+  .header-right {
+    @apply flex items-center gap-4;
+  }
+
+  .lang-btn {
+    @apply flex items-center gap-1.5 py-1.5 px-3 bg-transparent
+           border border-border rounded cursor-pointer text-13
+           text-text-secondary transition-all duration-200 h-8;
+  }
+
+  .lang-btn:hover {
+    @apply border-primary text-primary bg-primary-light;
+  }
+
+  /* ============================================
+     4. SOLUTION CARDS
+     ============================================ */
+
+  .solutions-grid {
+    @apply grid gap-6;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+
+  .solution-card {
+    @apply bg-card rounded-lg overflow-hidden shadow-sm border border-transparent cursor-pointer;
+    transition: all 0.3s ease;
+  }
+
+  .solution-card:hover {
+    @apply shadow-md border-primary;
+    transform: translateY(-4px);
+  }
+
+  .solution-card-image {
+    @apply w-full h-48 object-cover bg-gray-100;
+  }
+
+  .solution-card-content {
+    @apply p-5;
+  }
+
+  .solution-card-title {
+    @apply text-lg font-semibold text-text-primary mb-2;
+  }
+
+  .solution-card-description {
+    @apply text-sm text-text-secondary mb-4 line-clamp-2;
+  }
+
+  .solution-card-meta {
+    @apply flex items-center gap-4 text-xs text-text-muted;
+  }
+
+  .solution-card-tag {
+    @apply py-0.5 px-2 bg-primary-light text-primary rounded text-xs;
+  }
+
+  /* ============================================
+     5. DEVICE CARDS
+     ============================================ */
+
+  .device-list {
+    @apply flex flex-col gap-4;
+  }
+
+  .device-card {
+    @apply bg-card rounded-lg p-5 shadow-sm border border-border;
+  }
+
+  .device-card-header {
+    @apply flex items-center justify-between mb-4;
+  }
+
+  .device-card-title {
+    @apply text-base font-semibold text-text-primary flex items-center gap-2;
+  }
+
+  .device-status {
+    @apply py-1 px-2 rounded text-xs font-medium;
+  }
+
+  .device-status.detected {
+    @apply bg-[#effce8] text-success;
+  }
+
+  .device-status.not-detected {
+    @apply bg-[#fff1f0] text-danger;
+  }
+
+  .device-status.manual-required {
+    @apply bg-[#fff7e6] text-warning;
+  }
+
+  .device-wiring {
+    @apply mb-4;
+  }
+
+  .device-wiring-image {
+    @apply w-full max-h-40 object-contain bg-gray-50 rounded mb-3;
+  }
+
+  .device-wiring-steps {
+    @apply text-sm text-text-secondary space-y-1;
+  }
+
+  .device-deploy-btn {
+    @apply w-full py-3 px-4 bg-primary text-white rounded-lg font-medium
+           transition-all duration-200 flex items-center justify-center gap-2;
+  }
+
+  .device-deploy-btn:hover {
+    @apply bg-primary-hover;
+  }
+
+  .device-deploy-btn:disabled {
+    @apply bg-gray-300 cursor-not-allowed;
+  }
+
+  /* ============================================
+     6. DEPLOYMENT PROGRESS
+     ============================================ */
+
+  .deployment-progress {
+    @apply bg-card rounded-lg p-5 shadow-sm;
+  }
+
+  .progress-steps {
+    @apply flex flex-col gap-3;
+  }
+
+  .progress-step {
+    @apply flex items-center gap-3 py-2;
+  }
+
+  .progress-step-icon {
+    @apply w-6 h-6 rounded-full flex items-center justify-center text-sm;
+  }
+
+  .progress-step-icon.pending {
+    @apply bg-gray-100 text-text-muted;
+  }
+
+  .progress-step-icon.running {
+    @apply bg-info text-white;
+  }
+
+  .progress-step-icon.completed {
+    @apply bg-success text-white;
+  }
+
+  .progress-step-icon.failed {
+    @apply bg-danger text-white;
+  }
+
+  .progress-step-content {
+    @apply flex-1;
+  }
+
+  .progress-step-name {
+    @apply text-sm font-medium text-text-primary;
+  }
+
+  .progress-step-message {
+    @apply text-xs text-text-secondary mt-0.5;
+  }
+
+  .progress-bar {
+    @apply h-2 bg-gray-100 rounded-full overflow-hidden;
+  }
+
+  .progress-bar-fill {
+    @apply h-full bg-primary transition-all duration-300;
+  }
+
+  /* ============================================
+     7. LOG VIEWER
+     ============================================ */
+
+  .log-viewer {
+    @apply bg-gray-900 rounded-lg p-4 font-mono text-sm max-h-[400px] overflow-y-auto;
+  }
+
+  .log-entry {
+    @apply py-1 flex gap-2;
+  }
+
+  .log-timestamp {
+    @apply text-gray-500;
+  }
+
+  .log-level {
+    @apply font-medium;
+  }
+
+  .log-level.info {
+    @apply text-blue-400;
+  }
+
+  .log-level.warning {
+    @apply text-yellow-400;
+  }
+
+  .log-level.error {
+    @apply text-red-400;
+  }
+
+  .log-message {
+    @apply text-gray-200;
+  }
+
+  /* ============================================
+     8. BUTTONS
+     ============================================ */
+
+  .btn {
+    @apply py-2 px-4 rounded-lg border border-transparent cursor-pointer text-sm
+           transition-all duration-200 inline-flex items-center gap-2 justify-center font-medium;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white;
+  }
+
+  .btn-primary:hover {
+    @apply bg-primary-hover;
+  }
+
+  .btn-secondary {
+    @apply bg-white border-border text-text-primary;
+  }
+
+  .btn-secondary:hover {
+    @apply border-primary text-primary;
+  }
+
+  .btn-danger {
+    @apply bg-danger text-white;
+  }
+
+  .btn-danger:hover {
+    @apply bg-red-600;
+  }
+
+  /* Deploy Hero Button - Large CTA */
+  .btn-deploy-hero {
+    @apply py-3 px-8 rounded-lg cursor-pointer text-base font-semibold
+           inline-flex items-center gap-3 justify-center
+           bg-primary text-white shadow-md;
+    transition: all 0.2s ease;
+    min-width: 180px;
+  }
+
+  .btn-deploy-hero:hover {
+    @apply bg-primary-hover shadow-lg;
+    transform: translateY(-1px);
+  }
+
+  .btn-deploy-hero:active {
+    transform: translateY(0);
+  }
+
+  .btn-deploy-hero svg {
+    @apply w-5 h-5;
+  }
+
+  /* ============================================
+     9. FORMS
+     ============================================ */
+
+  .form-group {
+    @apply mb-4;
+  }
+
+  .form-group label {
+    @apply block mb-1.5 text-text-secondary text-13 font-medium;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    @apply w-full py-2 px-3 border border-border rounded-md text-sm transition-all duration-200 bg-white;
+  }
+
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    @apply outline-none border-primary;
+    box-shadow: 0 0 0 2px rgba(140, 198, 63, 0.1);
+  }
+
+  /* ============================================
+     10. MODALS
+     ============================================ */
+
+  .modal {
+    @apply fixed inset-0 bg-black/50 z-modal flex items-center justify-center;
+  }
+
+  .modal-content {
+    @apply bg-white rounded-lg w-[90%] max-h-[90vh] overflow-y-auto shadow-lg flex flex-col;
+    max-width: 500px;
+  }
+
+  .modal-header {
+    @apply py-5 px-6 border-b border-border flex justify-between items-center;
+  }
+
+  .modal-header h3 {
+    @apply text-lg m-0 font-semibold;
+  }
+
+  .close-btn {
+    @apply bg-transparent border-none text-2xl cursor-pointer text-text-muted transition-colors duration-200;
+  }
+
+  .close-btn:hover {
+    @apply text-text-primary;
+  }
+
+  .modal-body {
+    @apply p-6;
+  }
+
+  .modal-footer {
+    @apply py-5 px-6 border-t border-border flex justify-end gap-3;
+  }
+
+  /* ============================================
+     11. STATUS BADGES
+     ============================================ */
+
+  .status-badge {
+    @apply py-1 px-2 rounded text-xs font-medium;
+  }
+
+  .status-badge.ready {
+    @apply bg-[#effce8] text-success;
+  }
+
+  .status-badge.running {
+    @apply bg-[#e6f7ff] text-info;
+  }
+
+  .status-badge.failed {
+    @apply bg-[#fff1f0] text-danger;
+  }
+
+  .status-badge.pending {
+    @apply bg-[#f5f5f5] text-text-muted;
+  }
+
+  /* ============================================
+     12. INTRO PAGE
+     ============================================ */
+
+  .solution-intro {
+    @apply max-w-4xl mx-auto;
+  }
+
+  .solution-hero {
+    @apply mb-8;
+  }
+
+  .solution-hero-image {
+    @apply w-full h-64 object-cover rounded-lg shadow-sm mb-6;
+  }
+
+  .solution-title {
+    @apply text-2xl font-bold text-text-primary mb-3;
+  }
+
+  .solution-summary {
+    @apply text-lg text-text-secondary mb-6;
+  }
+
+  .solution-stats {
+    @apply flex items-center gap-6 mb-4;
+  }
+
+  /* Inline Device Chips */
+  .solution-devices-inline {
+    @apply flex flex-wrap gap-2 mt-2;
+  }
+
+  .device-chip {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 bg-white border-2 border-border rounded-full text-sm text-text-primary no-underline;
+    transition: border-color 0.2s, background-color 0.2s;
+  }
+
+  .device-chip:hover {
+    @apply border-primary bg-primary-light;
+  }
+
+  .device-chip img {
+    @apply w-6 h-6 object-contain rounded;
+  }
+
+  .solution-stat {
+    @apply flex items-center gap-2 text-sm text-text-secondary;
+  }
+
+  .solution-devices {
+    @apply grid grid-cols-2 gap-4 mb-8;
+  }
+
+  .required-device {
+    @apply bg-card rounded-lg p-4 flex items-center gap-4 shadow-sm;
+  }
+
+  .required-device-image {
+    @apply w-16 h-16 object-contain bg-gray-50 rounded;
+  }
+
+  .required-device-info {
+    @apply flex-1;
+  }
+
+  .required-device-name {
+    @apply font-medium text-text-primary;
+  }
+
+  .required-device-desc {
+    @apply text-sm text-text-secondary;
+  }
+
+  /* ============================================
+     9. PARTNERS - Deployment Partners Section
+     ============================================ */
+
+  .partners-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8;
+  }
+
+  .partner-card {
+    @apply bg-card rounded-lg p-5 border-2 border-border shadow-sm;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .partner-card:hover {
+    @apply border-primary/50 shadow-md;
+  }
+
+  .partner-header {
+    @apply flex items-center gap-3 mb-3;
+  }
+
+  .partner-logo {
+    @apply w-12 h-12 object-contain bg-gray-100 rounded-lg p-1.5;
+  }
+
+  .partner-logo-placeholder {
+    @apply w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400;
+  }
+
+  .partner-name {
+    @apply font-semibold text-text-primary text-base;
+  }
+
+  .partner-regions {
+    @apply flex items-center gap-2 text-sm text-text-secondary mb-3 pl-1;
+  }
+
+  .partner-regions svg {
+    @apply text-primary flex-shrink-0;
+  }
+
+  .partner-actions {
+    @apply flex flex-col gap-2 pt-3 border-t-2 border-border;
+  }
+
+  .partner-contact,
+  .partner-website {
+    @apply flex items-center gap-2 text-sm text-text-secondary no-underline;
+    transition: color 0.2s;
+  }
+
+  .partner-contact:hover,
+  .partner-website:hover {
+    @apply text-primary;
+  }
+
+  .partner-contact svg,
+  .partner-website svg {
+    @apply flex-shrink-0;
+  }
+
+  .partners-description {
+    @apply text-sm text-text-secondary mb-4;
+  }
+
+  .partner-register-box {
+    @apply flex items-center justify-between p-4 bg-primary-light/50 rounded-lg border-2 border-dashed border-primary/30 mb-8;
+  }
+
+  .partner-register-info {
+    @apply flex items-center gap-3 text-sm text-text-secondary;
+  }
+
+  .partner-register-info svg {
+    @apply text-primary flex-shrink-0;
+  }
+
+  .deploy-button {
+    @apply w-full py-4 px-6 bg-primary text-white rounded-lg font-semibold text-lg
+           transition-all duration-200 flex items-center justify-center gap-3;
+  }
+
+  .deploy-button:hover {
+    @apply bg-primary-hover;
+  }
+
+  /* ============================================
+     13. GALLERY
+     ============================================ */
+
+  .gallery {
+    @apply grid grid-cols-3 gap-4 mb-8;
+  }
+
+  .gallery-item {
+    @apply rounded-lg overflow-hidden cursor-pointer;
+    transition: transform 0.2s;
+  }
+
+  .gallery-item:hover {
+    transform: scale(1.02);
+  }
+
+  .gallery-image {
+    @apply w-full h-32 object-cover;
+  }
+
+  .gallery-video {
+    @apply relative;
+  }
+
+  .gallery-video::after {
+    content: '▶';
+    @apply absolute inset-0 flex items-center justify-center text-white text-3xl bg-black/30;
+  }
+
+  /* ============================================
+     14. MARKDOWN CONTENT (Wiki-style)
+     ============================================ */
+
+  .markdown-content {
+    @apply text-text-primary leading-relaxed;
+  }
+
+  /* Headings */
+  .markdown-content h1 {
+    @apply text-2xl font-bold text-text-primary mt-8 mb-4 pb-2 border-b border-border;
+  }
+
+  .markdown-content h2 {
+    @apply text-xl font-semibold text-text-primary mt-6 mb-3 pb-1.5 border-b border-border/50;
+  }
+
+  .markdown-content h3 {
+    @apply text-lg font-semibold text-text-primary mt-5 mb-2;
+  }
+
+  .markdown-content h4 {
+    @apply text-base font-semibold text-text-primary mt-4 mb-2;
+  }
+
+  .markdown-content h1:first-child,
+  .markdown-content h2:first-child,
+  .markdown-content h3:first-child {
+    @apply mt-0;
+  }
+
+  /* Paragraphs */
+  .markdown-content p {
+    @apply mb-4 text-sm leading-7;
+  }
+
+  /* Links */
+  .markdown-content a {
+    @apply text-primary hover:underline;
+  }
+
+  /* Lists */
+  .markdown-content ul,
+  .markdown-content ol {
+    @apply mb-4 pl-6 text-sm;
+  }
+
+  .markdown-content ul {
+    @apply list-disc;
+  }
+
+  .markdown-content ol {
+    @apply list-decimal;
+  }
+
+  .markdown-content li {
+    @apply mb-2 leading-6;
+  }
+
+  .markdown-content li > ul,
+  .markdown-content li > ol {
+    @apply mt-2 mb-0;
+  }
+
+  /* Code - Inline */
+  .markdown-content code {
+    @apply bg-gray-100 text-red-600 px-1.5 py-0.5 rounded text-13 font-mono;
+  }
+
+  /* Code - Block */
+  .markdown-content pre {
+    @apply bg-gray-900 text-gray-100 rounded-lg p-4 mb-4 overflow-x-auto;
+  }
+
+  .markdown-content pre code {
+    @apply bg-transparent text-gray-100 p-0 text-13 leading-6;
+  }
+
+  /* Tables */
+  .markdown-content table {
+    @apply w-full mb-4 border-collapse text-sm;
+  }
+
+  .markdown-content th {
+    @apply bg-gray-50 border border-border px-4 py-2.5 text-left font-semibold text-text-primary;
+  }
+
+  .markdown-content td {
+    @apply border border-border px-4 py-2.5 text-text-secondary;
+  }
+
+  .markdown-content tr:hover td {
+    @apply bg-gray-50/50;
+  }
+
+  /* Blockquotes */
+  .markdown-content blockquote {
+    @apply border-l-4 border-primary bg-primary-light/30 pl-4 py-3 pr-4 mb-4 rounded-r-lg;
+  }
+
+  .markdown-content blockquote p {
+    @apply mb-0 text-text-secondary italic;
+  }
+
+  /* Admonitions / Tips (using > **提示**: format) */
+  .markdown-content blockquote strong {
+    @apply text-primary not-italic;
+  }
+
+  /* Horizontal Rule */
+  .markdown-content hr {
+    @apply border-0 border-t border-border my-6;
+  }
+
+  /* Images */
+  .markdown-content img {
+    @apply max-w-full h-auto rounded-lg shadow-sm my-4;
+  }
+
+  /* Strong & Emphasis */
+  .markdown-content strong {
+    @apply font-semibold text-text-primary;
+  }
+
+  .markdown-content em {
+    @apply italic;
+  }
+
+  /* Task Lists (checkboxes) */
+  .markdown-content ul.task-list {
+    @apply list-none pl-0;
+  }
+
+  .markdown-content li.task-list-item {
+    @apply flex items-start gap-2;
+  }
+
+  .markdown-content input[type="checkbox"] {
+    @apply w-4 h-4 mt-1 accent-primary;
+  }
+
+  /* Definition Lists */
+  .markdown-content dl {
+    @apply mb-4;
+  }
+
+  .markdown-content dt {
+    @apply font-semibold text-text-primary mt-4;
+  }
+
+  .markdown-content dd {
+    @apply ml-4 text-text-secondary;
+  }
+
+  /* Enhanced styles for intro page (darker/stronger) */
+  .markdown-content-intro h2 {
+    @apply border-b-2 border-gray-300;
+  }
+
+  .markdown-content-intro h3 {
+    @apply border-l-4 border-primary pl-3;
+  }
+
+  .markdown-content-intro table {
+    @apply border-2 border-gray-300;
+  }
+
+  .markdown-content-intro th {
+    @apply bg-gray-100 border-2 border-gray-300 text-gray-800;
+  }
+
+  .markdown-content-intro td {
+    @apply border-2 border-gray-300 text-gray-700;
+  }
+
+  .markdown-content-intro tr:hover td {
+    @apply bg-gray-50;
+  }
+
+  .markdown-content-intro blockquote {
+    @apply border-l-4 border-primary bg-primary-light/30;
+  }
+
+  .markdown-content-intro code:not(pre code) {
+    @apply bg-gray-200 text-gray-800 font-semibold;
+  }
+
+  /* ============================================
+     15. DEPLOY PAGE (Wiki-style)
+     ============================================ */
+
+  .deploy-page {
+    @apply max-w-4xl mx-auto;
+  }
+
+  .deploy-section {
+    @apply bg-card rounded-lg shadow-sm border border-border mb-6 overflow-hidden;
+  }
+
+  .deploy-section-header {
+    @apply flex items-center gap-4 p-5 border-b border-border bg-gray-50/50 cursor-pointer;
+  }
+
+  .deploy-section-header:hover {
+    @apply bg-gray-50;
+  }
+
+  .deploy-section-step {
+    @apply w-8 h-8 rounded-full bg-primary text-white font-semibold text-sm
+           flex items-center justify-center flex-shrink-0;
+  }
+
+  .deploy-section-step.completed {
+    @apply bg-success;
+  }
+
+  .deploy-section-info {
+    @apply flex-1 min-w-0;
+  }
+
+  .deploy-section-title {
+    @apply font-semibold text-text-primary text-base;
+  }
+
+  .deploy-section-subtitle {
+    @apply text-sm text-text-secondary mt-0.5;
+  }
+
+  .deploy-section-status {
+    @apply flex items-center gap-2 text-sm font-medium px-3 py-1 rounded-full;
+  }
+
+  .deploy-section-status.pending {
+    @apply bg-gray-100 text-text-muted;
+  }
+
+  .deploy-section-status.ready {
+    @apply bg-blue-50 text-info;
+  }
+
+  .deploy-section-status.running {
+    @apply bg-primary-light text-primary;
+  }
+
+  .deploy-section-status.completed {
+    @apply bg-green-50 text-success;
+  }
+
+  .deploy-section-status.failed {
+    @apply bg-red-50 text-danger;
+  }
+
+  .deploy-section-chevron {
+    @apply text-text-muted transition-transform duration-200;
+  }
+
+  .deploy-section-chevron.expanded {
+    @apply rotate-180;
+  }
+
+  .deploy-section-content {
+    @apply p-5 hidden;
+  }
+
+  .deploy-section-content.expanded {
+    @apply block;
+  }
+
+  /* Deploy Action Area */
+  .deploy-action-area {
+    @apply bg-primary-light/30 border border-primary/20 rounded-lg p-5 mb-4;
+  }
+
+  /* Post-deployment Instructions */
+  .deploy-post-instructions {
+    @apply mt-4 pt-4 border-t border-border;
+  }
+
+  .deploy-post-title {
+    @apply text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3 flex items-center gap-2;
+  }
+
+  .deploy-post-title::before {
+    content: '';
+    @apply w-1 h-4 bg-primary rounded;
+  }
+
+  .deploy-action-title {
+    @apply font-semibold text-text-primary mb-3 flex items-center gap-2;
+  }
+
+  .deploy-action-desc {
+    @apply text-sm text-text-secondary mb-4;
+  }
+
+  .deploy-action-btn {
+    @apply w-full py-3 px-4 bg-primary text-white rounded-lg font-medium text-base
+           transition-all duration-200 flex items-center justify-center gap-2;
+  }
+
+  .deploy-action-btn:hover:not(:disabled) {
+    @apply bg-primary-hover;
+  }
+
+  .deploy-action-btn:disabled {
+    @apply bg-gray-300 cursor-not-allowed;
+  }
+
+  .deploy-action-btn.completed {
+    @apply bg-success;
+  }
+
+  .deploy-action-btn.running {
+    @apply bg-primary cursor-wait;
+  }
+
+  /* User Inputs */
+  .deploy-user-inputs {
+    @apply bg-gray-50 rounded-lg p-4 mb-4;
+  }
+
+  .deploy-user-inputs .form-group:last-child {
+    @apply mb-0;
+  }
+
+  /* Logs Section */
+  .deploy-logs {
+    @apply mt-4 border-t border-border pt-4;
+  }
+
+  .deploy-logs-toggle {
+    @apply flex items-center justify-between cursor-pointer py-2;
+  }
+
+  .deploy-logs-toggle:hover {
+    @apply text-primary;
+  }
+
+  .deploy-logs-label {
+    @apply flex items-center gap-2 text-sm font-medium text-text-secondary;
+  }
+
+  .deploy-logs-count {
+    @apply bg-gray-200 text-text-muted text-xs px-2 py-0.5 rounded-full ml-2;
+  }
+
+  .deploy-logs-panel {
+    @apply bg-gray-900 rounded-lg mt-3 max-h-0 overflow-hidden transition-all duration-300;
+  }
+
+  .deploy-logs-panel.expanded {
+    @apply max-h-80;
+  }
+
+  .deploy-logs-viewer {
+    @apply p-4 font-mono text-sm overflow-y-auto max-h-72;
+  }
+
+  .deploy-log-entry {
+    @apply flex gap-2 py-1;
+  }
+
+  .deploy-log-entry .time {
+    @apply text-gray-500 flex-shrink-0;
+  }
+
+  .deploy-log-entry .msg {
+    @apply text-gray-200;
+  }
+
+  .deploy-log-entry.info .msg {
+    @apply text-blue-300;
+  }
+
+  .deploy-log-entry.success .msg {
+    @apply text-green-300;
+  }
+
+  .deploy-log-entry.warning .msg {
+    @apply text-yellow-300;
+  }
+
+  .deploy-log-entry.error .msg {
+    @apply text-red-300;
+  }
+
+  .deploy-logs-empty {
+    @apply text-gray-500 text-center py-4;
+  }
+
+  /* ============================================
+     16. RESPONSIVE
+     ============================================ */
+
+  @media (max-width: 768px) {
+    .app-wrapper {
+      @apply flex-col overflow-y-auto;
+    }
+
+    .sidebar {
+      @apply w-full h-auto border-r-0 border-b border-border;
+    }
+
+    .side-nav {
+      @apply flex-row overflow-x-auto p-2.5;
+    }
+
+    .nav-item {
+      @apply w-auto whitespace-nowrap py-2 px-3;
+    }
+
+    .main-content {
+      @apply h-auto;
+    }
+
+    .solutions-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .solution-devices {
+      grid-template-columns: 1fr;
+    }
+
+    .gallery {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+/* ============================================
+   KEYFRAMES
+   ============================================ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}

@@ -1,0 +1,89 @@
+# MCP Bridge Service Configuration
+# This defines how to deploy and configure the MCP bridge that connects
+# AI intents to your business system APIs
+
+type: script
+id: mcp_bridge
+name: MCP Bridge Service
+name_zh: MCP 桥接服务
+
+detection:
+  method: manual
+  requirements:
+    - python_installed
+    - uv_installed
+
+# User inputs required before deployment
+user_inputs:
+  - id: mcp_endpoint
+    name: MCP WebSocket Endpoint
+    name_zh: MCP WebSocket 端点地址
+    type: text
+    placeholder: "wss://your-endpoint-address"
+    description: Get this from SenseCraft AI Platform -> Watcher Agent -> Configuration
+    description_zh: 从 SenseCraft AI 平台 -> Watcher Agent -> Configuration 获取
+    required: true
+    validation:
+      pattern: "^wss://.*"
+      message: Must start with wss://
+
+  - id: api_key
+    name: Warehouse API Key
+    name_zh: 仓库系统 API 密钥
+    type: password
+    placeholder: "wh_xxxxxxxxxxxx"
+    description: Create from User Management -> API Key Management in warehouse system
+    description_zh: 从仓库系统的用户管理 -> API 密钥管理中创建
+    required: true
+    validation:
+      pattern: "^wh_.*"
+      message: Must start with wh_
+
+  - id: api_base_url
+    name: API Base URL
+    name_zh: API 基础地址
+    type: text
+    default: "http://localhost:2124/api"
+    description: The base URL of your warehouse system API
+    description_zh: 仓库系统 API 的基础地址
+    required: true
+
+# Deployment configuration
+deployment:
+  # Working directory (relative to solution base)
+  working_dir: "warehouse_system/mcp"
+
+  # Pre-deployment commands
+  setup_commands:
+    - command: "cp config.yml.example config.yml"
+      description: Create configuration file
+
+  # Configuration file template
+  config_template:
+    file: "config.yml"
+    content: |
+      api_base_url: "{{api_base_url}}"
+      api_key: "{{api_key}}"
+
+  # Start command
+  start_command:
+    linux_macos: "./start_mcp.sh"
+    windows: "start_mcp.bat"
+    env:
+      MCP_ENDPOINT: "{{mcp_endpoint}}"
+
+  # Health check
+  health_check:
+    type: log_pattern
+    pattern: "MCP Service Started Successfully"
+    timeout_seconds: 30
+
+# Verification steps
+verification:
+  steps:
+    - description: Terminal shows "MCP Service Started Successfully!"
+      description_zh: 终端显示 "MCP Service Started Successfully!"
+    - description: SenseCraft AI Platform shows device connected
+      description_zh: SenseCraft AI 平台显示设备已连接
+    - description: Voice commands get responses
+      description_zh: 语音命令能获得响应

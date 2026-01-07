@@ -1,0 +1,234 @@
+version: "1.0"
+id: mcp_external_integration
+name: Smart Warehouse Solution
+name_zh: 智慧仓管方案
+
+# ============ 介绍页内容 ============
+intro:
+  summary: Enable voice commands to trigger API calls to existing business systems using SenseCAP Watcher and MCP bridge.
+  summary_zh: 使用SenseCAP Watcher和MCP桥接器，实现语音指令直接调用现有业务系统API，让操作员在戴手套或驾驶叉车时也能查询库存或记录发货。
+
+  description_file: intro/description.md
+  description_file_zh: intro/description_zh.md
+
+  cover_image: intro/gallery/wms-watcher-scenario.png
+
+  gallery:
+    - type: image
+      src: intro/gallery/wms-watcher-scenario.png
+      caption: Voice control warehouse system
+      caption_zh: 语音控制仓库管理系统
+    - type: image
+      src: intro/gallery/architecture.png
+      caption: System architecture diagram
+      caption_zh: 系统架构图
+    - type: image
+      src: intro/gallery/xiaozhi-stock-in.png
+      caption: Voice stock-in demo
+      caption_zh: 语音入库演示
+
+  category: voice_ai
+  tags:
+    - mcp
+    - voice
+    - watcher
+    - integration
+    - warehouse
+
+  required_devices:
+    - name: SenseCAP Watcher
+      name_zh: SenseCAP Watcher
+      image: intro/gallery/mcp-connected.png
+      purchase_url: https://www.seeedstudio.com/sensecap-watcher
+      description: AI-powered wearable assistant for voice commands
+      description_zh: AI驱动的可穿戴语音助手
+
+    - name: reComputer J4012
+      name_zh: reComputer J4012
+      image: intro/gallery/api-endpoint.png
+      purchase_url: https://www.seeedstudio.com/recomputer-j4012
+      description: Edge AI computer for running MCP bridge and warehouse system
+      description_zh: 边缘AI计算机，用于运行MCP桥接器和仓库管理系统
+
+  stats:
+    deployed_count: 0
+    likes_count: 0
+    difficulty: beginner
+    estimated_time: 30min
+
+  links:
+    wiki: https://wiki.seeedstudio.com/cn/mcp_external_system_integration/
+    github: https://github.com/suharvest/warehouse_system
+
+  # 合作伙伴 - 可提供现场部署服务
+  partners:
+    - name: 深圳矽递科技
+      name_zh: 深圳矽递科技
+      logo: intro/partners/seeed.png
+      regions:
+        - 广东省
+        - 全国远程
+      regions_en:
+        - Guangdong
+        - Remote (China)
+      contact: solutions@seeed.cc
+      website: https://www.seeedstudio.com.cn
+
+    - name: 上海智联方案
+      name_zh: 上海智联方案
+      logo: intro/partners/partner2.png
+      regions:
+        - 上海市
+        - 江苏省
+        - 浙江省
+      regions_en:
+        - Shanghai
+        - Jiangsu
+        - Zhejiang
+      contact: contact@example.com
+
+    - name: 北京创智科技
+      name_zh: 北京创智科技
+      logo: intro/partners/partner3.png
+      regions:
+        - 北京市
+        - 天津市
+        - 河北省
+      regions_en:
+        - Beijing
+        - Tianjin
+        - Hebei
+      contact: info@example.com
+
+# ============ 部署页内容 ============
+deployment:
+  guide_file: deploy/guide.md
+  guide_file_zh: deploy/guide_zh.md
+
+  devices:
+    # Step 1: 仓管服务部署
+    - id: warehouse
+      name: Warehouse System
+      name_zh: 仓库管理系统
+      type: docker_local
+      required: true
+      config_file: devices/recomputer.yaml
+      section:
+        title: Deploy Warehouse System
+        title_zh: 部署仓库管理系统
+        description_file: deploy/sections/warehouse.md
+        description_file_zh: deploy/sections/warehouse_zh.md
+        wiring:
+          image: intro/gallery/api-endpoint.png
+          steps:
+            - Ensure Docker is installed and running on your computer
+            - Clone the warehouse_system repository
+            - Run docker-compose to start the services
+          steps_zh:
+            - 确保电脑上已安装并运行 Docker
+            - 克隆 warehouse_system 仓库
+            - 运行 docker-compose 启动服务
+
+    # Step 2: Watcher 设备部署
+    - id: watcher
+      name: SenseCAP Watcher
+      name_zh: SenseCAP Watcher
+      type: esp32_usb
+      required: true
+      config_file: devices/watcher.yaml
+      section:
+        title: Configure Watcher Device
+        title_zh: 配置 Watcher 设备
+        description_file: deploy/sections/watcher.md
+        description_file_zh: deploy/sections/watcher_zh.md
+        wiring:
+          image: intro/gallery/mcp-connected.png
+          steps:
+            - Power on the SenseCAP Watcher
+            - Connect to SenseCraft AI platform
+            - Bind device to your account
+          steps_zh:
+            - 开启 SenseCAP Watcher 电源
+            - 连接到 SenseCraft AI 平台
+            - 将设备绑定到您的账户
+
+    # Step 3: MCP 服务启用
+    - id: mcp_bridge
+      name: MCP Bridge Service
+      name_zh: MCP 桥接服务
+      type: script
+      required: true
+      config_file: devices/mcp_bridge.yaml
+      user_inputs:
+        - id: mcp_endpoint
+          name: MCP WebSocket Endpoint
+          name_zh: MCP WebSocket 端点地址
+          type: text
+          placeholder: "wss://your-endpoint-address"
+          description: Get this from SenseCraft AI Platform -> Watcher Agent -> Configuration
+          description_zh: 从 SenseCraft AI 平台 -> Watcher Agent -> Configuration 获取
+          required: true
+        - id: api_key
+          name: Warehouse API Key
+          name_zh: 仓库系统 API 密钥
+          type: password
+          placeholder: "wh_xxxxxxxxxxxx"
+          description: Create from User Management -> API Key Management
+          description_zh: 从用户管理 -> API 密钥管理中创建
+          required: true
+      section:
+        title: Enable MCP Bridge Service
+        title_zh: 启用 MCP 桥接服务
+        description_file: deploy/sections/mcp_bridge.md
+        description_file_zh: deploy/sections/mcp_bridge_zh.md
+        wiring:
+          image: intro/gallery/mcp-endpoint.png
+          steps:
+            - Get MCP endpoint from SenseCraft AI platform
+            - Create API key in warehouse system
+            - Configure and start MCP bridge
+          steps_zh:
+            - 从 SenseCraft AI 平台获取 MCP 端点
+            - 在仓库系统中创建 API 密钥
+            - 配置并启动 MCP 桥接器
+
+    # Step 4: 效果体验
+    - id: demo
+      name: Demo & Testing
+      name_zh: 效果体验
+      type: manual
+      required: false
+      section:
+        title: Try Voice Commands
+        title_zh: 体验语音指令
+        description_file: deploy/sections/demo.md
+        description_file_zh: deploy/sections/demo_zh.md
+        wiring:
+          image: intro/gallery/xiaozhi-stock-in.png
+          steps:
+            - Speak to Watcher to query inventory
+            - Try stock-in and stock-out commands
+            - Check results in warehouse web interface
+          steps_zh:
+            - 对 Watcher 说话查询库存
+            - 尝试入库和出库指令
+            - 在仓库网页界面查看结果
+
+  order:
+    - warehouse
+    - watcher
+    - mcp_bridge
+    - demo
+
+  post_deployment:
+    success_message_file: deploy/success.md
+    success_message_file_zh: deploy/success_zh.md
+    next_steps:
+      - title: Access Web Interface
+        title_zh: 访问Web界面
+        action: open_url
+        url: "http://localhost:2125"
+      - title: View Wiki Documentation
+        title_zh: 查看Wiki文档
+        action: open_url
+        url: "https://wiki.seeedstudio.com/cn/mcp_external_system_integration/"

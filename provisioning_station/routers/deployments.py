@@ -1,0 +1,162 @@
+"""
+Deployment execution API routes
+"""
+
+from typing import List
+
+from fastapi import APIRouter, HTTPException, Query
+
+from ..models.api import (
+    StartDeploymentRequest,
+    DeploymentStatusResponse,
+    DeviceDeploymentStatus,
+    DeploymentListItem,
+)
+from ..models.deployment import DeploymentStatus
+from ..services.solution_manager import solution_manager
+from ..services.deployment_engine import deployment_engine
+
+router = APIRouter(prefix="/api/deployments", tags=["deployments"])
+
+
+@router.post("/start")
+async def start_deployment(request: StartDeploymentRequest):
+    """Start a new deployment"""
+    solution = solution_manager.get_solution(request.solution_id)
+    if not solution:
+        raise HTTPException(status_code=404, detail="Solution not found")
+
+    # Start deployment
+    deployment_id = await deployment_engine.start_deployment(
+        solution=solution,
+        device_connections=request.device_connections,
+        selected_devices=request.selected_devices,
+        options=request.options,
+    )
+
+    return {
+        "deployment_id": deployment_id,
+        "message": "Deployment started",
+    }
+
+
+@router.get("/{deployment_id}", response_model=DeploymentStatusResponse)
+async def get_deployment_status(deployment_id: str):
+    """Get current deployment status"""
+    deployment = deployment_engine.get_deployment(deployment_id)
+    if not deployment:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+
+    # Calculate overall progress
+    total_steps = 0
+    completed_steps = 0
+    for device in deployment.devices:
+        total_steps += len(device.steps)
+        for step in device.steps:
+            if step.status in ("completed", "skipped"):
+                completed_steps += 1
+            elif step.status == "running":
+                completed_steps += step.progress / 100
+
+    overall_progress = int((completed_steps / total_steps * 100) if total_steps > 0 else 0)
+
+    # Build device statuses
+    device_statuses = []
+    for device in deployment.devices:
+        device_progress = 0
+        if device.steps:
+            device_completed = sum(
+                1 if s.status in ("completed", "skipped") else (s.progress / 100 if s.status == "running" else 0)
+                for s in device.steps
+            )
+            device_progress = int(device_completed / len(device.steps) * 100)
+
+        device_statuses.append(DeviceDeploymentStatus(
+            device_id=device.device_id,
+            name=device.name,
+            type=device.type,
+            status=device.status,
+            current_step=device.current_step,
+            steps=device.steps,
+            progress=device_progress,
+            error=device.error,
+        ))
+
+    return DeploymentStatusResponse(
+        id=deployment.id,
+        solution_id=deployment.solution_id,
+        status=deployment.status,
+        started_at=deployment.started_at,
+        completed_at=deployment.completed_at,
+        devices=device_statuses,
+        overall_progress=overall_progress,
+    )
+
+
+@router.post("/{deployment_id}/cancel")
+async def cancel_deployment(deployment_id: str):
+    """Cancel a running deployment"""
+    deployment = deployment_engine.get_deployment(deployment_id)
+    if not deployment:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+
+    if deployment.status != DeploymentStatus.RUNNING:
+        raise HTTPException(status_code=400, detail="Deployment is not running")
+
+    await deployment_engine.cancel_deployment(deployment_id)
+
+    return {"message": "Deployment cancelled"}
+
+
+@router.get("/", response_model=List[DeploymentListItem])
+async def list_deployments(limit: int = Query(10, ge=1, le=100)):
+    """List recent deployments"""
+    deployments = deployment_engine.list_deployments(limit=limit)
+
+    result = []
+    for deployment in deployments:
+        solution = solution_manager.get_solution(deployment.solution_id)
+        result.append(DeploymentListItem(
+            id=deployment.id,
+            solution_id=deployment.solution_id,
+            solution_name=solution.name if solution else deployment.solution_id,
+            status=deployment.status,
+            started_at=deployment.started_at,
+            completed_at=deployment.completed_at,
+            device_count=len(deployment.devices),
+        ))
+
+    return result
+
+
+@router.get("/{deployment_id}/logs")
+async def get_deployment_logs(
+    deployment_id: str,
+    device_id: str = None,
+    limit: int = Query(100, ge=1, le=1000),
+):
+    """Get deployment logs"""
+    deployment = deployment_engine.get_deployment(deployment_id)
+    if not deployment:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+
+    if device_id:
+        device = deployment.get_device(device_id)
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found")
+        logs = device.logs[-limit:]
+    else:
+        logs = deployment.logs[-limit:]
+
+    return {
+        "logs": [
+            {
+                "timestamp": log.timestamp.isoformat(),
+                "level": log.level,
+                "device_id": log.device_id,
+                "step_id": log.step_id,
+                "message": log.message,
+            }
+            for log in logs
+        ]
+    }
