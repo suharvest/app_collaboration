@@ -7,7 +7,7 @@ This directory contains the pre-built firmware for SenseCAP Watcher with remote 
 - **Version**: 16c9887 (feat: remote-display with mDNS auto-discovery)
 - **Target**: ESP32-S3
 - **Flash Size**: 16MB
-- **Build Date**: 2026-01-20
+- **Build Date**: 2026-01-21
 
 ## Features
 
