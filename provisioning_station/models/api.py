@@ -82,11 +82,17 @@ class DetectedDevice(BaseModel):
 class DeviceConnectionRequest(BaseModel):
     """Request to configure device connection"""
     ip_address: Optional[str] = None
+    host: Optional[str] = None  # Alias for ip_address
     port: Optional[int] = None
     username: Optional[str] = None
     password: Optional[str] = None
     ssh_key: Optional[str] = None
     serial_port: Optional[str] = None
+
+    @property
+    def effective_host(self) -> Optional[str]:
+        """Get the host, preferring 'host' over 'ip_address'"""
+        return self.host or self.ip_address
 
 
 class StartDeploymentRequest(BaseModel):

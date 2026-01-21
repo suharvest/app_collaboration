@@ -123,6 +123,10 @@ class SolutionManager:
             # Set base path
             data["base_path"] = str(Path(solution.base_path))
 
+            # For script type devices, map 'deployment' key to 'script' config
+            if data.get("type") == "script" and "deployment" in data:
+                data["script"] = data.pop("deployment")
+
             config = DeviceConfig(**data)
 
             # Cache it

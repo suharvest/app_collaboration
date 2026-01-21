@@ -204,6 +204,7 @@ async def get_deployment_info(
     return {
         "solution_id": solution_id,
         "guide": guide,
+        "selection_mode": solution.deployment.selection_mode,
         "devices": devices,
         "order": solution.deployment.order,
         "post_deployment": post_deployment,

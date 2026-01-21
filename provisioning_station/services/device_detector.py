@@ -3,7 +3,9 @@ Device detection service
 """
 
 import asyncio
+import glob as glob_module
 import logging
+import sys
 from typing import Dict, Any, List, Optional
 
 from ..models.device import DeviceConfig
@@ -20,8 +22,14 @@ class DeviceDetector:
             return await self._detect_esp32_usb(config)
         elif config.type == "docker_local":
             return await self._detect_docker_local(config)
+        elif config.type == "docker_remote":
+            return await self._detect_docker_remote(config)
         elif config.type == "ssh_deb":
             return await self._detect_ssh_device(config)
+        elif config.type == "script":
+            return await self._detect_script_environment(config)
+        elif config.type == "manual":
+            return await self._detect_manual(config)
         else:
             return {
                 "status": "error",
@@ -59,22 +67,30 @@ class DeviceDetector:
                                 },
                             }
 
-            # Fallback: check common port patterns
-            import glob
+            # Fallback: check common port patterns (cross-platform)
+            fallback_ports = detection.fallback_ports or self._get_platform_port_patterns()
 
-            for pattern in detection.fallback_ports or []:
-                for port_path in glob.glob(pattern):
-                    return {
-                        "status": "detected",
-                        "connection_info": {"port": port_path},
-                        "details": {"port": port_path, "matched_pattern": pattern},
-                    }
+            for pattern in fallback_ports:
+                for port_path in glob_module.glob(pattern):
+                    # Verify it's accessible
+                    try:
+                        import serial
+                        ser = serial.Serial(port_path, 115200, timeout=1)
+                        ser.close()
+                        return {
+                            "status": "detected",
+                            "connection_info": {"port": port_path},
+                            "details": {"port": port_path, "matched_pattern": pattern},
+                        }
+                    except Exception:
+                        continue
 
             return {
                 "status": "not_detected",
                 "details": {
                     "message": "No matching USB device found",
                     "available_ports": [p.device for p in ports],
+                    "searched_patterns": fallback_ports,
                 },
             }
 
@@ -89,6 +105,25 @@ class DeviceDetector:
                 "status": "error",
                 "details": {"error": str(e)},
             }
+
+    def _get_platform_port_patterns(self) -> List[str]:
+        """Get platform-specific serial port patterns"""
+        if sys.platform == "win32":
+            return ["COM*"]
+        elif sys.platform == "darwin":
+            return [
+                "/dev/tty.usbserial-*",
+                "/dev/cu.usbserial-*",
+                "/dev/tty.wchusbserial*",
+                "/dev/cu.wchusbserial*",
+                "/dev/tty.SLAB_USBtoUART*",
+                "/dev/cu.SLAB_USBtoUART*",
+            ]
+        else:  # Linux
+            return [
+                "/dev/ttyUSB*",
+                "/dev/ttyACM*",
+            ]
 
     async def _detect_docker_local(self, config: DeviceConfig) -> Dict[str, Any]:
         """Check local Docker availability"""
@@ -148,6 +183,20 @@ class DeviceDetector:
                 "details": {"error": str(e)},
             }
 
+    async def _detect_docker_remote(self, config: DeviceConfig) -> Dict[str, Any]:
+        """Detect remote Docker deployment target"""
+        # For remote Docker, always return manual_required
+        # User needs to provide IP and SSH credentials
+        return {
+            "status": "manual_required",
+            "connection_info": None,
+            "details": {
+                "message": "Please enter remote host IP and SSH credentials",
+                "default_user": config.ssh.default_user if config.ssh else "root",
+                "default_port": config.ssh.port if config.ssh else 22,
+            },
+        }
+
     async def _detect_ssh_device(self, config: DeviceConfig) -> Dict[str, Any]:
         """Detect SSH-accessible devices"""
         # For SSH devices, return as "manual_required" by default
@@ -160,6 +209,90 @@ class DeviceDetector:
                 "default_user": config.ssh.default_user if config.ssh else "root",
                 "default_port": config.ssh.port if config.ssh else 22,
             },
+        }
+
+    async def _detect_script_environment(self, config: DeviceConfig) -> Dict[str, Any]:
+        """Check local script execution environment"""
+        detection = config.detection
+        missing = []
+
+        for req in detection.requirements:
+            if req == "python_installed":
+                if not await self._check_command_exists("python3", ["--version"]):
+                    if not await self._check_command_exists("python", ["--version"]):
+                        missing.append("python")
+            elif req == "uv_installed":
+                if not await self._check_command_exists("uv", ["--version"]):
+                    missing.append("uv")
+            elif req == "node_installed":
+                if not await self._check_command_exists("node", ["--version"]):
+                    missing.append("node")
+            elif req == "npm_installed":
+                if not await self._check_command_exists("npm", ["--version"]):
+                    missing.append("npm")
+
+        if missing:
+            return {
+                "status": "error",
+                "connection_info": None,
+                "details": {
+                    "missing_requirements": missing,
+                    "message": f"Missing requirements: {', '.join(missing)}",
+                },
+            }
+
+        # For script type, always return manual_required since user inputs are needed
+        if detection.method == "manual" or detection.manual_entry:
+            return {
+                "status": "manual_required",
+                "connection_info": {"local": True},
+                "details": {
+                    "message": "User inputs required for deployment",
+                    "requirements_met": True,
+                },
+            }
+
+        return {
+            "status": "detected",
+            "connection_info": {"local": True},
+            "details": {
+                "requirements_met": True,
+                "platform": await self._get_platform_info(),
+            },
+        }
+
+    async def _detect_manual(self, config: DeviceConfig) -> Dict[str, Any]:
+        """Handle manual deployment type (user performs steps manually)"""
+        return {
+            "status": "manual",
+            "connection_info": {"manual": True},
+            "details": {
+                "message": "Manual steps - no automated deployment",
+            },
+        }
+
+    async def _check_command_exists(self, cmd: str, args: List[str]) -> bool:
+        """Check if a command is available in the system"""
+        try:
+            process = await asyncio.create_subprocess_exec(
+                cmd,
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await process.communicate()
+            return process.returncode == 0
+        except Exception:
+            return False
+
+    async def _get_platform_info(self) -> Dict[str, str]:
+        """Get platform information"""
+        import sys
+        import platform
+        return {
+            "system": platform.system(),
+            "release": platform.release(),
+            "python_version": sys.version.split()[0],
         }
 
     async def list_serial_ports(self) -> List[Dict[str, Any]]:

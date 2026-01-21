@@ -79,6 +79,26 @@ async def list_serial_ports():
     return {"ports": ports}
 
 
+@router.post("/test-connection")
+async def test_connection(request: DeviceConnectionRequest):
+    """Test SSH connection to a remote device"""
+    host = request.effective_host
+    if not host:
+        raise HTTPException(status_code=400, detail="Host is required")
+
+    result = await device_detector.test_ssh_connection(
+        host=host,
+        port=request.port or 22,
+        username=request.username or "root",
+        password=request.password,
+    )
+
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("error", "Connection failed"))
+
+    return result
+
+
 @router.post("/{solution_id}/{device_id}/connect")
 async def configure_device_connection(
     solution_id: str,

@@ -215,12 +215,20 @@ class ESP32Deployer(BaseDeployer):
                     stderr=asyncio.subprocess.STDOUT,
                 )
 
+            last_progress = 0
+            all_output = []
+
             while True:
                 line = await process.stdout.readline()
                 if not line:
                     break
 
                 line_str = line.decode().strip()
+                if not line_str:
+                    continue
+
+                all_output.append(line_str)
+                logger.debug(f"esptool: {line_str}")
 
                 # Parse progress from esptool output
                 # Example: "Writing at 0x00010000... (5 %)"
@@ -228,12 +236,28 @@ class ESP32Deployer(BaseDeployer):
                     match = re.search(r"\((\d+)\s*%\)", line_str)
                     if match and progress_callback:
                         progress = int(match.group(1))
-                        progress_callback(progress, line_str)
+                        # Only report every 10% to avoid too many updates
+                        if progress >= last_progress + 10 or progress == 100:
+                            progress_callback(progress, f"Flashing... {progress}%")
+                            last_progress = progress
 
-                elif line_str:
-                    logger.debug(f"esptool: {line_str}")
+                # Send important status messages
+                elif progress_callback:
+                    # Key esptool messages to forward
+                    if any(keyword in line_str for keyword in [
+                        "Connecting", "Chip is", "Features:", "Crystal is",
+                        "MAC:", "Uploading", "Compressed", "Wrote", "Hash",
+                        "Leaving", "Hard resetting", "error", "Error", "failed", "Failed"
+                    ]):
+                        progress_callback(last_progress, line_str)
 
             await process.wait()
+
+            if process.returncode != 0:
+                # Return last few lines as error context
+                error_context = "\n".join(all_output[-5:]) if all_output else "Unknown error"
+                return {"success": False, "error": error_context}
+
             return {"success": process.returncode == 0}
 
         except Exception as e:

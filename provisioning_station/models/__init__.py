@@ -18,6 +18,7 @@ from .device import (
     DetectionConfig,
     FirmwareConfig,
     DockerConfig,
+    DockerRemoteConfig,
     SSHConfig,
     PackageConfig,
     DeploymentStep,
@@ -36,6 +37,23 @@ from .api import (
     StartDeploymentRequest,
     DeploymentStatusResponse,
 )
+from .version import (
+    VersionInfo,
+    UpdateCheckResult,
+    DeploymentRecord,
+    SolutionVersioning,
+    VersionSummary,
+)
+from .kiosk import (
+    KioskStatus,
+    KioskConfigRequest,
+    KioskConfigResponse,
+    UpdateRequest,
+    UpdateResponse,
+    ActiveDeployment,
+    DeploymentAction,
+    DeploymentActionResponse,
+)
 
 __all__ = [
     # Solution models
@@ -53,6 +71,7 @@ __all__ = [
     "DetectionConfig",
     "FirmwareConfig",
     "DockerConfig",
+    "DockerRemoteConfig",
     "SSHConfig",
     "PackageConfig",
     "DeploymentStep",
@@ -68,4 +87,19 @@ __all__ = [
     "DetectedDevice",
     "StartDeploymentRequest",
     "DeploymentStatusResponse",
+    # Version models
+    "VersionInfo",
+    "UpdateCheckResult",
+    "DeploymentRecord",
+    "SolutionVersioning",
+    "VersionSummary",
+    # Kiosk models
+    "KioskStatus",
+    "KioskConfigRequest",
+    "KioskConfigResponse",
+    "UpdateRequest",
+    "UpdateResponse",
+    "ActiveDeployment",
+    "DeploymentAction",
+    "DeploymentActionResponse",
 ]

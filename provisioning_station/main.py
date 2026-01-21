@@ -12,8 +12,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .config import settings
-from .routers import solutions, devices, deployments, websocket
+from .routers import solutions, devices, deployments, websocket, versions, device_management, preview
 from .services.solution_manager import solution_manager
+from .services.stream_proxy import get_stream_proxy
+from .services.mqtt_bridge import get_mqtt_bridge, is_mqtt_available
 
 
 @asynccontextmanager
@@ -35,6 +37,14 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     print("Shutting down...")
+
+    # Cleanup preview services
+    try:
+        await get_stream_proxy().stop_all()
+        if is_mqtt_available():
+            await get_mqtt_bridge().stop_all()
+    except Exception as e:
+        print(f"Preview cleanup error: {e}")
 
 
 app = FastAPI(
@@ -58,6 +68,9 @@ app.include_router(solutions.router)
 app.include_router(devices.router)
 app.include_router(deployments.router)
 app.include_router(websocket.router)
+app.include_router(versions.router)
+app.include_router(device_management.router)
+app.include_router(preview.router)
 
 # Serve static frontend files
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
