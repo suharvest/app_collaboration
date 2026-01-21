@@ -1,0 +1,135 @@
+version: "1.0"
+id: recamera_heatmap_grafana
+name: Real-time Heatmap with Grafana Dashboard
+name_zh: 实时热力图与 Grafana 数据仪表板集成
+
+# ============ 介绍页内容 ============
+intro:
+  summary: Use reCamera for person detection with privacy blur and real-time heatmap visualization on Grafana dashboard
+  summary_zh: 使用 reCamera 进行人员检测、隐私模糊处理，并在 Grafana 仪表板上实时显示热力图
+
+  description_file: intro/description.md
+  description_file_zh: intro/description_zh.md
+
+  cover_image: intro/gallery/cover.svg
+
+  gallery:
+    - type: image
+      src: intro/gallery/architecture.svg
+      caption: System Architecture
+      caption_zh: 系统架构
+    - type: image
+      src: intro/gallery/recamera.svg
+      caption: reCamera Device
+      caption_zh: reCamera 设备
+
+  category: sensing
+  tags:
+    - recamera
+    - heatmap
+    - grafana
+    - influxdb
+    - yolo
+    - privacy
+    - analytics
+
+  required_devices:
+    - name: reCamera
+      name_zh: reCamera
+      image: intro/gallery/recamera.svg
+      purchase_url: https://www.seeedstudio.com/reCamera-2002w-8GB-p-6250.html
+      description: AI camera with built-in YOLO model for person detection
+      description_zh: 内置 YOLO 模型的 AI 摄像头，用于人员检测
+
+    - name: Computer (Windows/Linux)
+      name_zh: 电脑 (Windows/Linux)
+      description: For running InfluxDB database and Grafana dashboard
+      description_zh: 用于运行 InfluxDB 数据库和 Grafana 仪表板
+
+  stats:
+    deployed_count: 0
+    likes_count: 0
+    difficulty: intermediate
+    estimated_time: 60min
+
+  links:
+    wiki: https://wiki.seeedstudio.com/cn/integration_of_real-time_heat_map_with_grafana_data_dashboard/
+    github: https://github.com/xr686/reCamera-with-Heatmap
+
+# ============ 部署页内容 ============
+deployment:
+  guide_file: deploy/guide.md
+  guide_file_zh: deploy/guide_zh.md
+
+  # 部署模式: sequential (按顺序执行)
+  selection_mode: sequential
+
+  devices:
+    # Step 1: 部署 InfluxDB + Grafana 后端
+    - id: backend
+      name: Deploy InfluxDB + Grafana
+      name_zh: 部署 InfluxDB + Grafana
+      type: docker_local
+      required: true
+      config_file: devices/backend.yaml
+      section:
+        title: Step 1 - Deploy Backend Services
+        title_zh: 第一步 - 部署后端服务
+        description_file: deploy/sections/influxdb.md
+        description_file_zh: deploy/sections/influxdb_zh.md
+
+    # Step 2: 配置 reCamera Node-RED
+    - id: recamera
+      name: Configure reCamera
+      name_zh: 配置 reCamera
+      type: recamera_nodered
+      required: true
+      config_file: devices/recamera.yaml
+      section:
+        title: Step 2 - Configure reCamera Node-RED
+        title_zh: 第二步 - 配置 reCamera Node-RED
+        description_file: deploy/sections/recamera.md
+        description_file_zh: deploy/sections/recamera_zh.md
+
+    # Step 3: 配置 Grafana 数据源和仪表板
+    - id: grafana
+      name: Configure Grafana Dashboard
+      name_zh: 配置 Grafana 仪表板
+      type: manual
+      required: true
+      section:
+        title: Step 3 - Configure Grafana Dashboard
+        title_zh: 第三步 - 配置 Grafana 仪表板
+        description_file: deploy/sections/grafana.md
+        description_file_zh: deploy/sections/grafana_zh.md
+
+    # Step 4: 校准和热力图配置
+    - id: heatmap
+      name: Calibrate and Configure Heatmap
+      name_zh: 校准并配置热力图
+      type: manual
+      required: true
+      section:
+        title: Step 4 - Calibrate and Configure Heatmap Page
+        title_zh: 第四步 - 校准并配置热力图页面
+        description_file: deploy/sections/heatmap.md
+        description_file_zh: deploy/sections/heatmap_zh.md
+
+  order:
+    - backend
+    - recamera
+    - grafana
+    - heatmap
+
+  post_deployment:
+    success_message_file: deploy/success.md
+    success_message_file_zh: deploy/success_zh.md
+    next_steps:
+      - title: Access Grafana Dashboard
+        title_zh: 访问 Grafana 仪表板
+        action: open_url
+        url: "http://localhost:3000"
+      - title: View Heatmap Page
+        title_zh: 查看热力图页面
+        action: open_url
+        url: "http://localhost:8080/index.html"

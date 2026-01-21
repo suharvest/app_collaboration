@@ -1,0 +1,156 @@
+version: "1.0"
+id: smart_retail_voice_ai
+name: Smart Retail Voice AI
+name_zh: 智能零售语音 AI
+
+# ============ 介绍页内容 ============
+intro:
+  summary: Edge-based voice-to-text solution for retail environments with privacy-first architecture
+  summary_zh: 基于边缘设备的语音转文本方案，专为零售环境设计，采用隐私优先架构
+
+  description_file: intro/description.md
+  description_file_zh: intro/description_zh.md
+
+  cover_image: intro/gallery/cover.webp
+
+  gallery:
+    - type: image
+      src: intro/gallery/architecture.png
+      caption: Hardware Setup
+      caption_zh: 硬件组合
+    - type: image
+      src: intro/gallery/rerouter.png
+      caption: reRouter CM4
+      caption_zh: reRouter CM4
+    - type: image
+      src: intro/gallery/respeaker.jpg
+      caption: reSpeaker XVF3800
+      caption_zh: reSpeaker XVF3800
+
+  category: voice_ai
+  tags:
+    - voice
+    - retail
+    - asr
+    - edge-ai
+    - rerouter
+    - respeaker
+
+  required_devices:
+    - name: reRouter CM4
+      name_zh: reRouter CM4
+      image: intro/gallery/rerouter.png
+      purchase_url: https://www.seeedstudio.com/reRouter-CM4
+      description: Edge computing device with 4GB RAM, 32GB eMMC
+      description_zh: 边缘计算设备，4GB 内存，32GB eMMC 存储
+
+    - name: reSpeaker XVF3800
+      name_zh: reSpeaker XVF3800 麦克风阵列
+      image: intro/gallery/respeaker.jpg
+      purchase_url: https://www.seeedstudio.com/ReSpeaker-XVF3800
+      description: 4-mic array with noise suppression, AEC, and beamforming
+      description_zh: 4 麦克风阵列，支持噪声抑制、回声消除和波束成形
+
+  stats:
+    deployed_count: 0
+    likes_count: 0
+    difficulty: intermediate
+    estimated_time: 45min
+
+  links:
+    wiki: https://wiki.seeedstudio.com/cn/solutions/smart-retail-voice-ai-solution-1/
+    purchase: https://www.seeedstudio.com.cn/solutions/voicecollectionanalysis-zh-hans
+
+# ============ 部署页内容 ============
+deployment:
+  guide_file: deploy/guide.md
+  guide_file_zh: deploy/guide_zh.md
+
+  # 部署模式: sequential (按顺序执行)
+  selection_mode: sequential
+
+  devices:
+    # Step 1: 刷写 OpenWrt 固件
+    - id: firmware
+      name: Flash OpenWrt Firmware
+      name_zh: 刷写 OpenWrt 固件
+      type: manual
+      required: true
+      config_file: devices/firmware.yaml
+      section:
+        title: Step 1 - Flash OpenWrt Firmware
+        title_zh: 第一步 - 刷写 OpenWrt 固件
+        description_file: deploy/sections/firmware.md
+        description_file_zh: deploy/sections/firmware_zh.md
+        wiring:
+          steps:
+            - Download the firmware for your region
+            - Flash firmware to reRouter using the flashing tool
+            - Connect WAN port to internet, LAN port to computer
+          steps_zh:
+            - 下载适合您地区的固件
+            - 使用刷机工具将固件刷入 reRouter
+            - WAN 口连接互联网，LAN 口连接电脑
+
+    # Step 2: 配置 reSpeaker
+    - id: respeaker
+      name: Configure reSpeaker
+      name_zh: 配置 reSpeaker 麦克风
+      type: manual
+      required: true
+      config_file: devices/respeaker.yaml
+      section:
+        title: Step 2 - Configure reSpeaker XVF3800
+        title_zh: 第二步 - 配置 reSpeaker XVF3800 麦克风
+        description_file: deploy/sections/respeaker.md
+        description_file_zh: deploy/sections/respeaker_zh.md
+        wiring:
+          steps:
+            - Connect reSpeaker to your computer via USB
+            - Clone the configuration repository
+            - Run the configuration commands
+          steps_zh:
+            - 使用 USB 连接 reSpeaker 到电脑
+            - 克隆配置仓库
+            - 运行配置命令
+
+    # Step 3: 部署语音服务
+    - id: voice_services
+      name: Deploy Voice Services
+      name_zh: 部署语音服务
+      type: docker_remote
+      required: true
+      config_file: devices/rerouter.yaml
+      section:
+        title: Step 3 - Deploy Voice Services
+        title_zh: 第三步 - 部署语音服务
+        description_file: deploy/sections/voice_services.md
+        description_file_zh: deploy/sections/voice_services_zh.md
+        wiring:
+          image: intro/gallery/wan_lan.png
+          steps:
+            - Connect reSpeaker to reRouter USB port
+            - Enter SSH credentials
+            - Deploy Docker containers
+          steps_zh:
+            - 将 reSpeaker 连接到 reRouter USB 口
+            - 输入 SSH 凭据
+            - 部署 Docker 容器
+
+  order:
+    - firmware
+    - respeaker
+    - voice_services
+
+  post_deployment:
+    success_message_file: deploy/success.md
+    success_message_file_zh: deploy/success_zh.md
+    next_steps:
+      - title: Access Voice Client Web UI
+        title_zh: 访问语音客户端 Web 界面
+        action: open_url
+        url: "http://{{voice_services.host}}:8090"
+      - title: View ASR Transcription
+        title_zh: 查看语音转录
+        description: Real-time voice transcription and device configuration
+        description_zh: 实时语音转录和设备配置

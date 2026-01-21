@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="screenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f3460;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a2e;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="url(#bgGrad)"/>
+
+  <!-- Large Display Screen -->
+  <rect x="100" y="80" width="420" height="280" rx="8" fill="#333" stroke="#555" stroke-width="3"/>
+  <rect x="110" y="90" width="400" height="250" rx="4" fill="url(#screenGrad)"/>
+
+  <!-- Display Stand -->
+  <rect x="280" y="360" width="60" height="40" fill="#444"/>
+  <rect x="240" y="400" width="140" height="15" rx="4" fill="#555"/>
+
+  <!-- Chat bubbles on display -->
+  <rect x="130" y="110" width="180" height="50" rx="10" fill="#8CC63F"/>
+  <text x="220" y="142" font-family="Arial" font-size="14" fill="white" text-anchor="middle">Hello! How can I help?</text>
+
+  <rect x="210" y="180" width="160" height="40" rx="10" fill="#3a3a5e"/>
+  <text x="290" y="205" font-family="Arial" font-size="12" fill="#ccc" text-anchor="middle">What's the weather?</text>
+
+  <rect x="130" y="240" width="200" height="50" rx="10" fill="#8CC63F"/>
+  <text x="230" y="272" font-family="Arial" font-size="14" fill="white" text-anchor="middle">It's sunny, 25°C today!</text>
+
+  <!-- Watcher Device -->
+  <rect x="580" y="200" width="150" height="150" rx="20" fill="#2a2a4a" stroke="#8CC63F" stroke-width="2"/>
+  <circle cx="655" cy="275" r="50" fill="#1a1a2e" stroke="#555" stroke-width="2"/>
+
+  <!-- Watcher emoji face -->
+  <circle cx="635" cy="265" r="8" fill="#8CC63F"/>
+  <circle cx="675" cy="265" r="8" fill="#8CC63F"/>
+  <path d="M 635 290 Q 655 310 675 290" stroke="#8CC63F" stroke-width="3" fill="none"/>
+
+  <!-- Connection line -->
+  <path d="M 530 275 L 570 275" stroke="#8CC63F" stroke-width="2" stroke-dasharray="5,5">
+    <animate attributeName="stroke-dashoffset" from="0" to="10" dur="1s" repeatCount="indefinite"/>
+  </path>
+
+  <!-- Title -->
+  <text x="400" y="500" font-family="Arial" font-size="32" fill="white" text-anchor="middle" font-weight="bold">Xiaozhi Display Cast</text>
+  <text x="400" y="540" font-family="Arial" font-size="18" fill="#8CC63F" text-anchor="middle">AI Conversations on the Big Screen</text>
+</svg>

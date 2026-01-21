@@ -1,0 +1,36 @@
+type: docker_local
+name: Indoor Positioning Application
+name_zh: 室内定位应用程序
+
+description: Docker-based positioning server with web dashboard
+description_zh: 基于 Docker 的定位服务器，带 Web 仪表板
+
+docker:
+  image: seeedcloud/sensecraft-indoor-positioning
+  container_name: indoor-positioning
+  ports:
+    - "5173:5173"
+  volumes:
+    - ./db:/app/db/
+    - ./config:/app/server/config/json
+    - ./uploads:/app/uploads
+  restart: unless-stopped
+
+# Full docker run command for reference
+docker_run: |
+  docker run -p 5173:5173 \
+    --name indoor-positioning \
+    --restart unless-stopped \
+    -v ./db:/app/db/ \
+    -v ./config:/app/server/config/json \
+    -v ./uploads:/app/uploads \
+    -d seeedcloud/sensecraft-indoor-positioning
+
+post_deploy:
+  url: http://localhost:5173
+  credentials:
+    username: admin
+    password: 83EtWJUbGrPnQjdCqyKq
+  health_check:
+    endpoint: /
+    expected_status: 200

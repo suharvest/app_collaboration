@@ -1,0 +1,94 @@
+version: "1.0"
+id: local
+name: Local Machine
+name_zh: 本机
+type: docker_local
+
+detection:
+  method: local
+  requirements:
+    - docker_installed
+    - docker_running
+
+docker:
+  compose_file: assets/docker/docker-compose.yml
+
+  environment:
+    TZ: Asia/Shanghai
+    OPC_UA_SERVER: "{{opc_ua_server}}"
+
+  options:
+    project_name: missionpack_knn
+    remove_orphans: true
+    build: false
+
+  services:
+    - name: app
+      port: 8280
+      health_check_endpoint: /api/v1/health
+      required: true
+
+  images:
+    - name: sensecraft-missionpack.seeed.cn/suzhou/missionpack-knn:v1.6.5
+      required: true
+
+user_inputs:
+  - id: opc_ua_server
+    name: OPC-UA Server Address
+    name_zh: OPC-UA 服务器地址
+    type: text
+    default: "opc.tcp://localhost:4841"
+    placeholder: "opc.tcp://192.168.1.100:4840"
+    description: OPC-UA server address (use default for built-in simulator)
+    description_zh: OPC-UA 服务器地址（使用默认值连接内置模拟器）
+    required: false
+
+pre_checks:
+  - type: docker_version
+    min_version: "20.0"
+    description: Check Docker version
+  - type: port_available
+    ports:
+      - 8280
+      - 4841
+    description: Check if ports are available
+  - type: disk_space
+    min_gb: 1
+    description: Check available disk space
+
+steps:
+  - id: pull_images
+    name: Pull Docker Images
+    name_zh: 拉取 Docker 镜像
+    description: Download container image from registry
+    description_zh: 从镜像仓库下载容器镜像
+    optional: false
+    default: true
+
+  - id: create_volumes
+    name: Create Data Volumes
+    name_zh: 创建数据卷
+    description: Set up persistent storage for configs and logs
+    description_zh: 设置配置和日志的持久化存储
+    optional: false
+    default: true
+
+  - id: start_services
+    name: Start Services
+    name_zh: 启动服务
+    description: Launch Docker container
+    description_zh: 启动 Docker 容器
+    optional: false
+    default: true
+
+  - id: health_check
+    name: Health Check
+    name_zh: 健康检查
+    description: Verify service is running correctly
+    description_zh: 验证服务运行正常
+    optional: false
+    default: true
+
+post_deployment:
+  open_browser: true
+  url: "http://localhost:8280"

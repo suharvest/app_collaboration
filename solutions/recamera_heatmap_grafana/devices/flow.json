@@ -1,0 +1,106 @@
+[
+    {
+        "id": "flow-heatmap",
+        "type": "tab",
+        "label": "Heatmap Flow",
+        "disabled": false,
+        "info": "Real-time heatmap with privacy blur and InfluxDB integration"
+    },
+    {
+        "id": "069087e0ad1b172e",
+        "type": "influxdb",
+        "hostname": "127.0.0.1",
+        "port": "8086",
+        "protocol": "http",
+        "database": "recamera",
+        "name": "InfluxDB 2.x",
+        "usetls": false,
+        "tls": "",
+        "influxdbVersion": "2.0",
+        "url": "http://10.228.172.98:8086",
+        "rejectUnauthorized": true,
+        "org": "seeed",
+        "bucket": "recamera"
+    },
+    {
+        "id": "camera-node",
+        "type": "camera",
+        "z": "flow-heatmap",
+        "name": "Camera Input",
+        "resolution": "1920x1080",
+        "fps": 15,
+        "x": 120,
+        "y": 200,
+        "wires": [["yolo-detect"]]
+    },
+    {
+        "id": "yolo-detect",
+        "type": "yolo-detect",
+        "z": "flow-heatmap",
+        "name": "YOLO11n Detection",
+        "model": "yolo11n",
+        "confidence": 0.5,
+        "classes": ["person"],
+        "x": 320,
+        "y": 200,
+        "wires": [["privacy-blur", "extract-coords"]]
+    },
+    {
+        "id": "privacy-blur",
+        "type": "image-blur",
+        "z": "flow-heatmap",
+        "name": "Privacy Blur",
+        "blurType": "gaussian",
+        "blurIntensity": 25,
+        "x": 520,
+        "y": 160,
+        "wires": [["mjpeg-output"]]
+    },
+    {
+        "id": "extract-coords",
+        "type": "function",
+        "z": "flow-heatmap",
+        "name": "Extract Coordinates",
+        "func": "// Extract person coordinates from detection results\nvar detections = msg.payload.detections || [];\nvar personCoords = [];\n\nfor (var i = 0; i < detections.length; i++) {\n    var det = detections[i];\n    if (det.class === 'person') {\n        // Get center point of bounding box\n        var centerX = (det.x1 + det.x2) / 2;\n        var centerY = (det.y1 + det.y2) / 2;\n        personCoords.push({\n            x: Math.round(centerX),\n            y: Math.round(centerY),\n            confidence: det.confidence\n        });\n    }\n}\n\nmsg.payload = {\n    count: personCoords.length,\n    coordinates: personCoords,\n    timestamp: new Date().toISOString()\n};\n\nreturn msg;",
+        "outputs": 1,
+        "x": 540,
+        "y": 240,
+        "wires": [["write-person-count", "write-coordinates"]]
+    },
+    {
+        "id": "write-person-count",
+        "type": "influxdb out",
+        "z": "flow-heatmap",
+        "influxdb": "069087e0ad1b172e",
+        "name": "Write Person Count",
+        "measurement": "person_count",
+        "precision": "ms",
+        "retentionPolicy": "",
+        "x": 780,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "write-coordinates",
+        "type": "influxdb out",
+        "z": "flow-heatmap",
+        "influxdb": "069087e0ad1b172e",
+        "name": "Write Coordinates",
+        "measurement": "person_coordinates",
+        "precision": "ms",
+        "retentionPolicy": "",
+        "x": 770,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "mjpeg-output",
+        "type": "mjpeg-output",
+        "z": "flow-heatmap",
+        "name": "MJPEG Stream",
+        "port": 8080,
+        "x": 730,
+        "y": 160,
+        "wires": []
+    }
+]

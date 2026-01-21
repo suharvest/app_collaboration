@@ -1,0 +1,55 @@
+version: "1.0"
+id: firmware
+name: OpenWrt Firmware
+name_zh: OpenWrt 固件
+type: manual
+
+description: Flash OpenWrt firmware to reRouter for edge computing
+description_zh: 将 OpenWrt 固件刷入 reRouter 以实现边缘计算
+
+resources:
+  firmware_global:
+    name: Global Version
+    name_zh: 全球版
+    url: https://files.seeedstudio.com/wiki/solution/ai-sound/reRouter-firmware-backup/openwrt-bcm27xx-bcm2711-rpi-4-ext4-factory-global.img.gz
+    description: For users outside mainland China
+    description_zh: 适用于中国大陆以外用户
+
+  firmware_china:
+    name: China Mainland Version
+    name_zh: 中国大陆版
+    url: https://files.seeedstudio.com/wiki/solution/ai-sound/reRouter-firmware-backup/openwrt-bcm27xx-bcm2711-rpi-4-ext4-factory-cn.img.gz
+    description: Optimized for mainland China users
+    description_zh: 为中国大陆用户优化
+
+  flash_guide:
+    name: Flashing Guide
+    name_zh: 刷机指南
+    url: https://wiki.seeedstudio.com/cn/OpenWrt-Getting-Started/#初始设置
+    description: Detailed flashing instructions
+    description_zh: 详细刷机教程
+
+steps:
+  - id: download
+    name: Download Firmware
+    name_zh: 下载固件
+    description: Download the appropriate firmware for your region
+    description_zh: 下载适合您地区的固件
+
+  - id: flash
+    name: Flash Firmware
+    name_zh: 刷写固件
+    description: Use the flashing tool to write firmware to reRouter
+    description_zh: 使用刷机工具将固件写入 reRouter
+
+  - id: connect
+    name: Connect Hardware
+    name_zh: 连接硬件
+    description: Connect WAN to internet, LAN to computer
+    description_zh: WAN 口连接互联网，LAN 口连接电脑
+
+  - id: verify
+    name: Verify Connection
+    name_zh: 验证连接
+    description: Access OpenWrt web UI at http://192.168.49.1
+    description_zh: 访问 OpenWrt 网页界面 http://192.168.49.1

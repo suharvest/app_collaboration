@@ -1,0 +1,50 @@
+version: "1.0"
+id: respeaker
+name: reSpeaker XVF3800 Configuration
+name_zh: reSpeaker XVF3800 配置
+type: manual
+
+description: Configure reSpeaker XVF3800 microphone array
+description_zh: 配置 reSpeaker XVF3800 麦克风阵列
+
+resources:
+  repository:
+    name: Configuration Repository
+    name_zh: 配置仓库
+    url: https://github.com/respeaker/reSpeaker_XVF3800_USB_4MIC_ARRAY.git
+    description: Official configuration tools
+    description_zh: 官方配置工具
+
+platforms:
+  linux_x86_64:
+    name: Linux x86_64
+    path: host_control/linux_x86_64
+  rpi_64bit:
+    name: Raspberry Pi 64-bit
+    path: host_control/rpi_64bit
+  mac_arm64:
+    name: macOS ARM64
+    path: host_control/mac_arm64
+  jetson:
+    name: NVIDIA Jetson
+    path: host_control/jetson
+
+steps:
+  - id: clone
+    name: Clone Repository
+    name_zh: 克隆仓库
+    command: git clone https://github.com/respeaker/reSpeaker_XVF3800_USB_4MIC_ARRAY.git
+
+  - id: navigate
+    name: Navigate to Control Folder
+    name_zh: 进入控制目录
+    command: cd reSpeaker_XVF3800_USB_4MIC_ARRAY/host_control/<YOUR_HOST_DIR>
+
+  - id: configure
+    name: Run Configuration Commands
+    name_zh: 运行配置命令
+    commands:
+      - chmod +x ./xvf_host
+      - sudo ./xvf_host clear_configuration 1
+      - sudo ./xvf_host audio_mgr_op_r 8 0
+      - sudo ./xvf_host save_configuration 1
