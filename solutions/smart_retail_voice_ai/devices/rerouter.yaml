@@ -1,0 +1,163 @@
+version: "1.0"
+id: rerouter
+name: Voice Services (Remote)
+name_zh: 语音服务（远程）
+type: docker_remote
+
+detection:
+  method: network_scan
+  manual_entry: true
+  requirements:
+    - docker_installed
+    - docker_running
+
+ssh:
+  port: 22
+  default_user: root
+  auth_methods:
+    - password
+  connection_timeout: 30
+  command_timeout: 1200  # Extended for model download
+
+docker_remote:
+  compose_file: assets/docker/docker-compose.yml
+  compose_dir: assets/docker
+  remote_path: /data-iot/respeaker
+
+  pre_commands:
+    - mkdir -p /data-iot/respeaker/recordings /data-iot/respeaker/models /data-iot/respeaker/voiceprints /data-iot/respeaker/logs
+    - chmod -R 666 /dev/snd/* || true
+
+  environment:
+    TZ: Asia/Shanghai
+    AUDIO_CARD_ID: "1"
+    AUDIO_DEVICE_ID: "0"
+
+  options:
+    project_name: sensecraft_voice
+    remove_orphans: true
+
+  services:
+    - name: sensecraft-voice-client
+      port: 8090
+      health_check_endpoint: /
+      required: true
+
+    - name: sensecraft-asr-server
+      required: true
+
+    - name: watchtower
+      required: false
+
+  images:
+    - name: sensecraft-missionpack.seeed.cn/respeaker/sensecraft-voice-client:v0.0.2
+      required: true
+    - name: sensecraft-missionpack.seeed.cn/respeaker/sensecraft-asr-server:latest
+      required: true
+    - name: sensecraft-missionpack.seeed.cn/respeaker/containrrr/watchtower:latest
+      required: false
+
+  models:
+    - name: ASR Models
+      name_zh: 语音识别模型
+      url: https://files.seeedstudio.com/wiki/solution/ai-sound/reRouter-firmware-backup/models.zip
+      sha256: 7b9e7606a2ddcad56f3f72a77b16eb2c60437ae4bfc3f1423bd33db177385c9d
+      target_dir: /data-iot/respeaker/models
+      size: 500MB
+      required: true
+
+user_inputs:
+  - id: host
+    name: Device IP
+    name_zh: 设备 IP 地址
+    type: text
+    required: true
+    default: "192.168.49.1"
+    placeholder: "192.168.49.1"
+    description: IP address of reRouter (default OpenWrt gateway)
+    description_zh: reRouter 的 IP 地址（默认 OpenWrt 网关）
+    validation:
+      pattern: "^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$"
+      message: Please enter a valid IP address
+
+  - id: password
+    name: SSH Password
+    name_zh: SSH 密码
+    type: password
+    required: false
+    placeholder: "(leave empty if no password set)"
+    description: SSH password for root user (empty by default on OpenWrt)
+    description_zh: root 用户的 SSH 密码（OpenWrt 默认为空）
+
+pre_checks:
+  - type: docker_version
+    min_version: "20.0"
+    description: Check Docker version
+
+  - type: audio_device
+    device_path: /dev/snd
+    description: Check audio device availability
+
+steps:
+  - id: connect
+    name: SSH Connect
+    name_zh: SSH 连接
+    description: Connect to reRouter via SSH
+    description_zh: 通过 SSH 连接 reRouter
+    optional: false
+    default: true
+
+  - id: prepare
+    name: Prepare Directories
+    name_zh: 准备目录
+    description: Create data directories for voice services
+    description_zh: 创建语音服务数据目录
+    optional: false
+    default: true
+
+  - id: download_models
+    name: Download ASR Models
+    name_zh: 下载语音模型
+    description: Download pre-trained ASR models (~500MB)
+    description_zh: 下载预训练语音识别模型（约 500MB）
+    optional: false
+    default: true
+
+  - id: upload
+    name: Upload Files
+    name_zh: 上传文件
+    description: Upload Docker Compose configuration
+    description_zh: 上传 Docker Compose 配置
+    optional: false
+    default: true
+
+  - id: pull_images
+    name: Pull Docker Images
+    name_zh: 拉取 Docker 镜像
+    description: Download container images from registry
+    description_zh: 从镜像仓库下载容器镜像
+    optional: false
+    default: true
+
+  - id: start_services
+    name: Start Services
+    name_zh: 启动服务
+    description: Launch voice processing containers
+    description_zh: 启动语音处理容器
+    optional: false
+    default: true
+
+  - id: health_check
+    name: Health Check
+    name_zh: 健康检查
+    description: Verify services are running correctly
+    description_zh: 验证服务运行正常
+    optional: false
+    default: true
+
+post_deployment:
+  open_browser: true
+  url: "http://{{host}}:8090"
+  reboot_recommended: true
+  reboot_message: Recommend rebooting the device to ensure all settings take effect
+  reboot_message_zh: 建议重启设备以确保所有设置生效

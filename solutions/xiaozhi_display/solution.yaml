@@ -1,0 +1,132 @@
+version: "1.0"
+id: xiaozhi_display
+name: Xiaozhi AI Display Cast
+name_zh: 小智投屏
+
+# ============ 介绍页内容 ============
+intro:
+  summary: Cast Xiaozhi AI assistant conversations to large displays with audio amplification
+  summary_zh: 将小智 AI 助手对话投射到大屏幕，支持音频放大输出
+
+  description_file: intro/description.md
+  description_file_zh: intro/description_zh.md
+
+  cover_image: intro/gallery/cover.svg
+
+  gallery:
+    - type: image
+      src: intro/gallery/architecture.svg
+      caption: System Architecture
+      caption_zh: 系统架构
+    - type: image
+      src: intro/gallery/demo.svg
+      caption: Display Demo
+      caption_zh: 展示效果
+
+  category: voice_ai
+  tags:
+    - watcher
+    - display
+    - voice
+    - xiaozhi
+    - recomputer
+
+  required_devices:
+    - name: SenseCAP Watcher
+      name_zh: SenseCAP Watcher
+      image: intro/gallery/watcher.svg
+      purchase_url: https://www.seeedstudio.com/SenseCAP-Watcher
+      description: AI-powered voice assistant with display
+      description_zh: 带屏幕的 AI 语音助手
+
+    - name: reComputer or Raspberry Pi
+      name_zh: reComputer 或树莓派
+      image: intro/gallery/recomputer.svg
+      purchase_url: https://www.seeedstudio.com/reComputer-R1000-Series
+      description: Edge computing device for display server
+      description_zh: 运行投屏服务的边缘计算设备
+
+    - name: HDMI Display
+      name_zh: HDMI 显示器
+      description: Large screen display (TV, monitor, advertising screen)
+      description_zh: 大屏幕显示设备（电视、显示器、广告机）
+
+  stats:
+    deployed_count: 0
+    likes_count: 0
+    difficulty: intermediate
+    estimated_time: 30min
+
+  links:
+    github: https://github.com/78/xiaozhi-esp32
+
+# ============ 部署页内容 ============
+deployment:
+  guide_file: deploy/guide.md
+  guide_file_zh: deploy/guide_zh.md
+
+  # 部署模式: sequential (按顺序执行)
+  selection_mode: sequential
+
+  devices:
+    # Step 1: 烧录 Watcher 固件
+    - id: watcher
+      name: Flash Watcher Firmware
+      name_zh: 烧录 Watcher 固件
+      type: esp32_usb
+      required: true
+      config_file: devices/watcher.yaml
+      section:
+        title: Step 1 - Flash Watcher Firmware
+        title_zh: 第一步 - 烧录 Watcher 固件
+        description_file: deploy/sections/watcher.md
+        description_file_zh: deploy/sections/watcher_zh.md
+        wiring:
+          steps:
+            - Connect Watcher to computer via USB-C
+            - Select the serial port
+            - Click Flash to program the firmware
+          steps_zh:
+            - 使用 USB-C 线连接 Watcher 到电脑
+            - 选择串口
+            - 点击烧录按钮写入固件
+
+    # Step 2: 部署投屏服务
+    - id: display_service
+      name: Deploy Display Service
+      name_zh: 部署投屏服务
+      type: docker_remote
+      required: true
+      config_file: devices/recomputer.yaml
+      section:
+        title: Step 2 - Deploy Display Service
+        title_zh: 第二步 - 部署投屏服务
+        description_file: deploy/sections/display_service.md
+        description_file_zh: deploy/sections/display_service_zh.md
+        wiring:
+          image: intro/gallery/architecture.svg
+          steps:
+            - Ensure reComputer/Raspberry Pi is connected to network
+            - Enter SSH credentials
+            - Deploy Docker container
+          steps_zh:
+            - 确保 reComputer/树莓派已连接网络
+            - 输入 SSH 凭据
+            - 部署 Docker 容器
+
+  order:
+    - watcher
+    - display_service
+
+  post_deployment:
+    success_message_file: deploy/success.md
+    success_message_file_zh: deploy/success_zh.md
+    next_steps:
+      - title: Access Display Web UI
+        title_zh: 访问投屏 Web 界面
+        action: open_url
+        url: "http://{{display_service.host}}:8765"
+      - title: Configure Watcher
+        title_zh: 配置 Watcher
+        description: Set display server address in Watcher settings
+        description_zh: 在 Watcher 设置中配置投屏服务器地址

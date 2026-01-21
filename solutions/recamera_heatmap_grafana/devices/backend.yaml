@@ -1,0 +1,57 @@
+version: "1.0"
+id: backend
+name: InfluxDB + Grafana Backend
+name_zh: InfluxDB + Grafana 后端
+
+type: docker_local
+
+detection:
+  method: local
+  requirements:
+    - docker
+
+docker:
+  compose_file: ../docker/docker-compose.yml
+  environment:
+    DOCKER_INFLUXDB_INIT_USERNAME: admin
+    DOCKER_INFLUXDB_INIT_PASSWORD: adminpassword
+    DOCKER_INFLUXDB_INIT_ORG: seeed
+    DOCKER_INFLUXDB_INIT_BUCKET: recamera
+  options:
+    project_name: recamera-heatmap
+    remove_orphans: true
+  services:
+    - name: influxdb
+      port: 8086
+      health_check_endpoint: /health
+      required: true
+    - name: grafana
+      port: 3000
+      health_check_endpoint: /api/health
+      required: true
+
+pre_checks:
+  - type: docker
+    description: Docker must be installed and running
+  - type: port_available
+    ports:
+      - 8086
+      - 3000
+
+steps:
+  - id: pull_images
+    name: Pull Docker images
+    name_zh: 拉取 Docker 镜像
+  - id: create_volumes
+    name: Create data volumes
+    name_zh: 创建数据卷
+  - id: start_services
+    name: Start services
+    name_zh: 启动服务
+  - id: health_check
+    name: Verify services are healthy
+    name_zh: 验证服务健康状态
+
+post_deployment:
+  open_browser: true
+  url: http://localhost:3000

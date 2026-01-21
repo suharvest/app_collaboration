@@ -1,0 +1,90 @@
+version: "1.0"
+id: rtsp_mqtt_preview
+name: RTSP + MQTT Live Preview Demo
+name_zh: RTSP + MQTT 实时预览演示
+
+intro:
+  summary: Demonstrate live video streaming with real-time inference overlay using RTSP and MQTT
+  summary_zh: 演示使用 RTSP 和 MQTT 实现实时视频流和推理结果叠加显示
+
+  description_file: intro/description.md
+  description_file_zh: intro/description_zh.md
+
+  cover_image: intro/gallery/cover.png
+
+  category: demo
+  tags:
+    - rtsp
+    - mqtt
+    - preview
+    - inference
+    - demo
+
+  stats:
+    difficulty: beginner
+    estimated_time: 5min
+    deployed_count: 0
+    likes_count: 0
+
+  links:
+    wiki: https://wiki.seeedstudio.com/
+
+deployment:
+  guide_file: deploy/guide.md
+  guide_file_zh: deploy/guide_zh.md
+
+  devices:
+    - id: preview_step
+      name: Live Preview
+      name_zh: 实时预览
+      type: preview
+      required: true
+      section:
+        title: Live Inference Preview
+        title_zh: 实时推理预览
+        description_file: deploy/sections/preview.md
+        description_file_zh: deploy/sections/preview_zh.md
+      preview:
+        video:
+          type: rtsp_proxy
+          rtsp_url_template: "{{rtsp_url}}"
+        mqtt:
+          broker_template: "{{mqtt_broker}}"
+          port: 1883
+          topic_template: "{{mqtt_topic}}"
+        overlay:
+          renderer: auto
+        display:
+          aspect_ratio: "16:9"
+          auto_start: false
+          show_stats: true
+        user_inputs:
+          - id: rtsp_url
+            name: RTSP Stream URL
+            name_zh: RTSP 视频流地址
+            type: text
+            placeholder: rtsp://192.168.1.100:554/live
+            description: Enter the RTSP URL of your camera
+            description_zh: 输入摄像头的 RTSP 地址
+            required: true
+            default: rtsp://rtsp.stream/demo
+          - id: mqtt_broker
+            name: MQTT Broker
+            name_zh: MQTT 服务器
+            type: text
+            placeholder: 192.168.1.100
+            description: IP address or hostname of MQTT broker
+            description_zh: MQTT 服务器的 IP 地址或主机名
+            required: true
+          - id: mqtt_topic
+            name: MQTT Topic
+            name_zh: MQTT 主题
+            type: text
+            placeholder: inference/results
+            description: Topic to subscribe for inference results
+            description_zh: 订阅推理结果的主题
+            required: true
+            default: inference/results
+
+  order:
+    - preview_step

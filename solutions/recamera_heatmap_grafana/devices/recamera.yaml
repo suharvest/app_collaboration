@@ -1,0 +1,83 @@
+version: "1.0"
+id: recamera
+name: reCamera Node-RED Configuration
+name_zh: reCamera Node-RED 配置
+
+type: recamera_nodered
+
+detection:
+  method: network_scan
+  manual_entry: true
+  requirements: []
+
+nodered:
+  flow_file: flow.json
+  port: 1880
+  influxdb_node_id: "069087e0ad1b172e"
+
+user_inputs:
+  - id: recamera_ip
+    name: reCamera IP Address
+    name_zh: reCamera IP 地址
+    type: text
+    placeholder: "192.168.42.1"
+    description: IP address of your reCamera device
+    description_zh: 您的 reCamera 设备 IP 地址
+    required: true
+    validation:
+      pattern: "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"
+
+  - id: influxdb_url
+    name: InfluxDB URL
+    name_zh: InfluxDB URL
+    type: text
+    placeholder: "http://192.168.1.100:8086"
+    description: URL of your InfluxDB instance
+    description_zh: 您的 InfluxDB 实例 URL
+    required: true
+
+  - id: influxdb_token
+    name: InfluxDB API Token
+    name_zh: InfluxDB API 令牌
+    type: password
+    description: API token from InfluxDB
+    description_zh: 来自 InfluxDB 的 API 令牌
+    required: true
+
+  - id: influxdb_org
+    name: InfluxDB Organization
+    name_zh: InfluxDB 组织
+    type: text
+    default: "seeed"
+    description: Organization name in InfluxDB
+    description_zh: InfluxDB 中的组织名称
+    required: false
+
+  - id: influxdb_bucket
+    name: InfluxDB Bucket
+    name_zh: InfluxDB 存储桶
+    type: text
+    default: "recamera"
+    description: Bucket name for storing data
+    description_zh: 用于存储数据的存储桶名称
+    required: false
+
+steps:
+  - id: load_flow
+    name: Load flow template
+    name_zh: 加载流程模板
+  - id: configure
+    name: Configure InfluxDB connection
+    name_zh: 配置 InfluxDB 连接
+  - id: connect
+    name: Connect to Node-RED
+    name_zh: 连接到 Node-RED
+  - id: deploy
+    name: Deploy flow
+    name_zh: 部署流程
+  - id: verify
+    name: Verify deployment
+    name_zh: 验证部署
+
+post_deployment:
+  open_browser: false
