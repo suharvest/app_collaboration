@@ -236,19 +236,15 @@ class ESP32Deployer(BaseDeployer):
                     match = re.search(r"\((\d+)\s*%\)", line_str)
                     if match and progress_callback:
                         progress = int(match.group(1))
-                        # Only report every 10% to avoid too many updates
-                        if progress >= last_progress + 10 or progress == 100:
+                        # Report every 5% for more granular updates
+                        if progress >= last_progress + 5 or progress == 100:
                             progress_callback(progress, f"Flashing... {progress}%")
                             last_progress = progress
 
-                # Send important status messages
+                # Send all meaningful status messages
                 elif progress_callback:
-                    # Key esptool messages to forward
-                    if any(keyword in line_str for keyword in [
-                        "Connecting", "Chip is", "Features:", "Crystal is",
-                        "MAC:", "Uploading", "Compressed", "Wrote", "Hash",
-                        "Leaving", "Hard resetting", "error", "Error", "failed", "Failed"
-                    ]):
+                    # Skip empty lines and pure dots
+                    if line_str and not line_str.startswith(".."):
                         progress_callback(last_progress, line_str)
 
             await process.wait()

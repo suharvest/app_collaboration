@@ -3,6 +3,10 @@ reCamera Node-RED deployment deployer
 
 Deploys Node-RED flows to reCamera devices via Node-RED Admin HTTP API.
 Includes service cleanup to stop conflicting C++ applications before deployment.
+
+When switching from C++ to Node-RED:
+- Stops and disables C++ services (S* → K*)
+- Restores and enables Node-RED services (K* → S*)
 """
 
 import asyncio
@@ -14,11 +18,19 @@ from ..models.device import DeviceConfig
 
 logger = logging.getLogger(__name__)
 
-# Known C++ services that may conflict with Node-RED flows on reCamera
-RECAMERA_CPP_SERVICES = [
-    "S99sensecraft",  # SenseCraft C++ app
-    "S99sscma",       # SSCMA C++ app
-    "S99recamera",    # Custom reCamera apps
+# C++ services that conflict with Node-RED (need to stop and disable)
+CPP_CONFLICT_SERVICES = [
+    "yolo26-detector",
+    "sensecraft",
+    "sscma",
+    "recamera",
+]
+
+# Node-RED related services that need to be enabled
+NODERED_SERVICES = [
+    "node-red",
+    "sscma-node",
+    "sscma-supervisor",
 ]
 
 
@@ -27,7 +39,8 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
 
     This deployer extends the base NodeRedDeployer with reCamera-specific
     functionality:
-    - Stops conflicting C++ services before deployment
+    - Stops and disables conflicting C++ services before deployment
+    - Restores and enables Node-RED related services
     - Updates InfluxDB configuration in the flow
     - Sets InfluxDB credentials via Node-RED API
     """
@@ -38,48 +51,52 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
         connection: Dict[str, Any],
         progress_callback: Optional[Callable] = None,
     ) -> bool:
-        """Stop conflicting C++ services before deploying Node-RED flow."""
+        """Prepare reCamera for Node-RED deployment.
 
+        This includes:
+        1. Stopping and disabling C++ services
+        2. Restoring Node-RED services that may have been disabled
+        """
         recamera_ip = connection.get("recamera_ip")
         ssh_password = connection.get("ssh_password")
 
         if not recamera_ip:
-            # Can't clean up without SSH access - just proceed with deployment
-            logger.info("No SSH credentials provided, skipping C++ service cleanup")
+            logger.info("No SSH credentials provided, skipping service management")
             return True
 
-        # Only attempt cleanup if SSH password is provided
         if not ssh_password:
-            logger.info("No SSH password provided, skipping C++ service cleanup")
+            logger.info("No SSH password provided, skipping service management")
             return True
 
         await self._report_progress(
-            progress_callback, "prepare", 50, "Stopping conflicting services..."
+            progress_callback, "prepare", 30, "Stopping C++ services..."
         )
 
         try:
-            await self._stop_cpp_services(
+            await self._manage_services(
                 recamera_ip,
                 connection.get("ssh_username", "recamera"),
                 ssh_password,
                 connection.get("ssh_port", 22),
+                progress_callback,
             )
         except Exception as e:
-            logger.warning(f"Failed to stop C++ services (non-fatal): {e}")
-            # Don't fail deployment if cleanup fails - Node-RED might still work
+            logger.warning(f"Service management failed (non-fatal): {e}")
 
         return True
 
-    async def _stop_cpp_services(
+    async def _manage_services(
         self,
         host: str,
         username: str,
         password: str,
         port: int = 22,
+        progress_callback: Optional[Callable] = None,
     ) -> None:
-        """Stop known C++ services on reCamera via SSH.
+        """Manage services for Node-RED deployment.
 
-        reCamera uses SysVinit, so we use /etc/init.d/S??xxx stop commands.
+        1. Stop and disable C++ services (S* → K*)
+        2. Restore Node-RED services (K* → S*)
         """
         try:
             import paramiko
@@ -97,38 +114,121 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
                     timeout=10,
                 )
 
-                # List all init.d scripts matching known patterns
-                for service in RECAMERA_CPP_SERVICES:
-                    # Try to find and stop the service
-                    cmd = f"ls /etc/init.d/{service}* 2>/dev/null && /etc/init.d/{service}* stop || true"
-                    stdin, stdout, stderr = await asyncio.to_thread(
-                        client.exec_command, cmd, timeout=30
-                    )
-                    exit_code = stdout.channel.recv_exit_status()
+                # Step 1: Stop and disable C++ services
+                await self._report_progress(
+                    progress_callback, "prepare", 40, "Disabling C++ services..."
+                )
+                await self._stop_and_disable_cpp_services(client, password)
 
-                    if exit_code == 0:
-                        output = stdout.read().decode().strip()
-                        if output:
-                            logger.info(f"Stopped service: {output}")
+                # Step 2: Restore Node-RED services
+                await self._report_progress(
+                    progress_callback, "prepare", 70, "Restoring Node-RED services..."
+                )
+                await self._restore_nodered_services(client, password)
 
-                # Also kill any running C++ processes by common names
-                kill_cmds = [
-                    "pkill -f 'sensecraft' || true",
-                    "pkill -f 'sscma-cpp' || true",
-                ]
-                for cmd in kill_cmds:
-                    await asyncio.to_thread(client.exec_command, cmd, timeout=10)
+                # Step 3: Kill any remaining C++ processes
+                await self._kill_cpp_processes(client, password)
 
-                logger.info("C++ services stopped successfully")
+                await asyncio.sleep(2)
+                logger.info("Service management completed successfully")
 
             finally:
                 client.close()
 
         except ImportError:
-            logger.warning("paramiko not available, skipping C++ service cleanup")
+            logger.warning("paramiko not available, skipping service management")
 
         except Exception as e:
-            logger.warning(f"Failed to stop C++ services: {e}")
+            logger.warning(f"Service management failed: {e}")
+
+    async def _stop_and_disable_cpp_services(
+        self,
+        client,
+        password: str,
+    ) -> None:
+        """Stop C++ services and disable them (S* → K*)."""
+        # Find all C++ related services
+        for svc_name in CPP_CONFLICT_SERVICES:
+            # Stop and disable S* version
+            stop_cmd = f"echo '{password}' | sudo -S sh -c 'for f in /etc/init.d/S*{svc_name}*; do [ -f \"$f\" ] && $f stop 2>/dev/null; done' || true"
+            await self._exec_cmd(client, stop_cmd)
+
+            # Rename S* to K* to disable auto-start
+            disable_cmd = f"""echo '{password}' | sudo -S sh -c '
+for svc in /etc/init.d/S*{svc_name}*; do
+    if [ -f "$svc" ]; then
+        new_name=$(echo "$svc" | sed "s|/S|/K|")
+        mv "$svc" "$new_name" 2>/dev/null && echo "Disabled: $svc -> $new_name"
+    fi
+done' || true"""
+            result = await self._exec_cmd(client, disable_cmd)
+            if result and "Disabled:" in result:
+                logger.info(result.strip())
+
+        # Also scan for other custom S9* services and stop them
+        scan_cmd = f"echo '{password}' | sudo -S sh -c 'for f in /etc/init.d/S9*; do [ -f \"$f\" ] && basename \"$f\"; done' 2>/dev/null || true"
+        result = await self._exec_cmd(client, scan_cmd)
+        if result:
+            for svc in result.strip().split('\n'):
+                svc = svc.strip()
+                if not svc:
+                    continue
+                # Skip Node-RED related services
+                if any(nr in svc.lower() for nr in ['node-red', 'sscma-node', 'sscma-supervisor']):
+                    continue
+                # Stop other S9* services
+                cmd = f"echo '{password}' | sudo -S /etc/init.d/{svc} stop 2>/dev/null || true"
+                await self._exec_cmd(client, cmd)
+
+    async def _restore_nodered_services(
+        self,
+        client,
+        password: str,
+    ) -> None:
+        """Restore Node-RED services that may have been disabled (K* → S*)."""
+        for svc_name in NODERED_SERVICES:
+            # Rename K* back to S* to enable auto-start
+            restore_cmd = f"""echo '{password}' | sudo -S sh -c '
+for svc in /etc/init.d/K*{svc_name}*; do
+    if [ -f "$svc" ]; then
+        new_name=$(echo "$svc" | sed "s|/K|/S|")
+        mv "$svc" "$new_name" 2>/dev/null && echo "Restored: $svc -> $new_name"
+    fi
+done' || true"""
+            result = await self._exec_cmd(client, restore_cmd)
+            if result and "Restored:" in result:
+                logger.info(result.strip())
+
+    async def _kill_cpp_processes(
+        self,
+        client,
+        password: str,
+    ) -> None:
+        """Kill any remaining C++ processes."""
+        kill_cmds = [
+            f"echo '{password}' | sudo -S pkill -f 'yolo26-detector' 2>/dev/null || true",
+            f"echo '{password}' | sudo -S pkill -f 'sensecraft' 2>/dev/null || true",
+            f"echo '{password}' | sudo -S pkill -f 'sscma-cpp' 2>/dev/null || true",
+        ]
+        for cmd in kill_cmds:
+            await self._exec_cmd(client, cmd)
+
+    async def _exec_cmd(
+        self,
+        client,
+        cmd: str,
+        timeout: int = 30,
+    ) -> Optional[str]:
+        """Execute SSH command and return stdout."""
+        try:
+            stdin, stdout, stderr = await asyncio.to_thread(
+                client.exec_command, cmd, timeout=timeout
+            )
+            stdout.channel.recv_exit_status()
+            return stdout.read().decode()
+        except Exception as e:
+            logger.debug(f"Command failed: {e}")
+            return None
 
     async def _update_flow_config(
         self,
