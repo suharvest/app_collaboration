@@ -290,7 +290,7 @@ class DeviceConfig(BaseModel):
     name_zh: Optional[str] = None
     type: str  # esp32_usb | docker_local | docker_remote | ssh_deb | script | manual | recamera_nodered | recamera_cpp
 
-    detection: DetectionConfig
+    detection: Optional[DetectionConfig] = None  # Optional for preview type
 
     # Type-specific configurations (only one will be set)
     firmware: Optional[FirmwareConfig] = None  # For esp32_usb
