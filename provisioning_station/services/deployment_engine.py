@@ -13,8 +13,16 @@ from ..models.deployment import Deployment, DeviceDeployment, DeploymentStatus, 
 from ..deployers.base import BaseDeployer
 from ..deployers.esp32_deployer import ESP32Deployer
 from ..deployers.docker_deployer import DockerDeployer
+from ..deployers.docker_remote_deployer import DockerRemoteDeployer, RemoteDockerNotInstalled
 from ..deployers.ssh_deployer import SSHDeployer
+from ..deployers.script_deployer import ScriptDeployer
+from ..deployers.manual_deployer import ManualDeployer
+from ..deployers.recamera_nodered_deployer import ReCameraNodeRedDeployer
+from ..deployers.recamera_cpp_deployer import ReCameraCppDeployer
 from .solution_manager import solution_manager
+from .pre_check_validator import pre_check_validator
+from .deployment_history import deployment_history
+from ..models.version import DeploymentRecord
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +40,12 @@ class DeploymentEngine:
         self.deployers: Dict[str, BaseDeployer] = {
             "esp32_usb": ESP32Deployer(),
             "docker_local": DockerDeployer(),
+            "docker_remote": DockerRemoteDeployer(),
             "ssh_deb": SSHDeployer(),
+            "script": ScriptDeployer(),
+            "manual": ManualDeployer(),
+            "recamera_nodered": ReCameraNodeRedDeployer(),
+            "recamera_cpp": ReCameraCppDeployer(),
         }
 
     def set_websocket_manager(self, manager):
@@ -71,6 +84,11 @@ class DeploymentEngine:
             if not device_ref:
                 continue
 
+            # Skip devices without config_file (e.g., manual info-only steps)
+            if not device_ref.config_file:
+                logger.info(f"Skipping device {device_id} (no config_file)")
+                continue
+
             # Load device config to get steps
             config = await solution_manager.load_device_config(
                 solution.id, device_ref.config_file
@@ -106,10 +124,12 @@ class DeploymentEngine:
         task = asyncio.create_task(self._run_deployment(deployment_id))
         self._running_tasks[deployment_id] = task
 
-        deployment.add_log(
+        # Broadcast initial log (don't await in sync context, use create_task)
+        asyncio.create_task(self._broadcast_log(
+            deployment_id,
             f"Started deployment for solution: {solution.id}",
             level="info",
-        )
+        ))
 
         return deployment_id
 
@@ -122,7 +142,7 @@ class DeploymentEngine:
         solution = solution_manager.get_solution(deployment.solution_id)
         if not solution:
             deployment.status = DeploymentStatus.FAILED
-            deployment.add_log("Solution not found", level="error")
+            await self._broadcast_log(deployment_id, "Solution not found", level="error")
             return
 
         try:
@@ -133,6 +153,12 @@ class DeploymentEngine:
                 device_deployment.status = DeploymentStatus.RUNNING
                 device_deployment.started_at = datetime.utcnow()
 
+                await self._broadcast_log(
+                    deployment_id,
+                    f"Starting deployment for device: {device_deployment.device_id}",
+                    level="info",
+                    device_id=device_deployment.device_id,
+                )
                 await self._broadcast_update(deployment_id, {
                     "type": "device_started",
                     "device_id": device_deployment.device_id,
@@ -146,6 +172,12 @@ class DeploymentEngine:
                 if not device_ref:
                     device_deployment.status = DeploymentStatus.FAILED
                     device_deployment.error = "Device reference not found"
+                    continue
+
+                # Skip devices without config_file
+                if not device_ref.config_file:
+                    device_deployment.status = DeploymentStatus.COMPLETED
+                    device_deployment.completed_at = datetime.utcnow()
                     continue
 
                 config = await solution_manager.load_device_config(
@@ -163,6 +195,51 @@ class DeploymentEngine:
                     device_deployment.error = f"No deployer for type: {config.type}"
                     continue
 
+                # Run pre-checks if defined
+                if config.pre_checks:
+                    await self._broadcast_log(
+                        deployment_id,
+                        "Running pre-deployment checks...",
+                        level="info",
+                        device_id=device_deployment.device_id,
+                    )
+                    await self._broadcast_update(deployment_id, {
+                        "type": "pre_check_started",
+                        "device_id": device_deployment.device_id,
+                    })
+
+                    check_results = await pre_check_validator.validate_all(config.pre_checks)
+                    failed_checks = [r for r in check_results if not r.passed]
+
+                    if failed_checks:
+                        device_deployment.status = DeploymentStatus.FAILED
+                        device_deployment.error = f"Pre-checks failed: {[c.message for c in failed_checks]}"
+                        await self._broadcast_log(
+                            deployment_id,
+                            f"Pre-checks failed for {device_deployment.device_id}: {[c.message for c in failed_checks]}",
+                            level="error",
+                            device_id=device_deployment.device_id,
+                        )
+                        await self._broadcast_update(deployment_id, {
+                            "type": "pre_check_failed",
+                            "device_id": device_deployment.device_id,
+                            "failures": [c.model_dump() for c in failed_checks],
+                        })
+                        deployment.status = DeploymentStatus.FAILED
+                        continue
+
+                    await self._broadcast_log(
+                        deployment_id,
+                        f"Pre-checks passed for {device_deployment.device_id}",
+                        level="info",
+                        device_id=device_deployment.device_id,
+                    )
+                    await self._broadcast_update(deployment_id, {
+                        "type": "pre_check_passed",
+                        "device_id": device_deployment.device_id,
+                        "results": [c.model_dump() for c in check_results],
+                    })
+
                 # Create progress callback
                 async def progress_callback(step_id: str, progress: int, message: str):
                     deployment.update_step(
@@ -172,8 +249,10 @@ class DeploymentEngine:
                         progress,
                         message,
                     )
-                    deployment.add_log(
+                    await self._broadcast_log(
+                        deployment_id,
                         message,
+                        level="info",
                         device_id=device_deployment.device_id,
                         step_id=step_id,
                     )
@@ -201,15 +280,76 @@ class DeploymentEngine:
                             if step.status != "completed":
                                 step.status = "completed"
                                 step.progress = 100
+                        await self._broadcast_log(
+                            deployment_id,
+                            f"Device {device_deployment.device_id} deployment completed successfully",
+                            level="success",
+                            device_id=device_deployment.device_id,
+                        )
                     else:
                         device_deployment.status = DeploymentStatus.FAILED
                         deployment.status = DeploymentStatus.FAILED
+                        await self._broadcast_log(
+                            deployment_id,
+                            f"Device {device_deployment.device_id} deployment failed",
+                            level="error",
+                            device_id=device_deployment.device_id,
+                        )
+
+                except RemoteDockerNotInstalled as e:
+                    # Docker not installed - ask user for confirmation to install
+                    logger.info(f"Docker not installed on {device_deployment.device_id}: {e}")
+                    device_deployment.status = DeploymentStatus.FAILED
+                    device_deployment.error = str(e)
+                    deployment.status = DeploymentStatus.FAILED
+
+                    await self._broadcast_log(
+                        deployment_id,
+                        str(e),
+                        level="warning",
+                        device_id=device_deployment.device_id,
+                    )
+
+                    # Send special message to frontend for confirmation
+                    await self._broadcast_update(deployment_id, {
+                        "type": "docker_not_installed",
+                        "device_id": device_deployment.device_id,
+                        "message": str(e),
+                        "can_auto_fix": e.can_auto_fix,
+                        "fix_action": e.fix_action,
+                    })
 
                 except Exception as e:
                     logger.error(f"Deployment error for {device_deployment.device_id}: {e}")
                     device_deployment.status = DeploymentStatus.FAILED
                     device_deployment.error = str(e)
                     deployment.status = DeploymentStatus.FAILED
+                    await self._broadcast_log(
+                        deployment_id,
+                        f"Deployment error: {str(e)}",
+                        level="error",
+                        device_id=device_deployment.device_id,
+                    )
+
+                # Record deployment to history
+                try:
+                    record = DeploymentRecord(
+                        deployment_id=deployment_id,
+                        solution_id=deployment.solution_id,
+                        device_id=device_deployment.device_id,
+                        device_type=device_deployment.type,
+                        deployed_version=config.version if hasattr(config, "version") else "1.0",
+                        config_version=config.version if hasattr(config, "version") else "1.0",
+                        status="completed" if device_deployment.status == DeploymentStatus.COMPLETED else "failed",
+                        deployed_at=datetime.utcnow(),
+                        metadata={
+                            "device_name": device_deployment.name,
+                            "error": device_deployment.error if device_deployment.error else None,
+                        },
+                    )
+                    await deployment_history.record_deployment(record)
+                except Exception as history_error:
+                    logger.error(f"Failed to record deployment history: {history_error}")
 
                 await self._broadcast_update(deployment_id, {
                     "type": "device_completed",
@@ -236,7 +376,7 @@ class DeploymentEngine:
         except Exception as e:
             logger.error(f"Deployment failed: {e}")
             deployment.status = DeploymentStatus.FAILED
-            deployment.add_log(str(e), level="error")
+            await self._broadcast_log(deployment_id, f"Deployment error: {str(e)}", level="error")
 
         finally:
             # Move to completed
@@ -257,7 +397,7 @@ class DeploymentEngine:
         deployment = self.active_deployments.get(deployment_id)
         if deployment:
             deployment.status = DeploymentStatus.CANCELLED
-            deployment.add_log("Deployment cancelled by user", level="warning")
+            await self._broadcast_log(deployment_id, "Deployment cancelled by user", level="warning")
 
             # Cancel the task
             if deployment_id in self._running_tasks:
@@ -288,6 +428,27 @@ class DeploymentEngine:
             message["deployment_id"] = deployment_id
             message["timestamp"] = datetime.utcnow().isoformat()
             await self._websocket_manager.broadcast(deployment_id, message)
+
+    async def _broadcast_log(
+        self,
+        deployment_id: str,
+        message: str,
+        level: str = "info",
+        device_id: str = None,
+        step_id: str = None,
+    ):
+        """Add log to deployment and broadcast to WebSocket clients"""
+        deployment = self.active_deployments.get(deployment_id)
+        if deployment:
+            deployment.add_log(message, level=level, device_id=device_id, step_id=step_id)
+
+        await self._broadcast_update(deployment_id, {
+            "type": "log",
+            "level": level,
+            "message": message,
+            "device_id": device_id,
+            "step_id": step_id,
+        })
 
 
 # Global instance

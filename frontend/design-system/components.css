@@ -413,6 +413,58 @@
     @apply py-5 px-6 border-t border-border flex justify-end gap-3;
   }
 
+  /* Dialog (confirmation dialogs) */
+  .dialog-overlay {
+    @apply fixed inset-0 bg-black/50 z-modal flex items-center justify-center;
+    animation: fadeIn 0.15s ease-out;
+  }
+
+  .dialog {
+    @apply bg-white rounded-lg shadow-xl;
+    max-width: 420px;
+    width: 90%;
+    animation: slideUp 0.2s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .dialog-header {
+    @apply flex items-center gap-3 p-5 border-b border-border;
+  }
+
+  .dialog-header svg {
+    @apply text-warning flex-shrink-0;
+  }
+
+  .dialog-header h3 {
+    @apply text-base font-semibold text-text-primary m-0;
+  }
+
+  .dialog-body {
+    @apply p-5;
+  }
+
+  .dialog-body p {
+    @apply text-sm text-text-secondary m-0;
+  }
+
+  .dialog-body .dialog-hint {
+    @apply mt-3 text-xs text-text-muted;
+  }
+
+  .dialog-actions {
+    @apply flex justify-end gap-3 p-4 border-t border-border bg-card;
+    border-radius: 0 0 0.5rem 0.5rem;
+  }
+
   /* ============================================
      11. STATUS BADGES
      ============================================ */
@@ -895,9 +947,37 @@
     @apply block;
   }
 
+  /* Deploy Warning Banner */
+  .deploy-warning-banner {
+    @apply flex items-center gap-3 p-4 mb-4 rounded-lg;
+    @apply bg-amber-50 border border-amber-200 text-amber-800;
+  }
+
+  .deploy-warning-banner svg {
+    @apply flex-shrink-0 text-amber-500;
+  }
+
+  .deploy-warning-banner span {
+    @apply text-sm leading-relaxed;
+  }
+
   /* Deploy Action Area */
   .deploy-action-area {
     @apply bg-primary-light/30 border border-primary/20 rounded-lg p-5 mb-4;
+  }
+
+  /* Pre-deployment Instructions */
+  .deploy-pre-instructions {
+    @apply mb-4;
+  }
+
+  .deploy-pre-instructions .markdown-content h3 {
+    @apply text-base font-semibold text-text-primary mb-2;
+  }
+
+  .deploy-pre-instructions .markdown-content ol,
+  .deploy-pre-instructions .markdown-content ul {
+    @apply text-sm text-text-secondary space-y-1;
   }
 
   /* Post-deployment Instructions */
@@ -1017,6 +1097,144 @@
     @apply text-gray-500 text-center py-4;
   }
 
+  .deploy-logs-options {
+    @apply flex items-center justify-end px-4 py-2 border-b border-gray-700;
+  }
+
+  .deploy-logs-detail-toggle {
+    @apply flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none;
+  }
+
+  .deploy-logs-detail-toggle:hover {
+    @apply text-gray-200;
+  }
+
+  .deploy-logs-detail-toggle input[type="checkbox"] {
+    @apply w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-primary
+           focus:ring-primary focus:ring-offset-0 cursor-pointer;
+  }
+
+  /* ============================================
+     15.5 DEPLOY - SINGLE CHOICE MODE
+     ============================================ */
+
+  .deploy-choice-section {
+    @apply mb-6;
+  }
+
+  .deploy-choice-header {
+    @apply mb-4;
+  }
+
+  .deploy-choice-title {
+    @apply text-lg font-semibold text-text-primary mb-1;
+  }
+
+  .deploy-choice-desc {
+    @apply text-sm text-text-secondary;
+  }
+
+  .deploy-choice-options {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  .deploy-choice-option {
+    @apply relative flex items-center gap-4 p-4 bg-white border-2 border-border rounded-xl
+           cursor-pointer transition-all duration-200;
+  }
+
+  .deploy-choice-option:hover:not(.completed) {
+    @apply border-primary/50 bg-primary/5;
+  }
+
+  .deploy-choice-option.selected {
+    @apply border-primary bg-primary/5;
+  }
+
+  .deploy-choice-option.completed {
+    @apply border-success bg-success/5 cursor-default;
+  }
+
+  .deploy-choice-option input[type="radio"] {
+    @apply sr-only;
+  }
+
+  .deploy-choice-radio {
+    @apply w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center
+           transition-all duration-200 flex-shrink-0;
+  }
+
+  .deploy-choice-option.selected .deploy-choice-radio {
+    @apply border-primary bg-primary;
+  }
+
+  .deploy-choice-option.selected .deploy-choice-radio::after {
+    content: '';
+    @apply w-2 h-2 bg-white rounded-full;
+  }
+
+  .deploy-choice-option.completed .deploy-choice-radio {
+    @apply border-success bg-success text-white;
+  }
+
+  .deploy-choice-content {
+    @apply flex items-center gap-3 flex-1;
+  }
+
+  .deploy-choice-icon {
+    @apply w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500;
+  }
+
+  .deploy-choice-option.selected .deploy-choice-icon {
+    @apply bg-primary/10 text-primary;
+  }
+
+  .deploy-choice-option.completed .deploy-choice-icon {
+    @apply bg-success/10 text-success;
+  }
+
+  .deploy-choice-info {
+    @apply flex-1;
+  }
+
+  .deploy-choice-name {
+    @apply font-medium text-text-primary;
+  }
+
+  .deploy-choice-type {
+    @apply text-sm text-text-secondary;
+  }
+
+  .deploy-choice-status {
+    @apply flex items-center gap-1 text-sm font-medium;
+  }
+
+  .deploy-choice-status.completed {
+    @apply text-success;
+  }
+
+  /* Selected Device Section */
+  .deploy-selected-section {
+    @apply mt-6;
+  }
+
+  .deploy-selected-card {
+    @apply bg-white rounded-xl border border-border p-6;
+  }
+
+  .deploy-selected-card .deploy-action-area {
+    @apply bg-transparent p-0 mb-6;
+  }
+
+  .deploy-selected-card .deploy-user-inputs {
+    @apply mb-6;
+  }
+
+  .deploy-selected-card .deploy-logs {
+    @apply border-t-0 pt-0 mt-0;
+  }
+
   /* ============================================
      16. RESPONSIVE
      ============================================ */
@@ -1057,6 +1275,180 @@
 }
 
 /* ============================================
+   SCROLLBAR STYLES
+   ============================================ */
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.25);
+}
+
+/* Dark background scrollbar (for log viewer etc.) */
+.dark-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+.dark-scrollbar {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+/* ============================================
+   17. DEVICE MANAGEMENT PAGE
+   ============================================ */
+
+.device-grid {
+  @apply grid gap-6;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+}
+
+.device-management-card {
+  @apply bg-card rounded-lg shadow-sm border border-border overflow-hidden;
+}
+
+.device-management-card .device-card-header {
+  @apply flex items-start justify-between p-5 border-b border-border bg-gray-50/50;
+}
+
+.device-management-card .device-card-title {
+  @apply text-base font-semibold text-text-primary;
+}
+
+.device-management-card .device-card-subtitle {
+  @apply text-sm text-text-secondary mt-1;
+}
+
+.device-management-card .device-card-body {
+  @apply p-5;
+}
+
+.device-management-card .device-card-actions {
+  @apply flex items-center gap-3 p-4 border-t border-border bg-gray-50/30;
+}
+
+.device-info-row {
+  @apply flex items-center justify-between py-2;
+}
+
+.device-info-row:not(:last-child) {
+  @apply border-b border-border/50;
+}
+
+.device-info-label {
+  @apply text-sm text-text-secondary;
+}
+
+.device-info-value {
+  @apply text-sm text-text-primary font-medium;
+}
+
+.device-info-value.link {
+  @apply text-primary hover:underline;
+}
+
+/* Kiosk Toggle */
+.kiosk-row {
+  @apply py-3;
+}
+
+.kiosk-controls {
+  @apply flex items-center;
+}
+
+.toggle-switch {
+  @apply relative inline-block w-11 h-6;
+}
+
+.toggle-switch input {
+  @apply opacity-0 w-0 h-0;
+}
+
+.toggle-slider {
+  @apply absolute cursor-pointer inset-0 bg-gray-300 rounded-full;
+  transition: 0.4s;
+}
+
+.toggle-slider::before {
+  content: "";
+  @apply absolute h-5 w-5 left-0.5 bottom-0.5 bg-white rounded-full;
+  transition: 0.4s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  @apply bg-primary;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+.toggle-switch input:disabled + .toggle-slider {
+  @apply bg-gray-200 cursor-not-allowed;
+}
+
+.kiosk-user {
+  @apply text-xs text-text-muted;
+}
+
+/* Button Sizes */
+.btn-sm {
+  @apply py-1.5 px-3 text-xs;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  @apply fixed inset-0 bg-black/50 z-modal items-center justify-center;
+}
+
+.modal-overlay .modal-content {
+  @apply bg-white rounded-lg p-6 shadow-xl;
+}
+
+.modal-overlay .modal-title {
+  @apply text-lg font-semibold text-text-primary mb-2;
+}
+
+/* Input Styles */
+.input {
+  @apply w-full py-2 px-3 border border-border rounded-md text-sm bg-white;
+}
+
+.input:focus {
+  @apply outline-none border-primary;
+  box-shadow: 0 0 0 2px rgba(140, 198, 63, 0.1);
+}
+
+/* Page subtitle */
+.page-subtitle {
+  @apply text-sm mt-1;
+}
+
+/* ============================================
    KEYFRAMES
    ============================================ */
 
@@ -1082,4 +1474,121 @@
 
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+/* ============================================
+   PREVIEW WINDOW STYLES
+   ============================================ */
+
+.preview-window {
+  @apply bg-gray-900 rounded-lg overflow-hidden;
+}
+
+.preview-header {
+  @apply flex items-center justify-between px-4 py-2 bg-gray-800;
+}
+
+.preview-status {
+  @apply flex items-center gap-2 text-sm;
+}
+
+.preview-status-dot {
+  @apply w-2.5 h-2.5 rounded-full bg-gray-500;
+}
+
+.preview-status.connecting .preview-status-dot {
+  @apply bg-yellow-400;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.preview-status.connected .preview-status-dot {
+  @apply bg-green-400;
+}
+
+.preview-status.error .preview-status-dot {
+  @apply bg-red-400;
+}
+
+.preview-status-text {
+  @apply text-gray-300;
+}
+
+.preview-stats {
+  @apply flex items-center gap-4 text-xs text-gray-400;
+}
+
+.preview-stat {
+  @apply font-mono;
+}
+
+.preview-container {
+  @apply relative w-full bg-black;
+  /* Aspect ratio set via inline style: padding-bottom: X% */
+}
+
+.preview-video {
+  @apply absolute inset-0 w-full h-full object-contain;
+}
+
+.preview-canvas {
+  @apply absolute inset-0 w-full h-full pointer-events-none;
+}
+
+.preview-overlay-info {
+  @apply absolute bottom-2 left-2 text-xs text-white/60 font-mono;
+}
+
+.preview-controls {
+  @apply flex items-center justify-between gap-3 px-4 py-3 bg-gray-800;
+}
+
+.preview-connect-btn {
+  @apply flex-1;
+}
+
+.preview-fullscreen-btn {
+  @apply !p-2.5;
+}
+
+.preview-fullscreen-btn:disabled {
+  @apply opacity-40 cursor-not-allowed;
+}
+
+/* Preview container wrapper in deploy page */
+.preview-container-wrapper {
+  @apply mb-4;
+}
+
+/* Preview inputs styling */
+.preview-inputs {
+  @apply bg-gray-50 rounded-lg p-4 mb-4;
+}
+
+.preview-inputs .form-group {
+  @apply mb-3;
+}
+
+.preview-inputs .form-group:last-child {
+  @apply mb-0;
+}
+
+/* Fullscreen mode */
+.preview-container:fullscreen {
+  @apply bg-black;
+  padding-bottom: 0 !important;
+}
+
+.preview-container:fullscreen .preview-video,
+.preview-container:fullscreen .preview-canvas {
+  @apply relative w-full h-full;
+}
+
+/* Pulse animation for connecting status */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
