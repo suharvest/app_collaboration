@@ -730,6 +730,7 @@ dependencies = [
     { name = "pyserial" },
     { name = "python-multipart" },
     { name = "pyyaml" },
+    { name = "scp" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "websockets" },
 ]
@@ -760,6 +761,7 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.6" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
+    { name = "scp", specifier = ">=0.14.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.27.0" },
     { name = "websockets", specifier = ">=12.0" },
 ]
@@ -1158,6 +1160,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f2/1c/d7b67ab43f30013b47c12b42d1acd354c195351a3f7a1d67f59e54227ede/ruff-0.14.10-py3-none-win32.whl", hash = "sha256:104c49fc7ab73f3f3a758039adea978869a918f31b73280db175b43a2d9b51d6", size = 13196187, upload-time = "2025-12-18T19:29:19.006Z" },
     { url = "https://files.pythonhosted.org/packages/fb/9c/896c862e13886fae2af961bef3e6312db9ebc6adc2b156fe95e615dee8c1/ruff-0.14.10-py3-none-win_amd64.whl", hash = "sha256:466297bd73638c6bdf06485683e812db1c00c7ac96d4ddd0294a338c62fdc154", size = 14661283, upload-time = "2025-12-18T19:29:30.16Z" },
     { url = "https://files.pythonhosted.org/packages/74/31/b0e29d572670dca3674eeee78e418f20bdf97fa8aa9ea71380885e175ca0/ruff-0.14.10-py3-none-win_arm64.whl", hash = "sha256:e51d046cf6dda98a4633b8a8a771451107413b0f07183b2bef03f075599e44e6", size = 13729839, upload-time = "2025-12-18T19:28:48.636Z" },
+]
+
+[[package]]
+name = "scp"
+version = "0.15.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "paramiko" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d6/1c/d213e1c6651d0bd37636b21b1ba9b895f276e8057f882c9f944931e4f002/scp-0.15.0.tar.gz", hash = "sha256:f1b22e9932123ccf17eebf19e0953c6e9148f589f93d91b872941a696305c83f", size = 13905, upload-time = "2024-05-23T21:37:41.835Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/79/b3/561cd6afa959e9dd522af12acc4f803e8bab1bd0e383bffc5211721c5fcb/scp-0.15.0-py2.py3-none-any.whl", hash = "sha256:9e7f721e5ac563c33eb0831d0f949c6342f1c28c3bdc3b02f39d77b5ea20df7e", size = 8753, upload-time = "2024-05-23T21:37:46.226Z" },
 ]
 
 [[package]]

@@ -94,6 +94,47 @@ class UserInput(BaseModel):
     description_zh: Optional[str] = None
     required: bool = True
     default: Optional[str] = None
+    default_template: Optional[str] = None  # Template with {{var}} placeholders
+
+
+# Preview configuration models
+class PreviewVideoConfig(BaseModel):
+    """Video source configuration for preview"""
+    type: str = "rtsp_proxy"  # rtsp_proxy | mjpeg | hls
+    rtsp_url_template: Optional[str] = None
+    mjpeg_url_template: Optional[str] = None
+    hls_url_template: Optional[str] = None
+
+
+class PreviewMqttConfig(BaseModel):
+    """MQTT configuration for preview"""
+    broker_template: Optional[str] = None
+    port: int = 1883
+    topic_template: str = "inference/results"
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+
+class PreviewOverlayConfig(BaseModel):
+    """Overlay rendering configuration"""
+    renderer: str = "custom"  # builtin_bbox | custom
+    script_file: Optional[str] = None
+
+
+class PreviewDisplayConfig(BaseModel):
+    """Display settings for preview"""
+    aspect_ratio: str = "16:9"
+    auto_start: bool = False
+    show_stats: bool = True
+
+
+class PreviewConfig(BaseModel):
+    """Complete preview configuration for a deployment step"""
+    video: PreviewVideoConfig = Field(default_factory=PreviewVideoConfig)
+    mqtt: PreviewMqttConfig = Field(default_factory=PreviewMqttConfig)
+    overlay: PreviewOverlayConfig = Field(default_factory=PreviewOverlayConfig)
+    display: PreviewDisplayConfig = Field(default_factory=PreviewDisplayConfig)
+    user_inputs: List[UserInput] = []
 
 
 class DeviceRef(BaseModel):
@@ -101,11 +142,12 @@ class DeviceRef(BaseModel):
     id: str
     name: str
     name_zh: Optional[str] = None
-    type: str  # esp32_usb | docker_local | ssh_deb | script | manual
+    type: str  # esp32_usb | docker_local | ssh_deb | script | manual | preview
     required: bool = True
     config_file: Optional[str] = None  # Optional for manual/script types
     user_inputs: List[UserInput] = []  # User inputs for script types
     section: Optional[DeviceSection] = None
+    preview: Optional[PreviewConfig] = None  # Preview configuration for type: preview
 
 
 class PostDeploymentStep(BaseModel):
@@ -128,6 +170,7 @@ class SolutionDeployment(BaseModel):
     """Deployment page content"""
     guide_file: Optional[str] = None
     guide_file_zh: Optional[str] = None
+    selection_mode: str = "sequential"  # sequential | single_choice
     devices: List[DeviceRef] = []
     order: List[str] = []
     post_deployment: PostDeployment = Field(default_factory=PostDeployment)

@@ -3,6 +3,7 @@ SSH + deb deployment deployer
 """
 
 import asyncio
+import hashlib
 import logging
 from pathlib import Path
 from typing import Callable, Optional, Dict, Any
@@ -38,224 +39,254 @@ class SSHDeployer(BaseDeployer):
             import paramiko
             from scp import SCPClient
 
-            # Step 1: Connect
+            # Step 1: Connect (wrapped in thread for async safety)
             await self._report_progress(
                 progress_callback, "connect", 0, f"Connecting to {host}..."
             )
 
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client = await asyncio.to_thread(
+                self._create_ssh_connection,
+                host, port, username, password, key_file,
+                config.ssh.connection_timeout
+            )
+
+            if not client:
+                await self._report_progress(
+                    progress_callback, "connect", 0, "Connection failed"
+                )
+                return False
+
+            await self._report_progress(
+                progress_callback, "connect", 100, "Connected successfully"
+            )
 
             try:
-                if key_file:
-                    client.connect(
-                        hostname=host,
-                        port=port,
-                        username=username,
-                        key_filename=key_file,
-                        timeout=config.ssh.connection_timeout,
+                # Step 2: Transfer package
+                await self._report_progress(
+                    progress_callback, "transfer", 0, "Transferring package..."
+                )
+
+                package_source = config.package.source
+                if package_source.type == "local":
+                    local_path = config.get_asset_path(package_source.path)
+                    if not local_path or not Path(local_path).exists():
+                        await self._report_progress(
+                            progress_callback,
+                            "transfer",
+                            0,
+                            f"Package not found: {package_source.path}",
+                        )
+                        return False
+
+                    package_name = Path(local_path).name
+                    remote_path = f"/tmp/{package_name}"
+
+                    # Transfer file with async wrapper
+                    success = await asyncio.to_thread(
+                        self._transfer_file,
+                        client, local_path, remote_path
                     )
+
+                    if not success:
+                        await self._report_progress(
+                            progress_callback, "transfer", 0, "File transfer failed"
+                        )
+                        return False
+
+                    # Verify checksum if specified
+                    if package_source.checksum:
+                        await self._report_progress(
+                            progress_callback, "transfer", 75, "Verifying checksum..."
+                        )
+
+                        checksum_valid = await asyncio.to_thread(
+                            self._verify_remote_checksum,
+                            client, remote_path, local_path, package_source.checksum
+                        )
+
+                        if not checksum_valid:
+                            await self._report_progress(
+                                progress_callback,
+                                "transfer",
+                                0,
+                                "Checksum verification failed",
+                            )
+                            return False
+
+                    await self._report_progress(
+                        progress_callback, "transfer", 100, "Package transferred"
+                    )
+
                 else:
-                    client.connect(
-                        hostname=host,
-                        port=port,
-                        username=username,
-                        password=password,
-                        timeout=config.ssh.connection_timeout,
-                    )
-
-                await self._report_progress(
-                    progress_callback, "connect", 100, "Connected successfully"
-                )
-
-            except paramiko.AuthenticationException:
-                await self._report_progress(
-                    progress_callback, "connect", 0, "Authentication failed"
-                )
-                return False
-            except Exception as e:
-                await self._report_progress(
-                    progress_callback, "connect", 0, f"Connection failed: {str(e)}"
-                )
-                return False
-
-            # Step 2: Transfer package
-            await self._report_progress(
-                progress_callback, "transfer", 0, "Transferring package..."
-            )
-
-            package_source = config.package.source
-            if package_source.type == "local":
-                local_path = config.get_asset_path(package_source.path)
-                if not local_path or not Path(local_path).exists():
+                    # Download from URL on remote device
                     await self._report_progress(
-                        progress_callback,
-                        "transfer",
-                        0,
-                        f"Package not found: {package_source.path}",
+                        progress_callback, "transfer", 0, "Downloading package..."
                     )
-                    client.close()
-                    return False
+                    url = package_source.url
+                    package_name = url.split("/")[-1]
+                    remote_path = f"/tmp/{package_name}"
 
-                package_name = Path(local_path).name
-                remote_path = f"/tmp/{package_name}"
+                    exit_code, _, stderr = await asyncio.to_thread(
+                        self._exec_with_timeout,
+                        client,
+                        f"wget -O {remote_path} {url}",
+                        config.ssh.command_timeout
+                    )
 
-                # Transfer file
-                with SCPClient(client.get_transport()) as scp:
-                    scp.put(local_path, remote_path)
+                    if exit_code != 0:
+                        await self._report_progress(
+                            progress_callback, "transfer", 0, f"Download failed: {stderr[:200]}"
+                        )
+                        return False
 
-                await self._report_progress(
-                    progress_callback, "transfer", 100, "Package transferred"
-                )
-
-            else:
-                # Download from URL on remote device
-                await self._report_progress(
-                    progress_callback, "transfer", 0, "Downloading package..."
-                )
-                url = package_source.url
-                package_name = url.split("/")[-1]
-                remote_path = f"/tmp/{package_name}"
-
-                stdin, stdout, stderr = client.exec_command(
-                    f"wget -O {remote_path} {url}",
-                    timeout=config.ssh.command_timeout,
-                )
-                exit_code = stdout.channel.recv_exit_status()
-                if exit_code != 0:
                     await self._report_progress(
-                        progress_callback, "transfer", 0, "Download failed"
+                        progress_callback, "transfer", 100, "Package downloaded"
                     )
-                    client.close()
-                    return False
 
+                # Step 3: Install package
                 await self._report_progress(
-                    progress_callback, "transfer", 100, "Package downloaded"
+                    progress_callback, "install", 0, "Installing package..."
                 )
 
-            # Step 3: Install package
-            await self._report_progress(
-                progress_callback, "install", 0, "Installing package..."
-            )
+                # Run install commands
+                install_commands = config.package.install_commands or [
+                    f"dpkg -i {remote_path}",
+                    "apt-get install -f -y",
+                ]
 
-            # Run install commands
-            install_commands = config.package.install_commands or [
-                f"dpkg -i {remote_path}",
-                "apt-get install -f -y",
-            ]
+                for i, cmd_template in enumerate(install_commands):
+                    cmd = cmd_template.replace("{package}", remote_path).replace(
+                        "{package_path}", remote_path
+                    )
 
-            for i, cmd_template in enumerate(install_commands):
-                cmd = cmd_template.replace("{package}", remote_path).replace(
-                    "{package_path}", remote_path
-                )
-
-                await self._report_progress(
-                    progress_callback,
-                    "install",
-                    int((i / len(install_commands)) * 100),
-                    f"Running: {cmd}",
-                )
-
-                stdin, stdout, stderr = client.exec_command(
-                    cmd, timeout=config.ssh.command_timeout
-                )
-                exit_code = stdout.channel.recv_exit_status()
-
-                if exit_code != 0:
-                    error = stderr.read().decode()
                     await self._report_progress(
                         progress_callback,
                         "install",
-                        0,
-                        f"Install failed: {error[:200]}",
+                        int((i / len(install_commands)) * 100),
+                        f"Running: {cmd}",
                     )
-                    client.close()
-                    return False
 
-            await self._report_progress(
-                progress_callback, "install", 100, "Package installed"
-            )
-
-            # Step 4: Configure
-            await self._report_progress(
-                progress_callback, "configure", 0, "Configuring..."
-            )
-
-            # Transfer config files
-            for config_file in config.package.config_files:
-                local_config = config.get_asset_path(config_file.source)
-                if local_config and Path(local_config).exists():
-                    with SCPClient(client.get_transport()) as scp:
-                        scp.put(local_config, config_file.destination)
-
-                    # Set permissions
-                    client.exec_command(f"chmod {config_file.mode} {config_file.destination}")
-
-            await self._report_progress(
-                progress_callback, "configure", 100, "Configuration applied"
-            )
-
-            # Step 5: Start service
-            await self._report_progress(
-                progress_callback, "start_service", 0, "Starting service..."
-            )
-
-            if config.package.service:
-                service = config.package.service
-
-                if service.enable:
-                    client.exec_command(f"systemctl enable {service.name}")
-
-                if service.start:
-                    stdin, stdout, stderr = client.exec_command(
-                        f"systemctl restart {service.name}"
+                    exit_code, _, stderr = await asyncio.to_thread(
+                        self._exec_with_timeout,
+                        client,
+                        cmd,
+                        config.ssh.command_timeout
                     )
-                    exit_code = stdout.channel.recv_exit_status()
 
                     if exit_code != 0:
-                        error = stderr.read().decode()
                         await self._report_progress(
                             progress_callback,
-                            "start_service",
+                            "install",
                             0,
-                            f"Service start failed: {error[:200]}",
+                            f"Install failed: {stderr[:200]}",
                         )
-                        client.close()
                         return False
 
-                    # Verify service is running
-                    await asyncio.sleep(2)
-                    stdin, stdout, stderr = client.exec_command(
-                        f"systemctl is-active {service.name}"
-                    )
-                    status = stdout.read().decode().strip()
+                await self._report_progress(
+                    progress_callback, "install", 100, "Package installed"
+                )
 
-                    if status != "active":
-                        await self._report_progress(
-                            progress_callback,
-                            "start_service",
-                            0,
-                            f"Service not active: {status}",
+                # Step 4: Configure
+                await self._report_progress(
+                    progress_callback, "configure", 0, "Configuring..."
+                )
+
+                # Transfer config files
+                for config_file in config.package.config_files:
+                    local_config = config.get_asset_path(config_file.source)
+                    if local_config and Path(local_config).exists():
+                        await asyncio.to_thread(
+                            self._transfer_file,
+                            client, local_config, config_file.destination
                         )
-                        client.close()
-                        return False
 
-            await self._report_progress(
-                progress_callback, "start_service", 100, "Service running"
-            )
+                        # Set permissions
+                        await asyncio.to_thread(
+                            self._exec_with_timeout,
+                            client,
+                            f"chmod {config_file.mode} {config_file.destination}",
+                            30
+                        )
 
-            # Cleanup
-            client.exec_command(f"rm -f {remote_path}")
-            client.close()
+                await self._report_progress(
+                    progress_callback, "configure", 100, "Configuration applied"
+                )
 
-            return True
+                # Step 5: Start service
+                await self._report_progress(
+                    progress_callback, "start_service", 0, "Starting service..."
+                )
 
-        except ImportError:
+                if config.package.service:
+                    service = config.package.service
+
+                    if service.enable:
+                        await asyncio.to_thread(
+                            self._exec_with_timeout,
+                            client,
+                            f"systemctl enable {service.name}",
+                            30
+                        )
+
+                    if service.start:
+                        exit_code, _, stderr = await asyncio.to_thread(
+                            self._exec_with_timeout,
+                            client,
+                            f"systemctl restart {service.name}",
+                            60
+                        )
+
+                        if exit_code != 0:
+                            await self._report_progress(
+                                progress_callback,
+                                "start_service",
+                                0,
+                                f"Service start failed: {stderr[:200]}",
+                            )
+                            return False
+
+                        # Verify service is running
+                        await asyncio.sleep(2)
+                        exit_code, stdout, _ = await asyncio.to_thread(
+                            self._exec_with_timeout,
+                            client,
+                            f"systemctl is-active {service.name}",
+                            30
+                        )
+                        status = stdout.strip()
+
+                        if status != "active":
+                            await self._report_progress(
+                                progress_callback,
+                                "start_service",
+                                0,
+                                f"Service not active: {status}",
+                            )
+                            return False
+
+                await self._report_progress(
+                    progress_callback, "start_service", 100, "Service running"
+                )
+
+                # Cleanup
+                await asyncio.to_thread(
+                    self._exec_with_timeout,
+                    client,
+                    f"rm -f {remote_path}",
+                    30
+                )
+
+                return True
+
+            finally:
+                client.close()
+
+        except ImportError as e:
             await self._report_progress(
                 progress_callback,
                 "connect",
                 0,
-                "paramiko or scp not installed",
+                f"Missing dependency: {str(e)}",
             )
             return False
 
@@ -264,4 +295,149 @@ class SSHDeployer(BaseDeployer):
             await self._report_progress(
                 progress_callback, "install", 0, f"Deployment failed: {str(e)}"
             )
+            return False
+
+    def _create_ssh_connection(
+        self,
+        host: str,
+        port: int,
+        username: str,
+        password: Optional[str],
+        key_file: Optional[str],
+        timeout: int,
+    ):
+        """Create SSH connection (blocking, run in thread)"""
+        import paramiko
+
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        try:
+            if key_file:
+                client.connect(
+                    hostname=host,
+                    port=port,
+                    username=username,
+                    key_filename=key_file,
+                    timeout=timeout,
+                )
+            else:
+                client.connect(
+                    hostname=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                    timeout=timeout,
+                )
+            return client
+        except paramiko.AuthenticationException:
+            logger.error("SSH authentication failed")
+            return None
+        except Exception as e:
+            logger.error(f"SSH connection failed: {e}")
+            return None
+
+    def _transfer_file(self, client, local_path: str, remote_path: str) -> bool:
+        """Transfer file via SCP (blocking, run in thread)"""
+        try:
+            from scp import SCPClient
+
+            with SCPClient(client.get_transport()) as scp:
+                scp.put(local_path, remote_path)
+            return True
+        except Exception as e:
+            logger.error(f"File transfer failed: {e}")
+            return False
+
+    def _exec_with_timeout(
+        self,
+        client,
+        cmd: str,
+        timeout: int = 300,
+    ) -> tuple:
+        """Execute command with timeout (blocking, run in thread)"""
+        try:
+            stdin, stdout, stderr = client.exec_command(cmd, timeout=timeout)
+
+            # Set channel timeout for read operations
+            stdout.channel.settimeout(timeout)
+            stderr.channel.settimeout(timeout)
+
+            exit_code = stdout.channel.recv_exit_status()
+            stdout_data = stdout.read().decode()
+            stderr_data = stderr.read().decode()
+
+            return exit_code, stdout_data, stderr_data
+
+        except Exception as e:
+            logger.error(f"Command execution failed: {e}")
+            return -1, "", str(e)
+
+    def _verify_remote_checksum(
+        self,
+        client,
+        remote_path: str,
+        local_path: str,
+        expected: Dict[str, str],
+    ) -> bool:
+        """Verify checksum of remote file matches local file"""
+        try:
+            # Calculate local file checksum
+            if "sha256" in expected:
+                with open(local_path, "rb") as f:
+                    local_hash = hashlib.sha256(f.read()).hexdigest()
+
+                expected_hash = expected["sha256"]
+
+                # Verify local matches expected
+                if local_hash != expected_hash:
+                    logger.error(f"Local file checksum mismatch: {local_hash} != {expected_hash}")
+                    return False
+
+                # Get remote file checksum
+                exit_code, stdout, _ = self._exec_with_timeout(
+                    client,
+                    f"sha256sum {remote_path} | cut -d' ' -f1",
+                    30
+                )
+
+                if exit_code != 0:
+                    logger.error("Failed to calculate remote checksum")
+                    return False
+
+                remote_hash = stdout.strip()
+
+                if remote_hash != expected_hash:
+                    logger.error(f"Remote checksum mismatch: {remote_hash} != {expected_hash}")
+                    return False
+
+                return True
+
+            elif "md5" in expected:
+                with open(local_path, "rb") as f:
+                    local_hash = hashlib.md5(f.read()).hexdigest()
+
+                expected_hash = expected["md5"]
+
+                if local_hash != expected_hash:
+                    logger.error(f"Local file MD5 mismatch")
+                    return False
+
+                exit_code, stdout, _ = self._exec_with_timeout(
+                    client,
+                    f"md5sum {remote_path} | cut -d' ' -f1",
+                    30
+                )
+
+                if exit_code != 0:
+                    return False
+
+                remote_hash = stdout.strip()
+                return remote_hash == expected_hash
+
+            # No checksum specified
+            return True
+
+        except Exception as e:
+            logger.error(f"Checksum verification error: {e}")
             return False

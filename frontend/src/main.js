@@ -12,6 +12,7 @@ import { renderSolutionsPage } from './pages/solutions.js';
 import { renderSolutionDetailPage } from './pages/solution-detail.js';
 import { renderDeployPage, cleanupDeployPage } from './pages/deploy.js';
 import { renderDeploymentsPage } from './pages/deployments.js';
+import { renderDevicesPage } from './pages/devices.js';
 import { renderSettingsPage } from './pages/settings.js';
 
 // Initialize application
@@ -60,6 +61,7 @@ function setupRouter() {
     .register('solutions', renderSolutionsPage)
     .register('solution', renderSolutionDetailPage)
     .register('deploy', renderDeployPage)
+    .register('devices', renderDevicesPage)
     .register('deployments', renderDeploymentsPage)
     .register('settings', renderSettingsPage);
 
@@ -87,6 +89,7 @@ function updatePageTitle(route) {
     solutions: 'nav.solutions',
     solution: 'nav.solutions',
     deploy: 'deploy.title',
+    devices: 'nav.devices',
     deployments: 'nav.deployments',
     settings: 'nav.settings',
   };
