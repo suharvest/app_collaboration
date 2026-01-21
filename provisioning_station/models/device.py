@@ -193,25 +193,77 @@ class NodeRedConfig(BaseModel):
     influxdb_node_id: Optional[str] = None  # ID of InfluxDB config node to update
 
 
-# Binary Deployment Configuration
-class BinarySource(BaseModel):
-    """Binary source configuration"""
-    type: str = "local"  # local | url
-    path: Optional[str] = None
-    url: Optional[str] = None
-    checksum: Optional[Dict[str, str]] = None
+# Binary/Package Deployment Configuration for reCamera
+class DebPackageConfig(BaseModel):
+    """Debian package configuration"""
+    path: str  # Path to .deb file (relative to solution assets)
+    name: Optional[str] = None  # Package name (for opkg remove)
+    includes_init_script: bool = True  # Whether deb package includes init script
+
+
+class ModelFileConfig(BaseModel):
+    """Model file configuration"""
+    path: str  # Path to model file (relative to solution assets)
+    target_path: str = "/userdata/local/models"  # Target directory on device
+    filename: Optional[str] = None  # Target filename (default: same as source)
+
+
+class InitScriptConfig(BaseModel):
+    """Init script configuration for SysVinit"""
+    path: Optional[str] = None  # Path to custom init script (relative to solution assets)
+    priority: int = 92  # SysVinit priority (S??xxx)
+    name: str  # Service name (e.g., "yolo26-detector")
+    binary_path: str = "/usr/local/bin"  # Where the binary is installed
+    daemon_args: Optional[str] = None  # Arguments passed to daemon
+    log_file: Optional[str] = None  # Log file path (default: /var/log/{name}.log)
+    ld_library_path: str = "/mnt/system/lib:/mnt/system/usr/lib:/mnt/system/usr/lib/3rd:/mnt/system/lib/3rd:/lib:/usr/lib"
+    config_file: Optional[str] = None  # Optional config file path (e.g., /etc/xxx.conf)
+
+
+class MqttExternalConfig(BaseModel):
+    """MQTT external access configuration"""
+    enable: bool = False  # Whether to configure external MQTT access
+    port: int = 1883
+    allow_anonymous: bool = True
+
+
+class ConflictServiceConfig(BaseModel):
+    """Conflicting services to stop/disable"""
+    stop: List[str] = []  # Services to stop (e.g., ["S03node-red", "S91sscma-node"])
+    disable: List[str] = []  # Services to disable (rename S* to K*)
 
 
 class BinaryConfig(BaseModel):
-    """Binary deployment configuration for C++ applications"""
-    source: BinarySource
-    install_path: Optional[str] = None  # Default: /usr/local/bin/<binary_name>
-    service_name: Optional[str] = None  # Name for the service script
-    service_priority: int = 99  # SysVinit priority (S??xxx)
-    description: Optional[str] = None  # Service description
-    daemon_args: Optional[str] = None  # Arguments to pass to the daemon
-    auto_start: bool = True  # Whether to start service after deployment
-    auto_restart: bool = True  # Whether service should auto-restart on boot
+    """Binary/Package deployment configuration for reCamera C++ applications
+
+    Supports:
+    - .deb package installation via opkg
+    - Model file deployment to /userdata/local/models
+    - SysVinit init script deployment
+    - MQTT external access configuration
+    - Conflicting service management
+    """
+    # Package installation
+    deb_package: Optional[DebPackageConfig] = None
+
+    # Model files
+    models: List[ModelFileConfig] = []
+
+    # Init script configuration
+    init_script: Optional[InitScriptConfig] = None
+
+    # MQTT configuration
+    mqtt_config: Optional[MqttExternalConfig] = None
+
+    # Conflict service handling
+    conflict_services: Optional[ConflictServiceConfig] = None
+
+    # Legacy fields for backwards compatibility
+    service_name: Optional[str] = None
+    service_priority: int = 92
+    description: Optional[str] = None
+    daemon_args: Optional[str] = None
+    auto_start: bool = True
 
 
 class UserInputConfig(BaseModel):

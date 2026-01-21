@@ -15,15 +15,13 @@ from .preview_deployer import PreviewDeployer
 from .nodered_deployer import NodeRedDeployer
 from .recamera_nodered_deployer import ReCameraNodeRedDeployer
 
-# SSH binary deployers
-from .ssh_binary_deployer import SSHBinaryDeployer
+# reCamera C++ deployer
 from .recamera_cpp_deployer import ReCameraCppDeployer
 
 __all__ = [
     # Base classes
     "BaseDeployer",
     "NodeRedDeployer",
-    "SSHBinaryDeployer",
     # Concrete deployers
     "ESP32Deployer",
     "DockerDeployer",
