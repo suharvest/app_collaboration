@@ -1,0 +1,41 @@
+version: "1.0"
+id: preview_heatmap
+name: Heatmap Preview
+name_zh: 热力图预览
+type: preview
+
+# 视频流配置（RTSP 端口 8554，路径 /live0）
+video:
+  type: rtsp_proxy
+  rtsp_url_template: "rtsp://{{host}}:8554/live0"
+
+# MQTT 配置（接收 YOLO26 跟踪结果）
+mqtt:
+  broker_template: "{{host}}"
+  port: 1883
+  topic_template: "recamera/yolo26/detections"
+
+# 叠加层配置
+overlay:
+  renderer: custom
+  script_file: preview/draw_heatmap.js
+  # 本地 simpleheat 库依赖
+  dependencies:
+    - lib/simpleheat.js
+
+# 显示配置
+display:
+  aspect_ratio: "16:9"
+  auto_start: false
+  show_stats: true
+
+# 用户输入（继承自上一步的 host）
+user_inputs:
+  - id: host
+    name: Device IP
+    name_zh: 设备 IP
+    type: text
+    required: true
+    placeholder: "192.168.10.88"
+    description: IP address of reCamera (from previous step)
+    description_zh: reCamera 的 IP 地址（来自上一步）
