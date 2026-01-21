@@ -1,0 +1,54 @@
+"""
+Manual deployment deployer - for steps that users perform manually
+"""
+
+import logging
+from typing import Callable, Optional, Dict, Any
+
+from .base import BaseDeployer
+from ..models.device import DeviceConfig
+
+logger = logging.getLogger(__name__)
+
+
+class ManualDeployer(BaseDeployer):
+    """Manual deployment - user performs steps manually"""
+
+    async def deploy(
+        self,
+        config: DeviceConfig,
+        connection: Dict[str, Any],
+        progress_callback: Optional[Callable] = None,
+    ) -> bool:
+        """
+        For manual deployments, we just mark the deployment as successful
+        since the user is expected to perform the steps manually.
+        """
+        try:
+            await self._report_progress(
+                progress_callback,
+                "manual_steps",
+                0,
+                "Manual deployment - please follow the instructions",
+            )
+
+            # For manual deployments, we consider them successful immediately
+            # The user is expected to follow the on-screen instructions
+            await self._report_progress(
+                progress_callback,
+                "manual_steps",
+                100,
+                "Manual steps completed - please verify the results",
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Manual deployment error: {e}")
+            await self._report_progress(
+                progress_callback,
+                "manual_steps",
+                0,
+                f"Error: {str(e)}",
+            )
+            return False
