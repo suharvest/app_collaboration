@@ -1476,6 +1476,18 @@
   animation: spin 1s linear infinite;
 }
 
+/* Button spinning state */
+.btn.spinning svg,
+button.spinning svg {
+  animation: spin 1s linear infinite;
+}
+
+.btn.spinning,
+button.spinning {
+  opacity: 0.7;
+  cursor: wait;
+}
+
 /* ============================================
    PREVIEW WINDOW STYLES
    ============================================ */

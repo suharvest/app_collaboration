@@ -430,6 +430,9 @@ function renderDeploySection(device, stepNumber) {
           <!-- Connection Settings (for SSH-based devices) -->
           ${device.type === 'ssh_deb' || device.type === 'docker_remote' || device.type === 'recamera_cpp' || device.type === 'recamera_nodered' ? renderSSHForm(device) : ''}
 
+          <!-- Additional User Inputs (for docker_remote devices, excluding SSH fields) -->
+          ${device.type === 'docker_remote' && state.details?.user_inputs ? renderUserInputs(device, state.details.user_inputs, ['host', 'username', 'password', 'port']) : ''}
+
           <!-- Markdown Content from section.description (pre-deployment instructions) -->
           ${sectionDescription ? `
             <div class="deploy-pre-instructions">
@@ -500,24 +503,46 @@ function renderDeploySection(device, stepNumber) {
   `;
 }
 
-function renderUserInputs(device, inputs) {
+function renderUserInputs(device, inputs, excludeIds = []) {
   if (!inputs || !inputs.length) return '';
+
+  // Filter out excluded inputs (e.g., those already handled by SSH form)
+  const filteredInputs = inputs.filter(input => !excludeIds.includes(input.id));
+  if (!filteredInputs.length) return '';
 
   return `
     <div class="deploy-user-inputs">
-      ${inputs.map(input => `
-        <div class="form-group">
-          <label>${getLocalizedField(input, 'name')}</label>
-          ${input.description ? `<p class="text-xs text-text-muted mb-1">${getLocalizedField(input, 'description')}</p>` : ''}
-          <input
-            type="${input.type === 'password' ? 'password' : 'text'}"
-            id="input-${device.id}-${input.id}"
-            placeholder="${input.placeholder || ''}"
-            value="${input.default || ''}"
-            ${input.required ? 'required' : ''}
-          />
-        </div>
-      `).join('')}
+      ${filteredInputs.map(input => {
+        if (input.type === 'checkbox') {
+          const isChecked = input.default === 'true' || input.default === true;
+          return `
+            <div class="form-group form-group-checkbox">
+              <label class="checkbox-label">
+                <input
+                  type="checkbox"
+                  id="input-${device.id}-${input.id}"
+                  ${isChecked ? 'checked' : ''}
+                />
+                <span>${getLocalizedField(input, 'name')}</span>
+              </label>
+              ${input.description ? `<p class="text-xs text-text-muted">${getLocalizedField(input, 'description')}</p>` : ''}
+            </div>
+          `;
+        }
+        return `
+          <div class="form-group">
+            <label>${getLocalizedField(input, 'name')}</label>
+            ${input.description ? `<p class="text-xs text-text-muted mb-1">${getLocalizedField(input, 'description')}</p>` : ''}
+            <input
+              type="${input.type === 'password' ? 'password' : 'text'}"
+              id="input-${device.id}-${input.id}"
+              placeholder="${input.placeholder || ''}"
+              value="${input.default || ''}"
+              ${input.required ? 'required' : ''}
+            />
+          </div>
+        `;
+      }).join('')}
     </div>
   `;
 }
@@ -954,7 +979,13 @@ async function detectDevices() {
   }
 }
 
-async function refreshSerialPorts() {
+async function refreshSerialPorts(clickedBtn = null) {
+  // Add spinning animation to button
+  if (clickedBtn) {
+    clickedBtn.classList.add('spinning');
+    clickedBtn.disabled = true;
+  }
+
   try {
     const result = await devicesApi.getPorts();
     const ports = result.ports || [];
@@ -1011,6 +1042,13 @@ async function refreshSerialPorts() {
     });
   } catch (error) {
     console.error('Failed to refresh ports:', error);
+    toast.error('Failed to refresh ports');
+  } finally {
+    // Remove spinning animation
+    if (clickedBtn) {
+      clickedBtn.classList.remove('spinning');
+      clickedBtn.disabled = false;
+    }
   }
 }
 
@@ -1197,9 +1235,9 @@ function setupSelectedDeviceHandlers(container) {
 
   // Refresh ports in selected section
   container.querySelectorAll('.deploy-selected-card [id^="refresh-ports-"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      refreshSerialPorts();
+      await refreshSerialPorts(btn);
     });
   });
 
@@ -1643,9 +1681,9 @@ function setupEventHandlers(container) {
 
   // Refresh ports
   container.querySelectorAll('[id^="refresh-ports-"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      refreshSerialPorts();
+      await refreshSerialPorts(btn);
     });
   });
 
