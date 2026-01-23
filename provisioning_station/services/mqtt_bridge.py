@@ -16,9 +16,16 @@ logger = logging.getLogger(__name__)
 # Try to import paho-mqtt
 try:
     import paho.mqtt.client as mqtt
+    # Check for paho-mqtt 2.0+ callback API
+    try:
+        from paho.mqtt.enums import CallbackAPIVersion
+        MQTT_V2_API = True
+    except ImportError:
+        MQTT_V2_API = False
     MQTT_AVAILABLE = True
 except ImportError:
     MQTT_AVAILABLE = False
+    MQTT_V2_API = False
     logger.warning("paho-mqtt not installed. MQTT bridge functionality will be limited.")
 
 
@@ -118,31 +125,56 @@ class MqttBridge:
         subscription.callbacks.add(callback)
 
         # Create and configure MQTT client
-        client = mqtt.Client(
-            client_id=f"preview_bridge_{subscription_id}",
-            protocol=mqtt.MQTTv311,
-        )
+        if MQTT_V2_API:
+            client = mqtt.Client(
+                callback_api_version=CallbackAPIVersion.VERSION2,
+                client_id=f"preview_bridge_{subscription_id}",
+                protocol=mqtt.MQTTv311,
+            )
+        else:
+            client = mqtt.Client(
+                client_id=f"preview_bridge_{subscription_id}",
+                protocol=mqtt.MQTTv311,
+            )
 
         if username and password:
             client.username_pw_set(username, password)
 
-        # Set up callbacks
-        def on_connect(client, userdata, flags, rc):
-            if rc == 0:
-                subscription.connected = True
-                subscription.error = None
-                client.subscribe(topic)
-                logger.info(f"Connected to MQTT broker {broker}:{port}, subscribed to {topic}")
-            else:
-                subscription.connected = False
-                subscription.error = f"Connection failed with code {rc}"
-                logger.error(f"MQTT connection failed: {subscription.error}")
+        # Set up callbacks (signature differs between API versions)
+        if MQTT_V2_API:
+            def on_connect(client, userdata, flags, rc, properties=None):
+                if rc == 0 or rc.value == 0:
+                    subscription.connected = True
+                    subscription.error = None
+                    client.subscribe(topic)
+                    logger.info(f"Connected to MQTT broker {broker}:{port}, subscribed to {topic}")
+                else:
+                    subscription.connected = False
+                    subscription.error = f"Connection failed with code {rc}"
+                    logger.error(f"MQTT connection failed: {subscription.error}")
 
-        def on_disconnect(client, userdata, rc):
-            subscription.connected = False
-            if rc != 0:
-                subscription.error = f"Unexpected disconnect (code {rc})"
-                logger.warning(f"MQTT disconnected: {subscription.error}")
+            def on_disconnect(client, userdata, flags, rc, properties=None):
+                subscription.connected = False
+                if rc != 0:
+                    subscription.error = f"Unexpected disconnect (code {rc})"
+                    logger.warning(f"MQTT disconnected: {subscription.error}")
+        else:
+            def on_connect(client, userdata, flags, rc):
+                if rc == 0:
+                    subscription.connected = True
+                    subscription.error = None
+                    client.subscribe(topic)
+                    logger.info(f"Connected to MQTT broker {broker}:{port}, subscribed to {topic}")
+                else:
+                    subscription.connected = False
+                    subscription.error = f"Connection failed with code {rc}"
+                    logger.error(f"MQTT connection failed: {subscription.error}")
+
+            def on_disconnect(client, userdata, rc):
+                subscription.connected = False
+                if rc != 0:
+                    subscription.error = f"Unexpected disconnect (code {rc})"
+                    logger.warning(f"MQTT disconnected: {subscription.error}")
 
         def on_message(client, userdata, msg):
             subscription.message_count += 1
@@ -154,10 +186,11 @@ class MqttBridge:
                 except json.JSONDecodeError:
                     data = {"raw": payload}
 
+                import time
                 message = {
                     "topic": msg.topic,
                     "payload": data,
-                    "timestamp": asyncio.get_event_loop().time(),
+                    "timestamp": time.time(),
                 }
 
                 # Forward to all callbacks
@@ -180,18 +213,31 @@ class MqttBridge:
         subscription.client = client
         self.subscriptions[subscription_id] = subscription
 
-        # Connect in a thread to not block
+        # Connect and wait for actual connection
         try:
             client.connect_async(broker, port, keepalive=60)
             client.loop_start()
-            logger.info(f"Started MQTT subscription {subscription_id} to {broker}:{port}/{topic}")
+            logger.info(f"Starting MQTT subscription {subscription_id} to {broker}:{port}/{topic}")
+
+            # Wait for connection to be established (max 10 seconds)
+            for _ in range(100):  # 100 * 0.1s = 10s
+                await asyncio.sleep(0.1)
+                if subscription.connected:
+                    logger.info(f"MQTT connected to {broker}:{port}/{topic}")
+                    return subscription_id
+                if subscription.error:
+                    raise RuntimeError(subscription.error)
+
+            # Timeout
+            client.loop_stop()
+            client.disconnect()
+            raise RuntimeError(f"Connection timeout to {broker}:{port}")
+
         except Exception as e:
             subscription.error = str(e)
             subscription.connected = False
             logger.error(f"Failed to connect to MQTT: {e}")
             raise RuntimeError(f"Failed to connect to MQTT broker: {e}")
-
-        return subscription_id
 
     async def unsubscribe(self, subscription_id: str, callback: Optional[Callable] = None) -> bool:
         """

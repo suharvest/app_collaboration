@@ -110,9 +110,15 @@ export class PreviewWindow {
     this.container.innerHTML = `
       <div class="preview-window">
         <div class="preview-header">
-          <div class="preview-status" id="preview-status">
-            <span class="preview-status-dot"></span>
-            <span class="preview-status-text">${t('preview.status.disconnected')}</span>
+          <div class="preview-status-group">
+            <div class="preview-status" id="preview-status-rtsp" title="RTSP Stream">
+              <span class="preview-status-dot"></span>
+              <span class="preview-status-text">RTSP</span>
+            </div>
+            <div class="preview-status" id="preview-status-mqtt" title="MQTT">
+              <span class="preview-status-dot"></span>
+              <span class="preview-status-text">MQTT</span>
+            </div>
           </div>
           ${this.config.showStats ? `
             <div class="preview-stats" id="preview-stats">
@@ -190,33 +196,40 @@ export class PreviewWindow {
   async connect(options = {}) {
     const { rtspUrl, mqttBroker, mqttPort, mqttTopic, mqttUsername, mqttPassword } = options;
 
-    this._updateStatus('connecting');
+    // Initialize both as connecting
+    this._updateRtspStatus('connecting');
+    this._updateMqttStatus('disconnected');
 
     try {
       // Start video stream if URL provided
       if (rtspUrl) {
         await this._connectVideo(rtspUrl);
+        // Video connected - update UI immediately
+        this.isConnected = true;
+        this._updateRtspStatus('connected');
+        this._updateConnectButton(true);
       }
-
-      // Connect to MQTT if configured
-      if (mqttBroker && mqttTopic) {
-        await this._connectMqtt({
-          broker: mqttBroker,
-          port: mqttPort || 1883,
-          topic: mqttTopic,
-          username: mqttUsername,
-          password: mqttPassword,
-        });
-      }
-
-      this.isConnected = true;
-      this._updateStatus('connected');
-      this._updateConnectButton(true);
-
     } catch (error) {
-      console.error('Connection failed:', error);
-      this._updateStatus('error', error.message);
+      console.error('Video connection failed:', error);
+      this._updateRtspStatus('error', error.message);
       throw error;
+    }
+
+    // Connect to MQTT asynchronously (don't block UI)
+    if (mqttBroker && mqttTopic) {
+      this._updateMqttStatus('connecting');
+      this._connectMqtt({
+        broker: mqttBroker,
+        port: mqttPort || 1883,
+        topic: mqttTopic,
+        username: mqttUsername,
+        password: mqttPassword,
+      }).then(() => {
+        this._updateMqttStatus('connected');
+      }).catch(error => {
+        console.error('MQTT connection failed:', error);
+        this._updateMqttStatus('error', error.message);
+      });
     }
   }
 
@@ -439,32 +452,54 @@ export class PreviewWindow {
     }
 
     this.isConnected = false;
-    this._updateStatus('disconnected');
+    this._updateRtspStatus('disconnected');
+    this._updateMqttStatus('disconnected');
     this._updateConnectButton(false);
   }
 
   /**
-   * Update status display
+   * Update RTSP status display
    */
-  _updateStatus(status, message = null) {
-    const statusEl = this.container.querySelector('#preview-status');
+  _updateRtspStatus(status, message = null) {
+    const statusEl = this.container.querySelector('#preview-status-rtsp');
     if (!statusEl) return;
 
-    const statusDot = statusEl.querySelector('.preview-status-dot');
+    statusEl.className = `preview-status ${status}`;
     const statusText = statusEl.querySelector('.preview-status-text');
+    if (statusText) {
+      if (status === 'error' && message) {
+        statusText.textContent = message;
+      } else {
+        statusText.textContent = 'RTSP';
+      }
+    }
+  }
+
+  /**
+   * Update MQTT status display
+   */
+  _updateMqttStatus(status, message = null) {
+    const statusEl = this.container.querySelector('#preview-status-mqtt');
+    if (!statusEl) return;
 
     statusEl.className = `preview-status ${status}`;
-
-    const statusMessages = {
-      disconnected: t('preview.status.disconnected'),
-      connecting: t('preview.status.connecting'),
-      connected: t('preview.status.connected'),
-      error: message || t('preview.status.error'),
-    };
-
+    const statusText = statusEl.querySelector('.preview-status-text');
     if (statusText) {
-      statusText.textContent = statusMessages[status] || status;
+      if (status === 'error' && message) {
+        statusText.textContent = message;
+      } else {
+        statusText.textContent = 'MQTT';
+      }
     }
+  }
+
+  /**
+   * Update status display (legacy - updates both)
+   */
+  _updateStatus(status, message = null) {
+    // For backwards compatibility, update both if needed
+    this._updateRtspStatus(status, message);
+    this._updateMqttStatus(status, message);
 
     // Notify status handlers
     this._statusHandlers.forEach(handler => {
