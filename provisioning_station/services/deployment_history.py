@@ -63,6 +63,21 @@ class DeploymentHistory:
         except Exception as e:
             logger.error(f"Failed to record deployment: {e}")
 
+    async def remove_deployment(self, deployment_id: str) -> bool:
+        """Remove a deployment record by deployment_id"""
+        try:
+            records = self._load_records()
+            original_len = len(records)
+            records = [r for r in records if r.get("deployment_id") != deployment_id]
+            if len(records) < original_len:
+                self._save_records(records)
+                logger.info(f"Removed deployment record: {deployment_id}")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Failed to remove deployment: {e}")
+            return False
+
     async def get_history(
         self,
         solution_id: Optional[str] = None,

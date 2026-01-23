@@ -1596,7 +1596,17 @@
 }
 
 .device-management-card {
-  @apply bg-card rounded-lg shadow-sm border border-border overflow-hidden;
+  @apply bg-card rounded-lg shadow-sm border border-border overflow-hidden relative;
+}
+
+.device-card-delete {
+  @apply absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full
+         text-text-secondary hover:text-red-500 hover:bg-red-50 transition-colors z-10;
+  opacity: 0;
+}
+
+.device-management-card:hover .device-card-delete {
+  opacity: 1;
 }
 
 .device-management-card .device-card-header {
@@ -1891,7 +1901,7 @@ button.spinning {
 }
 
 .presets-title {
-  @apply text-sm font-semibold text-text-primary mb-2 flex items-center gap-2;
+  @apply text-xl font-semibold text-text-primary mt-6 mb-3 pb-1.5 border-b border-border/50 flex items-center gap-2;
 }
 
 .presets-grid {
