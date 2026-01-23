@@ -91,6 +91,11 @@ function renderDeploymentCard(deployment) {
 
   return `
     <div class="device-management-card" data-deployment-id="${deployment.deployment_id}">
+      <button class="device-card-delete" data-deployment-id="${deployment.deployment_id}" title="${t('devices.actions.delete')}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
       <div class="device-card-header">
         <div>
           <div class="device-card-title">${name}</div>
@@ -186,6 +191,11 @@ function renderEmptyState() {
 }
 
 function setupEventHandlers() {
+  // Delete buttons
+  document.querySelectorAll('.device-card-delete').forEach(btn => {
+    btn.addEventListener('click', handleDeleteClick);
+  });
+
   // Action buttons
   document.querySelectorAll('.action-btn').forEach(btn => {
     btn.addEventListener('click', handleActionClick);
@@ -195,6 +205,22 @@ function setupEventHandlers() {
   document.querySelectorAll('.kiosk-toggle').forEach(toggle => {
     toggle.addEventListener('change', handleKioskToggle);
   });
+}
+
+async function handleDeleteClick(event) {
+  const btn = event.currentTarget;
+  const deploymentId = btn.dataset.deploymentId;
+  if (!confirm(t('devices.actions.confirmDelete'))) return;
+
+  try {
+    await deviceManagementApi.deleteDeployment(deploymentId);
+    // Remove card from DOM
+    const card = btn.closest('.device-management-card');
+    if (card) card.remove();
+    toast.success(t('devices.actions.deleted'));
+  } catch (error) {
+    toast.error(t('common.error') + ': ' + error.message);
+  }
 }
 
 async function handleActionClick(event) {

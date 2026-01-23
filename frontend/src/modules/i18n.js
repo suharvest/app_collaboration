@@ -36,7 +36,7 @@ const translations = {
       becomePartner: 'Become a Partner',
       partnerRegisterHint: 'Registered partners will be featured on Seeed Studio solution pages',
       // Device Configurator
-      quickStart: 'Quick Start',
+      quickStart: 'Solution Description',
       orCustomize: 'or customize',
       selectedDevices: 'Selected Devices',
       productDetails: 'Product Details',
@@ -145,6 +145,9 @@ const translations = {
         restart: 'Restart',
         start: 'Start',
         stop: 'Stop',
+        delete: 'Delete',
+        confirmDelete: 'Are you sure you want to delete this deployment record?',
+        deleted: 'Deployment record deleted',
       },
       kiosk: {
         title: 'Kiosk Mode',
@@ -245,7 +248,7 @@ const translations = {
       becomePartner: '成为合作伙伴',
       partnerRegisterHint: '已注册合作伙伴将有机会显示在矽递解决方案宣传页',
       // Device Configurator
-      quickStart: '快速开始',
+      quickStart: '方案说明',
       orCustomize: '或自定义选择',
       selectedDevices: '已选设备',
       productDetails: '产品详情',
@@ -354,6 +357,9 @@ const translations = {
         restart: '重启',
         start: '启动',
         stop: '停止',
+        delete: '删除',
+        confirmDelete: '确定删除此部署记录？',
+        deleted: '已删除部署记录',
       },
       kiosk: {
         title: 'Kiosk 模式',

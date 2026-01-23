@@ -337,6 +337,10 @@ export const deviceManagementApi = {
     });
   },
 
+  deleteDeployment(deploymentId) {
+    return request(`/device-management/${deploymentId}`, { method: 'DELETE' });
+  },
+
   /**
    * Get Kiosk mode status
    * @param {string} deploymentId - Deployment ID

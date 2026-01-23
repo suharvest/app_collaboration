@@ -255,6 +255,15 @@ async def update_deployment(deployment_id: str, request: UpdateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/{deployment_id}")
+async def delete_deployment(deployment_id: str):
+    """Remove a deployment record"""
+    removed = await deployment_history.remove_deployment(deployment_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+    return {"success": True, "deployment_id": deployment_id}
+
+
 async def _check_deployment_status(record) -> str:
     """Check if a deployment is currently running"""
     try:
