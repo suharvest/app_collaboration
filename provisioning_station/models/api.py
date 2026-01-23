@@ -59,7 +59,11 @@ class SolutionDetail(BaseModel):
     cover_image: Optional[str] = None
     gallery: List[Dict[str, Any]] = []
     devices: List[DeviceSummary] = []
-    required_devices: List[Dict[str, Any]] = []
+    required_devices: List[Dict[str, Any]] = []  # Legacy field
+    # New device configuration system
+    device_catalog: Dict[str, Dict[str, Any]] = {}
+    device_groups: List[Dict[str, Any]] = []
+    presets: List[Dict[str, Any]] = []
     partners: List[PartnerInfo] = []  # Deployment partners
     stats: Dict[str, Any] = {}
     links: Dict[str, str] = {}

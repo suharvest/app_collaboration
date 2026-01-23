@@ -2,17 +2,142 @@
 Solution management API routes
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, Response
+import markdown
 
 from ..models.api import SolutionSummary, SolutionDetail
+from ..models.solution import DeviceGroupSection
 from ..services.solution_manager import solution_manager
 from ..config import settings
 
 router = APIRouter(prefix="/api/solutions", tags=["solutions"])
+
+
+async def load_device_group_section(
+    solution_id: str,
+    section: DeviceGroupSection,
+    selected_device: Optional[str],
+    lang: str,
+) -> dict:
+    """Load section with template variable replacement"""
+    result = {
+        "title": section.title_zh if lang == "zh" and section.title_zh else section.title,
+    }
+
+    # Select language-specific template file
+    template_file = section.description_file_zh if lang == "zh" and section.description_file_zh else section.description_file
+    if not template_file:
+        return result
+
+    # Load template content (raw markdown, no HTML conversion yet)
+    template_content = await solution_manager.load_markdown(
+        solution_id, template_file, convert_to_html=False
+    )
+    if not template_content:
+        return result
+
+    # Replace template variables
+    if section.variables and selected_device:
+        for var_name, device_files in section.variables.items():
+            placeholder = "{{" + var_name + "}}"
+            if placeholder in template_content:
+                # Get content file for this device
+                content_file = device_files.get(selected_device)
+                if content_file:
+                    # Try language-specific version first
+                    if lang == "zh":
+                        zh_file = content_file.replace('.md', '_zh.md')
+                        content = await solution_manager.load_markdown(
+                            solution_id, zh_file, convert_to_html=False
+                        )
+                        if not content:
+                            content = await solution_manager.load_markdown(
+                                solution_id, content_file, convert_to_html=False
+                            )
+                    else:
+                        content = await solution_manager.load_markdown(
+                            solution_id, content_file, convert_to_html=False
+                        )
+                    template_content = template_content.replace(placeholder, content or '')
+                else:
+                    # No content for this device, clear the placeholder
+                    template_content = template_content.replace(placeholder, '')
+
+    # Convert final content to HTML
+    md = markdown.Markdown(extensions=['extra', 'codehilite', 'toc'])
+    result["description"] = md.convert(template_content)
+
+    return result
+
+
+async def load_preset_section(
+    solution_id: str,
+    section: DeviceGroupSection,
+    selections: dict,
+    lang: str,
+) -> dict:
+    """Load preset section with template variable replacement based on selections.
+
+    For preset sections, variables map to device_group selections.
+    E.g. variables: {server_config: {server_high: file1.md, server_low: file2.md}}
+    The key in selections that matches determines which file to use.
+    """
+    result = {
+        "title": section.title_zh if lang == "zh" and section.title_zh else section.title,
+    }
+
+    # Select language-specific template file
+    template_file = section.description_file_zh if lang == "zh" and section.description_file_zh else section.description_file
+    if not template_file:
+        return result
+
+    # Load template content (raw markdown, no HTML conversion yet)
+    template_content = await solution_manager.load_markdown(
+        solution_id, template_file, convert_to_html=False
+    )
+    if not template_content:
+        return result
+
+    # Replace template variables using selections
+    if section.variables:
+        for var_name, device_files in section.variables.items():
+            placeholder = "{{" + var_name + "}}"
+            if placeholder in template_content:
+                # Find which selection value matches a key in device_files
+                content_file = None
+                for group_id, selected_device in selections.items():
+                    if selected_device in device_files:
+                        content_file = device_files[selected_device]
+                        break
+
+                if content_file:
+                    # Try language-specific version first
+                    if lang == "zh":
+                        zh_file = content_file.replace('.md', '_zh.md')
+                        content = await solution_manager.load_markdown(
+                            solution_id, zh_file, convert_to_html=False
+                        )
+                        if not content:
+                            content = await solution_manager.load_markdown(
+                                solution_id, content_file, convert_to_html=False
+                            )
+                    else:
+                        content = await solution_manager.load_markdown(
+                            solution_id, content_file, convert_to_html=False
+                        )
+                    template_content = template_content.replace(placeholder, content or '')
+                else:
+                    template_content = template_content.replace(placeholder, '')
+
+    # Convert final content to HTML
+    md = markdown.Markdown(extensions=['extra', 'codehilite', 'toc'])
+    result["description"] = md.convert(template_content)
+
+    return result
 
 
 @router.get("/", response_model=List[SolutionSummary])
@@ -86,13 +211,67 @@ async def get_solution(
             "required": device.required,
         })
 
-    # Build required devices with image URLs
+    # Build required devices with image URLs (legacy)
     required_devices = []
     for device in solution.intro.required_devices:
         dev = device.model_dump()
         if device.image:
             dev["image"] = f"/api/solutions/{solution_id}/assets/{device.image}"
         required_devices.append(dev)
+
+    # Build device catalog by merging global catalog with local overrides
+    global_catalog = solution_manager.get_global_device_catalog()
+    device_catalog = {}
+
+    # Helper function to resolve device info
+    def resolve_device_info(device_id: str, local_device=None) -> dict:
+        """Merge global device info with local overrides"""
+        result = {}
+        # Start with global catalog info
+        if device_id in global_catalog:
+            result = dict(global_catalog[device_id])
+        # Override with local device catalog
+        if local_device:
+            local_data = local_device.model_dump() if hasattr(local_device, 'model_dump') else dict(local_device)
+            for key, value in local_data.items():
+                if value is not None:
+                    result[key] = value
+        # Convert local image paths to URLs
+        if result.get("image") and not result["image"].startswith("http"):
+            result["image"] = f"/api/solutions/{solution_id}/assets/{result['image']}"
+        return result
+
+    # Build local device catalog entries
+    for device_id, device in solution.intro.device_catalog.items():
+        device_catalog[device_id] = resolve_device_info(device_id, device)
+
+    # Build device groups with resolved device info
+    device_groups = []
+    for group in solution.intro.device_groups:
+        group_data = group.model_dump()
+        # Resolve device_ref for quantity type (check local then global)
+        if group.type == "quantity" and group.device_ref:
+            if group.device_ref in device_catalog:
+                group_data["device_info"] = device_catalog[group.device_ref]
+            elif group.device_ref in global_catalog:
+                group_data["device_info"] = resolve_device_info(group.device_ref, None)
+        # Resolve device_ref for options (check local then global)
+        if group.options:
+            resolved_options = []
+            for opt in group.options:
+                opt_data = opt.model_dump()
+                if opt.device_ref in device_catalog:
+                    opt_data["device_info"] = device_catalog[opt.device_ref]
+                elif opt.device_ref in global_catalog:
+                    opt_data["device_info"] = resolve_device_info(opt.device_ref, None)
+                resolved_options.append(opt_data)
+            group_data["options"] = resolved_options
+        device_groups.append(group_data)
+
+    # Build presets
+    presets = []
+    for preset in solution.intro.presets:
+        presets.append(preset.model_dump())
 
     # Build partners with logo URLs
     partners = []
@@ -121,6 +300,9 @@ async def get_solution(
         gallery=gallery,
         devices=devices,
         required_devices=required_devices,
+        device_catalog=device_catalog,
+        device_groups=device_groups,
+        presets=presets,
         partners=partners,
         stats=solution.intro.stats.model_dump(),
         links={k: v for k, v in solution.intro.links.model_dump().items() if v is not None},
@@ -156,6 +338,26 @@ async def get_deployment_info(
             "type": device.type,
             "required": device.required,
         }
+
+        # Load device config to get SSH settings, user_inputs, preview settings, etc.
+        if device.config_file:
+            config = await solution_manager.load_device_config(solution_id, device.config_file)
+            if config:
+                # Include SSH config for SSH-based deployments
+                if config.ssh:
+                    device_info["ssh"] = config.ssh.model_dump()
+                # Include user_inputs for all device types
+                if config.user_inputs:
+                    device_info["user_inputs"] = [inp.model_dump() for inp in config.user_inputs]
+                # Include preview-specific settings for preview type
+                if device.type == "preview":
+                    device_info["preview"] = {
+                        "user_inputs": [inp.model_dump() for inp in config.user_inputs] if config.user_inputs else [],
+                        "video": config.video.model_dump() if config.video else None,
+                        "mqtt": config.mqtt.model_dump() if config.mqtt else None,
+                        "overlay": config.overlay.model_dump() if config.overlay else None,
+                        "display": config.display.model_dump() if config.display else None,
+                    }
 
         if device.section:
             section = device.section
@@ -201,11 +403,53 @@ async def get_deployment_info(
                 "url": step.url,
             })
 
+    # Build device groups with section content
+    device_groups = []
+    for group in solution.intro.device_groups:
+        group_data = group.model_dump()
+
+        # Process section for this device group
+        if group.section:
+            # Get selected device (default)
+            selected_device = group.default
+            if group.type == 'multiple' and group.default_selections:
+                selected_device = group.default_selections[0]
+
+            section_data = await load_device_group_section(
+                solution_id,
+                group.section,
+                selected_device,
+                lang,
+            )
+            group_data["section"] = section_data
+        else:
+            group_data["section"] = None
+
+        device_groups.append(group_data)
+
+    # Build presets with section content
+    presets = []
+    for preset in solution.intro.presets:
+        preset_data = preset.model_dump()
+        if preset.section:
+            section_data = await load_preset_section(
+                solution_id,
+                preset.section,
+                preset.selections,
+                lang,
+            )
+            preset_data["section"] = section_data
+        else:
+            preset_data["section"] = None
+        presets.append(preset_data)
+
     return {
         "solution_id": solution_id,
         "guide": guide,
         "selection_mode": solution.deployment.selection_mode,
         "devices": devices,
+        "device_groups": device_groups,
+        "presets": presets,
         "order": solution.deployment.order,
         "post_deployment": post_deployment,
     }
@@ -223,6 +467,81 @@ async def get_solution_asset(solution_id: str, path: str):
         raise HTTPException(status_code=404, detail="Asset not found")
 
     return FileResponse(asset_path)
+
+
+@router.get("/{solution_id}/device-group/{group_id}/section")
+async def get_device_group_section(
+    solution_id: str,
+    group_id: str,
+    selected_device: str = Query(..., description="Selected device ref"),
+    lang: str = Query("en", pattern="^(en|zh)$"),
+):
+    """Get device group section content with template variable replacement"""
+    solution = solution_manager.get_solution(solution_id)
+    if not solution:
+        raise HTTPException(status_code=404, detail="Solution not found")
+
+    # Find the device group
+    group = None
+    for g in solution.intro.device_groups:
+        if g.id == group_id:
+            group = g
+            break
+
+    if not group:
+        raise HTTPException(status_code=404, detail="Device group not found")
+
+    if not group.section:
+        return {"section": None}
+
+    section_data = await load_device_group_section(
+        solution_id,
+        group.section,
+        selected_device,
+        lang,
+    )
+
+    return {"section": section_data}
+
+
+@router.get("/{solution_id}/preset/{preset_id}/section")
+async def get_preset_section(
+    solution_id: str,
+    preset_id: str,
+    lang: str = Query("en", pattern="^(en|zh)$"),
+):
+    """Get preset section content with template variable replacement.
+
+    Selections are passed as query parameters (group_id=device_ref).
+    """
+    solution = solution_manager.get_solution(solution_id)
+    if not solution:
+        raise HTTPException(status_code=404, detail="Solution not found")
+
+    # Find the preset
+    preset = None
+    for p in solution.intro.presets:
+        if p.id == preset_id:
+            preset = p
+            break
+
+    if not preset:
+        raise HTTPException(status_code=404, detail="Preset not found")
+
+    if not preset.section:
+        return {"section": None}
+
+    # Use preset's default selections
+    selections = dict(preset.selections)
+
+    section_data = await load_preset_section(
+        solution_id,
+        preset.section,
+        selections,
+        lang,
+    )
+
+    return {"section": section_data}
 
 
 @router.post("/{solution_id}/like")
