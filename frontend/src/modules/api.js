@@ -123,6 +123,27 @@ export const solutionsApi = {
   getContent(id, path) {
     return request(`/solutions/${id}/content/${path}`);
   },
+
+  /**
+   * Get device group section content with template variables replaced
+   * @param {string} id - Solution ID
+   * @param {string} groupId - Device group ID
+   * @param {string} selectedDevice - Selected device ref
+   * @param {string} lang - Language code
+   */
+  getDeviceGroupSection(id, groupId, selectedDevice, lang = 'en') {
+    return request(`/solutions/${id}/device-group/${groupId}/section?selected_device=${encodeURIComponent(selectedDevice)}&lang=${lang}`);
+  },
+
+  /**
+   * Get preset section content
+   * @param {string} id - Solution ID
+   * @param {string} presetId - Preset ID
+   * @param {string} lang - Language code
+   */
+  getPresetSection(id, presetId, lang = 'en') {
+    return request(`/solutions/${id}/preset/${presetId}/section?lang=${lang}`);
+  },
 };
 
 // ============================================

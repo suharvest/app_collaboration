@@ -10,12 +10,34 @@ import { escapeHtml } from '../modules/utils.js';
 import { PreviewWindow, fetchOverlayScript } from '../modules/preview.js';
 import { renderers } from '../modules/overlay-renderers.js';
 
+/**
+ * Load external script dynamically
+ * @param {string} url - Script URL
+ * @returns {Promise} Resolves when script is loaded
+ */
+function loadScript(url) {
+  return new Promise((resolve, reject) => {
+    // Check if already loaded
+    if (document.querySelector(`script[src="${url}"]`)) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = url;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
+    document.head.appendChild(script);
+  });
+}
+
 let currentSolution = null;
 let deviceStates = {};
 let logsWsMap = {};
 let selectedDevice = null; // For single_choice mode
 let showDetailedLogs = false; // Toggle for detailed vs summary logs
 let previewInstances = {}; // Track preview window instances
+let deviceGroupSelections = {}; // Track device selections for each device group
+let selectedPresetId = null; // Track selected preset for Level 1 sections
 
 export async function renderDeployPage(params) {
   const { id } = params;
@@ -47,10 +69,39 @@ export async function renderDeployPage(params) {
 
     deviceStates = {};
     selectedDevice = null; // Reset for new solution
+    deviceGroupSelections = {}; // Reset device group selections
+    selectedPresetId = null; // Reset preset selection
+
+    // Initialize selected preset (first preset with a section, or first preset)
+    const presets = deploymentInfo.presets || [];
+    if (presets.length > 0) {
+      const presetWithSection = presets.find(p => p.section);
+      selectedPresetId = presetWithSection ? presetWithSection.id : presets[0].id;
+    }
+
+    // Initialize device group selections from defaults
+    const deviceGroups = deploymentInfo.device_groups || [];
+    deviceGroups.forEach(group => {
+      if (group.type === 'single' && group.default) {
+        deviceGroupSelections[group.id] = group.default;
+      } else if (group.type === 'multiple' && group.default_selections?.length > 0) {
+        deviceGroupSelections[group.id] = group.default_selections[0];
+      }
+    });
+
     const devices = deploymentInfo.devices || [];
 
     // Initialize device states - first section expanded by default
     devices.forEach((device, index) => {
+      // For docker_deploy type: find default target (local/remote)
+      let defaultTarget = 'local';
+      if (device.targets) {
+        // targets is an object: { local: {...}, remote: {...} }
+        const targetEntries = Object.entries(device.targets);
+        const defaultEntry = targetEntries.find(([_, t]) => t.default);
+        defaultTarget = defaultEntry ? defaultEntry[0] : targetEntries[0]?.[0] || 'local';
+      }
+
       deviceStates[device.id] = {
         status: 'pending',
         detected: false,
@@ -60,6 +111,8 @@ export async function renderDeployPage(params) {
         logs: [],
         logsExpanded: false,
         sectionExpanded: index === 0, // First section expanded
+        // For docker_deploy type: track selected target (local/remote)
+        selectedTarget: device.type === 'docker_deploy' ? defaultTarget : null,
       };
     });
 
@@ -77,6 +130,8 @@ export async function renderDeployPage(params) {
 function renderDeployContent(container) {
   const deployment = currentSolution.deployment || {};
   const devices = deployment.devices || [];
+  const deviceGroups = deployment.device_groups || [];
+  const presets = deployment.presets || [];
   const name = getLocalizedField(currentSolution, 'name');
   const selectionMode = deployment.selection_mode || 'sequential';
 
@@ -84,6 +139,19 @@ function renderDeployContent(container) {
   if (selectionMode === 'single_choice' && !selectedDevice && devices.length > 0) {
     selectedDevice = devices[0].id;
   }
+
+  // Render device group sections (with template-based instructions)
+  // Filter by selected preset if applicable
+  const filteredDeviceGroups = getFilteredDeviceGroups(deviceGroups, presets);
+  const deviceGroupSectionsHtml = renderDeviceGroupSections(filteredDeviceGroups);
+
+  // Check if presets have sections (Level 1)
+  const presetsWithSections = presets.filter(p => p.section);
+  const hasPresetSections = presetsWithSections.length > 0;
+
+  // Render preset selector and section (Level 1)
+  const presetSelectorHtml = hasPresetSections ? renderPresetSelector(presets) : '';
+  const presetSectionHtml = hasPresetSections ? renderPresetSectionContent(presets) : '';
 
   container.innerHTML = `
     <div class="back-btn" id="back-btn">
@@ -96,7 +164,7 @@ function renderDeployContent(container) {
     <div class="deploy-page">
       <div class="page-header">
         <h1 class="page-title">${t('deploy.title')}: ${escapeHtml(name)}</h1>
-        ${deployment.guide ? `
+        ${!hasPresetSections && deployment.guide ? `
           <p class="text-sm text-text-secondary mt-2">${escapeHtml(currentSolution.summary || '')}</p>
         ` : ''}
       </div>
@@ -118,6 +186,15 @@ function renderDeployContent(container) {
           ${selectedDevice ? renderSelectedDeviceContent(devices.find(d => d.id === selectedDevice)) : ''}
         </div>
       ` : `
+        <!-- Level 1: Preset Selector + Section -->
+        ${presetSelectorHtml}
+        ${presetSectionHtml}
+
+        <!-- Level 2: Device Group Sections (template-based instructions) -->
+        <div id="deploy-device-groups-container">
+          ${deviceGroupSectionsHtml}
+        </div>
+
         <!-- Sequential Mode: Steps -->
         <div class="deploy-sections">
           ${devices.map((device, index) => renderDeploySection(device, index + 1)).join('')}
@@ -137,6 +214,213 @@ function renderDeployContent(container) {
       ` : ''}
     </div>
   `;
+}
+
+/**
+ * Render preset selector (Level 1 tab group)
+ * Only shown when multiple presets have sections
+ */
+function renderPresetSelector(presets) {
+  const presetsWithSections = presets.filter(p => p.section);
+  // Don't show selector for single preset
+  if (presetsWithSections.length <= 1) return '';
+
+  return `
+    <div class="deploy-preset-selector">
+      ${presetsWithSections.map(preset => {
+        const isSelected = preset.id === selectedPresetId;
+        const name = getLocalizedField(preset, 'name');
+        const badge = getLocalizedField(preset, 'badge');
+        return `
+          <button class="deploy-preset-btn ${isSelected ? 'selected' : ''}"
+                  data-preset-id="${preset.id}">
+            ${escapeHtml(name)}
+            ${badge ? `<span class="deploy-preset-badge">${escapeHtml(badge)}</span>` : ''}
+          </button>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+/**
+ * Render preset section content (Level 1 deployment guide)
+ */
+function renderPresetSectionContent(presets) {
+  const selectedPreset = presets.find(p => p.id === selectedPresetId);
+  if (!selectedPreset || !selectedPreset.section) return '';
+
+  const section = selectedPreset.section;
+  const title = section.title || '';
+  const description = section.description || '';
+
+  if (!description) return '';
+
+  return `
+    <div class="deploy-preset-section" id="deploy-preset-section">
+      ${title ? `<h3 class="deploy-preset-section-title">${escapeHtml(title)}</h3>` : ''}
+      <div class="deploy-preset-section-content markdown-content" id="deploy-preset-section-content">
+        ${description}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Handle preset selector change
+ */
+async function handlePresetChange(presetId) {
+  if (presetId === selectedPresetId) return;
+  selectedPresetId = presetId;
+
+  // Update button states
+  document.querySelectorAll('.deploy-preset-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.presetId === presetId);
+  });
+
+  // Show loading state on section content
+  const contentEl = document.getElementById('deploy-preset-section-content');
+  if (contentEl) {
+    contentEl.classList.add('loading');
+  }
+
+  // Re-render device group sections filtered by new preset
+  const deployment = currentSolution.deployment || {};
+  const deviceGroups = deployment.device_groups || [];
+  const presets = deployment.presets || [];
+  const filteredDeviceGroups = getFilteredDeviceGroups(deviceGroups, presets);
+  const deviceGroupContainer = document.getElementById('deploy-device-groups-container');
+  if (deviceGroupContainer) {
+    deviceGroupContainer.innerHTML = renderDeviceGroupSections(filteredDeviceGroups);
+    // Re-attach event handlers for new device group selectors
+    deviceGroupContainer.querySelectorAll('.device-group-selector').forEach(select => {
+      select.addEventListener('change', async (e) => {
+        const groupId = select.dataset.groupId;
+        const selectedDevice = e.target.value;
+        await handleDeviceGroupSelectorChange(groupId, selectedDevice);
+      });
+    });
+  }
+
+  try {
+    // Fetch new section content
+    const result = await solutionsApi.getPresetSection(
+      currentSolution.id,
+      presetId,
+      i18n.locale
+    );
+
+    if (result.section) {
+      const sectionEl = document.getElementById('deploy-preset-section');
+      if (sectionEl) {
+        const title = result.section.title || '';
+        const description = result.section.description || '';
+        sectionEl.innerHTML = `
+          ${title ? `<h3 class="deploy-preset-section-title">${escapeHtml(title)}</h3>` : ''}
+          <div class="deploy-preset-section-content markdown-content" id="deploy-preset-section-content">
+            ${description}
+          </div>
+        `;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load preset section:', error);
+    toast.error(t('common.error') + ': ' + error.message);
+  } finally {
+    const el = document.getElementById('deploy-preset-section-content');
+    if (el) {
+      el.classList.remove('loading');
+    }
+  }
+}
+
+/**
+ * Filter device groups by selected preset's selections keys
+ */
+function getFilteredDeviceGroups(deviceGroups, presets) {
+  if (!selectedPresetId || presets.length === 0) return deviceGroups;
+  const preset = presets.find(p => p.id === selectedPresetId);
+  if (!preset || !preset.selections) return deviceGroups;
+  const selectionKeys = Object.keys(preset.selections);
+  return deviceGroups.filter(g => selectionKeys.includes(g.id));
+}
+
+/**
+ * Render device group sections with template-based instructions
+ */
+function renderDeviceGroupSections(deviceGroups) {
+  return deviceGroups
+    .filter(group => group.section?.description)
+    .map(group => {
+      const section = group.section;
+      const title = section.title || getLocalizedField(group, 'name');
+      const hasMultipleOptions = group.options && group.options.length > 1;
+
+      return `
+        <div class="deploy-device-group-section" data-group-id="${group.id}">
+          <div class="deploy-device-group-header">
+            <h3 class="deploy-device-group-title">${escapeHtml(title)}</h3>
+            ${hasMultipleOptions ? renderDeviceGroupSelector(group) : ''}
+          </div>
+          <div class="deploy-device-group-content markdown-content" id="device-group-content-${group.id}">
+            ${section.description}
+          </div>
+        </div>
+      `;
+    })
+    .join('');
+}
+
+/**
+ * Render device selector for device group
+ */
+function renderDeviceGroupSelector(group) {
+  const currentSelection = deviceGroupSelections[group.id] || group.default;
+
+  return `
+    <select class="device-group-selector" data-group-id="${group.id}">
+      ${group.options.map(opt => {
+        const deviceInfo = opt.device_info || {};
+        const name = getLocalizedField(deviceInfo, 'name') || opt.label || opt.device_ref;
+        const selected = opt.device_ref === currentSelection ? 'selected' : '';
+        return `<option value="${opt.device_ref}" ${selected}>${escapeHtml(name)}</option>`;
+      }).join('')}
+    </select>
+  `;
+}
+
+/**
+ * Handle device group selector change
+ */
+async function handleDeviceGroupSelectorChange(groupId, selectedDevice) {
+  deviceGroupSelections[groupId] = selectedDevice;
+
+  // Show loading state
+  const contentEl = document.getElementById(`device-group-content-${groupId}`);
+  if (contentEl) {
+    contentEl.classList.add('loading');
+  }
+
+  try {
+    // Fetch updated section content from API
+    const result = await solutionsApi.getDeviceGroupSection(
+      currentSolution.id,
+      groupId,
+      selectedDevice,
+      i18n.locale
+    );
+
+    if (result.section && contentEl) {
+      contentEl.innerHTML = result.section.description || '';
+    }
+  } catch (error) {
+    console.error('Failed to load device group section:', error);
+    toast.error(t('common.error') + ': ' + error.message);
+  } finally {
+    if (contentEl) {
+      contentEl.classList.remove('loading');
+    }
+  }
 }
 
 function renderDeployOption(device) {
@@ -326,11 +610,12 @@ function renderDeploySection(device, stepNumber) {
   const state = deviceStates[device.id] || {};
   const name = getLocalizedField(device, 'name');
   const section = device.section || {};
-  const sectionTitle = section.title || name;
+  const sectionTitle = getLocalizedField(section, 'title') || name;
   const sectionDescription = section.description || '';
   const isManual = device.type === 'manual';
   const isScript = device.type === 'script';
   const isPreview = device.type === 'preview';
+  const isDockerDeploy = device.type === 'docker_deploy' && device.targets;
   const isCompleted = state.deploymentStatus === 'completed';
 
   return `
@@ -402,21 +687,31 @@ function renderDeploySection(device, stepNumber) {
 
           <!-- Preview Window Container -->
           <div class="preview-container-wrapper" id="preview-container-${device.id}"></div>
+        ` : isDockerDeploy ? `
+          <!-- Docker Deploy: local/remote target selector -->
+          ${renderDockerTargetSelector(device)}
+
+          <!-- Target-specific content (description, wiring, SSH form for remote) -->
+          <div class="deploy-target-content" id="target-content-${device.id}">
+            ${renderDockerTargetContent(device)}
+          </div>
 
           <!-- Deploy Action Area -->
           <div class="deploy-action-area">
             <div class="deploy-action-title">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="3" width="20" height="14" rx="2"/>
-                <polygon points="10 8 16 11 10 14 10 8"/>
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
               </svg>
-              ${t('preview.title')}
+              ${t('deploy.actions.auto')}
             </div>
-            <p class="deploy-action-desc">${t('preview.description')}</p>
+            <p class="deploy-action-desc">${t('deploy.actions.autoDesc')}</p>
             <button class="deploy-action-btn ${getButtonClass(state)}"
                     id="deploy-btn-${device.id}"
-                    data-device-id="${device.id}">
-              ${getPreviewButtonContent(state)}
+                    data-device-id="${device.id}"
+                    ${state.deploymentStatus === 'running' ? 'disabled' : ''}>
+              ${getDeployButtonContent(state, false)}
             </button>
           </div>
         ` : `
@@ -547,16 +842,137 @@ function renderUserInputs(device, inputs, excludeIds = []) {
   `;
 }
 
-function renderSSHForm(device) {
+/**
+ * Render target selector for docker_deploy type
+ * Allows user to choose between local and remote deployment
+ */
+function renderDockerTargetSelector(device) {
+  const state = deviceStates[device.id] || {};
+  const targets = device.targets || {};
+  const selectedTarget = state.selectedTarget || 'local';
+
+  const targetEntries = Object.entries(targets);
+  if (!targetEntries.length) return '';
+
+  return `
+    <div class="deploy-mode-selector">
+      <div class="deploy-mode-options">
+        ${targetEntries.map(([targetId, target]) => {
+          const isSelected = selectedTarget === targetId;
+          const targetName = getLocalizedField(target, 'name');
+          const targetDesc = getLocalizedField(target, 'description');
+          const isLocal = targetId === 'local';
+          const icon = isLocal
+            ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="7" width="20" height="14" rx="2"/>
+                <path d="M12 7V3M7 7V5M17 7V5"/>
+              </svg>`
+            : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="8" rx="2"/>
+                <rect x="2" y="14" width="20" height="8" rx="2"/>
+                <line x1="6" y1="6" x2="6.01" y2="6"/>
+                <line x1="6" y1="18" x2="6.01" y2="18"/>
+              </svg>`;
+
+          return `
+            <label class="deploy-mode-option ${isSelected ? 'selected' : ''}"
+                   data-device-id="${device.id}"
+                   data-target-id="${targetId}">
+              <input type="radio" name="target-${device.id}" value="${targetId}"
+                     ${isSelected ? 'checked' : ''}>
+              <div class="deploy-mode-radio"></div>
+              <div class="deploy-mode-icon">${icon}</div>
+              <div class="deploy-mode-info">
+                <div class="deploy-mode-name">${escapeHtml(targetName)}</div>
+                ${targetDesc ? `<div class="deploy-mode-desc">${escapeHtml(targetDesc)}</div>` : ''}
+              </div>
+            </label>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Get the currently selected target for a docker_deploy device
+ */
+function getSelectedTarget(device) {
+  const state = deviceStates[device.id] || {};
+  const targets = device.targets || {};
+  const selectedId = state.selectedTarget || 'local';
+  return { id: selectedId, ...targets[selectedId] };
+}
+
+/**
+ * Render content based on selected docker target
+ * Includes: description, wiring instructions, SSH form for remote
+ */
+function renderDockerTargetContent(device) {
+  const state = deviceStates[device.id] || {};
+  const target = getSelectedTarget(device);
+
+  if (!target) return '';
+
+  const targetSection = target.section || {};
+  const description = targetSection.description || '';
+  const wiring = targetSection.wiring || {};
+  const wiringSteps = getLocalizedField(wiring, 'steps') || [];
+  const isRemote = target.id === 'remote';
+
+  let html = '';
+
+  // Wiring instructions
+  if (wiringSteps.length > 0) {
+    html += `
+      <div class="deploy-wiring-section">
+        ${wiring.image ? `
+          <div class="deploy-wiring-image">
+            <img src="${getAssetUrl(currentSolution.id, wiring.image)}" alt="Wiring diagram">
+          </div>
+        ` : ''}
+        <div class="deploy-wiring-steps">
+          <ol>
+            ${wiringSteps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}
+          </ol>
+        </div>
+      </div>
+    `;
+  }
+
+  // SSH form for remote target
+  if (isRemote) {
+    html += renderSSHForm(device, target);
+  }
+
+  // Description content
+  if (description) {
+    html += `
+      <div class="deploy-pre-instructions">
+        <div class="markdown-content">
+          ${description}
+        </div>
+      </div>
+    `;
+  }
+
+  return html;
+}
+
+function renderSSHForm(device, mode = null) {
   const state = deviceStates[device.id] || {};
   const conn = state.connection || {};
+
+  // Get defaults from mode config or device config
+  const defaultHost = mode?.ssh?.default_host || device.ssh?.default_host || '';
+  const defaultUser = mode?.ssh?.default_user || device.ssh?.default_user || 'root';
 
   return `
     <div class="deploy-user-inputs">
       <div class="flex gap-4">
         <div class="form-group flex-1">
           <label>${t('deploy.connection.host')}</label>
-          <input type="text" id="ssh-host-${device.id}" value="${conn.host || ''}" placeholder="192.168.1.100">
+          <input type="text" id="ssh-host-${device.id}" value="${conn.host || defaultHost}" placeholder="192.168.42.1">
         </div>
         <div class="form-group" style="width: 100px;">
           <label>${t('deploy.connection.port')}</label>
@@ -566,7 +982,7 @@ function renderSSHForm(device) {
       <div class="flex gap-4">
         <div class="form-group flex-1">
           <label>${t('deploy.connection.username')}</label>
-          <input type="text" id="ssh-user-${device.id}" value="${conn.username || 'root'}">
+          <input type="text" id="ssh-user-${device.id}" value="${conn.username || defaultUser}">
         </div>
         <div class="form-group flex-1">
           <label>${t('deploy.connection.password')}</label>
@@ -745,32 +1161,75 @@ function renderPreviewInputs(device) {
   const currentIndex = devices.findIndex(d => d.id === device.id);
   const previousInputs = collectPreviousInputs(devices, currentIndex);
 
-  return `
-    <div class="deploy-user-inputs preview-inputs">
-      ${userInputs.map(input => {
-        // Resolve template for default value
-        let defaultValue = input.default || '';
-        if (input.default_template) {
-          defaultValue = resolveTemplate(input.default_template, previousInputs);
-        }
+  // Helper to render a single input field
+  const renderInput = (input, extraClass = '') => {
+    let defaultValue = input.default || '';
+    if (input.default_template) {
+      defaultValue = resolveTemplate(input.default_template, previousInputs);
+    }
+    return `
+      <div class="form-group ${extraClass}">
+        <label>${getLocalizedField(input, 'name')}</label>
+        <input
+          type="${input.type === 'password' ? 'password' : 'text'}"
+          id="preview-input-${device.id}-${input.id}"
+          class="preview-input"
+          data-device-id="${device.id}"
+          data-input-id="${input.id}"
+          placeholder="${input.placeholder || ''}"
+          value="${escapeHtml(defaultValue)}"
+          ${input.required ? 'required' : ''}
+        />
+      </div>
+    `;
+  };
 
-        return `
-          <div class="form-group">
-            <label>${getLocalizedField(input, 'name')}</label>
-            ${input.description ? `<p class="text-xs text-text-muted mb-1">${getLocalizedField(input, 'description')}</p>` : ''}
+  // Group inputs by row for compact layout
+  const getInput = (id) => userInputs.find(i => i.id === id);
+  const rtspUrl = getInput('rtsp_url');
+  const mqttBroker = getInput('mqtt_broker');
+  const mqttPort = getInput('mqtt_port');
+  const mqttTopic = getInput('mqtt_topic');
+  const mqttUsername = getInput('mqtt_username');
+  const mqttPassword = getInput('mqtt_password');
+
+  // Check if we have the expected MQTT inputs for compact layout
+  const hasCompactLayout = mqttBroker && mqttPort;
+
+  if (hasCompactLayout) {
+    return `
+      <div class="deploy-user-inputs preview-inputs">
+        ${rtspUrl ? renderInput(rtspUrl) : ''}
+        <div class="flex gap-4">
+          ${mqttBroker ? renderInput(mqttBroker, 'flex-1') : ''}
+          ${mqttPort ? `<div class="form-group" style="width: 100px;">
+            <label>${getLocalizedField(mqttPort, 'name')}</label>
             <input
-              type="${input.type === 'password' ? 'password' : 'text'}"
-              id="preview-input-${device.id}-${input.id}"
+              type="text"
+              id="preview-input-${device.id}-${mqttPort.id}"
               class="preview-input"
               data-device-id="${device.id}"
-              data-input-id="${input.id}"
-              placeholder="${input.placeholder || ''}"
-              value="${escapeHtml(defaultValue)}"
-              ${input.required ? 'required' : ''}
+              data-input-id="${mqttPort.id}"
+              placeholder="${mqttPort.placeholder || ''}"
+              value="${escapeHtml(mqttPort.default || '')}"
             />
+          </div>` : ''}
+        </div>
+        ${mqttTopic ? renderInput(mqttTopic) : ''}
+        ${(mqttUsername || mqttPassword) ? `
+          <div class="flex gap-4">
+            ${mqttUsername ? renderInput(mqttUsername, 'flex-1') : ''}
+            ${mqttPassword ? renderInput(mqttPassword, 'flex-1') : ''}
           </div>
-        `;
-      }).join('')}
+        ` : ''}
+      </div>
+    `;
+  }
+
+  // Fallback: render all inputs vertically
+  return `
+    <div class="deploy-user-inputs preview-inputs">
+      ${userInputs.map(input => renderInput(input)).join('')}
     </div>
   `;
 }
@@ -814,6 +1273,13 @@ async function initPreviewWindow(deviceId) {
 
   // Set up overlay renderer
   if (preview.overlay?.script_file) {
+    // Load dependencies first (e.g., simpleheat.js)
+    if (preview.overlay.dependencies?.length > 0) {
+      for (const dep of preview.overlay.dependencies) {
+        const depUrl = getAssetUrl(currentSolution.id, dep);
+        await loadScript(depUrl);
+      }
+    }
     // Load custom script
     const scriptUrl = getAssetUrl(currentSolution.id, preview.overlay.script_file);
     const renderer = await fetchOverlayScript(scriptUrl);
@@ -884,8 +1350,14 @@ async function startPreview(deviceId, previewWindow) {
     options.mqttBroker = inputs.mqtt_broker;
   }
 
-  options.mqttPort = preview.mqtt?.port || inputs.mqtt_port || 1883;
+  // Resolve MQTT port
+  if (preview.mqtt?.port_template) {
+    options.mqttPort = parseInt(resolveTemplate(preview.mqtt.port_template, inputs)) || 1883;
+  } else {
+    options.mqttPort = preview.mqtt?.port || parseInt(inputs.mqtt_port) || 1883;
+  }
 
+  // Resolve MQTT topic
   if (preview.mqtt?.topic_template) {
     options.mqttTopic = resolveTemplate(preview.mqtt.topic_template, inputs);
   } else if (inputs.mqtt_topic) {
@@ -894,7 +1366,16 @@ async function startPreview(deviceId, previewWindow) {
     options.mqttTopic = preview.mqtt?.topic || 'inference/results';
   }
 
-  if (preview.mqtt?.username || inputs.mqtt_username) {
+  // Resolve MQTT credentials
+  if (preview.mqtt?.username_template) {
+    const username = resolveTemplate(preview.mqtt.username_template, inputs);
+    if (username) {
+      options.mqttUsername = username;
+      options.mqttPassword = preview.mqtt?.password_template
+        ? resolveTemplate(preview.mqtt.password_template, inputs)
+        : (preview.mqtt?.password || inputs.mqtt_password);
+    }
+  } else if (preview.mqtt?.username || inputs.mqtt_username) {
     options.mqttUsername = preview.mqtt?.username || inputs.mqtt_username;
     options.mqttPassword = preview.mqtt?.password || inputs.mqtt_password;
   }
@@ -1094,6 +1575,40 @@ function updateChoiceOptionUI(deviceId) {
       const device = getDeviceById(deviceId);
       selectedSection.innerHTML = device ? renderSelectedDeviceContent(device) : '';
       setupSelectedDeviceHandlers(container);
+    }
+  }
+}
+
+/**
+ * Update docker target UI when user switches between local/remote
+ */
+function updateDockerTargetUI(deviceId, container) {
+  const device = getDeviceById(deviceId);
+  if (!device || !device.targets) return;
+
+  const state = deviceStates[deviceId];
+
+  // Update target selector options (selected state)
+  container.querySelectorAll(`.deploy-mode-option[data-device-id="${deviceId}"]`).forEach(el => {
+    const targetId = el.dataset.targetId;
+    const isSelected = targetId === state.selectedTarget;
+    el.classList.toggle('selected', isSelected);
+    const radio = el.querySelector('input[type="radio"]');
+    if (radio) radio.checked = isSelected;
+  });
+
+  // Re-render target content
+  const contentEl = document.getElementById(`target-content-${deviceId}`);
+  if (contentEl) {
+    contentEl.innerHTML = renderDockerTargetContent(device);
+
+    // Re-attach SSH test button handler
+    const testBtn = contentEl.querySelector(`#test-ssh-${deviceId}`);
+    if (testBtn) {
+      testBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await testSSHConnection(deviceId, testBtn);
+      });
     }
   }
 }
@@ -1344,6 +1859,16 @@ async function startDeployment(deviceId) {
 
   addLogToDevice(deviceId, 'info', t('deploy.logs.starting'));
 
+  // Determine effective device type (handle docker_deploy with targets)
+  let effectiveType = device.type;
+  let selectedTarget = null;
+
+  if (device.type === 'docker_deploy' && device.targets) {
+    selectedTarget = getSelectedTarget(device);
+    // Map target id to deployment type
+    effectiveType = selectedTarget?.id === 'remote' ? 'docker_remote' : 'docker_local';
+  }
+
   // Build params in the format expected by backend
   const params = {
     solution_id: currentSolution.id,
@@ -1351,6 +1876,12 @@ async function startDeployment(deviceId) {
     device_connections: {},
     options: {},
   };
+
+  // If using docker_deploy with targets, specify the selected target and config file
+  if (selectedTarget) {
+    params.options.deploy_target = selectedTarget.id;
+    params.options.config_file = selectedTarget.config_file;
+  }
 
   // Collect user inputs
   if (device.type === 'script') {
@@ -1362,20 +1893,20 @@ async function startDeployment(deviceId) {
     });
   }
 
-  // Add connection info based on device type
-  if (device.type === 'esp32_usb') {
+  // Add connection info based on effective device type
+  if (effectiveType === 'esp32_usb') {
     const select = document.getElementById(`serial-port-${deviceId}`);
     params.device_connections[deviceId] = {
       port: select?.value || state.port,
     };
-  } else if (device.type === 'ssh_deb' || device.type === 'docker_remote') {
+  } else if (effectiveType === 'ssh_deb' || effectiveType === 'docker_remote') {
     params.device_connections[deviceId] = {
       host: document.getElementById(`ssh-host-${deviceId}`)?.value,
       port: parseInt(document.getElementById(`ssh-port-${deviceId}`)?.value || '22'),
       username: document.getElementById(`ssh-user-${deviceId}`)?.value,
       password: document.getElementById(`ssh-pass-${deviceId}`)?.value,
     };
-  } else if (device.type === 'recamera_nodered') {
+  } else if (effectiveType === 'recamera_nodered') {
     // reCamera Node-RED deployment - need IP for Node-RED API and optional SSH for service cleanup
     const host = document.getElementById(`ssh-host-${deviceId}`)?.value;
     params.device_connections[deviceId] = {
@@ -1636,6 +2167,38 @@ function setupEventHandlers(container) {
     });
   });
 
+  // Docker deploy target options (local/remote)
+  container.querySelectorAll('.deploy-mode-option[data-target-id]').forEach(el => {
+    el.addEventListener('click', () => {
+      const deviceId = el.dataset.deviceId;
+      const targetId = el.dataset.targetId;
+      const state = deviceStates[deviceId];
+
+      if (state && state.selectedTarget !== targetId) {
+        state.selectedTarget = targetId;
+        // Update UI: re-render target selector and content
+        updateDockerTargetUI(deviceId, container);
+      }
+    });
+  });
+
+  // Preset selector buttons (Level 1)
+  container.querySelectorAll('.deploy-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const presetId = btn.dataset.presetId;
+      handlePresetChange(presetId);
+    });
+  });
+
+  // Device group selectors (template variable replacement)
+  container.querySelectorAll('.device-group-selector').forEach(select => {
+    select.addEventListener('change', async (e) => {
+      const groupId = select.dataset.groupId;
+      const selectedDevice = e.target.value;
+      await handleDeviceGroupSelectorChange(groupId, selectedDevice);
+    });
+  });
+
   // Section headers (expand/collapse)
   container.querySelectorAll('[id^="section-header-"]').forEach(el => {
     el.addEventListener('click', () => {
@@ -1726,6 +2289,7 @@ export function cleanupDeployPage() {
   Object.values(logsWsMap).forEach(ws => ws?.disconnect());
   logsWsMap = {};
   selectedDevice = null;
+  selectedPresetId = null;
 
   // Cleanup preview instances
   Object.values(previewInstances).forEach(preview => preview?.destroy());

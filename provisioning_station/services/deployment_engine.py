@@ -84,14 +84,27 @@ class DeploymentEngine:
             if not device_ref:
                 continue
 
+            # Determine effective type and config_file for docker_deploy
+            effective_type = device_ref.type
+            config_file = device_ref.config_file
+
+            if device_ref.type == "docker_deploy" and options:
+                # Get selected target from options (local/remote)
+                deploy_target = options.get("deploy_target", "local")
+                effective_type = "docker_remote" if deploy_target == "remote" else "docker_local"
+                # Use config_file from options if provided
+                if options.get("config_file"):
+                    config_file = options["config_file"]
+                logger.info(f"docker_deploy: target={deploy_target}, effective_type={effective_type}")
+
             # Skip devices without config_file (e.g., manual info-only steps)
-            if not device_ref.config_file:
+            if not config_file:
                 logger.info(f"Skipping device {device_id} (no config_file)")
                 continue
 
             # Load device config to get steps
             config = await solution_manager.load_device_config(
-                solution.id, device_ref.config_file
+                solution.id, config_file
             )
             if not config:
                 continue
@@ -105,7 +118,7 @@ class DeploymentEngine:
             device_deployment = DeviceDeployment(
                 device_id=device_id,
                 name=device_ref.name,
-                type=device_ref.type,
+                type=effective_type,  # Use effective type for deployer selection
                 status=DeploymentStatus.PENDING,
                 connection=device_connections.get(device_id),
                 steps=[

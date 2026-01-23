@@ -24,11 +24,38 @@ class SolutionManager:
         self.solutions_dir = settings.solutions_dir
         self.solutions: Dict[str, Solution] = {}
         self._device_configs: Dict[str, Dict[str, DeviceConfig]] = {}  # solution_id -> device_id -> config
+        self._global_device_catalog: Dict[str, dict] = {}  # Global device catalog
+
+    async def load_global_device_catalog(self) -> None:
+        """Load the global device catalog from devices/catalog.yaml"""
+        catalog_path = self.solutions_dir.parent / "devices" / "catalog.yaml"
+        if not catalog_path.exists():
+            logger.warning(f"Global device catalog not found: {catalog_path}")
+            return
+
+        try:
+            async with aiofiles.open(catalog_path, "r") as f:
+                content = await f.read()
+                self._global_device_catalog = yaml.safe_load(content) or {}
+            logger.info(f"Loaded {len(self._global_device_catalog)} devices from global catalog")
+        except Exception as e:
+            logger.error(f"Failed to load global device catalog: {e}")
+
+    def get_global_device(self, device_id: str) -> Optional[dict]:
+        """Get device info from global catalog"""
+        return self._global_device_catalog.get(device_id)
+
+    def get_global_device_catalog(self) -> Dict[str, dict]:
+        """Get the entire global device catalog"""
+        return self._global_device_catalog
 
     async def load_solutions(self) -> List[Solution]:
         """Scan and load all solutions from solutions directory"""
         self.solutions.clear()
         self._device_configs.clear()
+
+        # Load global device catalog first
+        await self.load_global_device_catalog()
 
         if not self.solutions_dir.exists():
             logger.warning(f"Solutions directory does not exist: {self.solutions_dir}")

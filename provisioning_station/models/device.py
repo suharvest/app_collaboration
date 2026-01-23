@@ -82,6 +82,7 @@ class SSHConfig(BaseModel):
     """SSH connection configuration"""
     port: int = 22
     default_user: str = "root"
+    default_host: Optional[str] = None
     auth_methods: List[str] = ["password", "key"]
     connection_timeout: int = 30
     command_timeout: int = 300
@@ -281,6 +282,41 @@ class UserInputConfig(BaseModel):
     options: List[Dict[str, str]] = []  # For select type
 
 
+# Preview Configuration
+class PreviewVideoConfig(BaseModel):
+    """Video stream configuration for preview"""
+    type: str = "rtsp_proxy"  # rtsp_proxy | hls | mjpeg
+    rtsp_url_template: Optional[str] = None
+    hls_url_template: Optional[str] = None
+
+
+class PreviewMqttConfig(BaseModel):
+    """MQTT configuration for preview"""
+    broker_template: Optional[str] = None
+    port: int = 1883
+    port_template: Optional[str] = None
+    topic_template: Optional[str] = None
+    topic: Optional[str] = None
+    username: Optional[str] = None
+    username_template: Optional[str] = None
+    password: Optional[str] = None
+    password_template: Optional[str] = None
+
+
+class PreviewOverlayConfig(BaseModel):
+    """Overlay configuration for preview"""
+    renderer: str = "auto"  # auto | bbox | custom
+    script_file: Optional[str] = None
+    dependencies: List[str] = []
+
+
+class PreviewDisplayConfig(BaseModel):
+    """Display configuration for preview"""
+    aspect_ratio: str = "16:9"
+    auto_start: bool = False
+    show_stats: bool = True
+
+
 # Main Device Configuration
 class DeviceConfig(BaseModel):
     """Complete device configuration"""
@@ -301,6 +337,12 @@ class DeviceConfig(BaseModel):
     script: Optional[ScriptDeploymentConfig] = None  # For script type (via deployment key)
     nodered: Optional[NodeRedConfig] = None  # For recamera_nodered
     binary: Optional[BinaryConfig] = None  # For recamera_cpp and other SSH binary deployments
+
+    # Preview type configurations
+    video: Optional[PreviewVideoConfig] = None  # For preview type
+    mqtt: Optional[PreviewMqttConfig] = None  # For preview type
+    overlay: Optional[PreviewOverlayConfig] = None  # For preview type
+    display: Optional[PreviewDisplayConfig] = None  # For preview type
 
     # User inputs for interactive deployments
     user_inputs: List[UserInputConfig] = []

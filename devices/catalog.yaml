@@ -1,0 +1,172 @@
+# Global Device Catalog
+# All Seeed Studio devices and related hardware
+# Solutions can reference these by ID
+
+# ============================================
+# SenseCAP Series
+# ============================================
+
+sensecap_watcher:
+  name: SenseCAP Watcher
+  name_zh: SenseCAP Watcher
+  category: ai_assistant
+  image: https://files.seeedstudio.com/wiki/watcher_getting_started/0.png
+  product_url: https://www.seeedstudio.com/SenseCAP-Watcher-W1-A-p-5979.html
+  wiki_url: https://wiki.seeedstudio.com/getting_started_with_watcher/
+  description: AI-powered visual assistant with display and voice interaction
+  description_zh: 带屏幕和语音交互的 AI 视觉助手
+
+sensecap_t1000_tracker:
+  name: SenseCAP T1000 Tracker
+  name_zh: SenseCAP T1000 定位器
+  category: tracker
+  image: https://files.seeedstudio.com/wiki/SenseCAP/Tracker/tracker_1.png
+  product_url: https://www.seeedstudio.com/SenseCAP-Card-Tracker-T1000-A-p-5697.html
+  wiki_url: https://wiki.seeedstudio.com/SenseCAP_T1000_tracker/
+  description: Credit card sized LoRaWAN GNSS tracker for indoor/outdoor positioning
+  description_zh: 信用卡大小的 LoRaWAN GNSS 定位器，支持室内外定位
+
+# SenseCAP Gateways
+sensecap_m2_gateway_us915:
+  name: SenseCAP M2 Gateway (US915)
+  name_zh: SenseCAP M2 网关 (US915)
+  category: gateway
+  image: https://files.seeedstudio.com/wiki/SenseCAP/M2_Multi-Platform/sensecapm2.png
+  product_url: https://www.seeedstudio.com/SenseCAP-M2-Multi-Platform-LoRaWAN-Indoor-Gateway-SX1302-US915-p-5472.html
+  wiki_url: https://wiki.seeedstudio.com/Network/SenseCAP_Network/SenseCAP_M2_Multi_Platform/SenseCAP_M2_Multi_Platform_Overview/
+  description: LoRaWAN gateway for Americas region (US915 frequency)
+  description_zh: 美洲地区 LoRaWAN 网关 (US915 频段)
+  region: Americas
+
+sensecap_m2_gateway_eu868:
+  name: SenseCAP M2 Gateway (EU868)
+  name_zh: SenseCAP M2 网关 (EU868)
+  category: gateway
+  image: https://files.seeedstudio.com/wiki/SenseCAP/M2_Multi-Platform/sensecapm2.png
+  product_url: https://www.seeedstudio.com/SenseCAP-M2-Multi-Platform-LoRaWAN-Indoor-Gateway-SX1302-EU868-p-5471.html
+  wiki_url: https://wiki.seeedstudio.com/Network/SenseCAP_Network/SenseCAP_M2_Multi_Platform/SenseCAP_M2_Multi_Platform_Overview/
+  description: LoRaWAN gateway for Europe region (EU868 frequency)
+  description_zh: 欧洲地区 LoRaWAN 网关 (EU868 频段)
+  region: Europe
+
+sensecap_m2_gateway_as923:
+  name: SenseCAP M2 Gateway (AS923)
+  name_zh: SenseCAP M2 网关 (AS923)
+  category: gateway
+  image: https://files.seeedstudio.com/wiki/SenseCAP/M2_Multi-Platform/sensecapm2.png
+  product_url: https://www.seeedstudio.com/SenseCAP-M2-Multi-Platform-LoRaWAN-Indoor-Gateway-SX1302-AS923-p-5473.html
+  wiki_url: https://wiki.seeedstudio.com/Network/SenseCAP_Network/SenseCAP_M2_Multi_Platform/SenseCAP_M2_Multi_Platform_Overview/
+  description: LoRaWAN gateway for Asia-Pacific region (AS923 frequency)
+  description_zh: 亚太地区 LoRaWAN 网关 (AS923 频段)
+  region: Asia-Pacific
+
+# BC01 Beacon
+bc01_beacon:
+  name: BC01 BLE Beacon
+  name_zh: BC01 蓝牙信标
+  category: beacon
+  image: https://files.seeedstudio.com/wiki/SenseCAP/Tracker/BC01.png
+  product_url: https://www.seeedstudio.com/BC01-Room-Locator-BLE-Beacon-p-6295.html
+  wiki_url: https://wiki.seeedstudio.com/SenseCAP_T1000_tracker_Beacon_scan_configuration/
+  description: Bluetooth beacon for indoor positioning reference points
+  description_zh: 用于室内定位参考点的蓝牙信标
+
+# ============================================
+# reComputer Series
+# ============================================
+
+recomputer_j4012:
+  name: reComputer J4012
+  name_zh: reComputer J4012
+  category: edge_computer
+  image: https://files.seeedstudio.com/wiki/reComputer-Jetson/J4012/recomputer-j4012.png
+  product_url: https://www.seeedstudio.com/reComputer-J4012-p-5586.html
+  wiki_url: https://wiki.seeedstudio.com/reComputer_J4012_Flash_Jetpack/
+  description: NVIDIA Jetson Orin NX 16GB edge AI computer
+  description_zh: NVIDIA Jetson Orin NX 16GB 边缘 AI 计算机
+
+recomputer_r1000:
+  name: reComputer R1000
+  name_zh: reComputer R1000
+  category: edge_computer
+  image: https://files.seeedstudio.com/wiki/reComputer-R1000/recomputer-r1000.png
+  product_url: https://www.seeedstudio.com/reComputer-R1025-10-p-5895.html
+  wiki_url: https://wiki.seeedstudio.com/recomputer_r/
+  description: Industrial edge controller with CM4 for IoT applications
+  description_zh: 基于 CM4 的工业边缘控制器，适用于物联网应用
+
+raspberry_pi:
+  name: Raspberry Pi
+  name_zh: 树莓派
+  category: edge_computer
+  image: https://files.seeedstudio.com/wiki/ReTerminal/RPi.png
+  product_url: https://www.seeedstudio.com/Raspberry-Pi-5-8GB-p-5810.html
+  wiki_url: https://www.raspberrypi.com/documentation/
+  description: Popular single-board computer for various projects
+  description_zh: 流行的单板计算机，适用于各种项目
+
+# ============================================
+# reCamera Series
+# ============================================
+
+recamera:
+  name: reCamera
+  name_zh: reCamera
+  category: camera
+  image: https://files.seeedstudio.com/wiki/reCamera/recamera.png
+  product_url: https://www.seeedstudio.com/reCamera-2002w-8GB-p-6250.html
+  wiki_url: https://wiki.seeedstudio.com/recamera/
+  description: AI camera with edge computing capabilities for computer vision
+  description_zh: 具有边缘计算能力的 AI 摄像头，用于计算机视觉
+
+# ============================================
+# reSpeaker Series
+# ============================================
+
+respeaker_xvf3800:
+  name: reSpeaker XVF3800
+  name_zh: reSpeaker XVF3800
+  category: microphone
+  image: https://files.seeedstudio.com/wiki/reSpeaker/XVF3800/respeaker-xvf3800.png
+  product_url: https://www.seeedstudio.com/reSpeaker-USB-Microphone-Array-4-mics-with-linear-layout-p-5864.html
+  wiki_url: https://wiki.seeedstudio.com/ReSpeaker_USB_Microphone_Array_4_mics_with_linear_layout_with_XVF_3800/
+  description: 4-microphone array with XMOS XVF3800 for voice AI applications
+  description_zh: 4 麦克风阵列，搭载 XMOS XVF3800，用于语音 AI 应用
+
+# ============================================
+# reRouter Series
+# ============================================
+
+rerouter_cm4:
+  name: reRouter CM4
+  name_zh: reRouter CM4
+  category: router
+  image: https://files.seeedstudio.com/wiki/Mini_Router/mini_router_overview.png
+  product_url: https://www.seeedstudio.com/reRouter-CM4102032-p-5734.html
+  wiki_url: https://wiki.seeedstudio.com/OpenWRT-Getting-Started/
+  description: Dual Gigabit router based on CM4 with OpenWrt support
+  description_zh: 基于 CM4 的双千兆路由器，支持 OpenWrt
+
+# ============================================
+# Generic / Third-party Hardware
+# ============================================
+
+hdmi_display:
+  name: HDMI Display
+  name_zh: HDMI 显示器
+  category: display
+  image: null
+  product_url: null
+  wiki_url: null
+  description: Any HDMI-compatible display (TV, monitor, advertising screen)
+  description_zh: 任何 HDMI 兼容显示设备（电视、显示器、广告机）
+
+computer_generic:
+  name: Computer (Windows/Linux)
+  name_zh: 电脑 (Windows/Linux)
+  category: computer
+  image: null
+  product_url: null
+  wiki_url: null
+  description: Desktop or laptop computer for running backend services
+  description_zh: 用于运行后端服务的台式机或笔记本电脑

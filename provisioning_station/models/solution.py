@@ -16,13 +16,88 @@ class MediaItem(BaseModel):
 
 
 class RequiredDevice(BaseModel):
-    """Device shown in intro page"""
+    """Device shown in intro page (legacy, kept for backward compatibility)"""
     name: str
     name_zh: Optional[str] = None
     image: Optional[str] = None
     purchase_url: Optional[str] = None
     description: Optional[str] = None
     description_zh: Optional[str] = None
+
+
+# ============ Device Configuration System ============
+
+class DeviceCatalogItem(BaseModel):
+    """Device definition in catalog (local overrides for global catalog)"""
+    name: Optional[str] = None  # Optional when using global catalog
+    name_zh: Optional[str] = None
+    image: Optional[str] = None
+    product_url: Optional[str] = None  # Renamed from purchase_url for consistency
+    wiki_url: Optional[str] = None
+    description: Optional[str] = None
+    description_zh: Optional[str] = None
+    category: Optional[str] = None
+
+
+class DeviceGroupOption(BaseModel):
+    """Option within a device group"""
+    device_ref: str
+    label: Optional[str] = None
+    label_zh: Optional[str] = None
+
+
+class DeviceGroupSection(BaseModel):
+    """Section with template variables for device group deployment instructions"""
+    title: Optional[str] = None
+    title_zh: Optional[str] = None
+    description_file: Optional[str] = None
+    description_file_zh: Optional[str] = None
+    # Template variable mappings: {variable_name: {device_ref: content_file_path}}
+    variables: Dict[str, Dict[str, str]] = {}
+
+
+class DeviceGroup(BaseModel):
+    """Device selection group"""
+    id: str
+    name: str
+    name_zh: Optional[str] = None
+    type: str = "single"  # single | multiple | quantity
+    required: bool = True
+    description: Optional[str] = None
+    description_zh: Optional[str] = None
+    # Deployment section with template variables
+    section: Optional[DeviceGroupSection] = None
+    # For single/multiple type
+    options: List[DeviceGroupOption] = []
+    default: Optional[str] = None
+    default_selections: List[str] = []
+    # For multiple type
+    min_count: int = 0
+    max_count: int = 10
+    # For quantity type
+    device_ref: Optional[str] = None
+    default_count: int = 1
+
+
+class PresetLinks(BaseModel):
+    """Links specific to a preset"""
+    wiki: Optional[str] = None
+    github: Optional[str] = None
+
+
+class Preset(BaseModel):
+    """Pre-defined device configuration"""
+    id: str
+    name: str
+    name_zh: Optional[str] = None
+    description: Optional[str] = None
+    description_zh: Optional[str] = None
+    badge: Optional[str] = None
+    badge_zh: Optional[str] = None
+    selections: Dict[str, Any] = {}
+    architecture_image: Optional[str] = None  # Architecture diagram for this preset
+    links: Optional[PresetLinks] = None  # Per-preset wiki/github links
+    section: Optional[DeviceGroupSection] = None  # Level 1: preset deployment guide
 
 
 class SolutionStats(BaseModel):
@@ -61,7 +136,11 @@ class SolutionIntro(BaseModel):
     gallery: List[MediaItem] = []
     category: str = "general"
     tags: List[str] = []
-    required_devices: List[RequiredDevice] = []
+    required_devices: List[RequiredDevice] = []  # Legacy field
+    # New device configuration system
+    device_catalog: Dict[str, DeviceCatalogItem] = {}
+    device_groups: List[DeviceGroup] = []
+    presets: List[Preset] = []
     partners: List[Partner] = []  # Deployment partners
     stats: SolutionStats = Field(default_factory=SolutionStats)
     links: SolutionLinks = Field(default_factory=SolutionLinks)
