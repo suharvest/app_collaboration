@@ -162,15 +162,30 @@ class StreamProxy:
         # Monitor the process in the background
         asyncio.create_task(self._monitor_process(stream_info))
 
-        # Wait a bit for the stream to start
-        await asyncio.sleep(2)
+        # Wait for HLS file to be generated
+        # FFmpeg writes to .tmp first, then renames, so check for .ts segments too
+        hls_output = stream_info.hls_dir / "index.m3u8"
+        max_wait = 15  # seconds
+        for i in range(max_wait * 2):
+            await asyncio.sleep(0.5)
 
-        # Check if process is still running
-        if stream_info.process.returncode is not None:
-            stderr = await stream_info.process.stderr.read()
-            raise RuntimeError(f"FFmpeg exited immediately: {stderr.decode()}")
+            # Check if process exited
+            if stream_info.process.returncode is not None:
+                stderr = await stream_info.process.stderr.read()
+                raise RuntimeError(f"FFmpeg exited: {stderr.decode()}")
 
-        stream_info.status = "running"
+            # Check if m3u8 file exists OR if .ts segments are being written
+            ts_files = list(stream_info.hls_dir.glob("*.ts"))
+            if hls_output.exists() or len(ts_files) > 0:
+                # Wait a bit more for m3u8 to be finalized
+                if not hls_output.exists():
+                    await asyncio.sleep(1)
+                stream_info.status = "running"
+                return
+
+        # Timeout - kill process and report error
+        stream_info.process.terminate()
+        raise RuntimeError(f"Timeout waiting for HLS stream to start. Check RTSP URL: {stream_info.rtsp_url}")
 
     async def _monitor_process(self, stream_info: StreamInfo):
         """Monitor FFmpeg process and handle exit"""

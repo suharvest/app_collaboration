@@ -212,13 +212,16 @@ for (const person of persons) {
 }
 
 // ========== Render Stats Panel ==========
+// Ensure full opacity for UI elements
+ctx.globalAlpha = 1.0;
+
 const panelWidth = 180;
 const panelHeight = 130;
 const panelX = 10;
 const panelY = 10;
 
-// Panel background
-ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+// Panel background (solid, always visible)
+ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
 ctx.beginPath();
 ctx.roundRect(panelX, panelY, panelWidth, panelHeight, 8);
 ctx.fill();
@@ -273,8 +276,8 @@ const legendItems = [
   { label: 'Need Help', color: CONFIG.stateColors.assistance },
 ];
 
-// Legend background
-ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+// Legend background (solid, always visible)
+ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
 ctx.beginPath();
 ctx.roundRect(legendX - 8, legendY - 8, 138, legendItems.length * 18 + 16, 6);
 ctx.fill();

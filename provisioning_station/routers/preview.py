@@ -20,7 +20,7 @@ from ..services.stream_proxy import get_stream_proxy
 from ..services.mqtt_bridge import get_mqtt_bridge, is_mqtt_available
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/preview", tags=["preview"])
+router = APIRouter(prefix="/api/preview", tags=["preview"])
 
 
 # ============================================
