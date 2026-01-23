@@ -32,13 +32,43 @@ intro:
     - automation
     - recomputer
 
-  required_devices:
-    - name: reComputer R Series
+  # Device Catalog
+  device_catalog:
+    recomputer_r:
+      name: reComputer R Series
       name_zh: reComputer R 系列
       image: intro/gallery/recomputer.svg
-      purchase_url: https://www.seeedstudio.com/reComputer-R1000-Series
+      product_url: https://www.seeedstudio.com/reComputer-R1000-Series
       description: Optional - only needed for remote deployment
       description_zh: 可选 - 仅远程部署时需要
+
+  # Device Groups
+  device_groups:
+    - id: edge_device
+      name: Edge Device
+      name_zh: 边缘设备
+      type: single
+      required: false
+      description: Only needed for remote deployment
+      description_zh: 仅远程部署时需要
+      options:
+        - device_ref: recomputer_r
+      default: recomputer_r
+
+  # Presets
+  presets:
+    - id: default
+      name: Standard Deployment
+      name_zh: 标准部署
+      selections:
+        edge_device: recomputer_r
+      links:
+        github: https://github.com/seeed-solution/missionpack-knn
+      section:
+        title: Deployment Guide
+        title_zh: 部署指南
+        description_file: deploy/guide.md
+        description_file_zh: deploy/guide_zh.md
 
   stats:
     deployed_count: 0
@@ -46,69 +76,60 @@ intro:
     difficulty: intermediate
     estimated_time: 15min
 
-  links:
-    github: https://github.com/seeed-solution/missionpack-knn
-
 # ============ 部署页内容 ============
 deployment:
   guide_file: deploy/guide.md
   guide_file_zh: deploy/guide_zh.md
 
-  # 部署模式: sequential (按顺序执行) | single_choice (二选一)
-  selection_mode: single_choice
-
   devices:
-    # 选项 1: 本机部署
-    - id: hvac_local
-      name: Local Deployment
-      name_zh: 本机部署
-      type: docker_local
-      required: false
-      config_file: devices/local.yaml
-      section:
-        title: Deploy on This Machine
-        title_zh: 在本机部署
-        description_file: deploy/sections/hvac_local.md
-        description_file_zh: deploy/sections/hvac_local_zh.md
-        wiring:
-          image: intro/gallery/architecture.svg
-          steps:
-            - Ensure Docker is installed and running
-            - Click deploy to start the container
-            - Access the web interface at localhost:8280
-          steps_zh:
-            - 确保 Docker 已安装并运行
-            - 点击部署启动容器
-            - 通过 localhost:8280 访问 Web 界面
+    - id: hvac
+      name: HVAC Control System
+      name_zh: 暖通控制系统
+      type: docker_deploy
+      required: true
+      targets:
+        local:
+          name: Local Deployment
+          name_zh: 本机部署
+          default: true
+          config_file: devices/local.yaml
+          section:
+            title: Deploy on This Machine
+            title_zh: 在本机部署
+            description_file: deploy/sections/hvac_local.md
+            description_file_zh: deploy/sections/hvac_local_zh.md
+            wiring:
+              image: intro/gallery/architecture.svg
+              steps:
+                - Ensure Docker is installed and running
+                - Click deploy to start the container
+                - Access the web interface at localhost:8280
+              steps_zh:
+                - 确保 Docker 已安装并运行
+                - 点击部署启动容器
+                - 通过 localhost:8280 访问 Web 界面
+        remote:
+          name: Remote Deployment
+          name_zh: 远程部署
+          config_file: devices/remote.yaml
+          section:
+            title: Deploy to Remote Device
+            title_zh: 部署到远程设备
+            description_file: deploy/sections/hvac_remote.md
+            description_file_zh: deploy/sections/hvac_remote_zh.md
+            wiring:
+              image: intro/gallery/recomputer.svg
+              steps:
+                - Connect to remote device via SSH
+                - Deploy Docker container remotely
+                - Access the web interface at device IP:8280
+              steps_zh:
+                - 通过 SSH 连接远程设备
+                - 远程部署 Docker 容器
+                - 通过设备 IP:8280 访问 Web 界面
 
-    # 选项 2: 远程部署
-    - id: hvac_remote
-      name: Remote Deployment
-      name_zh: 远程部署
-      type: docker_remote
-      required: false
-      config_file: devices/remote.yaml
-      section:
-        title: Deploy to Remote Device
-        title_zh: 部署到远程设备
-        description_file: deploy/sections/hvac_remote.md
-        description_file_zh: deploy/sections/hvac_remote_zh.md
-        wiring:
-          image: intro/gallery/recomputer.png
-          steps:
-            - Connect to remote device via SSH
-            - Deploy Docker container remotely
-            - Access the web interface at device IP:8280
-          steps_zh:
-            - 通过 SSH 连接远程设备
-            - 远程部署 Docker 容器
-            - 通过设备 IP:8280 访问 Web 界面
-
-  # 用户选择其一进行部署
-  # Kiosk 模式配置已移至设备管理页面（部署后可配置）
   order:
-    - hvac_local
-    - hvac_remote
+    - hvac
 
   post_deployment:
     success_message_file: deploy/success.md

@@ -1,0 +1,69 @@
+version: "1.0"
+id: app_local
+name: Indoor Positioning Application (Local)
+name_zh: 室内定位应用程序（本机）
+type: docker_local
+
+detection:
+  method: local
+  requirements:
+    - docker_installed
+    - docker_running
+
+docker:
+  image: seeedcloud/sensecraft-indoor-positioning
+  container_name: indoor-positioning
+  ports:
+    - "5173:5173"
+  volumes:
+    - ./db:/app/db/
+    - ./config:/app/server/config/json
+    - ./uploads:/app/uploads
+  restart: unless-stopped
+
+  services:
+    - name: indoor-positioning
+      port: 5173
+      health_check_endpoint: /
+      required: true
+
+  images:
+    - name: seeedcloud/sensecraft-indoor-positioning
+      required: true
+
+pre_checks:
+  - type: docker_version
+    min_version: "20.0"
+    description: Check Docker version
+
+steps:
+  - id: pull_images
+    name: Pull Docker Images
+    name_zh: 拉取 Docker 镜像
+    description: Download container image from registry
+    description_zh: 从镜像仓库下载容器镜像
+    optional: false
+    default: true
+
+  - id: start_services
+    name: Start Services
+    name_zh: 启动服务
+    description: Launch Docker container
+    description_zh: 启动 Docker 容器
+    optional: false
+    default: true
+
+  - id: health_check
+    name: Health Check
+    name_zh: 健康检查
+    description: Verify service is running correctly
+    description_zh: 验证服务运行正常
+    optional: false
+    default: true
+
+post_deployment:
+  open_browser: true
+  url: "http://localhost:5173"
+  credentials:
+    username: admin
+    password: 83EtWJUbGrPnQjdCqyKq

@@ -1,0 +1,114 @@
+version: "1.0"
+id: voice_local
+name: Voice Services (Local)
+name_zh: 语音服务（本机）
+type: docker_local
+
+detection:
+  method: local
+  requirements:
+    - docker_installed
+    - docker_running
+    - docker_compose_installed
+
+docker:
+  compose_file: assets/docker/docker-compose.yml
+
+  environment:
+    TZ: Asia/Shanghai
+    AUDIO_CARD_ID: "1"
+    AUDIO_DEVICE_ID: "0"
+
+  options:
+    project_name: sensecraft_voice
+    remove_orphans: true
+    build: false
+
+  services:
+    - name: sensecraft-voice-client
+      port: 8090
+      health_check_endpoint: /
+      required: true
+
+    - name: sensecraft-asr-server
+      required: true
+
+    - name: watchtower
+      required: false
+
+  images:
+    - name: sensecraft-missionpack.seeed.cn/respeaker/sensecraft-voice-client:v0.0.2
+      required: true
+    - name: sensecraft-missionpack.seeed.cn/respeaker/sensecraft-asr-server:latest
+      required: true
+    - name: sensecraft-missionpack.seeed.cn/respeaker/containrrr/watchtower:latest
+      required: false
+
+  models:
+    - name: ASR Models
+      name_zh: 语音识别模型
+      url: https://files.seeedstudio.com/wiki/solution/ai-sound/reRouter-firmware-backup/models.zip
+      sha256: 7b9e7606a2ddcad56f3f72a77b16eb2c60437ae4bfc3f1423bd33db177385c9d
+      target_dir: ./models
+      size: 500MB
+      required: true
+
+pre_checks:
+  - type: docker_version
+    min_version: "20.0"
+    description: Check Docker version
+  - type: docker_compose_version
+    min_version: "2.0"
+    description: Check Docker Compose version
+  - type: port_available
+    ports:
+      - 8090
+    description: Check if port 8090 is available
+  - type: disk_space
+    min_gb: 2
+    description: Check available disk space
+
+steps:
+  - id: download_models
+    name: Download ASR Models
+    name_zh: 下载语音模型
+    description: Download pre-trained ASR models (~500MB)
+    description_zh: 下载预训练语音识别模型（约 500MB）
+    optional: false
+    default: true
+
+  - id: pull_images
+    name: Pull Docker Images
+    name_zh: 拉取 Docker 镜像
+    description: Download container images from registry
+    description_zh: 从镜像仓库下载容器镜像
+    optional: false
+    default: true
+
+  - id: create_volumes
+    name: Create Data Volumes
+    name_zh: 创建数据卷
+    description: Set up persistent storage for recordings and models
+    description_zh: 设置录音和模型的持久化存储
+    optional: false
+    default: true
+
+  - id: start_services
+    name: Start Services
+    name_zh: 启动服务
+    description: Launch voice processing containers
+    description_zh: 启动语音处理容器
+    optional: false
+    default: true
+
+  - id: health_check
+    name: Health Check
+    name_zh: 健康检查
+    description: Verify services are running correctly
+    description_zh: 验证服务运行正常
+    optional: false
+    default: true
+
+post_deployment:
+  open_browser: true
+  url: "http://localhost:8090"

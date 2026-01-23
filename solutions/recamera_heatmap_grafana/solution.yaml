@@ -33,28 +33,64 @@ intro:
     - privacy
     - analytics
 
-  required_devices:
-    - name: reCamera
+  # Device Catalog
+  device_catalog:
+    recamera:
+      name: reCamera
       name_zh: reCamera
       image: intro/gallery/recamera.svg
-      purchase_url: https://www.seeedstudio.com/reCamera-2002w-8GB-p-6250.html
+      product_url: https://www.seeedstudio.com/reCamera-2002w-8GB-p-6250.html
       description: AI camera with built-in YOLO model for person detection
       description_zh: 内置 YOLO 模型的 AI 摄像头，用于人员检测
 
-    - name: Computer (Windows/Linux)
+    computer:
+      name: Computer (Windows/Linux)
       name_zh: 电脑 (Windows/Linux)
       description: For running InfluxDB database and Grafana dashboard
       description_zh: 用于运行 InfluxDB 数据库和 Grafana 仪表板
+
+  # Device Groups
+  device_groups:
+    - id: camera
+      name: AI Camera
+      name_zh: AI 摄像头
+      type: single
+      required: true
+      options:
+        - device_ref: recamera
+      default: recamera
+
+    - id: server
+      name: Backend Server
+      name_zh: 后端服务器
+      type: single
+      required: true
+      options:
+        - device_ref: computer
+      default: computer
+
+  # Presets
+  presets:
+    - id: default
+      name: Standard Deployment
+      name_zh: 标准部署
+      selections:
+        camera: recamera
+        server: computer
+      links:
+        wiki: https://wiki.seeedstudio.com/cn/integration_of_real-time_heat_map_with_grafana_data_dashboard/
+        github: https://github.com/xr686/reCamera-with-Heatmap
+      section:
+        title: Deployment Guide
+        title_zh: 部署指南
+        description_file: deploy/guide.md
+        description_file_zh: deploy/guide_zh.md
 
   stats:
     deployed_count: 0
     likes_count: 0
     difficulty: intermediate
     estimated_time: 60min
-
-  links:
-    wiki: https://wiki.seeedstudio.com/cn/integration_of_real-time_heat_map_with_grafana_data_dashboard/
-    github: https://github.com/xr686/reCamera-with-Heatmap
 
 # ============ 部署页内容 ============
 deployment:
@@ -69,14 +105,51 @@ deployment:
     - id: backend
       name: Deploy InfluxDB + Grafana
       name_zh: 部署 InfluxDB + Grafana
-      type: docker_local
+      type: docker_deploy
       required: true
       config_file: devices/backend.yaml
       section:
         title: Step 1 - Deploy Backend Services
         title_zh: 第一步 - 部署后端服务
-        description_file: deploy/sections/influxdb.md
-        description_file_zh: deploy/sections/influxdb_zh.md
+      # 部署目标选择：本机或远程
+      targets:
+        local:
+          name: Local Deployment
+          name_zh: 本机部署
+          description: Deploy on this computer
+          description_zh: 部署到当前电脑
+          default: true
+          config_file: devices/backend.yaml
+          section:
+            description_file: deploy/sections/backend_local.md
+            description_file_zh: deploy/sections/backend_local_zh.md
+            wiring:
+              image: intro/gallery/architecture.svg
+              steps:
+                - Ensure Docker is installed and running
+                - Click Deploy button to start services
+              steps_zh:
+                - 确保 Docker 已安装并运行
+                - 点击部署按钮启动服务
+        remote:
+          name: Remote Deployment
+          name_zh: 远程部署
+          description: Deploy to a remote device via SSH
+          description_zh: 通过 SSH 部署到远程设备
+          config_file: devices/backend_remote.yaml
+          section:
+            description_file: deploy/sections/backend_remote.md
+            description_file_zh: deploy/sections/backend_remote_zh.md
+            wiring:
+              image: intro/gallery/architecture.svg
+              steps:
+                - Connect target device to network
+                - Enter IP address and SSH credentials
+                - Click Deploy to install on remote device
+              steps_zh:
+                - 将目标设备连接到网络
+                - 输入 IP 地址和 SSH 凭据
+                - 点击部署安装到远程设备
 
     # Step 2: 配置 reCamera Node-RED
     - id: recamera
