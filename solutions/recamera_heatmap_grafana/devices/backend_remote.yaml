@@ -1,0 +1,152 @@
+version: "1.0"
+id: backend_remote
+name: InfluxDB + Grafana Backend (Remote)
+name_zh: InfluxDB + Grafana 后端（远程）
+type: docker_remote
+
+detection:
+  method: network_scan
+  manual_entry: true
+  requirements:
+    - docker_installed
+    - docker_running
+
+ssh:
+  port: 22
+  default_user: root
+  auth_methods:
+    - password
+    - key
+  connection_timeout: 30
+  command_timeout: 600
+
+docker_remote:
+  compose_file: ../docker/docker-compose.yml
+  compose_dir: docker
+  remote_path: /home/{{username}}/recamera-heatmap
+
+  environment:
+    DOCKER_INFLUXDB_INIT_USERNAME: admin
+    DOCKER_INFLUXDB_INIT_PASSWORD: adminpassword
+    DOCKER_INFLUXDB_INIT_ORG: seeed
+    DOCKER_INFLUXDB_INIT_BUCKET: recamera
+
+  options:
+    project_name: recamera-heatmap
+    remove_orphans: true
+
+  services:
+    - name: influxdb
+      port: 8086
+      health_check_endpoint: /health
+      required: true
+    - name: grafana
+      port: 3000
+      health_check_endpoint: /api/health
+      required: true
+
+  images:
+    - name: influxdb:2.7
+      required: true
+    - name: grafana/grafana:latest
+      required: true
+
+user_inputs:
+  - id: host
+    name: Device IP
+    name_zh: 设备 IP 地址
+    type: text
+    required: true
+    placeholder: "192.168.1.100"
+    description: IP address of the target device (reComputer, Raspberry Pi, etc.)
+    description_zh: 目标设备的 IP 地址（reComputer、树莓派等）
+    validation:
+      pattern: "^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$"
+      message: Please enter a valid IP address
+
+  - id: username
+    name: SSH Username
+    name_zh: SSH 用户名
+    type: text
+    default: root
+    required: true
+    description: SSH login username
+    description_zh: SSH 登录用户名
+
+  - id: password
+    name: SSH Password
+    name_zh: SSH 密码
+    type: password
+    required: true
+    description: SSH login password
+    description_zh: SSH 登录密码
+
+  - id: port
+    name: SSH Port
+    name_zh: SSH 端口
+    type: text
+    default: "22"
+    required: false
+    description: SSH port (default 22)
+    description_zh: SSH 端口（默认 22）
+
+pre_checks:
+  - type: docker_version
+    min_version: "20.0"
+    description: Check Docker version
+  - type: docker_compose_version
+    min_version: "2.0"
+    description: Check Docker Compose version
+
+steps:
+  - id: connect
+    name: SSH Connect
+    name_zh: SSH 连接
+    description: Connect to remote device via SSH
+    description_zh: 通过 SSH 连接远程设备
+    optional: false
+    default: true
+
+  - id: prepare
+    name: Prepare Directory
+    name_zh: 准备目录
+    description: Create deployment directory on remote
+    description_zh: 在远程设备上创建部署目录
+    optional: false
+    default: true
+
+  - id: upload
+    name: Upload Files
+    name_zh: 上传文件
+    description: Upload Docker Compose files
+    description_zh: 上传 Docker Compose 文件
+    optional: false
+    default: true
+
+  - id: pull_images
+    name: Pull Docker Images
+    name_zh: 拉取 Docker 镜像
+    description: Download container image from registry
+    description_zh: 从镜像仓库下载容器镜像
+    optional: false
+    default: true
+
+  - id: start_services
+    name: Start Services
+    name_zh: 启动服务
+    description: Launch Docker containers
+    description_zh: 启动 Docker 容器
+    optional: false
+    default: true
+
+  - id: health_check
+    name: Health Check
+    name_zh: 健康检查
+    description: Verify services are running correctly
+    description_zh: 验证服务运行正常
+    optional: false
+    default: true
+
+post_deployment:
+  open_browser: true
+  url: "http://{{host}}:3000"

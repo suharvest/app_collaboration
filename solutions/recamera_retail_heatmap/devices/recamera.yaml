@@ -13,6 +13,7 @@ detection:
 ssh:
   port: 22
   default_user: recamera
+  default_host: 192.168.42.1
   connection_timeout: 30
   command_timeout: 300
 
@@ -59,9 +60,10 @@ user_inputs:
     name: Device IP Address
     name_zh: 设备 IP 地址
     type: text
-    placeholder: "192.168.10.88"
-    description: IP address of your reCamera (wired network or USB 192.168.42.1)
-    description_zh: reCamera 的 IP 地址（有线网络或 USB 192.168.42.1）
+    default: "192.168.42.1"
+    placeholder: "192.168.42.1"
+    description: IP address of your reCamera (USB default 192.168.42.1)
+    description_zh: reCamera 的 IP 地址（USB 默认 192.168.42.1）
     required: true
     validation:
       pattern: "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"

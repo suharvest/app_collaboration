@@ -36,20 +36,59 @@ intro:
     - rerouter
     - respeaker
 
-  required_devices:
-    - name: reRouter CM4
+  # Device Catalog
+  device_catalog:
+    rerouter_cm4:
+      name: reRouter CM4
       name_zh: reRouter CM4
       image: intro/gallery/rerouter.png
-      purchase_url: https://www.seeedstudio.com/reRouter-CM4
+      product_url: https://www.seeedstudio.com/reRouter-CM4
       description: Edge computing device with 4GB RAM, 32GB eMMC
       description_zh: 边缘计算设备，4GB 内存，32GB eMMC 存储
 
-    - name: reSpeaker XVF3800
+    respeaker_xvf3800:
+      name: reSpeaker XVF3800
       name_zh: reSpeaker XVF3800 麦克风阵列
       image: intro/gallery/respeaker.jpg
-      purchase_url: https://www.seeedstudio.com/ReSpeaker-XVF3800
+      product_url: https://www.seeedstudio.com/ReSpeaker-XVF3800
       description: 4-mic array with noise suppression, AEC, and beamforming
       description_zh: 4 麦克风阵列，支持噪声抑制、回声消除和波束成形
+
+  # Device Groups
+  device_groups:
+    - id: edge_device
+      name: Edge Computing Device
+      name_zh: 边缘计算设备
+      type: single
+      required: true
+      options:
+        - device_ref: rerouter_cm4
+      default: rerouter_cm4
+
+    - id: microphone
+      name: Microphone Array
+      name_zh: 麦克风阵列
+      type: single
+      required: true
+      options:
+        - device_ref: respeaker_xvf3800
+      default: respeaker_xvf3800
+
+  # Presets
+  presets:
+    - id: default
+      name: Standard Deployment
+      name_zh: 标准部署
+      selections:
+        edge_device: rerouter_cm4
+        microphone: respeaker_xvf3800
+      links:
+        wiki: https://wiki.seeedstudio.com/cn/solutions/smart-retail-voice-ai-solution-1/
+      section:
+        title: Deployment Guide
+        title_zh: 部署指南
+        description_file: deploy/guide.md
+        description_file_zh: deploy/guide_zh.md
 
   stats:
     deployed_count: 0
@@ -118,24 +157,52 @@ deployment:
     - id: voice_services
       name: Deploy Voice Services
       name_zh: 部署语音服务
-      type: docker_remote
+      type: docker_deploy
       required: true
       config_file: devices/rerouter.yaml
       section:
         title: Step 3 - Deploy Voice Services
         title_zh: 第三步 - 部署语音服务
-        description_file: deploy/sections/voice_services.md
-        description_file_zh: deploy/sections/voice_services_zh.md
-        wiring:
-          image: intro/gallery/wan_lan.png
-          steps:
-            - Connect reSpeaker to reRouter USB port
-            - Enter SSH credentials
-            - Deploy Docker containers
-          steps_zh:
-            - 将 reSpeaker 连接到 reRouter USB 口
-            - 输入 SSH 凭据
-            - 部署 Docker 容器
+      # 部署目标选择：本机或远程
+      targets:
+        local:
+          name: Local Deployment
+          name_zh: 本机部署
+          description: Deploy on this computer
+          description_zh: 部署到当前电脑
+          config_file: devices/voice_local.yaml
+          section:
+            description_file: deploy/sections/voice_local.md
+            description_file_zh: deploy/sections/voice_local_zh.md
+            wiring:
+              steps:
+                - Connect reSpeaker to computer USB port
+                - Ensure Docker is installed and running
+                - Click Deploy button to start services
+              steps_zh:
+                - 将 reSpeaker 连接到电脑 USB 口
+                - 确保 Docker 已安装并运行
+                - 点击部署按钮启动服务
+        remote:
+          name: Remote Deployment
+          name_zh: 远程部署
+          description: Deploy to reRouter via SSH
+          description_zh: 通过 SSH 部署到 reRouter
+          default: true
+          config_file: devices/rerouter.yaml
+          section:
+            description_file: deploy/sections/voice_remote.md
+            description_file_zh: deploy/sections/voice_remote_zh.md
+            wiring:
+              image: intro/gallery/wan_lan.png
+              steps:
+                - Connect reSpeaker to reRouter USB port
+                - Enter SSH credentials
+                - Deploy Docker containers
+              steps_zh:
+                - 将 reSpeaker 连接到 reRouter USB 口
+                - 输入 SSH 凭据
+                - 部署 Docker 容器
 
   order:
     - firmware

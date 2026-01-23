@@ -31,34 +31,68 @@ intro:
     - xiaozhi
     - recomputer
 
-  required_devices:
-    - name: SenseCAP Watcher
-      name_zh: SenseCAP Watcher
-      image: intro/gallery/watcher.svg
-      purchase_url: https://www.seeedstudio.com/SenseCAP-Watcher
-      description: AI-powered voice assistant with display
-      description_zh: 带屏幕的 AI 语音助手
+  # Device Catalog (references global catalog, with local overrides)
+  # Global catalog: devices/catalog.yaml
+  device_catalog:
+    sensecap_watcher:
+      image: intro/gallery/watcher.svg  # Use local image
 
-    - name: reComputer or Raspberry Pi
-      name_zh: reComputer 或树莓派
-      image: intro/gallery/recomputer.svg
-      purchase_url: https://www.seeedstudio.com/reComputer-R1000-Series
-      description: Edge computing device for display server
-      description_zh: 运行投屏服务的边缘计算设备
+    recomputer_r1000:
+      image: intro/gallery/recomputer.svg  # Use local image
 
-    - name: HDMI Display
-      name_zh: HDMI 显示器
-      description: Large screen display (TV, monitor, advertising screen)
-      description_zh: 大屏幕显示设备（电视、显示器、广告机）
+    hdmi_display: {}  # Use global catalog as-is
+
+  # Device Groups
+  device_groups:
+    - id: voice_assistant
+      name: Voice Assistant
+      name_zh: 语音助手
+      type: single
+      required: true
+      options:
+        - device_ref: sensecap_watcher
+      default: sensecap_watcher
+
+    - id: edge_device
+      name: Edge Computing Device
+      name_zh: 边缘计算设备
+      type: single
+      required: true
+      options:
+        - device_ref: recomputer_r1000
+      default: recomputer_r1000
+
+    - id: display
+      name: Display
+      name_zh: 显示器
+      type: single
+      required: true
+      options:
+        - device_ref: hdmi_display
+      default: hdmi_display
+
+  # Presets
+  presets:
+    - id: default
+      name: Standard Deployment
+      name_zh: 标准部署
+      selections:
+        voice_assistant: sensecap_watcher
+        edge_device: recomputer_r1000
+        display: hdmi_display
+      links:
+        github: https://github.com/78/xiaozhi-esp32
+      section:
+        title: Deployment Guide
+        title_zh: 部署指南
+        description_file: deploy/guide.md
+        description_file_zh: deploy/guide_zh.md
 
   stats:
     deployed_count: 0
     likes_count: 0
     difficulty: intermediate
     estimated_time: 30min
-
-  links:
-    github: https://github.com/78/xiaozhi-esp32
 
 # ============ 部署页内容 ============
 deployment:
@@ -95,24 +129,50 @@ deployment:
     - id: display_service
       name: Deploy Display Service
       name_zh: 部署投屏服务
-      type: docker_remote
+      type: docker_deploy
       required: true
-      config_file: devices/recomputer.yaml
+      config_file: devices/display_local.yaml
       section:
         title: Step 2 - Deploy Display Service
         title_zh: 第二步 - 部署投屏服务
-        description_file: deploy/sections/display_service.md
-        description_file_zh: deploy/sections/display_service_zh.md
-        wiring:
-          image: intro/gallery/architecture.svg
-          steps:
-            - Ensure reComputer/Raspberry Pi is connected to network
-            - Enter SSH credentials
-            - Deploy Docker container
-          steps_zh:
-            - 确保 reComputer/树莓派已连接网络
-            - 输入 SSH 凭据
-            - 部署 Docker 容器
+      targets:
+        local:
+          name: Local Deployment
+          name_zh: 本机部署
+          description: Deploy on this computer
+          description_zh: 部署到当前电脑
+          default: true
+          config_file: devices/display_local.yaml
+          section:
+            description_file: deploy/sections/display_local.md
+            description_file_zh: deploy/sections/display_local_zh.md
+            wiring:
+              image: intro/gallery/architecture.svg
+              steps:
+                - Ensure Docker is installed and running
+                - Click Deploy button to start services
+              steps_zh:
+                - 确保 Docker 已安装并运行
+                - 点击部署按钮启动服务
+        remote:
+          name: Remote Deployment
+          name_zh: 远程部署
+          description: Deploy to reComputer/Raspberry Pi via SSH
+          description_zh: 通过 SSH 部署到 reComputer/树莓派
+          config_file: devices/recomputer.yaml
+          section:
+            description_file: deploy/sections/display_remote.md
+            description_file_zh: deploy/sections/display_remote_zh.md
+            wiring:
+              image: intro/gallery/architecture.svg
+              steps:
+                - Connect target device to network
+                - Enter IP address and SSH credentials
+                - Click Deploy to install on remote device
+              steps_zh:
+                - 将目标设备连接到网络
+                - 输入 IP 地址和 SSH 凭据
+                - 点击部署安装到远程设备
 
   order:
     - watcher

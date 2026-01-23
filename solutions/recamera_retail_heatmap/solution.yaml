@@ -22,13 +22,42 @@ intro:
     - recamera
     - analytics
 
-  required_devices:
-    - name: reCamera
+  # Device Catalog
+  device_catalog:
+    recamera:
+      name: reCamera
       name_zh: reCamera
       image: intro/gallery/recamera.svg
-      purchase_url: https://www.seeedstudio.com/reCamera-2002w-8GB-p-6250.html
+      product_url: https://www.seeedstudio.com/reCamera-2002w-8GB-p-6250.html
       description: AI camera with edge computing for real-time person detection
       description_zh: 内置边缘计算的 AI 摄像头，用于实时人员检测
+
+  # Device Groups
+  device_groups:
+    - id: camera
+      name: AI Camera
+      name_zh: AI 摄像头
+      type: single
+      required: true
+      options:
+        - device_ref: recamera
+      default: recamera
+
+  # Presets
+  presets:
+    - id: default
+      name: Standard Deployment
+      name_zh: 标准部署
+      selections:
+        camera: recamera
+      links:
+        wiki: https://wiki.seeedstudio.com/
+        github: https://github.com/Seeed-Studio/sscma-example-sg200x
+      section:
+        title: Deployment Guide
+        title_zh: 部署指南
+        description_file: deploy/guide.md
+        description_file_zh: deploy/guide_zh.md
 
   stats:
     difficulty: beginner
