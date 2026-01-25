@@ -94,7 +94,8 @@ async def test_connection(request: DeviceConnectionRequest):
     )
 
     if result.get("status") == "error":
-        raise HTTPException(status_code=400, detail=result.get("error", "Connection failed"))
+        error_msg = result.get("details", {}).get("error", "Connection failed")
+        raise HTTPException(status_code=400, detail=error_msg)
 
     return result
 
