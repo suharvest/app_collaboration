@@ -2,7 +2,7 @@
  * Preview Module - Live Video + MQTT Inference Display
  *
  * Handles:
- * - RTSP stream playback via HLS proxy
+ * - RTSP stream playback via MJPEG proxy (low latency)
  * - MQTT message forwarding via WebSocket
  * - Canvas overlay rendering for inference results
  */
@@ -17,13 +17,13 @@ const API_BASE = '/api/preview';
 
 export const previewApi = {
   /**
-   * Start an RTSP to HLS stream
+   * Start an RTSP to MJPEG stream
    */
-  async startStream(rtspUrl, streamId = null) {
-    const response = await fetch(`${API_BASE}/stream/start`, {
+  async startMjpegStream(rtspUrl, streamId = null, fps = 10, quality = 5) {
+    const response = await fetch(`${API_BASE}/mjpeg/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rtsp_url: rtspUrl, stream_id: streamId }),
+      body: JSON.stringify({ rtsp_url: rtspUrl, stream_id: streamId, fps, quality }),
     });
     if (!response.ok) {
       const error = await response.json();
@@ -79,13 +79,14 @@ export class PreviewWindow {
       ...config,
     };
 
-    this.video = null;
+    this.img = null;
     this.canvas = null;
-    this.hls = null;
     this.ws = null;
     this.streamId = null;
     this.isConnected = false;
     this.overlayRenderer = null;
+    this._abortController = null;
+    this._lastBlobUrl = null;
     this.stats = {
       fps: 0,
       messageCount: 0,
@@ -129,7 +130,7 @@ export class PreviewWindow {
         </div>
 
         <div class="preview-container" style="padding-bottom: ${paddingBottom}%;">
-          <video id="preview-video" class="preview-video" muted playsinline></video>
+          <img id="preview-img" class="preview-video" style="visibility:hidden" alt="">
           <canvas id="preview-canvas" class="preview-canvas"></canvas>
           <div class="preview-overlay-info" id="preview-overlay-info"></div>
         </div>
@@ -153,7 +154,7 @@ export class PreviewWindow {
       </div>
     `;
 
-    this.video = this.container.querySelector('#preview-video');
+    this.img = this.container.querySelector('#preview-img');
     this.canvas = this.container.querySelector('#preview-canvas');
     this._setupEventHandlers();
   }
@@ -177,16 +178,24 @@ export class PreviewWindow {
       this._toggleFullscreen();
     });
 
-    // Resize canvas when video size changes
-    this.video?.addEventListener('loadedmetadata', () => {
-      this._resizeCanvas();
-    });
+    // Handle MJPEG frame events
+    if (this.img) {
+      this.img.addEventListener('load', () => {
+        this.img.style.visibility = 'visible';
+        this._resizeCanvas();
+        // First frame received - stream is live
+        if (this.isConnected) {
+          this._updateRtspStatus('connected');
+        }
+      });
 
-    // Handle video errors
-    this.video?.addEventListener('error', (e) => {
-      console.error('Video error:', e);
-      this._updateStatus('error', 'Video playback error');
-    });
+      this.img.addEventListener('error', (e) => {
+        if (this.isConnected) {
+          console.error('MJPEG stream error:', e);
+          this._updateRtspStatus('error', 'Stream error');
+        }
+      });
+    }
   }
 
   /**
@@ -204,9 +213,9 @@ export class PreviewWindow {
       // Start video stream if URL provided
       if (rtspUrl) {
         await this._connectVideo(rtspUrl);
-        // Video connected - update UI immediately
+        // Process started, img.src set - enable disconnect button
+        // Status stays "connecting" until first frame loads (img.load event)
         this.isConnected = true;
-        this._updateRtspStatus('connected');
         this._updateConnectButton(true);
       }
     } catch (error) {
@@ -234,65 +243,110 @@ export class PreviewWindow {
   }
 
   /**
-   * Connect to HLS video stream
+   * Connect to MJPEG video stream
    */
   async _connectVideo(rtspUrl) {
-    // Start stream proxy
-    const result = await previewApi.startStream(rtspUrl);
+    // Start MJPEG stream proxy
+    const result = await previewApi.startMjpegStream(rtspUrl);
     this.streamId = result.stream_id;
 
-    // Wait for stream to be ready
-    await this._waitForStream(this.streamId);
+    // Use fetch + ReadableStream to parse MJPEG frames.
+    // This works through proxies (Vite dev server) unlike native
+    // multipart/x-mixed-replace which requires direct connection.
+    this._abortController = new AbortController();
+    this._startMjpegReader(result.mjpeg_url);
+  }
 
-    // Connect HLS player
-    const hlsUrl = result.hls_url;
-
-    if (window.Hls && Hls.isSupported()) {
-      this.hls = new Hls({
-        liveDurationInfinity: true,
-        liveBackBufferLength: 0,
-        maxBufferLength: 2,
-        maxMaxBufferLength: 3,
-      });
-
-      this.hls.loadSource(hlsUrl);
-      this.hls.attachMedia(this.video);
-
-      this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        this.video.play().catch(e => console.warn('Autoplay blocked:', e));
-      });
-
-      this.hls.on(Hls.Events.ERROR, (event, data) => {
-        if (data.fatal) {
-          console.error('HLS fatal error:', data);
-          this._updateStatus('error', 'Stream error');
+  /**
+   * Start reading MJPEG frames from the streaming endpoint
+   */
+  _startMjpegReader(url) {
+    fetch(url, { signal: this._abortController.signal })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Stream request failed: ${response.status}`);
+        }
+        const reader = response.body.getReader();
+        this._readMjpegFrames(reader);
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          console.error('MJPEG fetch error:', err);
+          this._updateRtspStatus('error', 'Stream failed');
         }
       });
-    } else if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Native HLS support (Safari)
-      this.video.src = hlsUrl;
-      this.video.play().catch(e => console.warn('Autoplay blocked:', e));
-    } else {
-      throw new Error('HLS playback not supported in this browser');
+  }
+
+  /**
+   * Parse JPEG frames from a ReadableStream and display them
+   */
+  async _readMjpegFrames(reader) {
+    let buffer = new Uint8Array(0);
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        // Append chunk to buffer
+        const newBuffer = new Uint8Array(buffer.length + value.length);
+        newBuffer.set(buffer);
+        newBuffer.set(value, buffer.length);
+        buffer = newBuffer;
+
+        // Find complete JPEG frames (SOI: 0xFF 0xD8, EOI: 0xFF 0xD9)
+        while (true) {
+          const soiIdx = this._findMarker(buffer, 0xFF, 0xD8);
+          if (soiIdx < 0) break;
+
+          const eoiIdx = this._findMarker(buffer, 0xFF, 0xD9, soiIdx + 2);
+          if (eoiIdx < 0) break;
+
+          // Extract complete JPEG frame
+          const frameEnd = eoiIdx + 2;
+          const frame = buffer.slice(soiIdx, frameEnd);
+
+          // Display frame as blob URL
+          const blob = new Blob([frame], { type: 'image/jpeg' });
+          const blobUrl = URL.createObjectURL(blob);
+          if (this._lastBlobUrl) {
+            URL.revokeObjectURL(this._lastBlobUrl);
+          }
+          this._lastBlobUrl = blobUrl;
+          this.img.src = blobUrl;
+
+          // Advance buffer past this frame
+          buffer = buffer.slice(frameEnd);
+        }
+
+        // Trim buffer: discard data before the last potential SOI start
+        if (buffer.length > 0) {
+          const lastSoi = this._findMarker(buffer, 0xFF, 0xD8);
+          if (lastSoi > 0) {
+            buffer = buffer.slice(lastSoi);
+          }
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('MJPEG reader error:', err);
+        if (this.isConnected) {
+          this._updateRtspStatus('error', 'Stream ended');
+        }
+      }
     }
   }
 
   /**
-   * Wait for stream to be ready
+   * Find a 2-byte marker in a Uint8Array
    */
-  async _waitForStream(streamId, maxWait = 10000) {
-    const startTime = Date.now();
-    while (Date.now() - startTime < maxWait) {
-      const status = await previewApi.getStreamStatus(streamId);
-      if (status?.status === 'running') {
-        return;
+  _findMarker(buffer, b0, b1, startIdx = 0) {
+    for (let i = startIdx; i < buffer.length - 1; i++) {
+      if (buffer[i] === b0 && buffer[i + 1] === b1) {
+        return i;
       }
-      if (status?.status === 'error') {
-        throw new Error(status.error || 'Stream failed to start');
-      }
-      await new Promise(r => setTimeout(r, 500));
     }
-    throw new Error('Stream startup timeout');
+    return -1;
   }
 
   /**
@@ -382,11 +436,18 @@ export class PreviewWindow {
   _renderOverlay(data) {
     if (!this.canvas || !this.overlayRenderer) return;
 
+    // Ensure canvas resolution matches display size
+    const displayRect = this.canvas.getBoundingClientRect();
+    if (this.canvas.width !== Math.round(displayRect.width) ||
+        this.canvas.height !== Math.round(displayRect.height)) {
+      this._resizeCanvas();
+    }
+
     const ctx = this.canvas.getContext('2d');
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     try {
-      this.overlayRenderer(ctx, data, this.canvas, this.video);
+      this.overlayRenderer(ctx, data, this.canvas, this.img);
       this._frameCount++;
 
       // Update FPS
@@ -407,12 +468,15 @@ export class PreviewWindow {
   }
 
   /**
-   * Resize canvas to match video
+   * Resize canvas to match video or container
    */
   _resizeCanvas() {
-    if (!this.video || !this.canvas) return;
+    if (!this.canvas) return;
 
-    const rect = this.video.getBoundingClientRect();
+    // Use img dimensions if loaded, otherwise use canvas display size
+    const rect = (this.img && this.img.naturalWidth)
+      ? this.img.getBoundingClientRect()
+      : this.canvas.getBoundingClientRect();
     this.canvas.width = rect.width;
     this.canvas.height = rect.height;
   }
@@ -421,16 +485,20 @@ export class PreviewWindow {
    * Disconnect from stream and MQTT
    */
   async disconnect() {
-    // Stop HLS
-    if (this.hls) {
-      this.hls.destroy();
-      this.hls = null;
+    // Abort MJPEG fetch
+    if (this._abortController) {
+      this._abortController.abort();
+      this._abortController = null;
     }
 
-    // Stop video
-    if (this.video) {
-      this.video.pause();
-      this.video.src = '';
+    // Clean up blob URL and img
+    if (this._lastBlobUrl) {
+      URL.revokeObjectURL(this._lastBlobUrl);
+      this._lastBlobUrl = null;
+    }
+    if (this.img) {
+      this.img.style.visibility = 'hidden';
+      this.img.src = '';
     }
 
     // Close WebSocket
@@ -575,7 +643,7 @@ export class PreviewWindow {
 
   /**
    * Set overlay renderer function
-   * @param {Function} renderer - Function(ctx, data, canvas, video)
+   * @param {Function} renderer - Function(ctx, data, canvas, img)
    */
   setOverlayRenderer(renderer) {
     this.overlayRenderer = renderer;
@@ -626,8 +694,8 @@ export class PreviewWindow {
 export function loadOverlayScript(scriptContent) {
   try {
     // Create a function from the script content
-    // The script should define drawing operations using ctx, data, canvas, video
-    const fn = new Function('ctx', 'data', 'canvas', 'video', scriptContent);
+    // The script should define drawing operations using ctx, data, canvas, img
+    const fn = new Function('ctx', 'data', 'canvas', 'img', scriptContent);
     return fn;
   } catch (e) {
     console.error('Failed to load overlay script:', e);
