@@ -33,6 +33,11 @@ logs/
 data/cache/
 data/logs/
 
+# PyInstaller
+pyinstaller/build/
+pyinstaller/dist/
+*.spec.bak
+
 # Local config
 .env.local
 .env.*.local
