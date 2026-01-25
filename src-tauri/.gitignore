@@ -1,0 +1,19 @@
+# Rust build artifacts
+/target/
+
+# Sidecar binaries (built during CI)
+/binaries/*
+!/binaries/.gitkeep
+
+# Generated icons (if using tauri icon command)
+/icons/*.png
+/icons/*.ico
+/icons/*.icns
+!/icons/README.md
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+*.swp

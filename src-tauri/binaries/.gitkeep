@@ -1,0 +1,7 @@
+# This directory contains sidecar binaries built during CI
+# The binaries are platform-specific and not committed to git
+#
+# Expected files after building:
+# - provisioning-station-x86_64-unknown-linux-gnu
+# - provisioning-station-x86_64-pc-windows-msvc.exe
+# - provisioning-station-aarch64-apple-darwin

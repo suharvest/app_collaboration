@@ -1,0 +1,32 @@
+#!/bin/bash
+# Post-installation script for SenseCraft Solution
+# Reloads udev rules to enable serial port access
+
+set -e
+
+echo "Reloading udev rules for serial device access..."
+
+# Reload udev rules
+if command -v udevadm &> /dev/null; then
+    udevadm control --reload-rules
+    udevadm trigger
+    echo "udev rules reloaded successfully."
+else
+    echo "Warning: udevadm not found. You may need to reboot for serial port access."
+fi
+
+echo ""
+echo "============================================"
+echo "SenseCraft Solution installed successfully!"
+echo "============================================"
+echo ""
+echo "You can now launch the application from your application menu"
+echo "or by running: sensecraft-solution"
+echo ""
+echo "Note: If you encounter serial port permission issues, try:"
+echo "  1. Unplug and replug your device"
+echo "  2. Log out and log back in"
+echo "  3. Reboot your system"
+echo ""
+
+exit 0
