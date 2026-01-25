@@ -12,6 +12,7 @@ from ..models.solution import Solution
 from ..models.deployment import Deployment, DeviceDeployment, DeploymentStatus, StepStatus
 from ..deployers.base import BaseDeployer
 from ..deployers.esp32_deployer import ESP32Deployer
+from ..deployers.himax_deployer import HimaxDeployer
 from ..deployers.docker_deployer import DockerDeployer
 from ..deployers.docker_remote_deployer import DockerRemoteDeployer, RemoteDockerNotInstalled
 from ..deployers.ssh_deployer import SSHDeployer
@@ -39,6 +40,7 @@ class DeploymentEngine:
         # Initialize deployers
         self.deployers: Dict[str, BaseDeployer] = {
             "esp32_usb": ESP32Deployer(),
+            "himax_usb": HimaxDeployer(),
             "docker_local": DockerDeployer(),
             "docker_remote": DockerRemoteDeployer(),
             "ssh_deb": SSHDeployer(),
@@ -283,9 +285,17 @@ class DeploymentEngine:
 
                 # Execute deployment
                 try:
+                    # Add solution metadata to connection for label injection
+                    enriched_connection = {
+                        **device_deployment.connection,
+                        "_solution_id": solution.id,
+                        "_solution_name": solution.name,
+                        "_device_id": device_deployment.device_id,
+                    }
+
                     success = await deployer.deploy(
                         config=config,
-                        connection=device_deployment.connection,
+                        connection=enriched_connection,
                         progress_callback=progress_callback,
                     )
 

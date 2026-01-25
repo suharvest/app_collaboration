@@ -111,10 +111,21 @@ async def cancel_deployment(deployment_id: str):
 
 
 @router.get("/", response_model=List[DeploymentListItem])
-async def list_deployments(limit: int = Query(20, ge=1, le=100)):
+async def list_deployments(
+    limit: int = Query(20, ge=1, le=100),
+    lang: str = Query("en", regex="^(en|zh)$"),
+):
     """List recent deployments - merges active + persisted history"""
     result = []
     seen_ids = set()
+
+    def get_solution_name(solution, fallback: str) -> str:
+        """Get localized solution name"""
+        if not solution:
+            return fallback
+        if lang == "zh" and solution.name_zh:
+            return solution.name_zh
+        return solution.name
 
     # 1. Active deployments (real-time step progress)
     active_deployments = deployment_engine.list_deployments(limit=limit)
@@ -136,7 +147,7 @@ async def list_deployments(limit: int = Query(20, ge=1, le=100)):
         result.append(DeploymentListItem(
             id=deployment.id,
             solution_id=deployment.solution_id,
-            solution_name=solution.name if solution else deployment.solution_id,
+            solution_name=get_solution_name(solution, deployment.solution_id),
             status=deployment.status,
             started_at=deployment.started_at,
             completed_at=deployment.completed_at,
@@ -165,7 +176,7 @@ async def list_deployments(limit: int = Query(20, ge=1, le=100)):
         result.append(DeploymentListItem(
             id=record.deployment_id,
             solution_id=record.solution_id,
-            solution_name=solution.name if solution else record.solution_id,
+            solution_name=get_solution_name(solution, record.solution_id),
             status=DeploymentStatus.COMPLETED if record.status == "completed" else DeploymentStatus.FAILED,
             started_at=record.deployed_at,
             completed_at=record.deployed_at,

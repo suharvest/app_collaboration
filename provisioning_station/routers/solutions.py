@@ -5,11 +5,11 @@ Solution management API routes
 from typing import List, Optional, Dict
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse, Response
 import markdown
 
-from ..models.api import SolutionSummary, SolutionDetail
+from ..models.api import SolutionSummary, SolutionDetail, SolutionCreate, SolutionUpdate
 from ..models.solution import DeviceGroupSection
 from ..services.solution_manager import solution_manager
 from ..config import settings
@@ -153,11 +153,18 @@ async def list_solutions(
         if category and solution.intro.category != category:
             continue
 
+        # Check file existence for management UI
+        base_path = Path(solution.base_path) if solution.base_path else None
+        has_description = base_path and (base_path / solution.intro.description_file).exists() if solution.intro.description_file else False
+        has_description_zh = base_path and (base_path / solution.intro.description_file_zh).exists() if solution.intro.description_file_zh else False
+        has_guide = base_path and (base_path / solution.deployment.guide_file).exists() if solution.deployment.guide_file else False
+        has_guide_zh = base_path and (base_path / solution.deployment.guide_file_zh).exists() if solution.deployment.guide_file_zh else False
+
         summary = SolutionSummary(
             id=solution.id,
-            name=solution.name if lang == "en" else (solution.name_zh or solution.name),
+            name=solution.name,  # Always return original values for management
             name_zh=solution.name_zh,
-            summary=solution.intro.summary if lang == "en" else (solution.intro.summary_zh or solution.intro.summary),
+            summary=solution.intro.summary,  # Always return original values
             summary_zh=solution.intro.summary_zh,
             category=solution.intro.category,
             tags=solution.intro.tags,
@@ -167,6 +174,10 @@ async def list_solutions(
             deployed_count=solution.intro.stats.deployed_count,
             likes_count=solution.intro.stats.likes_count,
             device_count=len(solution.deployment.devices),
+            has_description=has_description,
+            has_description_zh=has_description_zh,
+            has_guide=has_guide,
+            has_guide_zh=has_guide_zh,
         )
         result.append(summary)
 
@@ -583,3 +594,116 @@ async def like_solution(solution_id: str):
     # In a real app, this would persist to a database
     solution.intro.stats.likes_count += 1
     return {"likes_count": solution.intro.stats.likes_count}
+
+
+# ============================================
+# Solution Management CRUD Routes
+# ============================================
+
+@router.post("/", response_model=SolutionSummary)
+async def create_solution(data: SolutionCreate):
+    """Create a new solution"""
+    try:
+        solution = await solution_manager.create_solution(data.model_dump())
+
+        return SolutionSummary(
+            id=solution.id,
+            name=solution.name,
+            name_zh=solution.name_zh,
+            summary=solution.intro.summary,
+            summary_zh=solution.intro.summary_zh,
+            category=solution.intro.category,
+            tags=solution.intro.tags,
+            cover_image=None,
+            difficulty=solution.intro.stats.difficulty,
+            estimated_time=solution.intro.stats.estimated_time,
+            deployed_count=0,
+            likes_count=0,
+            device_count=0,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create solution: {str(e)}")
+
+
+@router.put("/{solution_id}", response_model=SolutionSummary)
+async def update_solution(solution_id: str, data: SolutionUpdate):
+    """Update an existing solution"""
+    try:
+        # Filter out None values
+        update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No fields to update")
+
+        solution = await solution_manager.update_solution(solution_id, update_data)
+
+        return SolutionSummary(
+            id=solution.id,
+            name=solution.name,
+            name_zh=solution.name_zh,
+            summary=solution.intro.summary,
+            summary_zh=solution.intro.summary_zh,
+            category=solution.intro.category,
+            tags=solution.intro.tags,
+            cover_image=f"/api/solutions/{solution.id}/assets/{solution.intro.cover_image}" if solution.intro.cover_image else None,
+            difficulty=solution.intro.stats.difficulty,
+            estimated_time=solution.intro.stats.estimated_time,
+            deployed_count=solution.intro.stats.deployed_count,
+            likes_count=solution.intro.stats.likes_count,
+            device_count=len(solution.deployment.devices),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update solution: {str(e)}")
+
+
+@router.delete("/{solution_id}")
+async def delete_solution(
+    solution_id: str,
+    permanent: bool = Query(False, description="Permanently delete instead of moving to trash")
+):
+    """Delete a solution (moves to trash by default)"""
+    try:
+        await solution_manager.delete_solution(solution_id, move_to_trash=not permanent)
+        return {"success": True, "message": f"Solution '{solution_id}' deleted"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete solution: {str(e)}")
+
+
+@router.post("/{solution_id}/assets")
+async def upload_asset(
+    solution_id: str,
+    file: UploadFile = File(...),
+    path: str = Form(..., description="Relative path within solution directory"),
+    update_field: Optional[str] = Form(None, description="Optional YAML field to update with this path")
+):
+    """Upload an asset file to a solution"""
+    try:
+        # Read file content
+        content = await file.read()
+
+        # Max file size: 10MB
+        if len(content) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+
+        # Save the asset
+        saved_path = await solution_manager.save_asset(
+            solution_id,
+            content,
+            path,
+            update_yaml_field=update_field
+        )
+
+        return {
+            "success": True,
+            "path": saved_path,
+            "url": f"/api/solutions/{solution_id}/assets/{saved_path}"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload asset: {str(e)}")

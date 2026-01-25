@@ -24,6 +24,11 @@ class SolutionSummary(BaseModel):
     deployed_count: int = 0
     likes_count: int = 0
     device_count: int = 0
+    # File existence flags for management UI
+    has_description: bool = False
+    has_description_zh: bool = False
+    has_guide: bool = False
+    has_guide_zh: bool = False
 
 
 class DeviceSummary(BaseModel):
@@ -158,3 +163,30 @@ class DeploymentListItem(BaseModel):
     device_count: int = 0
     device_id: Optional[str] = None
     steps: List[StepSummary] = []
+
+
+# ============================================
+# Solution Management Models
+# ============================================
+
+class SolutionCreate(BaseModel):
+    """Request model for creating a new solution"""
+    id: str  # Solution ID (directory name, lowercase letters, numbers, underscore)
+    name: str  # English name
+    name_zh: Optional[str] = None  # Chinese name
+    summary: str  # English summary
+    summary_zh: Optional[str] = None  # Chinese summary
+    category: str = "general"  # Category
+    difficulty: str = "beginner"  # beginner | intermediate | advanced
+    estimated_time: str = "30min"  # Estimated time
+
+
+class SolutionUpdate(BaseModel):
+    """Request model for updating an existing solution"""
+    name: Optional[str] = None
+    name_zh: Optional[str] = None
+    summary: Optional[str] = None
+    summary_zh: Optional[str] = None
+    category: Optional[str] = None
+    difficulty: Optional[str] = None
+    estimated_time: Optional[str] = None
