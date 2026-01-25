@@ -1,59 +1,52 @@
-version: "1.0"
+version: '1.0'
 id: indoor_positioning_ble_lorawan
 name: Indoor Positioning with BLE & LoRaWAN
 name_zh: 蓝牙 LoRaWAN 室内定位系统
-
-# ============ Intro Page ============
 intro:
-  summary: Cost-effective indoor positioning system combining BLE beacons for location sensing and LoRaWAN for long-range data transmission
+  summary: Cost-effective indoor positioning system combining BLE beacons for location
+    sensing and LoRaWAN for long-range data transmission
   summary_zh: 经济高效的室内定位系统，结合 BLE 信标进行位置感知和 LoRaWAN 进行远距离数据传输
-
   description_file: intro/description.md
   description_file_zh: intro/description_zh.md
-
   cover_image: intro/gallery/cover.png
-
   gallery:
-    - type: image
-      src: intro/gallery/architecture.png
-      caption: System Architecture
-      caption_zh: 系统架构
-    - type: image
-      src: intro/gallery/app-preview.png
-      caption: Application Dashboard
-      caption_zh: 应用仪表板
-    - type: image
-      src: intro/gallery/map-view.png
-      caption: Map Visualization
-      caption_zh: 地图可视化
-
+  - type: image
+    src: intro/gallery/architecture.png
+    caption: System Architecture
+    caption_zh: 系统架构
+  - type: image
+    src: intro/gallery/app-preview.png
+    caption: Application Dashboard
+    caption_zh: 应用仪表板
+  - type: image
+    src: intro/gallery/map-view.png
+    caption: Map Visualization
+    caption_zh: 地图可视化
   category: smart_building
   tags:
-    - iot
-    - lorawan
-    - bluetooth
-    - indoor-positioning
-    - asset-tracking
-    - sensecap
-
-  # Device Catalog - All available devices
+  - iot
+  - lorawan
+  - bluetooth
+  - indoor-positioning
+  - asset-tracking
+  - sensecap
   device_catalog:
     t1000_tracker:
       name: SenseCAP T1000 Tracker
       name_zh: SenseCAP T1000 追踪器
       image: intro/gallery/t1000.png
       product_url: https://www.seeedstudio.com/SenseCAP-Card-Tracker-T1000-B-p-5698.html
-      description: LoRaWAN mobile tracker with BLE scanning, motion detection, and SOS button
+      description: LoRaWAN mobile tracker with BLE scanning, motion detection, and
+        SOS button
       description_zh: LoRaWAN 移动追踪器，支持 BLE 扫描、运动检测和 SOS 按钮
-
     bc01_beacon:
       name: BC01 BLE Beacon
       name_zh: BC01 室内蓝牙信标
       image: intro/gallery/beacon.png
       product_url: https://www.seeedstudio.com/BC01-Indoor-Bluetooth-Beacon-p-5791.html
-      description: Bluetooth LE 5.0 beacon with iBeacon/Eddystone support, up to 2 years battery life
+      description: Bluetooth LE 5.0 beacon with iBeacon/Eddystone support, up to 2
+        years battery life
       description_zh: 蓝牙 LE 5.0 信标，支持 iBeacon/Eddystone，电池寿命长达 2 年
-
     gateway_us915:
       name: SenseCAP M2 Gateway (US915)
       name_zh: SenseCAP M2 网关 (US915)
@@ -61,7 +54,6 @@ intro:
       product_url: https://www.seeedstudio.com/SenseCAP-Multi-Platform-LoRaWAN-Indoor-Gateway-SX1302-US915-p-5472.html
       description: LoRaWAN gateway for Americas region (US915), 2km indoor coverage
       description_zh: 美洲地区 LoRaWAN 网关 (US915)，室内覆盖半径 2km
-
     gateway_eu868:
       name: SenseCAP M2 Gateway (EU868)
       name_zh: SenseCAP M2 网关 (EU868)
@@ -69,7 +61,6 @@ intro:
       product_url: https://www.seeedstudio.com/SenseCAP-Multi-Platform-LoRaWAN-Indoor-Gateway-SX1302-EU868-p-5471.html
       description: LoRaWAN gateway for Europe region (EU868), 2km indoor coverage
       description_zh: 欧洲地区 LoRaWAN 网关 (EU868)，室内覆盖半径 2km
-
     gateway_as923:
       name: SenseCAP M2 Gateway (AS923)
       name_zh: SenseCAP M2 网关 (AS923)
@@ -77,241 +68,218 @@ intro:
       product_url: https://www.seeedstudio.com/SenseCAP-Multi-Platform-LoRaWAN-Indoor-Gateway-SX1302-AS923-p-5473.html
       description: LoRaWAN gateway for Asia-Pacific region (AS923), 2km indoor coverage
       description_zh: 亚太地区 LoRaWAN 网关 (AS923)，室内覆盖半径 2km
-
-  # Device Groups - User selection interface
   device_groups:
-    - id: gateway
-      name: LoRaWAN Gateway
-      name_zh: LoRaWAN 网关
-      type: single
-      required: true
-      description: Select the gateway for your region
-      description_zh: 选择您所在地区的网关
-      options:
-        - device_ref: gateway_us915
-          label: Americas (US915)
-          label_zh: 美洲 (US915)
-        - device_ref: gateway_eu868
-          label: Europe (EU868)
-          label_zh: 欧洲 (EU868)
-        - device_ref: gateway_as923
-          label: Asia-Pacific (AS923)
-          label_zh: 亚太 (AS923)
-      default: gateway_us915
-
-    - id: beacons
-      name: BLE Beacons
-      name_zh: BLE 信标
-      type: quantity
-      required: true
-      device_ref: bc01_beacon
-      min_count: 3
-      max_count: 100
-      default_count: 6
-      description: "Recommended: 3-5 per zone for accurate positioning"
-      description_zh: "建议：每个区域 3-5 个，以获得准确定位"
-
-    - id: tracker
-      name: T1000 Tracker
-      name_zh: T1000 追踪器
-      type: quantity
-      required: true
-      device_ref: t1000_tracker
-      min_count: 1
-      max_count: 50
-      default_count: 1
-      description: Mobile asset tracker with BLE scanning
-      description_zh: 带 BLE 扫描的移动资产追踪器
-
-  # Presets - Quick configuration options (different scale, same deployment process)
+  - id: gateway
+    name: LoRaWAN Gateway
+    name_zh: LoRaWAN 网关
+    type: single
+    required: true
+    description: Select the gateway for your region
+    description_zh: 选择您所在地区的网关
+    options:
+    - device_ref: gateway_us915
+      label: Americas (US915)
+      label_zh: 美洲 (US915)
+    - device_ref: gateway_eu868
+      label: Europe (EU868)
+      label_zh: 欧洲 (EU868)
+    - device_ref: gateway_as923
+      label: Asia-Pacific (AS923)
+      label_zh: 亚太 (AS923)
+    default: gateway_us915
+  - id: beacons
+    name: BLE Beacons
+    name_zh: BLE 信标
+    type: quantity
+    required: true
+    device_ref: bc01_beacon
+    min_count: 3
+    max_count: 100
+    default_count: 6
+    description: 'Recommended: 3-5 per zone for accurate positioning'
+    description_zh: 建议：每个区域 3-5 个，以获得准确定位
+  - id: tracker
+    name: T1000 Tracker
+    name_zh: T1000 追踪器
+    type: quantity
+    required: true
+    device_ref: t1000_tracker
+    min_count: 1
+    max_count: 50
+    default_count: 1
+    description: Mobile asset tracker with BLE scanning
+    description_zh: 带 BLE 扫描的移动资产追踪器
   presets:
-    - id: starter
-      name: Starter Kit
-      name_zh: 入门套件
-      description: Small office (up to 500 sqm)
-      description_zh: 小型办公室（500平方米以内）
-      badge: Popular
-      badge_zh: 热门
-      selections:
-        gateway: gateway_us915
-        beacons: 6
-        tracker: 1
-      links:
-        wiki: https://wiki.seeedstudio.com/cn/solutions/indoor-positioning-bluetooth-lorawan-tracker/
-        github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
-
-    - id: standard
-      name: Standard Setup
-      name_zh: 标准配置
-      description: Medium facility (500-2000 sqm)
-      description_zh: 中型设施（500-2000平方米）
-      selections:
-        gateway: gateway_us915
-        beacons: 15
-        tracker: 3
-      links:
-        wiki: https://wiki.seeedstudio.com/cn/solutions/indoor-positioning-bluetooth-lorawan-tracker/
-        github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
-
-    - id: enterprise
-      name: Enterprise
-      name_zh: 企业版
-      description: Large facility (2000+ sqm)
-      description_zh: 大型设施（2000平方米以上）
-      selections:
-        gateway: gateway_us915
-        beacons: 30
-        tracker: 10
-      links:
-        wiki: https://wiki.seeedstudio.com/cn/solutions/indoor-positioning-bluetooth-lorawan-tracker/
-        github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
-
+  - id: starter
+    name: Starter Kit
+    name_zh: 入门套件
+    description: Small office (up to 500 sqm)
+    description_zh: 小型办公室（500平方米以内）
+    badge: Popular
+    badge_zh: 热门
+    selections:
+      gateway: gateway_us915
+      beacons: 6
+      tracker: 1
+    links:
+      wiki: https://wiki.seeedstudio.com/cn/solutions/indoor-positioning-bluetooth-lorawan-tracker/
+      github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
+  - id: standard
+    name: Standard Setup
+    name_zh: 标准配置
+    description: Medium facility (500-2000 sqm)
+    description_zh: 中型设施（500-2000平方米）
+    selections:
+      gateway: gateway_us915
+      beacons: 15
+      tracker: 3
+    links:
+      wiki: https://wiki.seeedstudio.com/cn/solutions/indoor-positioning-bluetooth-lorawan-tracker/
+      github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
+  - id: enterprise
+    name: Enterprise
+    name_zh: 企业版
+    description: Large facility (2000+ sqm)
+    description_zh: 大型设施（2000平方米以上）
+    selections:
+      gateway: gateway_us915
+      beacons: 30
+      tracker: 10
+    links:
+      wiki: https://wiki.seeedstudio.com/cn/solutions/indoor-positioning-bluetooth-lorawan-tracker/
+      github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
   stats:
     deployed_count: 0
     likes_count: 0
     difficulty: intermediate
     estimated_time: 60min
-
   links:
     wiki: https://wiki.seeedstudio.com/cn/solutions/indoor-positioning-bluetooth-lorawan-tracker/
     wiki_en: https://wiki.seeedstudio.com/solutions/indoor-positioning-bluetooth-lorawan-tracker/
     github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
     demo: https://indoorpositioning-demo.seeed.cc/
     purchase: https://www.seeedstudio.com/Indoor-Outdoor-Integrated-Positioning.html
-
-# ============ Deployment Page ============
 deployment:
   guide_file: deploy/guide.md
   guide_file_zh: deploy/guide_zh.md
-
   selection_mode: sequential
-
   devices:
-    # Step 1: Deploy BLE Beacons
-    - id: beacons
-      name: Deploy BLE Beacons
-      name_zh: 部署 BLE 信标
-      type: manual
-      required: true
-      section:
-        title: Step 1 - Deploy BLE Beacons
-        title_zh: 第一步 - 部署 BLE 信标
-        description_file: deploy/sections/beacons.md
-        description_file_zh: deploy/sections/beacons_zh.md
-        wiring:
-          steps:
-            - Place BLE beacons at strategic locations in your facility
-            - Record each beacon's MAC address and installation location
-            - Configure beacons using SenseCraft app if needed
-          steps_zh:
-            - 在设施中的战略位置放置 BLE 信标
-            - 记录每个信标的 MAC 地址和安装位置
-            - 如需要，使用 SenseCraft 应用配置信标
-
-    # Step 2: Setup LoRaWAN Gateway
-    - id: gateway
-      name: Setup LoRaWAN Gateway
-      name_zh: 设置 LoRaWAN 网关
-      type: manual
-      required: true
-      section:
-        title: Step 2 - Setup LoRaWAN Gateway
-        title_zh: 第二步 - 设置 LoRaWAN 网关
-        description_file: deploy/sections/gateway.md
-        description_file_zh: deploy/sections/gateway_zh.md
-        wiring:
-          steps:
-            - Power on the LoRaWAN gateway and connect to internet
-            - Register the gateway on SenseCraft Data or ChirpStack
-            - Verify gateway is online
-          steps_zh:
-            - 打开 LoRaWAN 网关并连接互联网
-            - 在 SenseCraft Data 或 ChirpStack 上注册网关
-            - 验证网关在线状态
-
-    # Step 3: Deploy Positioning Application
-    - id: app_server
-      name: Deploy Positioning Application
-      name_zh: 部署定位应用程序
-      type: docker_deploy
-      required: true
-      config_file: devices/app_local.yaml
-      section:
-        title: Step 3 - Deploy Positioning Application
-        title_zh: 第三步 - 部署定位应用程序
-      targets:
-        local:
-          name: Local Deployment
-          name_zh: 本机部署
-          description: Deploy on this computer
-          description_zh: 部署到当前电脑
-          default: true
-          config_file: devices/app_local.yaml
-          section:
-            description_file: deploy/sections/app_local.md
-            description_file_zh: deploy/sections/app_local_zh.md
-            wiring:
-              steps:
-                - Ensure Docker is installed and running
-                - Click Deploy button to start services
-              steps_zh:
-                - 确保 Docker 已安装并运行
-                - 点击部署按钮启动服务
-        remote:
-          name: Remote Deployment
-          name_zh: 远程部署
-          description: Deploy to remote server via SSH
-          description_zh: 通过 SSH 部署到远程服务器
-          config_file: devices/app_remote.yaml
-          section:
-            description_file: deploy/sections/app_remote.md
-            description_file_zh: deploy/sections/app_remote_zh.md
-            wiring:
-              steps:
-                - Connect target device to network
-                - Enter IP address and SSH credentials
-                - Click Deploy to install on remote device
-              steps_zh:
-                - 将目标设备连接到网络
-                - 输入 IP 地址和 SSH 凭据
-                - 点击部署安装到远程设备
-
-    # Step 4: Configure and Activate Tracker
-    - id: tracker
-      name: Configure and Activate Tracker
-      name_zh: 配置并激活追踪器
-      type: manual
-      required: true
-      section:
-        title: Step 4 - Configure and Activate Tracker
-        title_zh: 第四步 - 配置并激活追踪器
-        description_file: deploy/sections/tracker.md
-        description_file_zh: deploy/sections/tracker_zh.md
-        wiring:
-          steps:
-            - Activate SenseCAP T1000 tracker
-            - Join to your LoRaWAN network server
-            - Enable BLE scanning mode
-          steps_zh:
-            - 激活 SenseCAP T1000 追踪器
-            - 加入到您的 LoRaWAN 网络服务器
-            - 启用 BLE 扫描模式
-
+  - id: beacons
+    name: Deploy BLE Beacons
+    name_zh: 部署 BLE 信标
+    type: manual
+    required: true
+    section:
+      title: Step 1 - Deploy BLE Beacons
+      title_zh: 第一步 - 部署 BLE 信标
+      description_file: deploy/sections/beacons.md
+      description_file_zh: deploy/sections/beacons_zh.md
+      wiring:
+        steps:
+        - Place BLE beacons at strategic locations in your facility
+        - Record each beacon's MAC address and installation location
+        - Configure beacons using SenseCraft app if needed
+        steps_zh:
+        - 在设施中的战略位置放置 BLE 信标
+        - 记录每个信标的 MAC 地址和安装位置
+        - 如需要，使用 SenseCraft 应用配置信标
+  - id: gateway
+    name: Setup LoRaWAN Gateway
+    name_zh: 设置 LoRaWAN 网关
+    type: manual
+    required: true
+    section:
+      title: Step 2 - Setup LoRaWAN Gateway
+      title_zh: 第二步 - 设置 LoRaWAN 网关
+      description_file: deploy/sections/gateway.md
+      description_file_zh: deploy/sections/gateway_zh.md
+      wiring:
+        steps:
+        - Power on the LoRaWAN gateway and connect to internet
+        - Register the gateway on SenseCraft Data or ChirpStack
+        - Verify gateway is online
+        steps_zh:
+        - 打开 LoRaWAN 网关并连接互联网
+        - 在 SenseCraft Data 或 ChirpStack 上注册网关
+        - 验证网关在线状态
+  - id: app_server
+    name: Deploy Positioning Application
+    name_zh: 部署定位应用程序
+    type: docker_deploy
+    required: true
+    config_file: devices/app_local.yaml
+    section:
+      title: Step 3 - Deploy Positioning Application
+      title_zh: 第三步 - 部署定位应用程序
+    targets:
+      local:
+        name: Local Deployment
+        name_zh: 本机部署
+        description: Deploy on this computer
+        description_zh: 部署到当前电脑
+        default: true
+        config_file: devices/app_local.yaml
+        section:
+          description_file: deploy/sections/app_local.md
+          description_file_zh: deploy/sections/app_local_zh.md
+          wiring:
+            steps:
+            - Ensure Docker is installed and running
+            - Click Deploy button to start services
+            steps_zh:
+            - 确保 Docker 已安装并运行
+            - 点击部署按钮启动服务
+      remote:
+        name: Remote Deployment
+        name_zh: 远程部署
+        description: Deploy to remote server via SSH
+        description_zh: 通过 SSH 部署到远程服务器
+        config_file: devices/app_remote.yaml
+        section:
+          description_file: deploy/sections/app_remote.md
+          description_file_zh: deploy/sections/app_remote_zh.md
+          wiring:
+            steps:
+            - Connect target device to network
+            - Enter IP address and SSH credentials
+            - Click Deploy to install on remote device
+            steps_zh:
+            - 将目标设备连接到网络
+            - 输入 IP 地址和 SSH 凭据
+            - 点击部署安装到远程设备
+  - id: tracker
+    name: Configure and Activate Tracker
+    name_zh: 配置并激活追踪器
+    type: manual
+    required: true
+    section:
+      title: Step 4 - Configure and Activate Tracker
+      title_zh: 第四步 - 配置并激活追踪器
+      description_file: deploy/sections/tracker.md
+      description_file_zh: deploy/sections/tracker_zh.md
+      wiring:
+        steps:
+        - Activate SenseCAP T1000 tracker
+        - Join to your LoRaWAN network server
+        - Enable BLE scanning mode
+        steps_zh:
+        - 激活 SenseCAP T1000 追踪器
+        - 加入到您的 LoRaWAN 网络服务器
+        - 启用 BLE 扫描模式
   order:
-    - beacons
-    - gateway
-    - app_server
-    - tracker
-
+  - beacons
+  - gateway
+  - app_server
+  - tracker
   post_deployment:
     success_message_file: deploy/success.md
     success_message_file_zh: deploy/success_zh.md
     next_steps:
-      - title: Access Indoor Positioning Dashboard
-        title_zh: 访问室内定位仪表板
-        action: open_url
-        url: "http://localhost:5173"
-      - title: Configure Maps and Beacons
-        title_zh: 配置地图和信标
-        description: Upload floor maps and add beacon locations
-        description_zh: 上传楼层地图并添加信标位置
+    - title: Access Indoor Positioning Dashboard
+      title_zh: 访问室内定位仪表板
+      action: open_url
+      url: http://localhost:5173
+    - title: Configure Maps and Beacons
+      title_zh: 配置地图和信标
+      description: Upload floor maps and add beacon locations
+      description_zh: 上传楼层地图并添加信标位置

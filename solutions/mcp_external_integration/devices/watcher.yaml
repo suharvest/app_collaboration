@@ -6,9 +6,12 @@ type: esp32_usb
 
 detection:
   method: usb_serial
-  usb_vendor_id: "0x10c4"
-  usb_product_id: "0xea60"
+  # Watcher uses WCH USB-UART chip
+  usb_vendor_id: "0x1a86"
+  usb_product_id: "0x55d2"
   fallback_ports:
+    - /dev/tty.wchusbserial*
+    - /dev/cu.wchusbserial*
     - /dev/ttyUSB*
     - /dev/ttyACM*
 

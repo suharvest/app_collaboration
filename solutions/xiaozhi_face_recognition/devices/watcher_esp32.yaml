@@ -1,7 +1,7 @@
 version: "1.0"
-id: watcher
-name: SenseCAP Watcher
-name_zh: SenseCAP Watcher
+id: watcher_esp32
+name: Xiaozhi ESP32 Firmware
+name_zh: 小智 ESP32 固件
 type: esp32_usb
 
 detection:
@@ -21,7 +21,7 @@ detection:
 firmware:
   source:
     type: local
-    path: assets/watcher_firmware/firmware.bin
+    path: assets/watcher_firmware/xiaozhi_firmware.bin
   flash_config:
     chip: esp32s3
     baud_rate: 921600
@@ -31,7 +31,7 @@ firmware:
     partitions:
       - name: firmware
         offset: "0x0"
-        file: firmware.bin
+        file: xiaozhi_firmware.bin
 
 user_inputs:
   - id: serial_port
@@ -39,8 +39,8 @@ user_inputs:
     name_zh: 串口
     type: serial_port
     required: true
-    description: Select the USB serial port connected to Watcher
-    description_zh: 选择连接到 Watcher 的 USB 串口
+    description: Select the USB serial port (wchusbserial)
+    description_zh: 选择 USB 串口（wchusbserial 开头）
     auto_detect: true
 
 pre_checks:
@@ -61,8 +61,8 @@ steps:
   - id: flash_firmware
     name: Flash Firmware
     name_zh: 烧录固件
-    description: Write firmware to flash memory
-    description_zh: 将固件写入闪存
+    description: Write Xiaozhi firmware to flash memory
+    description_zh: 将小智固件写入闪存
     optional: false
     default: true
 
