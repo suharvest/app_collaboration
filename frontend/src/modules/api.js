@@ -9,7 +9,33 @@
 // Configuration
 // ============================================
 
-const API_BASE = '/api';
+// Detect Tauri environment
+const isTauri = window.__TAURI__ !== undefined;
+
+// API base URL - Tauri mode uses dynamic port from backend sidecar
+let API_BASE = '/api';
+if (isTauri) {
+  const backendPort = window.__BACKEND_PORT__ || 3260;
+  API_BASE = `http://127.0.0.1:${backendPort}/api`;
+}
+
+// Export for use in WebSocket connections
+export function getApiBase() {
+  if (isTauri) {
+    const backendPort = window.__BACKEND_PORT__ || 3260;
+    return `http://127.0.0.1:${backendPort}/api`;
+  }
+  return '/api';
+}
+
+export function getWsBase() {
+  if (isTauri) {
+    const backendPort = window.__BACKEND_PORT__ || 3260;
+    return `ws://127.0.0.1:${backendPort}`;
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}`;
+}
 
 // Request timeout in milliseconds
 const REQUEST_TIMEOUT = 30000;
@@ -144,6 +170,91 @@ export const solutionsApi = {
   getPresetSection(id, presetId, lang = 'en') {
     return request(`/solutions/${id}/preset/${presetId}/section?lang=${lang}`);
   },
+
+  // ============================================
+  // Solution Management Methods
+  // ============================================
+
+  /**
+   * Create a new solution
+   * @param {Object} data - Solution data
+   * @param {string} data.id - Solution ID (lowercase letters, numbers, underscore)
+   * @param {string} data.name - English name
+   * @param {string} data.name_zh - Chinese name (optional)
+   * @param {string} data.summary - English summary
+   * @param {string} data.summary_zh - Chinese summary (optional)
+   * @param {string} data.category - Category (default: "general")
+   * @param {string} data.difficulty - Difficulty level (default: "beginner")
+   * @param {string} data.estimated_time - Estimated time (default: "30min")
+   */
+  create(data) {
+    return request('/solutions/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Update an existing solution
+   * @param {string} id - Solution ID
+   * @param {Object} data - Fields to update
+   */
+  update(id, data) {
+    return request(`/solutions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Delete a solution
+   * @param {string} id - Solution ID
+   * @param {boolean} permanent - Permanently delete (default: false, moves to trash)
+   */
+  delete(id, permanent = false) {
+    const params = permanent ? '?permanent=true' : '';
+    return request(`/solutions/${id}${params}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Upload an asset file to a solution
+   * @param {string} solutionId - Solution ID
+   * @param {File} file - File to upload
+   * @param {string} path - Relative path within solution directory
+   * @param {string} updateField - Optional YAML field to update with this path
+   */
+  async uploadAsset(solutionId, file, path, updateField = null) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('path', path);
+    if (updateField) {
+      formData.append('update_field', updateField);
+    }
+
+    const url = `${API_BASE}/solutions/${solutionId}/assets`;
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = { detail: response.statusText };
+      }
+      throw new ApiError(
+        errorData.detail || 'Upload failed',
+        response.status,
+        errorData
+      );
+    }
+
+    return response.json();
+  },
 };
 
 // ============================================
@@ -209,9 +320,10 @@ export const deploymentsApi = {
 
   /**
    * List all deployments
+   * @param {string} lang - Language code ('en' or 'zh')
    */
-  list() {
-    return request('/deployments');
+  list(lang = 'en') {
+    return request(`/deployments?lang=${lang}`);
   },
 
   /**
@@ -393,6 +505,44 @@ export const deviceManagementApi = {
 // ============================================
 
 export const dockerDevicesApi = {
+  // ============================================
+  // Local Docker (no SSH required)
+  // ============================================
+
+  /**
+   * Check if Docker is available locally
+   */
+  checkLocal() {
+    return request('/docker-devices/local/check');
+  },
+
+  /**
+   * List containers on local machine
+   */
+  listLocalContainers() {
+    return request('/docker-devices/local/containers', { timeout: 15000 });
+  },
+
+  /**
+   * List SenseCraft-managed apps on local machine
+   */
+  listLocalManagedApps() {
+    return request('/docker-devices/local/managed-apps', { timeout: 15000 });
+  },
+
+  /**
+   * Perform action on a local container
+   */
+  localContainerAction(containerName, action) {
+    return request(`/docker-devices/local/container-action?container_name=${encodeURIComponent(containerName)}&action=${action}`, {
+      method: 'POST',
+    });
+  },
+
+  // ============================================
+  // Remote Docker (SSH)
+  // ============================================
+
   /**
    * Test SSH connection and verify Docker availability
    * @param {Object} connection - Connection parameters
@@ -440,6 +590,64 @@ export const dockerDevicesApi = {
       body: JSON.stringify(connection),
     });
   },
+
+  /**
+   * List SenseCraft-managed applications on device
+   * Returns only containers deployed through this platform
+   * @param {Object} connection - Connection parameters
+   */
+  listManagedApps(connection) {
+    return request('/docker-devices/managed-apps', {
+      method: 'POST',
+      body: JSON.stringify(connection),
+      timeout: 15000,
+    });
+  },
+};
+
+// ============================================
+// Restore API
+// Device factory restore operations
+// ============================================
+
+export const restoreApi = {
+  /**
+   * Get list of devices that support factory restore
+   * @param {string} lang - Language code ('en' or 'zh')
+   */
+  getDevices(lang = 'en') {
+    return request(`/restore/devices?lang=${lang}`);
+  },
+
+  /**
+   * Get available serial ports for USB restore
+   */
+  getPorts() {
+    return request('/restore/ports');
+  },
+
+  /**
+   * Start a restore operation
+   * @param {string} deviceType - Device type (sensecap_watcher, recamera)
+   * @param {Object} connection - Connection parameters
+   */
+  start(deviceType, connection) {
+    return request('/restore/start', {
+      method: 'POST',
+      body: JSON.stringify({
+        device_type: deviceType,
+        connection,
+      }),
+    });
+  },
+
+  /**
+   * Get restore operation status
+   * @param {string} operationId - Operation ID
+   */
+  getStatus(operationId) {
+    return request(`/restore/${operationId}/status`);
+  },
 };
 
 // ============================================
@@ -486,8 +694,8 @@ export class LogsWebSocket {
   }
 
   connect() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/logs/${this.deploymentId}`;
+    const wsBase = getWsBase();
+    const wsUrl = `${wsBase}/ws/logs/${this.deploymentId}`;
 
     this.ws = new WebSocket(wsUrl);
 
