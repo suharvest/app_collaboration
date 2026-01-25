@@ -2,7 +2,7 @@
 Docker device management models
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel
 
 
@@ -23,6 +23,32 @@ class ContainerInfo(BaseModel):
     config_tag: Optional[str] = None  # Expected version from solution config
     update_available: bool = False
     status: str  # running | exited | stopped
+    ports: List[str] = []
+    labels: Dict[str, str] = {}  # Container labels
+
+
+class ManagedAppContainer(BaseModel):
+    """Single container within a managed application"""
+    container_id: str
+    container_name: str
+    image: str
+    tag: str
+    status: str  # running | exited | stopped
+    ports: List[str] = []
+
+
+class ManagedApp(BaseModel):
+    """SenseCraft-managed application detected on device (grouped by solution)"""
+    # SenseCraft metadata from labels
+    solution_id: str
+    solution_name: Optional[str] = None
+    device_id: Optional[str] = None
+    deployed_at: Optional[str] = None
+    # Aggregated status: running if any container running, otherwise exited/stopped
+    status: str  # running | exited | stopped
+    # All containers in this application
+    containers: List[ManagedAppContainer] = []
+    # Aggregated ports from all containers
     ports: List[str] = []
 
 

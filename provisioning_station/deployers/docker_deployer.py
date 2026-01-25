@@ -4,11 +4,13 @@ Docker deployment deployer
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 from typing import Callable, Optional, Dict, Any
 
 from .base import BaseDeployer
 from ..models.device import DeviceConfig
+from ..utils.compose_labels import create_labels, inject_labels_to_compose_file
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,9 @@ class DockerDeployer(BaseDeployer):
 
         docker_config = config.docker
 
+        # Track temp file for cleanup
+        temp_compose_file = None
+
         try:
             # Get compose file path
             compose_file = config.get_asset_path(docker_config.compose_file)
@@ -41,6 +46,21 @@ class DockerDeployer(BaseDeployer):
 
             compose_dir = Path(compose_file).parent
             project_name = docker_config.options.get("project_name", "provisioning")
+
+            # Inject SenseCraft labels for container tracking
+            solution_id = connection.get("_solution_id")
+            solution_name = connection.get("_solution_name")
+            device_id = connection.get("_device_id")
+
+            if solution_id and device_id:
+                labels = create_labels(
+                    solution_id=solution_id,
+                    device_id=device_id,
+                    solution_name=solution_name,
+                )
+                temp_compose_file = inject_labels_to_compose_file(compose_file, labels)
+                compose_file = temp_compose_file
+                logger.info(f"Injected SenseCraft labels into compose file")
 
             # Step 1: Pull images
             await self._report_progress(
@@ -173,6 +193,15 @@ class DockerDeployer(BaseDeployer):
                 progress_callback, "start_services", 0, f"Deployment failed: {str(e)}"
             )
             return False
+
+        finally:
+            # Clean up temporary compose file
+            if temp_compose_file and Path(temp_compose_file).exists():
+                try:
+                    os.remove(temp_compose_file)
+                    logger.debug(f"Cleaned up temp compose file: {temp_compose_file}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up temp file: {e}")
 
     async def _run_docker_compose(
         self,
