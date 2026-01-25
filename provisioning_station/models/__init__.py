@@ -41,8 +41,16 @@ from .version import (
     VersionInfo,
     UpdateCheckResult,
     DeploymentRecord,
+    StepRecord,
     SolutionVersioning,
     VersionSummary,
+)
+from .docker_device import (
+    ConnectDeviceRequest,
+    ContainerInfo,
+    DeviceInfo,
+    ContainersResponse,
+    UpgradeRequest,
 )
 from .kiosk import (
     KioskStatus,
@@ -91,8 +99,15 @@ __all__ = [
     "VersionInfo",
     "UpdateCheckResult",
     "DeploymentRecord",
+    "StepRecord",
     "SolutionVersioning",
     "VersionSummary",
+    # Docker device models
+    "ConnectDeviceRequest",
+    "ContainerInfo",
+    "DeviceInfo",
+    "ContainersResponse",
+    "UpgradeRequest",
     # Kiosk models
     "KioskStatus",
     "KioskConfigRequest",

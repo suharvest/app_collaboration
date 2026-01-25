@@ -11,10 +11,12 @@ from ..models.api import (
     DeploymentStatusResponse,
     DeviceDeploymentStatus,
     DeploymentListItem,
+    StepSummary,
 )
 from ..models.deployment import DeploymentStatus
 from ..services.solution_manager import solution_manager
 from ..services.deployment_engine import deployment_engine
+from ..services.deployment_history import deployment_history
 
 router = APIRouter(prefix="/api/deployments", tags=["deployments"])
 
@@ -109,13 +111,28 @@ async def cancel_deployment(deployment_id: str):
 
 
 @router.get("/", response_model=List[DeploymentListItem])
-async def list_deployments(limit: int = Query(10, ge=1, le=100)):
-    """List recent deployments"""
-    deployments = deployment_engine.list_deployments(limit=limit)
-
+async def list_deployments(limit: int = Query(20, ge=1, le=100)):
+    """List recent deployments - merges active + persisted history"""
     result = []
-    for deployment in deployments:
+    seen_ids = set()
+
+    # 1. Active deployments (real-time step progress)
+    active_deployments = deployment_engine.list_deployments(limit=limit)
+    for deployment in active_deployments:
         solution = solution_manager.get_solution(deployment.solution_id)
+        # Build steps from all devices
+        steps = []
+        device_id = None
+        for device in deployment.devices:
+            if not device_id:
+                device_id = device.device_id
+            for step in device.steps:
+                steps.append(StepSummary(
+                    id=step.id,
+                    name=step.name,
+                    status=step.status,
+                    progress=step.progress,
+                ))
         result.append(DeploymentListItem(
             id=deployment.id,
             solution_id=deployment.solution_id,
@@ -124,9 +141,51 @@ async def list_deployments(limit: int = Query(10, ge=1, le=100)):
             started_at=deployment.started_at,
             completed_at=deployment.completed_at,
             device_count=len(deployment.devices),
+            device_id=device_id,
+            steps=steps,
+        ))
+        seen_ids.add(deployment.id)
+
+    # 2. Persisted history records
+    history_records = await deployment_history.get_history(limit=limit)
+    for record in history_records:
+        if record.deployment_id in seen_ids:
+            continue
+        seen_ids.add(record.deployment_id)
+        solution = solution_manager.get_solution(record.solution_id)
+        steps = [
+            StepSummary(
+                id=s.id,
+                name=s.name,
+                status=s.status,
+                progress=100 if s.status == "completed" else 0,
+            )
+            for s in record.steps
+        ]
+        result.append(DeploymentListItem(
+            id=record.deployment_id,
+            solution_id=record.solution_id,
+            solution_name=solution.name if solution else record.solution_id,
+            status=DeploymentStatus.COMPLETED if record.status == "completed" else DeploymentStatus.FAILED,
+            started_at=record.deployed_at,
+            completed_at=record.deployed_at,
+            device_count=1,
+            device_id=record.device_id,
+            steps=steps,
         ))
 
-    return result
+    # Sort by started_at descending
+    result.sort(key=lambda d: d.started_at, reverse=True)
+    return result[:limit]
+
+
+@router.delete("/{deployment_id}")
+async def delete_deployment(deployment_id: str):
+    """Delete a deployment record from history"""
+    removed = await deployment_history.remove_deployment(deployment_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Deployment record not found")
+    return {"message": "Deployment record deleted"}
 
 
 @router.get("/{deployment_id}/logs")

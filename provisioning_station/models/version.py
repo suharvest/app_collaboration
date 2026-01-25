@@ -28,6 +28,16 @@ class UpdateCheckResult(BaseModel):
     update_type: str  # "pull_image" | "reflash" | "reinstall" | "rerun"
 
 
+class StepRecord(BaseModel):
+    """Persisted record of a deployment step"""
+    id: str
+    name: str
+    status: str  # pending | completed | failed | skipped
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    error: Optional[str] = None
+
+
 class DeploymentRecord(BaseModel):
     """Record of a deployment"""
     deployment_id: str
@@ -40,6 +50,7 @@ class DeploymentRecord(BaseModel):
     deployed_at: datetime
     deployed_by: Optional[str] = None  # Optional user identifier
     metadata: Dict[str, Any] = {}  # Extra info (firmware path, image tag, etc.)
+    steps: List[StepRecord] = []  # Step-level progress records
 
 
 class SolutionVersioning(BaseModel):

@@ -1,17 +1,17 @@
 /**
  * Device Management Page
  *
- * Displays deployed applications with controls for:
- * - Application status monitoring
- * - Update/restart actions
- * - Kiosk mode configuration
+ * Top section: SSH connection form for Docker container management
+ * Bottom section: Previously deployed apps (legacy device management)
  */
 
-import { deviceManagementApi } from '../modules/api.js';
-import { t, i18n, getLocalizedField } from '../modules/i18n.js';
+import { deviceManagementApi, dockerDevicesApi } from '../modules/api.js';
+import { t, i18n } from '../modules/i18n.js';
 import { router } from '../modules/router.js';
 import { toast } from '../modules/toast.js';
 
+let currentConnection = null;
+let currentContainers = [];
 let currentDeployments = [];
 let passwordModalCallback = null;
 
@@ -24,9 +24,70 @@ export async function renderDevicesPage() {
       <p class="page-subtitle text-text-secondary" data-i18n="devices.subtitle">${t('devices.subtitle')}</p>
     </div>
 
-    <div id="devices-list">
-      <div class="flex items-center justify-center py-8">
-        <div class="spinner spinner-lg"></div>
+    <!-- Docker Device Connection -->
+    <div class="docker-connect-section mb-6">
+      <div class="docker-connect-card">
+        <div class="docker-connect-header">
+          <h3 class="docker-connect-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="2" width="20" height="8" rx="2"/>
+              <rect x="2" y="14" width="20" height="8" rx="2"/>
+              <circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/>
+            </svg>
+            ${t('devices.docker.title')}
+          </h3>
+          <div id="docker-connection-status"></div>
+        </div>
+        <form id="docker-connect-form" class="docker-connect-form">
+          <div class="docker-connect-fields">
+            <div class="form-group mb-0">
+              <label>${t('deploy.connection.host')}</label>
+              <input type="text" id="docker-host" class="input" placeholder="192.168.x.x" required>
+            </div>
+            <div class="form-group mb-0">
+              <label>${t('deploy.connection.username')}</label>
+              <input type="text" id="docker-username" class="input" value="recomputer" required>
+            </div>
+            <div class="form-group mb-0">
+              <label>${t('deploy.connection.password')}</label>
+              <input type="password" id="docker-password" class="input" required>
+            </div>
+            <div class="form-group mb-0 flex items-end">
+              <button type="submit" class="btn btn-primary w-full" id="docker-connect-btn">
+                ${t('deploy.connection.connect')}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Container List (shown after connection) -->
+    <div id="containers-section" style="display: none;">
+      <div class="containers-header mb-4">
+        <h3 class="text-base font-semibold text-text-primary">${t('devices.docker.containers')}</h3>
+        <button class="btn btn-sm btn-secondary" id="refresh-containers-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 4v6h6M23 20v-6h-6"/>
+            <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+          </svg>
+          ${t('devices.actions.refresh')}
+        </button>
+      </div>
+      <div id="containers-list">
+        <div class="flex items-center justify-center py-4">
+          <div class="spinner spinner-lg"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deployed Applications (legacy) -->
+    <div class="mt-8" id="deployed-apps-section">
+      <h3 class="text-base font-semibold text-text-primary mb-4">${t('devices.deployedApps')}</h3>
+      <div id="devices-list">
+        <div class="flex items-center justify-center py-4">
+          <div class="spinner spinner-lg"></div>
+        </div>
       </div>
     </div>
 
@@ -46,16 +107,214 @@ export async function renderDevicesPage() {
     </div>
   `;
 
-  // Setup password modal handlers
+  // Setup handlers
+  setupDockerConnectForm();
   setupPasswordModal();
 
+  // Load deployed apps (legacy)
+  loadDeployedApps();
+}
+
+// ============================================
+// Docker Connection & Container Management
+// ============================================
+
+function setupDockerConnectForm() {
+  const form = document.getElementById('docker-connect-form');
+  form.addEventListener('submit', handleDockerConnect);
+
+  const refreshBtn = document.getElementById('refresh-containers-btn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', refreshContainers);
+  }
+
+  // Restore last connection from sessionStorage
+  const saved = sessionStorage.getItem('docker_connection');
+  if (saved) {
+    try {
+      const conn = JSON.parse(saved);
+      document.getElementById('docker-host').value = conn.host || '';
+      document.getElementById('docker-username').value = conn.username || 'recomputer';
+    } catch (e) {}
+  }
+}
+
+async function handleDockerConnect(e) {
+  e.preventDefault();
+  const btn = document.getElementById('docker-connect-btn');
+  const originalText = btn.innerHTML;
+
+  const connection = {
+    host: document.getElementById('docker-host').value.trim(),
+    username: document.getElementById('docker-username').value.trim(),
+    password: document.getElementById('docker-password').value,
+    port: 22,
+  };
+
+  try {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner spinner-sm"></span>`;
+
+    const result = await dockerDevicesApi.connect(connection);
+
+    if (result.success) {
+      currentConnection = connection;
+      // Save (without password) to sessionStorage
+      sessionStorage.setItem('docker_connection', JSON.stringify({
+        host: connection.host,
+        username: connection.username,
+      }));
+
+      // Show connection status
+      const statusEl = document.getElementById('docker-connection-status');
+      statusEl.innerHTML = `
+        <span class="status-badge ready">
+          <span class="status-dot"></span>
+          ${result.device.hostname} (${result.device.docker_version})
+        </span>
+      `;
+
+      toast.success(t('devices.docker.connected'));
+      await loadContainers();
+    }
+  } catch (error) {
+    toast.error(error.message);
+    const statusEl = document.getElementById('docker-connection-status');
+    statusEl.innerHTML = `<span class="status-badge failed">${t('devices.docker.connectionFailed')}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+async function loadContainers() {
+  if (!currentConnection) return;
+
+  const section = document.getElementById('containers-section');
+  section.style.display = 'block';
+
+  const listEl = document.getElementById('containers-list');
+  listEl.innerHTML = `<div class="flex items-center justify-center py-4"><div class="spinner spinner-lg"></div></div>`;
+
+  try {
+    const result = await dockerDevicesApi.listContainers(currentConnection);
+    currentContainers = result.containers || [];
+    renderContainersList();
+  } catch (error) {
+    listEl.innerHTML = `<div class="text-center text-text-secondary py-4">${t('common.error')}: ${error.message}</div>`;
+  }
+}
+
+async function refreshContainers() {
+  await loadContainers();
+}
+
+function renderContainersList() {
+  const listEl = document.getElementById('containers-list');
+
+  if (!currentContainers || currentContainers.length === 0) {
+    listEl.innerHTML = `
+      <div class="text-center text-text-secondary py-4">
+        ${t('devices.docker.noContainers')}
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = `
+    <div class="container-table">
+      <div class="container-table-header">
+        <div class="container-col-name">${t('devices.docker.containerName')}</div>
+        <div class="container-col-image">${t('devices.docker.image')}</div>
+        <div class="container-col-version">${t('devices.docker.version')}</div>
+        <div class="container-col-status">${t('devices.docker.status')}</div>
+        <div class="container-col-actions">${t('devices.docker.actions')}</div>
+      </div>
+      ${currentContainers.map(renderContainerRow).join('')}
+    </div>
+  `;
+
+  setupContainerHandlers();
+}
+
+function renderContainerRow(container) {
+  const statusClass = container.status === 'running' ? 'ready' :
+                      container.status === 'exited' ? 'failed' : 'pending';
+
+  const statusText = t(`devices.docker.containerStatus.${container.status}`) || container.status;
+
+  return `
+    <div class="container-table-row" data-container="${container.name}">
+      <div class="container-col-name">
+        <span class="container-name-text">${container.name}</span>
+      </div>
+      <div class="container-col-image">${container.image}</div>
+      <div class="container-col-version">
+        <span class="container-version-tag">${container.current_tag}</span>
+        ${container.update_available ? `<span class="container-update-badge">!</span>` : ''}
+      </div>
+      <div class="container-col-status">
+        <span class="status-badge ${statusClass}">${statusText}</span>
+      </div>
+      <div class="container-col-actions">
+        ${container.status === 'running' ? `
+          <button class="btn btn-sm btn-secondary container-action-btn" data-container="${container.name}" data-action="restart" title="Restart">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 4v6h6M23 20v-6h-6"/>
+              <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+            </svg>
+          </button>
+          <button class="btn btn-sm btn-secondary container-action-btn" data-container="${container.name}" data-action="stop" title="Stop">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="6" y="6" width="12" height="12"/>
+            </svg>
+          </button>
+        ` : `
+          <button class="btn btn-sm btn-primary container-action-btn" data-container="${container.name}" data-action="start" title="Start">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+          </button>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function setupContainerHandlers() {
+  document.querySelectorAll('.container-action-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const containerName = btn.dataset.container;
+      const action = btn.dataset.action;
+
+      const originalHTML = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner spinner-sm"></span>`;
+
+      try {
+        await dockerDevicesApi.containerAction(currentConnection, containerName, action);
+        toast.success(`${containerName} ${action}ed`);
+        await loadContainers();
+      } catch (error) {
+        toast.error(error.message);
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+// ============================================
+// Deployed Applications (Legacy)
+// ============================================
+
+async function loadDeployedApps() {
   try {
     const deployments = await deviceManagementApi.listActive();
     currentDeployments = deployments;
     renderDeploymentsList(deployments);
   } catch (error) {
     console.error('Failed to load devices:', error);
-    toast.error(t('common.error') + ': ' + error.message);
     document.getElementById('devices-list').innerHTML = renderEmptyState();
   }
 }
@@ -74,7 +333,6 @@ function renderDeploymentsList(deployments) {
     </div>
   `;
 
-  // Setup event handlers
   setupEventHandlers();
 }
 
@@ -110,7 +368,6 @@ function renderDeploymentCard(deployment) {
       </div>
 
       <div class="device-card-body">
-        <!-- URL -->
         <div class="device-info-row">
           <span class="device-info-label">URL:</span>
           <a href="${deployment.app_url}" target="_blank" class="device-info-value link">
@@ -119,29 +376,12 @@ function renderDeploymentCard(deployment) {
           </a>
         </div>
 
-        <!-- Host (for remote) -->
         ${deployment.host ? `
           <div class="device-info-row">
             <span class="device-info-label">Host:</span>
             <span class="device-info-value">${deployment.host}</span>
           </div>
         ` : ''}
-
-        <!-- Kiosk Status -->
-        <div class="device-info-row kiosk-row">
-          <span class="device-info-label">${t('devices.kiosk.title')}:</span>
-          <div class="kiosk-controls">
-            <label class="toggle-switch">
-              <input type="checkbox"
-                     class="kiosk-toggle"
-                     data-deployment-id="${deployment.deployment_id}"
-                     ${deployment.kiosk_enabled ? 'checked' : ''}>
-              <span class="toggle-slider"></span>
-            </label>
-            ${deployment.kiosk_enabled ?
-              `<span class="kiosk-user text-sm text-text-secondary ml-2">(${deployment.kiosk_user})</span>` : ''}
-          </div>
-        </div>
       </div>
 
       <div class="device-card-actions">
@@ -184,26 +424,19 @@ function renderEmptyState() {
         <rect x="4" y="4" width="16" height="16" rx="2"/>
         <path d="M9 9h6M9 13h6M9 17h4"/>
       </svg>
-      <h3 class="empty-state-title" data-i18n="devices.empty">${t('devices.empty')}</h3>
-      <p class="empty-state-description" data-i18n="devices.emptyDescription">${t('devices.emptyDescription')}</p>
+      <h3 class="empty-state-title">${t('devices.empty')}</h3>
+      <p class="empty-state-description">${t('devices.emptyDescription')}</p>
     </div>
   `;
 }
 
 function setupEventHandlers() {
-  // Delete buttons
   document.querySelectorAll('.device-card-delete').forEach(btn => {
     btn.addEventListener('click', handleDeleteClick);
   });
 
-  // Action buttons
   document.querySelectorAll('.action-btn').forEach(btn => {
     btn.addEventListener('click', handleActionClick);
-  });
-
-  // Kiosk toggles
-  document.querySelectorAll('.kiosk-toggle').forEach(toggle => {
-    toggle.addEventListener('change', handleKioskToggle);
   });
 }
 
@@ -214,7 +447,6 @@ async function handleDeleteClick(event) {
 
   try {
     await deviceManagementApi.deleteDeployment(deploymentId);
-    // Remove card from DOM
     const card = btn.closest('.device-management-card');
     if (card) card.remove();
     toast.success(t('devices.actions.deleted'));
@@ -231,15 +463,12 @@ async function handleActionClick(event) {
   const deployment = currentDeployments.find(d => d.deployment_id === deploymentId);
   if (!deployment) return;
 
-  // Check if remote and might need password
   const needsPassword = deployment.device_type === 'docker_remote' &&
                         !deployment.connection_info?.password;
 
   if (needsPassword) {
-    // Show password modal
     const password = await showPasswordModal();
     if (!password) return;
-
     await performAction(deploymentId, action, password, btn);
   } else {
     await performAction(deploymentId, action, null, btn);
@@ -257,7 +486,6 @@ async function performAction(deploymentId, action, password, btn) {
 
     if (result.success) {
       toast.success(result.message);
-      // Refresh the list
       const deployments = await deviceManagementApi.listActive();
       currentDeployments = deployments;
       renderDeploymentsList(deployments);
@@ -267,95 +495,15 @@ async function performAction(deploymentId, action, password, btn) {
       btn.disabled = false;
     }
   } catch (error) {
-    console.error('Action failed:', error);
     toast.error(error.message);
     btn.innerHTML = originalText;
     btn.disabled = false;
   }
 }
 
-async function handleKioskToggle(event) {
-  const toggle = event.currentTarget;
-  const deploymentId = toggle.dataset.deploymentId;
-  const enabled = toggle.checked;
-
-  const deployment = currentDeployments.find(d => d.deployment_id === deploymentId);
-  if (!deployment) return;
-
-  // If enabling, we need user input
-  if (enabled) {
-    const kioskUser = prompt(t('devices.kiosk.user') + ':', 'user');
-    if (!kioskUser) {
-      toggle.checked = false;
-      return;
-    }
-
-    // Check if needs password for remote
-    const needsPassword = deployment.device_type === 'docker_remote' &&
-                          !deployment.connection_info?.password;
-
-    let password = null;
-    if (needsPassword) {
-      password = await showPasswordModal();
-      if (!password) {
-        toggle.checked = false;
-        return;
-      }
-    }
-
-    await configureKiosk(deploymentId, enabled, kioskUser, password, toggle);
-  } else {
-    // Disabling - need user that was configured
-    const kioskUser = deployment.kiosk_user || 'user';
-
-    const needsPassword = deployment.device_type === 'docker_remote' &&
-                          !deployment.connection_info?.password;
-
-    let password = null;
-    if (needsPassword) {
-      password = await showPasswordModal();
-      if (!password) {
-        toggle.checked = true;
-        return;
-      }
-    }
-
-    await configureKiosk(deploymentId, enabled, kioskUser, password, toggle);
-  }
-}
-
-async function configureKiosk(deploymentId, enabled, kioskUser, password, toggle) {
-  const kioskRow = toggle.closest('.kiosk-row');
-  const controlsDiv = kioskRow.querySelector('.kiosk-controls');
-  const originalHTML = controlsDiv.innerHTML;
-
-  try {
-    controlsDiv.innerHTML = `<span class="spinner spinner-sm"></span> <span class="ml-2">${t('devices.kiosk.configuring')}</span>`;
-
-    const result = await deviceManagementApi.configureKiosk(deploymentId, {
-      enabled,
-      kiosk_user: kioskUser,
-      password,
-    });
-
-    if (result.success) {
-      toast.success(result.message);
-      // Refresh the list
-      const deployments = await deviceManagementApi.listActive();
-      currentDeployments = deployments;
-      renderDeploymentsList(deployments);
-    } else {
-      toast.error(result.message);
-      controlsDiv.innerHTML = originalHTML;
-      toggle.checked = !enabled;
-    }
-  } catch (error) {
-    console.error('Kiosk config failed:', error);
-    toast.error(error.message);
-    controlsDiv.innerHTML = originalHTML;
-    toggle.checked = !enabled;
-  }
-}
+// ============================================
+// Password Modal
+// ============================================
 
 function setupPasswordModal() {
   const modal = document.getElementById('password-modal');
@@ -385,7 +533,6 @@ function setupPasswordModal() {
     }
   });
 
-  // Close on backdrop click
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
       passwordInput.value = '';

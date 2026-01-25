@@ -22,7 +22,7 @@ from ..deployers.recamera_cpp_deployer import ReCameraCppDeployer
 from .solution_manager import solution_manager
 from .pre_check_validator import pre_check_validator
 from .deployment_history import deployment_history
-from ..models.version import DeploymentRecord
+from ..models.version import DeploymentRecord, StepRecord
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class DeploymentEngine:
             if not device_ref:
                 continue
 
-            # Determine effective type and config_file for docker_deploy
+            # Determine effective type and config_file
             effective_type = device_ref.type
             config_file = device_ref.config_file
 
@@ -96,6 +96,10 @@ class DeploymentEngine:
                 if options.get("config_file"):
                     config_file = options["config_file"]
                 logger.info(f"docker_deploy: target={deploy_target}, effective_type={effective_type}")
+            elif options and options.get("config_file"):
+                # Support config_file override for any device type with targets
+                config_file = options["config_file"]
+                logger.info(f"{device_ref.type}: using target config_file={config_file}")
 
             # Skip devices without config_file (e.g., manual info-only steps)
             if not config_file:
@@ -346,6 +350,17 @@ class DeploymentEngine:
 
                 # Record deployment to history
                 try:
+                    step_records = [
+                        StepRecord(
+                            id=step.id,
+                            name=step.name,
+                            status=step.status,
+                            started_at=step.started_at,
+                            completed_at=step.completed_at,
+                            error=step.message if step.status == "failed" else None,
+                        )
+                        for step in device_deployment.steps
+                    ]
                     record = DeploymentRecord(
                         deployment_id=deployment_id,
                         solution_id=deployment.solution_id,
@@ -359,6 +374,7 @@ class DeploymentEngine:
                             "device_name": device_deployment.name,
                             "error": device_deployment.error if device_deployment.error else None,
                         },
+                        steps=step_records,
                     )
                     await deployment_history.record_deployment(record)
                 except Exception as history_error:
