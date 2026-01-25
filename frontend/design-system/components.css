@@ -2211,6 +2211,72 @@ button.spinning {
   @apply text-danger;
 }
 
+/* Deployment Group (multiple deployments grouped together) */
+.deployment-group {
+  @apply bg-card;
+}
+
+.deployment-group-expand {
+  @apply w-7 h-7 flex items-center justify-center rounded text-text-muted
+         hover:bg-gray-100 hover:text-text-primary transition-all cursor-pointer
+         bg-transparent border-none;
+}
+
+.deployment-group-expand.expanded {
+  transform: rotate(180deg);
+}
+
+.deployment-group-children {
+  @apply border-t border-border bg-gray-50/30;
+}
+
+/* Child cards within a group */
+.deployment-child-card {
+  @apply border-b border-border/50 last:border-b-0;
+}
+
+.deployment-child-header {
+  @apply flex items-center justify-between px-4 py-3 pl-8;
+}
+
+.deployment-child-info {
+  @apply flex items-center gap-3 text-sm;
+}
+
+.deployment-child-device {
+  @apply font-medium text-text-primary;
+}
+
+.deployment-child-time {
+  @apply text-xs text-text-secondary;
+}
+
+.deployment-child-right {
+  @apply flex items-center gap-2;
+}
+
+.deployment-child-card .deployment-record-steps {
+  @apply ml-4 border-l border-border/50 border-t-0 bg-gray-50/50;
+}
+
+.deployment-child-card .deployment-record-expand {
+  @apply w-6 h-6;
+}
+
+.deployment-child-card .deployment-record-delete {
+  @apply w-6 h-6;
+  opacity: 0;
+}
+
+.deployment-child-card:hover .deployment-record-delete {
+  opacity: 1;
+}
+
+/* Small status badge for child items */
+.status-badge.sm {
+  @apply text-xs px-1.5 py-0.5;
+}
+
 /* Deployment Summary Stats */
 .deployment-summary-stats {
   @apply flex gap-6;
@@ -2231,6 +2297,32 @@ button.spinning {
 /* ============================================
    20. DOCKER DEVICE MANAGEMENT
    ============================================ */
+
+/* Device Mode Toggle */
+.device-mode-toggle {
+  @apply inline-flex rounded-lg border border-border bg-gray-100 p-1;
+}
+
+.device-mode-btn {
+  @apply px-4 py-2 text-sm font-medium rounded-md flex items-center gap-2
+         text-text-secondary bg-transparent transition-all duration-200;
+}
+
+.device-mode-btn:hover:not(.active) {
+  @apply text-text-primary bg-gray-200/50;
+}
+
+.device-mode-btn.active {
+  @apply bg-white text-text-primary shadow-sm;
+}
+
+.device-mode-btn svg {
+  @apply opacity-60;
+}
+
+.device-mode-btn.active svg {
+  @apply opacity-100;
+}
 
 .docker-connect-card {
   @apply bg-card rounded-lg border border-border shadow-sm p-5;
@@ -2375,4 +2467,296 @@ button.spinning {
 .device-purchase-btn:hover {
   @apply opacity-90;
   transform: translateY(-1px);
+}
+
+/* ============================================
+   21. SOLUTION MANAGEMENT PAGE
+   ============================================ */
+
+.management-page {
+  /* Left-aligned like other pages, no centering */
+}
+
+.management-page .page-header {
+  @apply flex items-center justify-between mb-6;
+}
+
+/* Management Table */
+.management-table-container {
+  @apply bg-card rounded-lg border border-border shadow-sm overflow-hidden;
+}
+
+.management-table {
+  @apply w-full text-sm;
+}
+
+.management-table thead {
+  @apply bg-gray-50 border-b border-border;
+}
+
+.management-table th {
+  @apply px-4 py-3 text-left font-semibold text-text-secondary text-xs uppercase tracking-wide;
+}
+
+.management-table tbody tr {
+  @apply border-b border-border/50;
+  transition: background-color 0.15s;
+}
+
+.management-table tbody tr:last-child {
+  @apply border-b-0;
+}
+
+.management-table tbody tr:hover {
+  @apply bg-gray-50/50;
+}
+
+.management-table td {
+  @apply px-4 py-3 text-text-primary;
+}
+
+.solution-name-cell {
+  @apply flex items-center gap-3;
+}
+
+.solution-thumb {
+  @apply w-10 h-10 rounded object-cover bg-gray-100;
+}
+
+/* Category Badges */
+.category-badge {
+  @apply px-2 py-0.5 rounded text-xs font-medium;
+  /* Default style for undefined categories */
+  @apply bg-gray-100 text-gray-700;
+}
+
+/* Optional: define specific colors for known categories */
+.category-badge.category-voice_ai { @apply bg-purple-100 text-purple-700; }
+.category-badge.category-sensing { @apply bg-blue-100 text-blue-700; }
+.category-badge.category-automation { @apply bg-orange-100 text-orange-700; }
+.category-badge.category-vision { @apply bg-green-100 text-green-700; }
+.category-badge.category-smart_building { @apply bg-amber-100 text-amber-700; }
+.category-badge.category-industrial_iot { @apply bg-cyan-100 text-cyan-700; }
+
+/* Difficulty Badges */
+.difficulty-badge {
+  @apply px-2 py-0.5 rounded text-xs font-medium;
+}
+
+.difficulty-badge.difficulty-beginner { @apply bg-green-100 text-green-700; }
+.difficulty-badge.difficulty-intermediate { @apply bg-yellow-100 text-yellow-700; }
+.difficulty-badge.difficulty-advanced { @apply bg-red-100 text-red-700; }
+
+/* Table Actions */
+.table-actions {
+  @apply flex items-center gap-1;
+}
+
+.btn-icon {
+  @apply w-8 h-8 flex items-center justify-center rounded text-text-secondary
+         bg-transparent border-none cursor-pointer;
+  transition: all 0.15s;
+}
+
+.btn-icon:hover {
+  @apply bg-gray-100 text-text-primary;
+}
+
+.btn-icon.btn-icon-danger:hover {
+  @apply bg-red-50 text-red-500;
+}
+
+/* Modal Large */
+.modal-lg {
+  max-width: 700px !important;
+}
+
+/* Form Sections */
+.form-section {
+  @apply mb-6 pb-6 border-b border-border;
+}
+
+.form-section:last-child {
+  @apply mb-0 pb-0 border-b-0;
+}
+
+.form-section-title {
+  @apply text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide;
+}
+
+/* Form Row Layout */
+.form-row {
+  @apply grid gap-4;
+  grid-template-columns: 1fr 1fr;
+}
+
+.form-row-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+@media (max-width: 640px) {
+  .form-row,
+  .form-row-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Form Hint */
+.form-hint {
+  @apply text-xs text-text-muted mt-1;
+}
+
+/* File Upload Area */
+.file-upload-area {
+  @apply relative border-2 border-dashed border-border rounded-lg p-4 cursor-pointer;
+  transition: all 0.2s;
+}
+
+.file-upload-area:hover {
+  @apply border-primary bg-primary-light/20;
+}
+
+.file-upload-area.drag-over {
+  @apply border-primary bg-primary-light/30;
+}
+
+.file-upload-area.uploading {
+  @apply opacity-70 pointer-events-none;
+}
+
+.file-upload-content {
+  @apply flex flex-col items-center justify-center gap-2 text-text-secondary text-center;
+}
+
+.file-upload-content svg {
+  @apply text-text-muted;
+}
+
+.file-upload-content p {
+  @apply text-sm m-0;
+}
+
+.file-upload-content .file-uploaded {
+  @apply text-xs text-success mt-1;
+}
+
+.file-input {
+  @apply absolute inset-0 opacity-0 cursor-pointer;
+}
+
+/* Checkbox Label */
+.checkbox-label {
+  @apply flex items-center gap-2 cursor-pointer text-sm text-text-secondary;
+}
+
+.checkbox-label input[type="checkbox"] {
+  @apply w-4 h-4 rounded border-border text-primary focus:ring-primary;
+}
+
+/* Empty State */
+.empty-state {
+  @apply flex flex-col items-center justify-center py-16 text-center;
+}
+
+.empty-state svg {
+  @apply mb-4;
+}
+
+/* Spinner */
+.spinner {
+  @apply w-6 h-6 border-2 border-primary border-t-transparent rounded-full;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-sm {
+  @apply inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full;
+  animation: spin 0.8s linear infinite;
+}
+
+.loading-spinner {
+  @apply flex items-center justify-center gap-3 py-16 text-text-secondary;
+}
+
+/* ============================================
+   22. DEVICE RESTORE SECTION
+   ============================================ */
+
+.restore-section {
+  @apply border-t border-border pt-8;
+}
+
+.restore-section-standalone {
+  /* No border when shown as main content in embedded mode */
+}
+
+.restore-header {
+  @apply flex flex-col gap-1;
+}
+
+.restore-card {
+  @apply bg-card rounded-lg border border-border shadow-sm p-5;
+}
+
+.restore-device-options {
+  @apply grid gap-3;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.restore-device-option {
+  @apply relative flex items-center gap-3 p-4 bg-white border-2 border-border rounded-xl
+         cursor-pointer transition-all duration-200;
+}
+
+.restore-device-option:hover:not(.selected) {
+  @apply border-primary/50 bg-primary/5;
+}
+
+.restore-device-option.selected {
+  @apply border-primary bg-primary/5;
+}
+
+.restore-device-option input[type="radio"] {
+  @apply sr-only;
+}
+
+.restore-device-radio {
+  @apply w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center
+         transition-all duration-200 flex-shrink-0;
+}
+
+.restore-device-option.selected .restore-device-radio {
+  @apply border-primary bg-primary;
+}
+
+.restore-device-option.selected .restore-device-radio::after {
+  content: '';
+  @apply w-2 h-2 bg-white rounded-full;
+}
+
+.restore-device-info {
+  @apply flex-1;
+}
+
+.restore-device-name {
+  @apply font-medium text-text-primary text-sm;
+}
+
+.restore-device-desc {
+  @apply text-xs text-text-secondary mt-0.5;
+}
+
+.restore-config {
+  @apply bg-gray-50 rounded-lg p-4 border border-border/50;
+}
+
+.restore-action {
+  @apply flex justify-start;
+}
+
+.restore-progress {
+  @apply bg-gray-50 rounded-lg p-4;
+}
+
+.restore-logs {
+  @apply border-t border-border pt-4;
 }
