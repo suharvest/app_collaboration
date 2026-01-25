@@ -13,7 +13,7 @@ export function renderSettingsPage() {
       <h1 class="page-title" data-i18n="settings.title">${t('settings.title')}</h1>
     </div>
 
-    <div class="max-w-2xl">
+    <div>
       <!-- Language Setting -->
       <div class="device-card mb-4">
         <div class="device-card-header">
