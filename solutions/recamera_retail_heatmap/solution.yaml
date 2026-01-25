@@ -77,18 +77,36 @@ deployment:
   selection_mode: sequential
 
   devices:
-    # Step 1: 部署 YOLO26 检测器到 reCamera
+    # Step 1: 部署检测器到 reCamera（可选 YOLO26 或 YOLO11）
     - id: deploy_detector
-      name: Deploy YOLO26 Detector
-      name_zh: 部署 YOLO26 检测器
+      name: Deploy Detector
+      name_zh: 部署检测器
       type: recamera_cpp
       required: true
-      config_file: devices/recamera.yaml
+      config_file: devices/recamera_yolo11.yaml
+      targets:
+        yolo11:
+          name: YOLO11 (~8 FPS)
+          name_zh: YOLO11 (~8 FPS)
+          description: Faster detection with DFL decoding, recommended
+          description_zh: 更快的检测速度，使用 DFL 解码，推荐使用
+          default: true
+          config_file: devices/recamera_yolo11.yaml
+          section:
+            description_file: deploy/sections/deploy_yolo11.md
+            description_file_zh: deploy/sections/deploy_yolo11_zh.md
+        yolo26:
+          name: YOLO26 (~3 FPS)
+          name_zh: YOLO26 (~3 FPS)
+          description: Legacy model with direct bbox output
+          description_zh: 传统模型，直接输出边界框
+          config_file: devices/recamera.yaml
+          section:
+            description_file: deploy/sections/deploy_app.md
+            description_file_zh: deploy/sections/deploy_app_zh.md
       section:
         title: Step 1 - Deploy People Detection Service
         title_zh: 第一步 - 部署人流检测服务
-        description_file: deploy/sections/deploy_app.md
-        description_file_zh: deploy/sections/deploy_app_zh.md
 
     # Step 2: 实时热力图预览
     - id: preview

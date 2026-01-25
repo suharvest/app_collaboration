@@ -47,6 +47,7 @@ binary:
       - S03node-red
       - S91sscma-node
       - S93sscma-supervisor
+      - S92yolo11-detector
     disable:
       - node-red
       - sscma-node

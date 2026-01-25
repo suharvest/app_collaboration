@@ -65,8 +65,8 @@ user_inputs:
     name_zh: MQTT 主题
     type: text
     required: false
-    default: "recamera/yolo26/detections"
-    placeholder: "recamera/yolo26/detections"
+    default: "recamera/yolo11/detections"
+    placeholder: "recamera/yolo11/detections"
 
   - id: mqtt_username
     name: MQTT Username

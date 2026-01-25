@@ -42,16 +42,24 @@ intro:
       name_zh: SenseCAP Watcher
       image: intro/gallery/mcp-connected.png
       product_url: https://www.seeedstudio.com/sensecap-watcher
-      description: AI-powered wearable assistant for voice commands
-      description_zh: AI驱动的可穿戴语音助手
+      description: AI-powered wearable voice assistant (ESP32-S3)
+      description_zh: AI 驱动的可穿戴语音助手（ESP32-S3）
+
+    recomputer_r1100:
+      name: reComputer R1100
+      name_zh: reComputer R1100
+      image: intro/gallery/api-endpoint.png
+      product_url: https://www.seeedstudio.com/recomputer-r1100
+      description: Edge gateway for warehouse system and voice server
+      description_zh: 边缘网关，运行仓管系统和语音服务
 
     recomputer_j4012:
       name: reComputer J4012
       name_zh: reComputer J4012
       image: intro/gallery/api-endpoint.png
       product_url: https://www.seeedstudio.com/recomputer-j4012
-      description: Edge AI computer for running MCP bridge and warehouse system
-      description_zh: 边缘AI计算机，用于运行MCP桥接器和仓库管理系统
+      description: Edge AI computer (Jetson Orin NX 16GB) for local LLM and TTS
+      description_zh: 边缘 AI 计算机（Jetson Orin NX 16GB），用于本地 LLM 和 TTS 推理
 
   # Device Groups
   device_groups:
@@ -64,11 +72,20 @@ intro:
         - device_ref: sensecap_watcher
       default: sensecap_watcher
 
-    - id: edge_computer
-      name: Edge Computer
-      name_zh: 边缘计算机
+    - id: warehouse_box
+      name: Warehouse Box (R1100)
+      name_zh: 仓管盒子（R1100）
       type: single
       required: true
+      options:
+        - device_ref: recomputer_r1100
+      default: recomputer_r1100
+
+    - id: ai_compute
+      name: AI Compute (J4012)
+      name_zh: AI 算力（J4012）
+      type: single
+      required: false
       options:
         - device_ref: recomputer_j4012
       default: recomputer_j4012
