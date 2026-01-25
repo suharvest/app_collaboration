@@ -155,7 +155,7 @@ class WiringInfo(BaseModel):
 
 class DeviceSection(BaseModel):
     """Device section in deployment page"""
-    title: str
+    title: Optional[str] = None
     title_zh: Optional[str] = None
     description_file: Optional[str] = None
     description_file_zh: Optional[str] = None
@@ -216,6 +216,17 @@ class PreviewConfig(BaseModel):
     user_inputs: List[UserInput] = []
 
 
+class DeviceTarget(BaseModel):
+    """A deployment target variant (e.g., local/remote, or model A/B)"""
+    name: str
+    name_zh: Optional[str] = None
+    description: Optional[str] = None
+    description_zh: Optional[str] = None
+    default: bool = False
+    config_file: Optional[str] = None
+    section: Optional[DeviceSection] = None
+
+
 class DeviceRef(BaseModel):
     """Device reference in solution"""
     id: str
@@ -224,6 +235,7 @@ class DeviceRef(BaseModel):
     type: str  # esp32_usb | docker_local | ssh_deb | script | manual | preview
     required: bool = True
     config_file: Optional[str] = None  # Optional for manual/script types
+    targets: Optional[Dict[str, DeviceTarget]] = None  # Alternative deployment targets
     user_inputs: List[UserInput] = []  # User inputs for script types
     section: Optional[DeviceSection] = None
     preview: Optional[PreviewConfig] = None  # Preview configuration for type: preview
