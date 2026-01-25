@@ -270,11 +270,15 @@ class StreamProxy:
         Yields frames in multipart/x-mixed-replace format.
         """
         stream_info = self.streams.get(stream_id)
+        logger.info(f"get_mjpeg_frames called for {stream_id}, stream_info exists: {stream_info is not None}")
         if not stream_info or stream_info.mode != "mjpeg":
+            logger.warning(f"get_mjpeg_frames: invalid stream {stream_id}")
             return
 
+        logger.info(f"get_mjpeg_frames: status={stream_info.status}, latest_frame={stream_info._latest_frame is not None}")
         stream_info.last_accessed = time.time()
         last_frame = None
+        frame_count = 0
 
         while stream_info.status in ("starting", "running"):
             # Wait for a new frame or timeout
@@ -284,14 +288,20 @@ class StreamProxy:
                     timeout=5.0
                 )
             except asyncio.TimeoutError:
-                if stream_info.status != "running":
+                logger.debug(f"get_mjpeg_frames: timeout waiting for frame, status={stream_info.status}")
+                # Keep waiting during "starting" (ffmpeg connecting) and "running" phases
+                # Only break if status changed to "error" or "stopped"
+                if stream_info.status not in ("starting", "running"):
                     break
                 continue
 
             frame = stream_info._latest_frame
             if frame and frame is not last_frame:
                 last_frame = frame
+                frame_count += 1
                 stream_info.last_accessed = time.time()
+                if frame_count <= 3:
+                    logger.info(f"get_mjpeg_frames: yielding frame {frame_count}, size={len(frame)}")
                 # Yield as multipart chunk
                 yield (
                     b"--frame\r\n"
@@ -299,6 +309,8 @@ class StreamProxy:
                     b"Content-Length: " + str(len(frame)).encode() + b"\r\n"
                     b"\r\n" + frame + b"\r\n"
                 )
+
+        logger.info(f"get_mjpeg_frames: loop exited, status={stream_info.status}, frames yielded={frame_count}")
 
     async def _wait_for_frame(self, stream_info: StreamInfo, last_frame):
         """Wait until a new frame is available"""
