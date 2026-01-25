@@ -380,6 +380,35 @@ async def get_deployment_info(
                     "steps": section.wiring.steps_zh if lang == "zh" else section.wiring.steps,
                 }
 
+        # Process targets (alternative deployment options within a device step)
+        if device.targets:
+            targets_data = {}
+            for target_id, target in device.targets.items():
+                target_info = {
+                    "name": target.name if lang == "en" else (target.name_zh or target.name),
+                    "name_zh": target.name_zh,
+                    "description": target.description if lang == "en" else (target.description_zh or target.description),
+                    "description_zh": target.description_zh,
+                    "default": target.default,
+                    "config_file": target.config_file,
+                }
+                # Load target section description
+                if target.section:
+                    target_section = {}
+                    desc_file = target.section.description_file_zh if lang == "zh" else target.section.description_file
+                    if desc_file:
+                        target_section["description"] = await solution_manager.load_markdown(
+                            solution_id, desc_file
+                        )
+                    if target.section.wiring:
+                        target_section["wiring"] = {
+                            "image": f"/api/solutions/{solution_id}/assets/{target.section.wiring.image}" if target.section.wiring.image else None,
+                            "steps": target.section.wiring.steps_zh if lang == "zh" else target.section.wiring.steps,
+                        }
+                    target_info["section"] = target_section
+                targets_data[target_id] = target_info
+            device_info["targets"] = targets_data
+
         devices.append(device_info)
 
     # Post deployment info

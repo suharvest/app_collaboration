@@ -111,8 +111,8 @@ export async function renderDeployPage(params) {
         logs: [],
         logsExpanded: false,
         sectionExpanded: index === 0, // First section expanded
-        // For docker_deploy type: track selected target (local/remote)
-        selectedTarget: device.type === 'docker_deploy' ? defaultTarget : null,
+        // For devices with targets: track selected target
+        selectedTarget: (device.type === 'docker_deploy' || (device.type === 'recamera_cpp' && device.targets)) ? defaultTarget : null,
       };
     });
 
@@ -616,6 +616,7 @@ function renderDeploySection(device, stepNumber) {
   const isScript = device.type === 'script';
   const isPreview = device.type === 'preview';
   const isDockerDeploy = device.type === 'docker_deploy' && device.targets;
+  const isRecameraCppWithTargets = device.type === 'recamera_cpp' && device.targets;
   const isCompleted = state.deploymentStatus === 'completed';
 
   return `
@@ -694,6 +695,39 @@ function renderDeploySection(device, stepNumber) {
           <!-- Target-specific content (description, wiring, SSH form for remote) -->
           <div class="deploy-target-content" id="target-content-${device.id}">
             ${renderDockerTargetContent(device)}
+          </div>
+
+          <!-- Deploy Action Area -->
+          <div class="deploy-action-area">
+            <div class="deploy-action-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+              </svg>
+              ${t('deploy.actions.auto')}
+            </div>
+            <p class="deploy-action-desc">${t('deploy.actions.autoDesc')}</p>
+            <button class="deploy-action-btn ${getButtonClass(state)}"
+                    id="deploy-btn-${device.id}"
+                    data-device-id="${device.id}"
+                    ${state.deploymentStatus === 'running' ? 'disabled' : ''}>
+              ${getDeployButtonContent(state, false)}
+            </button>
+          </div>
+        ` : isRecameraCppWithTargets ? `
+          <!-- reCamera C++ with model targets: model selector + SSH + deploy -->
+          ${renderDockerTargetSelector(device)}
+
+          <!-- Service Switch Warning -->
+          ${renderServiceSwitchWarning(device.type)}
+
+          <!-- Connection Settings (SSH) -->
+          ${renderSSHForm(device)}
+
+          <!-- Target-specific content -->
+          <div class="deploy-target-content" id="target-content-${device.id}">
+            ${renderRecameraCppTargetContent(device)}
           </div>
 
           <!-- Deploy Action Area -->
@@ -862,17 +896,27 @@ function renderDockerTargetSelector(device) {
           const targetName = getLocalizedField(target, 'name');
           const targetDesc = getLocalizedField(target, 'description');
           const isLocal = targetId === 'local';
-          const icon = isLocal
-            ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="7" width="20" height="14" rx="2"/>
-                <path d="M12 7V3M7 7V5M17 7V5"/>
-              </svg>`
-            : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="2" width="20" height="8" rx="2"/>
-                <rect x="2" y="14" width="20" height="8" rx="2"/>
-                <line x1="6" y1="6" x2="6.01" y2="6"/>
-                <line x1="6" y1="18" x2="6.01" y2="18"/>
+          let icon;
+          if (device.type === 'recamera_cpp') {
+            // Model variant icon (AI chip)
+            icon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="4" y="4" width="16" height="16" rx="2"/>
+                <rect x="9" y="9" width="6" height="6"/>
+                <path d="M15 2v2M15 20v2M9 2v2M9 20v2M2 15h2M20 15h2M2 9h2M20 9h2"/>
               </svg>`;
+          } else {
+            icon = isLocal
+              ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="7" width="20" height="14" rx="2"/>
+                  <path d="M12 7V3M7 7V5M17 7V5"/>
+                </svg>`
+              : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="2" width="20" height="8" rx="2"/>
+                  <rect x="2" y="14" width="20" height="8" rx="2"/>
+                  <line x1="6" y1="6" x2="6.01" y2="6"/>
+                  <line x1="6" y1="18" x2="6.01" y2="18"/>
+                </svg>`;
+          }
 
           return `
             <label class="deploy-mode-option ${isSelected ? 'selected' : ''}"
@@ -957,6 +1001,28 @@ function renderDockerTargetContent(device) {
   }
 
   return html;
+}
+
+/**
+ * Render content based on selected recamera_cpp target
+ * Shows target-specific description (e.g., model performance info)
+ */
+function renderRecameraCppTargetContent(device) {
+  const target = getSelectedTarget(device);
+  if (!target) return '';
+
+  const targetSection = target.section || {};
+  const description = targetSection.description || '';
+
+  if (!description) return '';
+
+  return `
+    <div class="deploy-pre-instructions">
+      <div class="markdown-content">
+        ${description}
+      </div>
+    </div>
+  `;
 }
 
 function renderSSHForm(device, mode = null) {
@@ -1597,10 +1663,14 @@ function updateDockerTargetUI(deviceId, container) {
     if (radio) radio.checked = isSelected;
   });
 
-  // Re-render target content
+  // Re-render target content based on device type
   const contentEl = document.getElementById(`target-content-${deviceId}`);
   if (contentEl) {
-    contentEl.innerHTML = renderDockerTargetContent(device);
+    if (device.type === 'recamera_cpp') {
+      contentEl.innerHTML = renderRecameraCppTargetContent(device);
+    } else {
+      contentEl.innerHTML = renderDockerTargetContent(device);
+    }
 
     // Re-attach SSH test button handler
     const testBtn = contentEl.querySelector(`#test-ssh-${deviceId}`);
@@ -1863,10 +1933,12 @@ async function startDeployment(deviceId) {
   let effectiveType = device.type;
   let selectedTarget = null;
 
-  if (device.type === 'docker_deploy' && device.targets) {
+  if (device.targets) {
     selectedTarget = getSelectedTarget(device);
-    // Map target id to deployment type
-    effectiveType = selectedTarget?.id === 'remote' ? 'docker_remote' : 'docker_local';
+    if (device.type === 'docker_deploy') {
+      // Map target id to deployment type
+      effectiveType = selectedTarget?.id === 'remote' ? 'docker_remote' : 'docker_local';
+    }
   }
 
   // Build params in the format expected by backend
