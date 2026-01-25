@@ -1,0 +1,156 @@
+version: "1.0"
+id: xiaozhi_face_recognition
+name: Xiaozhi Face Recognition Assistant
+name_zh: 小智人脸识别助手
+
+# ============ 介绍页内容 ============
+intro:
+  summary: Add face recognition to Xiaozhi AI - greet family members by name automatically
+  summary_zh: 给小智装上"眼睛"，认识家人朋友，进门自动打招呼
+
+  description_file: intro/description.md
+  description_file_zh: intro/description_zh.md
+
+  cover_image: intro/gallery/cover.svg
+
+  gallery:
+    - type: image
+      src: intro/gallery/demo.svg
+      caption: Face Recognition Demo
+      caption_zh: 人脸识别演示
+
+  category: voice_ai
+  tags:
+    - watcher
+    - face_recognition
+    - voice
+    - xiaozhi
+    - smart_home
+
+  # Device Catalog (references global catalog, with local overrides)
+  device_catalog:
+    sensecap_watcher:
+      image: intro/gallery/watcher.svg
+
+  # Device Groups
+  device_groups:
+    - id: voice_assistant
+      name: Voice Assistant Device
+      name_zh: 语音助手设备
+      type: single
+      required: true
+      options:
+        - device_ref: sensecap_watcher
+      default: sensecap_watcher
+
+  # Presets
+  presets:
+    - id: default
+      name: Standard Deployment
+      name_zh: 标准部署
+      selections:
+        voice_assistant: sensecap_watcher
+      links:
+        github: https://github.com/78/xiaozhi-esp32
+      section:
+        title: Deployment Guide
+        title_zh: 部署指南
+        description_file: deploy/guide.md
+        description_file_zh: deploy/guide_zh.md
+
+  stats:
+    deployed_count: 0
+    likes_count: 0
+    difficulty: beginner
+    estimated_time: 20min
+
+# ============ 部署页内容 ============
+deployment:
+  guide_file: deploy/guide.md
+  guide_file_zh: deploy/guide_zh.md
+
+  # 部署模式: sequential (按顺序执行)
+  selection_mode: sequential
+
+  devices:
+    # Step 1: 烧录小智 ESP32 固件
+    - id: watcher_esp32
+      name: Flash Xiaozhi Firmware
+      name_zh: 烧录小智固件
+      type: esp32_usb
+      required: true
+      config_file: devices/watcher_esp32.yaml
+      section:
+        title: Step 1 - Flash Xiaozhi Firmware
+        title_zh: 第一步 - 烧录小智固件
+        description_file: deploy/sections/flash_esp32.md
+        description_file_zh: deploy/sections/flash_esp32_zh.md
+        wiring:
+          steps:
+            - Connect Watcher to computer via USB-C cable
+            - Select the serial port (wchusbserial)
+            - Click Flash to program the firmware
+          steps_zh:
+            - 用 USB-C 线连接 Watcher 到电脑
+            - 选择串口（wchusbserial 开头）
+            - 点击烧录按钮写入固件
+
+    # Step 2: 烧录人脸识别固件 (Himax WE2)
+    - id: watcher_himax
+      name: Flash Face Recognition Firmware
+      name_zh: 烧录人脸识别固件
+      type: himax_usb
+      required: true
+      config_file: devices/watcher_himax.yaml
+      section:
+        title: Step 2 - Flash Face Recognition Firmware
+        title_zh: 第二步 - 烧录人脸识别固件
+        description_file: deploy/sections/flash_himax.md
+        description_file_zh: deploy/sections/flash_himax_zh.md
+        wiring:
+          steps:
+            - Ensure Watcher is connected via USB-C
+            - Select the serial port (usbmodem)
+            - Click Flash and press reset button when prompted
+          steps_zh:
+            - 确保 Watcher 已通过 USB-C 线连接
+            - 选择串口（usbmodem 开头）
+            - 点击烧录并按提示按下重启按钮
+
+    # Step 3: 配置小智
+    - id: configure_xiaozhi
+      name: Configure Xiaozhi
+      name_zh: 配置小智
+      type: manual
+      required: false
+      section:
+        title: Step 3 - Configure Xiaozhi
+        title_zh: 第三步 - 配置小智
+        description_file: deploy/sections/configure_xiaozhi.md
+        description_file_zh: deploy/sections/configure_xiaozhi_zh.md
+
+    # Step 4: 人脸录入指南
+    - id: face_enrollment
+      name: Face Enrollment Guide
+      name_zh: 人脸录入指南
+      type: manual
+      required: false
+      section:
+        title: Step 4 - Enroll Faces
+        title_zh: 第四步 - 录入人脸
+        description_file: deploy/sections/face_enrollment.md
+        description_file_zh: deploy/sections/face_enrollment_zh.md
+
+  order:
+    - watcher_esp32
+    - watcher_himax
+    - configure_xiaozhi
+    - face_enrollment
+
+  post_deployment:
+    success_message: |
+      Deployment complete! Your Watcher now has face recognition capability.
+      Say "Remember my face, my name is [your name]" to enroll your face.
+    success_message_zh: |
+      部署完成！您的 Watcher 现在具备人脸识别功能。
+      说"记住我的脸，我叫[你的名字]"来录入人脸。

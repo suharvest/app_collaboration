@@ -1,0 +1,151 @@
+version: "1.0"
+id: llm_jetson
+name: LLM & TTS Service (Jetson)
+name_zh: LLM 与 TTS 服务（Jetson）
+type: docker_remote
+
+detection:
+  method: network_scan
+  manual_entry: true
+  requirements:
+    - docker_installed
+    - docker_running
+    - nvidia_runtime
+
+ssh:
+  port: 22
+  default_user: root
+  auth_methods:
+    - password
+    - key
+  connection_timeout: 30
+  command_timeout: 1800
+
+docker_remote:
+  compose_file: assets/docker/docker-compose-llm-tts.yml
+  compose_dir: assets/docker
+  remote_path: /home/{{username}}/llm_deployment
+
+  environment:
+    MODEL_NAME: "qwen3-8b-instruct-q4f16_1-MLC"
+
+  options:
+    project_name: llm_tts_local
+    remove_orphans: true
+
+  services:
+    - name: mlc-llm
+      port: 8000
+      health_check_endpoint: /v1/models
+      required: true
+    - name: kokoro-tts
+      port: 8001
+      required: true
+
+  images:
+    - name: ghcr.nju.edu.cn/xinnan-tech/mlc-llm-serve:jetson
+      required: true
+    - name: ghcr.nju.edu.cn/xinnan-tech/kokoro-tts:jetson
+      required: true
+
+user_inputs:
+  - id: host
+    name: J4012 IP Address
+    name_zh: J4012 IP 地址
+    type: text
+    required: true
+    placeholder: "192.168.1.200"
+    description: IP address of the reComputer J4012 device
+    description_zh: reComputer J4012 设备的 IP 地址
+    validation:
+      pattern: "^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$"
+      message: Please enter a valid IP address
+
+  - id: username
+    name: SSH Username
+    name_zh: SSH 用户名
+    type: text
+    default: root
+    required: true
+    description: SSH login username
+    description_zh: SSH 登录用户名
+
+  - id: password
+    name: SSH Password
+    name_zh: SSH 密码
+    type: password
+    required: true
+    description: SSH login password
+    description_zh: SSH 登录密码
+
+  - id: port
+    name: SSH Port
+    name_zh: SSH 端口
+    type: text
+    default: "22"
+    required: false
+    description: SSH port (default 22)
+    description_zh: SSH 端口（默认 22）
+
+pre_checks:
+  - type: docker_version
+    min_version: "20.0"
+    description: Check Docker version
+  - type: nvidia_runtime
+    description: Check NVIDIA container runtime is available
+  - type: disk_space
+    min_gb: 15
+    description: Check available disk space (model ~5GB + runtime)
+
+steps:
+  - id: connect
+    name: SSH Connect
+    name_zh: SSH 连接
+    description: Connect to J4012 device via SSH
+    description_zh: 通过 SSH 连接 J4012 设备
+    optional: false
+    default: true
+
+  - id: prepare
+    name: Prepare Directory
+    name_zh: 准备目录
+    description: Create deployment directory and upload scripts
+    description_zh: 创建部署目录并上传脚本
+    optional: false
+    default: true
+
+  - id: upload
+    name: Upload Files
+    name_zh: 上传文件
+    description: Upload Docker Compose files
+    description_zh: 上传 Docker Compose 文件
+    optional: false
+    default: true
+
+  - id: pull_images
+    name: Pull MLC-LLM and Kokoro Images
+    name_zh: 拉取 MLC-LLM 和 Kokoro 镜像
+    description: Download MLC-LLM and Kokoro TTS container images
+    description_zh: 下载 MLC-LLM 和 Kokoro TTS 容器镜像
+    optional: false
+    default: true
+
+  - id: start_services
+    name: Start Services & Init Model
+    name_zh: 启动服务并初始化模型
+    description: Launch MLC-LLM and Kokoro TTS (first run may take 10-30 min to load model)
+    description_zh: 启动 MLC-LLM 和 Kokoro TTS（首次运行可能需要 10-30 分钟加载模型）
+    optional: false
+    default: true
+
+  - id: health_check
+    name: Health Check
+    name_zh: 健康检查
+    description: Verify MLC-LLM and Kokoro TTS are running correctly
+    description_zh: 验证 MLC-LLM 和 Kokoro TTS 运行正常
+    optional: false
+    default: true
+
+post_deployment:
+  message: "LLM & TTS services are running on {{host}}. MLC-LLM: http://{{host}}:8000, Kokoro TTS: http://{{host}}:8001"
+  message_zh: "LLM 和 TTS 服务已在 {{host}} 上运行。MLC-LLM: http://{{host}}:8000, Kokoro TTS: http://{{host}}:8001"

@@ -1,0 +1,74 @@
+version: "1.0"
+id: watcher_himax
+name: Himax WE2 Face Recognition
+name_zh: Himax WE2 人脸识别
+type: himax_usb
+
+# Auto-detection configuration
+detection:
+  method: usb_serial
+  # Watcher Himax WE2 USB identifiers (WCH chip)
+  usb_vendor_id: "0x1a86"
+  usb_product_id: "0x55d2"
+  # Fallback port patterns
+  fallback_ports:
+    - "/dev/cu.usbmodem*"
+    - "/dev/tty.usbmodem*"
+    - "/dev/ttyACM*"
+
+firmware:
+  source:
+    type: local
+    path: assets/watcher_firmware/face_recognition.img
+  flash_config:
+    baudrate: 921600
+    requires_reset: true
+    timeout: 60
+
+# User inputs (supports auto-detection, can also be manually selected)
+user_inputs:
+  - id: serial_port
+    name: Serial Port
+    name_zh: 串口
+    type: serial_port
+    required: true
+    description: Select the USB port for Himax WE2 (usbmodem)
+    description_zh: 选择 Himax WE2 的串口（usbmodem 开头）
+    auto_detect: true
+
+steps:
+  - id: detect
+    name: Detect Device
+    name_zh: 检测设备
+    description: Auto-scan USB ports for Himax WE2
+    description_zh: 自动扫描 USB 端口查找 Himax WE2
+    optional: false
+    default: true
+
+  - id: wait_reset
+    name: Wait for Reset
+    name_zh: 等待重启按钮
+    description: Press the reset button when prompted
+    description_zh: 提示时按下重启按钮
+    optional: false
+    default: true
+
+  - id: flash
+    name: Flash Firmware
+    name_zh: 烧录固件
+    description: Write face recognition firmware
+    description_zh: 写入人脸识别固件
+    optional: false
+    default: true
+
+  - id: verify
+    name: Verify
+    name_zh: 验证
+    description: Verify firmware installation
+    description_zh: 验证固件安装
+    optional: true
+    default: true
+
+post_deployment:
+  reset_device: false
+  wait_for_ready: 5

@@ -61,7 +61,8 @@ const CONFIG = {
   },
 
   // UI settings
-  boxLineWidth: 2,
+  boxLineWidth: 4,
+  boxGlowBlur: 8,
   labelFont: 'bold 12px Inter, sans-serif',
   statsFont: '12px Inter, sans-serif',
   statsHeaderFont: 'bold 14px Inter, sans-serif',
@@ -75,9 +76,32 @@ if (!window._heatmapState) {
     points: new Map(),  // track_id -> { x, y, heat }
     initialized: false,
     lastCanvasSize: { w: 0, h: 0 },
+    // Double buffering
+    bufferCanvas: null,
+    bufferCtx: null,
+    // Static UI cache
+    legendCache: null,
+    statsPanelCache: null,
   };
 }
 const state = window._heatmapState;
+
+// ========== Double Buffer Setup ==========
+// Create or resize buffer canvas
+if (!state.bufferCanvas ||
+    state.bufferCanvas.width !== canvas.width ||
+    state.bufferCanvas.height !== canvas.height) {
+  state.bufferCanvas = document.createElement('canvas');
+  state.bufferCanvas.width = canvas.width;
+  state.bufferCanvas.height = canvas.height;
+  state.bufferCtx = state.bufferCanvas.getContext('2d');
+  // Force reinit of heatmap and caches
+  state.initialized = false;
+  state.legendCache = null;
+  state.statsPanelCache = null;
+}
+
+const bufferCtx = state.bufferCtx;
 
 // ========== Initialize / Reset Heatmap ==========
 function initHeatmap() {
@@ -86,12 +110,14 @@ function initHeatmap() {
     return false;
   }
 
-  state.heat = simpleheat(canvas);
+  // Initialize simpleheat on the BUFFER canvas, not the visible one
+  state.heat = simpleheat(state.bufferCanvas);
   state.heat.radius(CONFIG.pointRadius, CONFIG.blurRadius);
   state.heat.gradient(CONFIG.gradient);
   state.heat.max(CONFIG.maxHeatValue);
   state.initialized = true;
   state.lastCanvasSize = { w: canvas.width, h: canvas.height };
+  state.points.clear();
   return true;
 }
 
@@ -99,7 +125,6 @@ function initHeatmap() {
 if (state.initialized &&
     (state.lastCanvasSize.w !== canvas.width || state.lastCanvasSize.h !== canvas.height)) {
   state.initialized = false;
-  state.points.clear();
 }
 
 // Initialize on first run
@@ -159,9 +184,11 @@ for (const person of persons) {
   }
 }
 
-// ========== Render Heatmap ==========
-ctx.clearRect(0, 0, canvas.width, canvas.height);
+// ========== Render to Buffer ==========
+// Clear buffer
+bufferCtx.clearRect(0, 0, canvas.width, canvas.height);
 
+// Draw heatmap to buffer
 if (state.heat && state.points.size > 0) {
   // Convert Map to simpleheat data format: [[x, y, value], ...]
   const heatData = Array.from(state.points.values())
@@ -171,7 +198,7 @@ if (state.heat && state.points.size > 0) {
   state.heat.draw(0.05);  // minOpacity
 }
 
-// ========== Render Person Bounding Boxes ==========
+// ========== Render Person Bounding Boxes to Buffer ==========
 for (const person of persons) {
   const { bbox, track_id, state: personState, dwell_duration_sec = 0, confidence = 0 } = person;
   if (!bbox) continue;
@@ -184,113 +211,129 @@ for (const person of persons) {
   const bw = bbox.w * canvas.width;
   const bh = bbox.h * canvas.height;
 
-  // Draw bounding box
-  ctx.strokeStyle = color;
-  ctx.lineWidth = CONFIG.boxLineWidth;
-  ctx.strokeRect(bx, by, bw, bh);
+  // Draw bounding box with glow effect for visibility
+  bufferCtx.save();
+  bufferCtx.shadowColor = color;
+  bufferCtx.shadowBlur = CONFIG.boxGlowBlur;
+  bufferCtx.strokeStyle = color;
+  bufferCtx.lineWidth = CONFIG.boxLineWidth;
+  bufferCtx.strokeRect(bx, by, bw, bh);
+  // Draw twice for stronger glow
+  bufferCtx.strokeRect(bx, by, bw, bh);
+  bufferCtx.restore();
 
   // Draw semi-transparent fill
-  ctx.fillStyle = color;
-  ctx.globalAlpha = 0.1;
-  ctx.fillRect(bx, by, bw, bh);
-  ctx.globalAlpha = 1.0;
+  bufferCtx.fillStyle = color;
+  bufferCtx.globalAlpha = 0.15;
+  bufferCtx.fillRect(bx, by, bw, bh);
+  bufferCtx.globalAlpha = 1.0;
 
   // Draw label background
   const labelText = dwell_duration_sec > 1
     ? `#${track_id} ${dwell_duration_sec.toFixed(1)}s`
     : `#${track_id}`;
 
-  ctx.font = CONFIG.labelFont;
-  const textWidth = ctx.measureText(labelText).width;
+  bufferCtx.font = CONFIG.labelFont;
+  const textWidth = bufferCtx.measureText(labelText).width;
 
-  ctx.fillStyle = color;
-  ctx.fillRect(bx, by - 20, textWidth + 8, 18);
+  bufferCtx.fillStyle = color;
+  bufferCtx.fillRect(bx, by - 22, textWidth + 10, 20);
 
   // Draw label text
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(labelText, bx + 4, by - 6);
+  bufferCtx.fillStyle = '#FFFFFF';
+  bufferCtx.fillText(labelText, bx + 5, by - 7);
 }
 
-// ========== Render Stats Panel ==========
-// Ensure full opacity for UI elements
-ctx.globalAlpha = 1.0;
+// ========== Render Stats Panel to Buffer ==========
+bufferCtx.globalAlpha = 1.0;
 
 const panelWidth = 180;
 const panelHeight = 130;
 const panelX = 10;
 const panelY = 10;
 
-// Panel background (solid, always visible)
-ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-ctx.beginPath();
-ctx.roundRect(panelX, panelY, panelWidth, panelHeight, 8);
-ctx.fill();
+// Panel background
+bufferCtx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+bufferCtx.beginPath();
+bufferCtx.roundRect(panelX, panelY, panelWidth, panelHeight, 8);
+bufferCtx.fill();
 
 // Panel border
-ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-ctx.lineWidth = 1;
-ctx.stroke();
+bufferCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+bufferCtx.lineWidth = 1;
+bufferCtx.stroke();
 
 // Title
-ctx.fillStyle = '#FFFFFF';
-ctx.font = CONFIG.statsHeaderFont;
-ctx.fillText('People Flow Stats', panelX + 12, panelY + 24);
+bufferCtx.fillStyle = '#FFFFFF';
+bufferCtx.font = CONFIG.statsHeaderFont;
+bufferCtx.fillText('People Flow Stats', panelX + 12, panelY + 24);
 
 // Stats
-ctx.font = CONFIG.statsFont;
+bufferCtx.font = CONFIG.statsFont;
 let statY = panelY + 48;
 
 // Total count
-ctx.fillStyle = '#FFFFFF';
-ctx.fillText(`Total: ${zoneOccupancy.total || 0}`, panelX + 12, statY);
+bufferCtx.fillStyle = '#FFFFFF';
+bufferCtx.fillText(`Total: ${zoneOccupancy.total || 0}`, panelX + 12, statY);
 statY += 20;
 
 // Browsing
-ctx.fillStyle = CONFIG.stateColors.browsing;
-ctx.fillText(`Browsing: ${zoneOccupancy.browsing || 0}`, panelX + 12, statY);
+bufferCtx.fillStyle = CONFIG.stateColors.browsing;
+bufferCtx.fillText(`Browsing: ${zoneOccupancy.browsing || 0}`, panelX + 12, statY);
 statY += 20;
 
 // Engaged
-ctx.fillStyle = CONFIG.stateColors.engaged;
-ctx.fillText(`Engaged: ${zoneOccupancy.engaged || 0}`, panelX + 12, statY);
+bufferCtx.fillStyle = CONFIG.stateColors.engaged;
+bufferCtx.fillText(`Engaged: ${zoneOccupancy.engaged || 0}`, panelX + 12, statY);
 statY += 20;
 
 // Assistance
-ctx.fillStyle = CONFIG.stateColors.assistance;
-ctx.fillText(`Need Help: ${zoneOccupancy.assistance || 0}`, panelX + 12, statY);
+bufferCtx.fillStyle = CONFIG.stateColors.assistance;
+bufferCtx.fillText(`Need Help: ${zoneOccupancy.assistance || 0}`, panelX + 12, statY);
 
 // Inference time (bottom right of panel)
 if (inferenceTime > 0) {
-  ctx.fillStyle = '#9CA3AF';
-  ctx.font = '10px Inter, sans-serif';
-  ctx.fillText(`${inferenceTime.toFixed(0)}ms`, panelX + panelWidth - 40, panelY + panelHeight - 8);
+  bufferCtx.fillStyle = '#9CA3AF';
+  bufferCtx.font = '10px Inter, sans-serif';
+  bufferCtx.fillText(`${inferenceTime.toFixed(0)}ms`, panelX + panelWidth - 40, panelY + panelHeight - 8);
 }
 
-// ========== Legend (Bottom Right) ==========
-const legendX = canvas.width - 140;
-const legendY = canvas.height - 90;
+// ========== Render Legend to Buffer ==========
 const legendItems = [
   { label: 'Moving', color: CONFIG.stateColors.transient },
   { label: 'Browsing', color: CONFIG.stateColors.browsing },
   { label: 'Engaged', color: CONFIG.stateColors.engaged },
   { label: 'Need Help', color: CONFIG.stateColors.assistance },
 ];
+const legendW = 138;
+const legendH = legendItems.length * 18 + 16;
+const legendX = canvas.width - legendW - 10;
+const legendY = canvas.height - legendH - 10;
 
-// Legend background (solid, always visible)
-ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-ctx.beginPath();
-ctx.roundRect(legendX - 8, legendY - 8, 138, legendItems.length * 18 + 16, 6);
-ctx.fill();
+// Legend background
+bufferCtx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+bufferCtx.beginPath();
+bufferCtx.roundRect(legendX, legendY, legendW, legendH, 6);
+bufferCtx.fill();
 
-ctx.font = '11px Inter, sans-serif';
+// Legend border
+bufferCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+bufferCtx.lineWidth = 1;
+bufferCtx.stroke();
+
+bufferCtx.font = '11px Inter, sans-serif';
 legendItems.forEach((item, i) => {
-  const y = legendY + i * 18 + 6;
+  const y = legendY + 8 + i * 18 + 6;
 
   // Color box
-  ctx.fillStyle = item.color;
-  ctx.fillRect(legendX, y - 8, 12, 12);
+  bufferCtx.fillStyle = item.color;
+  bufferCtx.fillRect(legendX + 8, y - 8, 12, 12);
 
   // Label
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(item.label, legendX + 20, y);
+  bufferCtx.fillStyle = '#FFFFFF';
+  bufferCtx.fillText(item.label, legendX + 28, y);
 });
+
+// ========== Copy Buffer to Visible Canvas (Single Operation) ==========
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+ctx.drawImage(state.bufferCanvas, 0, 0);

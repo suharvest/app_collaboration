@@ -256,7 +256,53 @@ deployment:
                 - 输入 IP 地址和 SSH 凭据
                 - 点击部署安装到远程设备
 
-    # Step 2: SenseCraft 平台配置
+    # Step 2: 部署语音服务
+    - id: voice_service
+      name: Voice AI Service
+      name_zh: 语音 AI 服务
+      type: docker_deploy
+      required: true
+      config_file: devices/xiaozhi_server.yaml
+      section:
+        title: Deploy Voice AI Service
+        title_zh: 部署语音 AI 服务
+      targets:
+        local:
+          name: Local Deployment
+          name_zh: 本机部署
+          description: Deploy voice service on this computer
+          description_zh: 在当前电脑部署语音服务
+          config_file: devices/xiaozhi_server.yaml
+          section:
+            description_file: deploy/sections/voice_local.md
+            description_file_zh: deploy/sections/voice_local_zh.md
+        remote:
+          name: Remote Deployment (R1100)
+          name_zh: 远程部署（R1100）
+          description: Deploy to reComputer R1100 via SSH
+          description_zh: 通过 SSH 部署到 reComputer R1100
+          default: true
+          config_file: devices/xiaozhi_remote.yaml
+          section:
+            description_file: deploy/sections/voice_remote.md
+            description_file_zh: deploy/sections/voice_remote_zh.md
+
+    # Step 3: (边缘计算方案) 部署 Jetson LLM/TTS
+    - id: jetson_llm_tts
+      name: Jetson LLM & TTS
+      name_zh: Jetson LLM 与 TTS 服务
+      type: docker_deploy
+      required: false
+      show_when:
+        preset: edge_computing
+      config_file: devices/llm_jetson.yaml
+      section:
+        title: Deploy LLM & TTS on Jetson
+        title_zh: 在 Jetson 上部署 LLM 和 TTS
+        description_file: deploy/sections/llm_local.md
+        description_file_zh: deploy/sections/llm_local_zh.md
+
+    # Step 4: SenseCraft 平台配置
     - id: sensecraft
       name: SenseCraft Platform
       name_zh: SenseCraft 平台配置
@@ -344,6 +390,8 @@ deployment:
 
   order:
     - warehouse
+    - voice_service
+    - jetson_llm_tts    # 仅边缘计算方案显示
     - sensecraft
     - mcp_bridge
     - demo
