@@ -1,0 +1,103 @@
+# Device Restore Configuration
+# Factory firmware and restore operations for supported devices
+
+version: "1.0"
+
+devices:
+  sensecap_watcher:
+    name: "SenseCAP Watcher"
+    name_zh: "SenseCAP Watcher"
+    type: "himax_usb"
+    description: "Restore to factory firmware via USB"
+    description_zh: "通过 USB 烧录恢复出厂固件"
+
+    firmware:
+      # Himax firmware (slot 1)
+      - slot: 1
+        name: "Himax Firmware"
+        file: "himax/himax_firmware_20240816.img"
+        source_url: "https://github.com/Seeed-Studio/OSHW-SenseCAP-Watcher/raw/main/Firmware/Himax/himax_firmware_20240816.img"
+        address: 0x0
+        required: true
+
+      # Factory model (slot 4, address 0x400000)
+      # Note: vela format tflite, to be provided
+      # - slot: 4
+      #   name: "Factory Model"
+      #   file: "himax/factory_model.tflite"
+      #   address: 0x400000
+      #   required: false
+
+    detection:
+      usb_vendor_id: "0x1a86"
+      usb_product_id: "0x55d2"
+      fallback_ports:
+        - "/dev/cu.usbmodem*"
+        - "/dev/tty.usbmodem*"
+        - "/dev/ttyACM*"
+        - "COM*"
+
+    flash_config:
+      baudrate: 921600
+      timeout: 60
+
+  recamera:
+    name: "reCamera"
+    name_zh: "reCamera"
+    type: "ssh_restore"
+    description: "Restore by removing deployed packages and services"
+    description_zh: "通过卸载已部署的包和服务进行还原"
+
+    restore_operations:
+      # Step 1: Stop deployed services
+      - name: "Stop deployed services"
+        name_zh: "停止已部署的服务"
+        command: |
+          for svc in /etc/init.d/S*yolo* /etc/init.d/S*detector*; do
+            [ -f "$svc" ] && sudo $svc stop 2>/dev/null || true
+          done
+
+      # Step 2: Remove deployed packages
+      - name: "Remove deployed packages"
+        name_zh: "卸载已部署的包"
+        command: |
+          pkgs=$(opkg list-installed 2>/dev/null | grep -E 'yolo.*-detector' | cut -d' ' -f1)
+          for pkg in $pkgs; do
+            sudo opkg remove $pkg 2>/dev/null || true
+          done
+
+      # Step 3: Remove deployed models (NOT factory models)
+      - name: "Remove deployed models"
+        name_zh: "删除部署添加的模型"
+        command: |
+          # Only remove models from /userdata/local/models/
+          # DO NOT remove factory models from:
+          # - /userdata/Models/model.cvimodel
+          # - /userdata/MODEL/model.cvimodel
+          sudo rm -rf /userdata/local/models/* 2>/dev/null || true
+
+      # Step 4: Restore node-red autostart
+      - name: "Restore node-red autostart"
+        name_zh: "恢复 node-red 自启动"
+        command: |
+          [ -f /etc/init.d/K03node-red ] && sudo mv /etc/init.d/K03node-red /etc/init.d/S03node-red 2>/dev/null || true
+
+      # Step 5: Start node-red service
+      - name: "Start node-red service"
+        name_zh: "启动 node-red 服务"
+        command: |
+          [ -f /etc/init.d/S03node-red ] && sudo /etc/init.d/S03node-red start 2>/dev/null || true
+
+    factory_paths:
+      # These paths contain factory models - DO NOT DELETE
+      protected:
+        - "/userdata/Models/model.cvimodel"
+        - "/userdata/MODEL/model.cvimodel"
+
+      # These paths contain deployment-added content - CAN DELETE
+      removable:
+        - "/userdata/local/models/"
+
+    default_credentials:
+      username: "root"
+      port: 22
