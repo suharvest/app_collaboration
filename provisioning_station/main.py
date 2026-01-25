@@ -3,8 +3,12 @@ FastAPI application entry point
 """
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+# Configure application logging (uvicorn only sets up its own loggers)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:\t %(name)s - %(message)s")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .config import settings
-from .routers import solutions, devices, deployments, websocket, versions, device_management, preview
+from .routers import solutions, devices, deployments, websocket, versions, device_management, preview, docker_devices
 from .services.solution_manager import solution_manager
 from .services.stream_proxy import get_stream_proxy
 from .services.mqtt_bridge import get_mqtt_bridge, is_mqtt_available
@@ -71,6 +75,7 @@ app.include_router(websocket.router)
 app.include_router(versions.router)
 app.include_router(device_management.router)
 app.include_router(preview.router)
+app.include_router(docker_devices.router)
 
 # Serve static frontend files
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"

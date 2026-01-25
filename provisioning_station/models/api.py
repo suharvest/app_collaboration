@@ -139,6 +139,14 @@ class LogEntryResponse(BaseModel):
     message: str
 
 
+class StepSummary(BaseModel):
+    """Step summary for deployment list"""
+    id: str
+    name: str
+    status: str
+    progress: int = 0
+
+
 class DeploymentListItem(BaseModel):
     """Deployment list item"""
     id: str
@@ -148,3 +156,5 @@ class DeploymentListItem(BaseModel):
     started_at: datetime
     completed_at: Optional[datetime] = None
     device_count: int = 0
+    device_id: Optional[str] = None
+    steps: List[StepSummary] = []

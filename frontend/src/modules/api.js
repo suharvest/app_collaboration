@@ -233,6 +233,16 @@ export const deploymentsApi = {
       method: 'POST',
     });
   },
+
+  /**
+   * Delete a deployment record
+   * @param {string} deploymentId - Deployment ID
+   */
+  delete(deploymentId) {
+    return request(`/deployments/${deploymentId}`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 // ============================================
@@ -373,6 +383,61 @@ export const deviceManagementApi = {
     return request(`/device-management/${deploymentId}/update`, {
       method: 'POST',
       body: JSON.stringify({ password }),
+    });
+  },
+};
+
+// ============================================
+// Docker Devices API
+// Remote Docker container management
+// ============================================
+
+export const dockerDevicesApi = {
+  /**
+   * Test SSH connection and verify Docker availability
+   * @param {Object} connection - Connection parameters
+   */
+  connect(connection) {
+    return request('/docker-devices/connect', {
+      method: 'POST',
+      body: JSON.stringify(connection),
+    });
+  },
+
+  /**
+   * List containers on connected device
+   * @param {Object} connection - Connection parameters
+   */
+  listContainers(connection) {
+    return request('/docker-devices/containers', {
+      method: 'POST',
+      body: JSON.stringify(connection),
+      timeout: 15000,
+    });
+  },
+
+  /**
+   * Upgrade a container (pull + recreate)
+   * @param {Object} params - Upgrade parameters
+   */
+  upgrade(params) {
+    return request('/docker-devices/upgrade', {
+      method: 'POST',
+      body: JSON.stringify(params),
+      timeout: 180000,
+    });
+  },
+
+  /**
+   * Perform action on a container (start/stop/restart)
+   * @param {Object} connection - Connection parameters
+   * @param {string} containerName - Container name
+   * @param {string} action - Action to perform
+   */
+  containerAction(connection, containerName, action) {
+    return request(`/docker-devices/container-action?container_name=${encodeURIComponent(containerName)}&action=${action}`, {
+      method: 'POST',
+      body: JSON.stringify(connection),
     });
   },
 };
