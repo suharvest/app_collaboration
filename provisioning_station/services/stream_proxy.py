@@ -1,20 +1,26 @@
 """
-Stream Proxy Service - RTSP to HLS conversion
+Stream Proxy Service - RTSP to MJPEG/HLS conversion
 
-Uses FFmpeg to convert RTSP streams to HLS format for browser playback.
+Uses FFmpeg to convert RTSP streams to MJPEG (low latency) or HLS format for browser playback.
 """
 
 import asyncio
 import logging
 import os
+import platform
 import shutil
 import tempfile
+import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Optional
+from typing import AsyncGenerator, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+# JPEG markers
+JPEG_SOI = b'\xff\xd8'
+JPEG_EOI = b'\xff\xd9'
 
 
 @dataclass
@@ -22,30 +28,27 @@ class StreamInfo:
     """Information about an active stream"""
     stream_id: str
     rtsp_url: str
-    hls_dir: Path
+    hls_dir: Optional[Path] = None
     process: Optional[asyncio.subprocess.Process] = None
     started_at: float = 0
     last_accessed: float = 0
     error: Optional[str] = None
     status: str = "starting"  # starting | running | stopped | error
+    mode: str = "mjpeg"  # mjpeg | hls
+    # MJPEG specific
+    _frame_buffer: bytes = field(default=b'', repr=False)
+    _latest_frame: Optional[bytes] = field(default=None, repr=False)
+    _frame_event: Optional[asyncio.Event] = field(default=None, repr=False)
+    _reader_task: Optional[asyncio.Task] = field(default=None, repr=False)
+    _stderr_output: str = field(default='', repr=False)
 
 
 class StreamProxy:
     """
-    Manages RTSP to HLS stream conversion using FFmpeg.
-
-    Each stream gets a unique ID and output directory.
-    HLS files are served via the preview router.
+    Manages RTSP to MJPEG/HLS stream conversion using FFmpeg.
     """
 
     def __init__(self, output_base_dir: Optional[str] = None):
-        """
-        Initialize the stream proxy.
-
-        Args:
-            output_base_dir: Base directory for HLS output files.
-                           Defaults to a temp directory.
-        """
         if output_base_dir:
             self.output_base_dir = Path(output_base_dir)
         else:
@@ -53,8 +56,8 @@ class StreamProxy:
 
         self.output_base_dir.mkdir(parents=True, exist_ok=True)
         self.streams: Dict[str, StreamInfo] = {}
-        self._cleanup_task: Optional[asyncio.Task] = None
         self._ffmpeg_path = self._find_ffmpeg()
+        self._has_v4l2m2m = self._check_v4l2m2m()
 
     def _find_ffmpeg(self) -> Optional[str]:
         """Find FFmpeg executable"""
@@ -65,84 +68,294 @@ class StreamProxy:
             logger.warning("FFmpeg not found in PATH")
         return ffmpeg
 
-    async def start_stream(self, rtsp_url: str, stream_id: Optional[str] = None) -> str:
+    def _check_v4l2m2m(self) -> bool:
+        """Check if v4l2m2m hardware acceleration is available (Raspberry Pi)"""
+        if platform.system() != "Linux":
+            return False
+        # Check for v4l2 device
+        return os.path.exists("/dev/video10") or os.path.exists("/dev/video11")
+
+    async def start_mjpeg_stream(self, rtsp_url: str, stream_id: Optional[str] = None,
+                                  fps: int = 10, quality: int = 5) -> str:
         """
-        Start converting an RTSP stream to HLS.
+        Start an RTSP to MJPEG stream.
 
         Args:
             rtsp_url: The RTSP URL to convert
-            stream_id: Optional stream ID (auto-generated if not provided)
+            stream_id: Optional stream ID
+            fps: Target frame rate (default: 10)
+            quality: JPEG quality (2=best, 31=worst, default: 5)
 
         Returns:
             The stream ID
-
-        Raises:
-            RuntimeError: If FFmpeg is not available or stream fails to start
         """
         if not self._ffmpeg_path:
-            raise RuntimeError("FFmpeg is not installed. Please install FFmpeg to use RTSP streaming.")
+            raise RuntimeError("FFmpeg is not installed.")
 
-        # Generate or validate stream ID
         if stream_id is None:
             stream_id = str(uuid.uuid4())[:8]
 
-        # Check if stream already exists
+        # Stop existing stream with same ID
+        if stream_id in self.streams:
+            await self.stop_stream(stream_id)
+
+        stream_info = StreamInfo(
+            stream_id=stream_id,
+            rtsp_url=rtsp_url,
+            mode="mjpeg",
+            started_at=time.time(),
+            last_accessed=time.time(),
+            _frame_event=asyncio.Event(),
+        )
+        self.streams[stream_id] = stream_info
+
+        try:
+            await self._start_mjpeg_ffmpeg(stream_info, fps, quality)
+            logger.info(f"Started MJPEG stream {stream_id} from {rtsp_url}")
+        except Exception as e:
+            stream_info.status = "error"
+            stream_info.error = str(e)
+            logger.error(f"Failed to start MJPEG stream {stream_id}: {e}")
+            raise
+
+        return stream_id
+
+    async def _start_mjpeg_ffmpeg(self, stream_info: StreamInfo, fps: int, quality: int):
+        """Start FFmpeg for MJPEG output to pipe"""
+        cmd = [self._ffmpeg_path]
+
+        # Hardware acceleration on Raspberry Pi
+        if self._has_v4l2m2m:
+            cmd.extend(["-hwaccel", "v4l2m2m"])
+
+        cmd.extend([
+            "-rtsp_transport", "tcp",
+            "-fflags", "nobuffer",
+            "-flags", "low_delay",
+            "-analyzeduration", "1000000",  # Reduce stream analysis to 1 second
+            "-probesize", "500000",  # Reduce probe size for faster startup
+            "-i", stream_info.rtsp_url,
+            "-f", "image2pipe",
+            "-c:v", "mjpeg",
+            "-q:v", str(quality),
+            "-r", str(fps),
+            "-an",  # No audio
+            "-flush_packets", "1",
+            "pipe:1",
+        ])
+
+        logger.info(f"Starting FFmpeg MJPEG: {' '.join(cmd)}")
+
+        stream_info.process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        # Drain stderr concurrently to prevent pipe buffer deadlock.
+        # On macOS the pipe buffer is only 4-16KB; if ffmpeg fills it
+        # with connection/codec info, it blocks and stops producing frames.
+        asyncio.create_task(self._drain_stderr(stream_info))
+
+        # Start reading frames in background
+        stream_info._reader_task = asyncio.create_task(
+            self._read_mjpeg_frames(stream_info)
+        )
+
+        # Startup timeout: kill ffmpeg if no frame within 15 seconds
+        asyncio.create_task(self._startup_timeout(stream_info, timeout=15))
+
+    async def _startup_timeout(self, stream_info: StreamInfo, timeout: int = 15):
+        """Kill ffmpeg if it doesn't produce a frame within timeout seconds"""
+        await asyncio.sleep(timeout)
+        if stream_info.status == "starting":
+            logger.error(
+                f"MJPEG stream {stream_info.stream_id}: no frames after {timeout}s, "
+                f"killing ffmpeg. RTSP URL may be unreachable: {stream_info.rtsp_url}"
+            )
+            if stream_info.process and stream_info.process.returncode is None:
+                stream_info.process.kill()
+
+    async def _drain_stderr(self, stream_info: StreamInfo):
+        """Read and log ffmpeg stderr to prevent pipe buffer from filling up"""
+        stderr_lines = []
+        try:
+            while True:
+                line = await stream_info.process.stderr.readline()
+                if not line:
+                    break
+                text = line.decode(errors="replace").rstrip()
+                if text:
+                    stderr_lines.append(text)
+                    logger.info(f"ffmpeg [{stream_info.stream_id}]: {text}")
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass
+        # Store last stderr for error reporting
+        if stderr_lines:
+            stream_info._stderr_output = "\n".join(stderr_lines[-20:])
+
+    async def _read_mjpeg_frames(self, stream_info: StreamInfo):
+        """Read JPEG frames from ffmpeg stdout pipe"""
+        buffer = b''
+        frame_start = -1
+
+        try:
+            while True:
+                chunk = await stream_info.process.stdout.read(65536)
+                if not chunk:
+                    break
+
+                buffer += chunk
+
+                # Find complete JPEG frames in buffer
+                while True:
+                    # Find SOI marker
+                    if frame_start < 0:
+                        soi_pos = buffer.find(JPEG_SOI)
+                        if soi_pos < 0:
+                            # No SOI found, discard buffer up to last byte
+                            buffer = buffer[-1:] if buffer else b''
+                            break
+                        frame_start = soi_pos
+
+                    # Find EOI marker after frame_start
+                    eoi_pos = buffer.find(JPEG_EOI, frame_start + 2)
+                    if eoi_pos < 0:
+                        # No complete frame yet, trim buffer
+                        if frame_start > 0:
+                            buffer = buffer[frame_start:]
+                            frame_start = 0
+                        break
+
+                    # Extract complete JPEG frame
+                    frame_end = eoi_pos + 2
+                    frame = buffer[frame_start:frame_end]
+
+                    # Update latest frame
+                    stream_info._latest_frame = frame
+                    stream_info._frame_event.set()
+                    stream_info._frame_event.clear()
+
+                    if stream_info.status == "starting":
+                        stream_info.status = "running"
+                        logger.info(f"MJPEG stream {stream_info.stream_id}: first frame received ({len(frame)} bytes)")
+
+                    # Advance buffer past this frame
+                    buffer = buffer[frame_end:]
+                    frame_start = -1
+
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"MJPEG reader error for {stream_info.stream_id}: {e}")
+            stream_info.error = str(e)
+            stream_info.status = "error"
+        finally:
+            if stream_info.status == "starting":
+                # ffmpeg exited without producing any frames
+                stderr_msg = getattr(stream_info, '_stderr_output', '')
+                stream_info.error = stderr_msg or "Stream failed to produce frames"
+                stream_info.status = "error"
+                logger.error(f"MJPEG stream {stream_info.stream_id} failed: {stream_info.error}")
+            elif stream_info.status == "running":
+                stream_info.status = "stopped"
+            logger.info(f"MJPEG reader stopped for {stream_info.stream_id}")
+
+    async def get_mjpeg_frames(self, stream_id: str) -> AsyncGenerator[bytes, None]:
+        """
+        Async generator yielding MJPEG frames for HTTP streaming.
+
+        Yields frames in multipart/x-mixed-replace format.
+        """
+        stream_info = self.streams.get(stream_id)
+        if not stream_info or stream_info.mode != "mjpeg":
+            return
+
+        stream_info.last_accessed = time.time()
+        last_frame = None
+
+        while stream_info.status in ("starting", "running"):
+            # Wait for a new frame or timeout
+            try:
+                await asyncio.wait_for(
+                    self._wait_for_frame(stream_info, last_frame),
+                    timeout=5.0
+                )
+            except asyncio.TimeoutError:
+                if stream_info.status != "running":
+                    break
+                continue
+
+            frame = stream_info._latest_frame
+            if frame and frame is not last_frame:
+                last_frame = frame
+                stream_info.last_accessed = time.time()
+                # Yield as multipart chunk
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n"
+                    b"Content-Length: " + str(len(frame)).encode() + b"\r\n"
+                    b"\r\n" + frame + b"\r\n"
+                )
+
+    async def _wait_for_frame(self, stream_info: StreamInfo, last_frame):
+        """Wait until a new frame is available"""
+        while stream_info._latest_frame is last_frame and stream_info.status in ("starting", "running"):
+            await asyncio.sleep(0.01)
+
+    # ========== HLS mode (kept for backward compatibility) ==========
+
+    async def start_stream(self, rtsp_url: str, stream_id: Optional[str] = None) -> str:
+        """Start converting an RTSP stream to HLS."""
+        if not self._ffmpeg_path:
+            raise RuntimeError("FFmpeg is not installed.")
+
+        if stream_id is None:
+            stream_id = str(uuid.uuid4())[:8]
+
         if stream_id in self.streams:
             existing = self.streams[stream_id]
             if existing.status == "running":
-                logger.info(f"Stream {stream_id} already running")
                 return stream_id
             else:
-                # Clean up old stream
                 await self.stop_stream(stream_id)
 
-        # Create output directory
         hls_dir = self.output_base_dir / stream_id
         hls_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create stream info
-        import time
         stream_info = StreamInfo(
             stream_id=stream_id,
             rtsp_url=rtsp_url,
             hls_dir=hls_dir,
+            mode="hls",
             started_at=time.time(),
             last_accessed=time.time(),
         )
         self.streams[stream_id] = stream_info
 
-        # Start FFmpeg process
         try:
-            await self._start_ffmpeg(stream_info)
-            logger.info(f"Started stream {stream_id} from {rtsp_url}")
+            await self._start_hls_ffmpeg(stream_info)
         except Exception as e:
             stream_info.status = "error"
             stream_info.error = str(e)
-            logger.error(f"Failed to start stream {stream_id}: {e}")
             raise
 
         return stream_id
 
-    async def _start_ffmpeg(self, stream_info: StreamInfo):
-        """Start the FFmpeg process for HLS conversion"""
+    async def _start_hls_ffmpeg(self, stream_info: StreamInfo):
+        """Start FFmpeg for HLS output"""
         hls_output = stream_info.hls_dir / "index.m3u8"
 
-        # FFmpeg command for RTSP to HLS conversion
-        # -rtsp_transport tcp: Use TCP for more reliable RTSP
-        # -fflags nobuffer: Reduce buffering for lower latency
-        # -flags low_delay: Low delay mode
-        # -hls_time 1: 1 second segments
-        # -hls_list_size 3: Keep only 3 segments in playlist
-        # -hls_flags delete_segments: Delete old segments
-        # -start_number 0: Start segment numbering from 0
         cmd = [
             self._ffmpeg_path,
             "-rtsp_transport", "tcp",
             "-fflags", "nobuffer",
             "-flags", "low_delay",
             "-i", stream_info.rtsp_url,
-            "-c:v", "copy",  # Copy video codec (no re-encoding for speed)
-            "-c:a", "aac",   # Convert audio to AAC
+            "-c:v", "copy",
+            "-c:a", "aac",
             "-f", "hls",
             "-hls_time", "1",
             "-hls_list_size", "3",
@@ -151,74 +364,62 @@ class StreamProxy:
             str(hls_output),
         ]
 
-        logger.debug(f"Starting FFmpeg: {' '.join(cmd)}")
-
         stream_info.process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
 
-        # Monitor the process in the background
         asyncio.create_task(self._monitor_process(stream_info))
 
-        # Wait for HLS file to be generated
-        # FFmpeg writes to .tmp first, then renames, so check for .ts segments too
-        hls_output = stream_info.hls_dir / "index.m3u8"
-        max_wait = 15  # seconds
+        # Wait for HLS file
+        max_wait = 15
         for i in range(max_wait * 2):
             await asyncio.sleep(0.5)
-
-            # Check if process exited
             if stream_info.process.returncode is not None:
                 stderr = await stream_info.process.stderr.read()
                 raise RuntimeError(f"FFmpeg exited: {stderr.decode()}")
-
-            # Check if m3u8 file exists OR if .ts segments are being written
             ts_files = list(stream_info.hls_dir.glob("*.ts"))
             if hls_output.exists() or len(ts_files) > 0:
-                # Wait a bit more for m3u8 to be finalized
                 if not hls_output.exists():
                     await asyncio.sleep(1)
                 stream_info.status = "running"
                 return
 
-        # Timeout - kill process and report error
         stream_info.process.terminate()
-        raise RuntimeError(f"Timeout waiting for HLS stream to start. Check RTSP URL: {stream_info.rtsp_url}")
+        raise RuntimeError(f"Timeout waiting for HLS stream: {stream_info.rtsp_url}")
 
     async def _monitor_process(self, stream_info: StreamInfo):
-        """Monitor FFmpeg process and handle exit"""
+        """Monitor FFmpeg process"""
         if not stream_info.process:
             return
-
         stdout, stderr = await stream_info.process.communicate()
-
         if stream_info.process.returncode != 0:
             error_msg = stderr.decode() if stderr else "Unknown error"
             logger.error(f"Stream {stream_info.stream_id} FFmpeg error: {error_msg}")
             stream_info.status = "error"
             stream_info.error = error_msg
         else:
-            logger.info(f"Stream {stream_info.stream_id} stopped normally")
             stream_info.status = "stopped"
 
+    # ========== Common methods ==========
+
     async def stop_stream(self, stream_id: str) -> bool:
-        """
-        Stop a running stream.
-
-        Args:
-            stream_id: The stream ID to stop
-
-        Returns:
-            True if stream was stopped, False if not found
-        """
+        """Stop a running stream"""
         if stream_id not in self.streams:
             return False
 
         stream_info = self.streams[stream_id]
 
-        # Terminate FFmpeg process
+        # Cancel reader task
+        if stream_info._reader_task and not stream_info._reader_task.done():
+            stream_info._reader_task.cancel()
+            try:
+                await stream_info._reader_task
+            except asyncio.CancelledError:
+                pass
+
+        # Terminate FFmpeg
         if stream_info.process and stream_info.process.returncode is None:
             stream_info.process.terminate()
             try:
@@ -228,68 +429,55 @@ class StreamProxy:
                 await stream_info.process.wait()
 
         # Clean up HLS files
-        if stream_info.hls_dir.exists():
+        if stream_info.hls_dir and stream_info.hls_dir.exists():
             shutil.rmtree(stream_info.hls_dir, ignore_errors=True)
 
-        # Remove from tracking
         del self.streams[stream_id]
-
         logger.info(f"Stopped stream {stream_id}")
         return True
 
     def get_stream_info(self, stream_id: str) -> Optional[StreamInfo]:
-        """Get information about a stream"""
         return self.streams.get(stream_id)
 
     def get_hls_path(self, stream_id: str) -> Optional[Path]:
-        """Get the HLS playlist path for a stream"""
-        stream_info = self.streams.get(stream_id)
-        if stream_info and stream_info.status == "running":
-            return stream_info.hls_dir / "index.m3u8"
+        info = self.streams.get(stream_id)
+        if info and info.mode == "hls" and info.status == "running":
+            return info.hls_dir / "index.m3u8"
         return None
 
     def get_stream_file(self, stream_id: str, filename: str) -> Optional[Path]:
-        """Get the path to a stream file (playlist or segment)"""
-        stream_info = self.streams.get(stream_id)
-        if stream_info:
-            file_path = stream_info.hls_dir / filename
+        info = self.streams.get(stream_id)
+        if info and info.hls_dir:
+            file_path = info.hls_dir / filename
             if file_path.exists():
                 return file_path
         return None
 
     def list_streams(self) -> Dict[str, dict]:
-        """List all active streams"""
         return {
             sid: {
                 "stream_id": info.stream_id,
                 "rtsp_url": info.rtsp_url,
                 "status": info.status,
+                "mode": info.mode,
                 "error": info.error,
             }
             for sid, info in self.streams.items()
         }
 
     async def cleanup_idle_streams(self, max_idle_seconds: int = 300):
-        """Clean up streams that haven't been accessed recently"""
-        import time
         now = time.time()
-
-        to_stop = []
-        for stream_id, info in self.streams.items():
-            if now - info.last_accessed > max_idle_seconds:
-                to_stop.append(stream_id)
-
+        to_stop = [
+            sid for sid, info in self.streams.items()
+            if now - info.last_accessed > max_idle_seconds
+        ]
         for stream_id in to_stop:
             logger.info(f"Cleaning up idle stream: {stream_id}")
             await self.stop_stream(stream_id)
 
     async def stop_all(self):
-        """Stop all active streams"""
-        stream_ids = list(self.streams.keys())
-        for stream_id in stream_ids:
+        for stream_id in list(self.streams.keys()):
             await self.stop_stream(stream_id)
-
-        logger.info("All streams stopped")
 
 
 # Global instance
@@ -297,7 +485,6 @@ _stream_proxy: Optional[StreamProxy] = None
 
 
 def get_stream_proxy() -> StreamProxy:
-    """Get the global stream proxy instance"""
     global _stream_proxy
     if _stream_proxy is None:
         _stream_proxy = StreamProxy()

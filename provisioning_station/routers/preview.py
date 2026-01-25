@@ -13,7 +13,7 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 from ..services.stream_proxy import get_stream_proxy
@@ -37,6 +37,21 @@ class StartStreamResponse(BaseModel):
     """Response from starting a stream"""
     stream_id: str
     hls_url: str
+    status: str
+
+
+class StartMjpegRequest(BaseModel):
+    """Request to start an MJPEG stream"""
+    rtsp_url: str
+    stream_id: Optional[str] = None
+    fps: int = 10
+    quality: int = 5
+
+
+class StartMjpegResponse(BaseModel):
+    """Response from starting an MJPEG stream"""
+    stream_id: str
+    mjpeg_url: str
     status: str
 
 
@@ -85,6 +100,66 @@ async def start_stream(request: StartStreamRequest):
     except Exception as e:
         logger.error(f"Failed to start stream: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to start stream: {str(e)}")
+
+
+# ============================================
+# MJPEG Stream Endpoints
+# ============================================
+
+@router.post("/mjpeg/start", response_model=StartMjpegResponse)
+async def start_mjpeg_stream(request: StartMjpegRequest):
+    """
+    Start an RTSP to MJPEG stream proxy.
+
+    Returns a stream_id and the URL to fetch the MJPEG stream from.
+    """
+    try:
+        proxy = get_stream_proxy()
+        stream_id = await proxy.start_mjpeg_stream(
+            rtsp_url=request.rtsp_url,
+            stream_id=request.stream_id,
+            fps=request.fps,
+            quality=request.quality,
+        )
+
+        return StartMjpegResponse(
+            stream_id=stream_id,
+            mjpeg_url=f"/api/preview/mjpeg/{stream_id}",
+            status="starting",
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to start MJPEG stream: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start stream: {str(e)}")
+
+
+@router.get("/mjpeg/{stream_id}")
+async def get_mjpeg_stream(stream_id: str):
+    """
+    MJPEG streaming endpoint.
+
+    Returns a multipart/x-mixed-replace stream of JPEG frames.
+    Set this URL as the src of an <img> element for live video.
+    """
+    proxy = get_stream_proxy()
+    info = proxy.get_stream_info(stream_id)
+
+    if not info:
+        raise HTTPException(status_code=404, detail=f"Stream {stream_id} not found")
+
+    if info.mode != "mjpeg":
+        raise HTTPException(status_code=400, detail="Stream is not in MJPEG mode")
+
+    return StreamingResponse(
+        proxy.get_mjpeg_frames(stream_id),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
 
 
 @router.post("/stream/{stream_id}/stop")

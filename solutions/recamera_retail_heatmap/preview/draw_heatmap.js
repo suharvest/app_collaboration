@@ -21,7 +21,7 @@
  *   }]
  * }
  *
- * Variables: ctx, data, canvas, video (provided by PreviewWindow)
+ * Variables: ctx, data, canvas, img (provided by PreviewWindow)
  */
 
 // ========== Configuration ==========
