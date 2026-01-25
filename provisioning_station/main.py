@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .config import settings
-from .routers import solutions, devices, deployments, websocket, versions, device_management, preview, docker_devices
+from .routers import solutions, devices, deployments, websocket, versions, device_management, preview, docker_devices, restore
 from .services.solution_manager import solution_manager
 from .services.stream_proxy import get_stream_proxy
 from .services.mqtt_bridge import get_mqtt_bridge, is_mqtt_available
@@ -76,6 +76,7 @@ app.include_router(versions.router)
 app.include_router(device_management.router)
 app.include_router(preview.router)
 app.include_router(docker_devices.router)
+app.include_router(restore.router)
 
 # Serve static frontend files
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
@@ -99,12 +100,37 @@ async def health_check():
 
 def main():
     """CLI entry point"""
+    import argparse
     import uvicorn
+
+    parser = argparse.ArgumentParser(
+        description="SenseCraft Solution Provisioning Station"
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=settings.port,
+        help=f"Port to listen on (default: {settings.port})"
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default=settings.host,
+        help=f"Host to bind to (default: {settings.host})"
+    )
+    parser.add_argument(
+        "--reload",
+        action="store_true",
+        default=settings.debug,
+        help="Enable auto-reload (for development)"
+    )
+    args = parser.parse_args()
+
     uvicorn.run(
         "provisioning_station.main:app",
-        host=settings.host,
-        port=settings.port,
-        reload=settings.debug,
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
     )
 
 
