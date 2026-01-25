@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Seeed Green Gradient -->
+    <linearGradient id="seedGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9ED54A"/>
+      <stop offset="100%" style="stop-color:#6BA834"/>
+    </linearGradient>
+
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+
+    <!-- Glow Effect -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect x="64" y="64" width="896" height="896" rx="180" ry="180" fill="url(#bgGrad)"/>
+
+  <!-- Outer ring - connectivity symbol -->
+  <circle cx="512" cy="512" r="320" fill="none" stroke="url(#seedGreen)" stroke-width="24" opacity="0.3"/>
+
+  <!-- Middle ring -->
+  <circle cx="512" cy="512" r="240" fill="none" stroke="url(#seedGreen)" stroke-width="20" opacity="0.5"/>
+
+  <!-- Inner ring -->
+  <circle cx="512" cy="512" r="160" fill="none" stroke="url(#seedGreen)" stroke-width="16" opacity="0.7"/>
+
+  <!-- Central hexagon - represents IoT hub/solution -->
+  <polygon
+    points="512,352 651,432 651,592 512,672 373,592 373,432"
+    fill="url(#seedGreen)"
+    filter="url(#glow)"/>
+
+  <!-- S letter in center - for SenseCraft -->
+  <path
+    d="M480,480 Q480,450 510,450 L545,450 Q575,450 575,480 Q575,510 545,510 L480,510 Q450,510 450,540 Q450,570 480,570 L545,570"
+    fill="none"
+    stroke="#1a1a2e"
+    stroke-width="28"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <!-- Connection nodes around the hexagon -->
+  <g fill="url(#seedGreen)" filter="url(#glow)">
+    <!-- Top -->
+    <circle cx="512" cy="280" r="28"/>
+    <!-- Top Right -->
+    <circle cx="713" cy="396" r="28"/>
+    <!-- Bottom Right -->
+    <circle cx="713" cy="628" r="28"/>
+    <!-- Bottom -->
+    <circle cx="512" cy="744" r="28"/>
+    <!-- Bottom Left -->
+    <circle cx="311" cy="628" r="28"/>
+    <!-- Top Left -->
+    <circle cx="311" cy="396" r="28"/>
+  </g>
+
+  <!-- Connection lines from center to nodes -->
+  <g stroke="url(#seedGreen)" stroke-width="6" opacity="0.6">
+    <line x1="512" y1="352" x2="512" y2="308"/>
+    <line x1="651" y1="432" x2="685" y2="410"/>
+    <line x1="651" y1="592" x2="685" y2="614"/>
+    <line x1="512" y1="672" x2="512" y2="716"/>
+    <line x1="373" y1="592" x2="339" y2="614"/>
+    <line x1="373" y1="432" x2="339" y2="410"/>
+  </g>
+</svg>

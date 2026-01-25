@@ -1,0 +1,30 @@
+[package]
+name = "sensecraft-solution"
+version = "1.0.0"
+description = "IoT Solution Provisioning Platform for Seeed Studio products"
+authors = ["Seeed Studio"]
+license = "MIT"
+repository = "https://github.com/seeed-studio/sensecraft-solution"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-shell = "2"
+tauri-plugin-process = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+portpicker = "0.1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json"] }
+log = "0.4"
+env_logger = "0.11"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
