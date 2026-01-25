@@ -13,6 +13,7 @@ import { renderSolutionDetailPage } from './pages/solution-detail.js';
 import { renderDeployPage, cleanupDeployPage } from './pages/deploy.js';
 import { renderDeploymentsPage } from './pages/deployments.js';
 import { renderDevicesPage } from './pages/devices.js';
+import { renderManagementPage } from './pages/solution-management.js';
 import { renderSettingsPage } from './pages/settings.js';
 
 // Initialize application
@@ -63,6 +64,7 @@ function setupRouter() {
     .register('deploy', renderDeployPage)
     .register('devices', renderDevicesPage)
     .register('deployments', renderDeploymentsPage)
+    .register('management', renderManagementPage)
     .register('settings', renderSettingsPage);
 
   // Before each navigation
@@ -91,6 +93,7 @@ function updatePageTitle(route) {
     deploy: 'deploy.title',
     devices: 'nav.devices',
     deployments: 'nav.deployments',
+    management: 'nav.management',
     settings: 'nav.settings',
   };
 

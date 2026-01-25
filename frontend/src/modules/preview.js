@@ -261,8 +261,17 @@ export class PreviewWindow {
    * Start reading MJPEG frames from the streaming endpoint
    */
   _startMjpegReader(url) {
-    fetch(url, { signal: this._abortController.signal })
+    // In dev mode, bypass Vite proxy and connect directly to backend
+    // Vite proxy doesn't support streaming responses properly
+    let fullUrl = url;
+    if (window.location.port === '5173') {
+      // Dev mode: connect directly to backend at port 3260
+      fullUrl = `http://${window.location.hostname}:3260${url}`;
+    }
+    console.log('[MJPEG] Starting fetch:', fullUrl);
+    fetch(fullUrl, { signal: this._abortController.signal, mode: 'cors' })
       .then(response => {
+        console.log('[MJPEG] Response:', response.status, response.headers.get('content-type'));
         if (!response.ok) {
           throw new Error(`Stream request failed: ${response.status}`);
         }
@@ -282,17 +291,25 @@ export class PreviewWindow {
    */
   async _readMjpegFrames(reader) {
     let buffer = new Uint8Array(0);
+    let frameCount = 0;
 
     try {
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log('[MJPEG] Stream ended');
+          break;
+        }
 
         // Append chunk to buffer
         const newBuffer = new Uint8Array(buffer.length + value.length);
         newBuffer.set(buffer);
         newBuffer.set(value, buffer.length);
         buffer = newBuffer;
+
+        if (frameCount === 0) {
+          console.log('[MJPEG] First chunk received:', value.length, 'bytes, buffer now:', buffer.length);
+        }
 
         // Find complete JPEG frames (SOI: 0xFF 0xD8, EOI: 0xFF 0xD9)
         while (true) {
@@ -305,6 +322,11 @@ export class PreviewWindow {
           // Extract complete JPEG frame
           const frameEnd = eoiIdx + 2;
           const frame = buffer.slice(soiIdx, frameEnd);
+
+          frameCount++;
+          if (frameCount <= 3) {
+            console.log(`[MJPEG] Frame ${frameCount}: ${frame.length} bytes, SOI@${soiIdx}, EOI@${eoiIdx}`);
+          }
 
           // Display frame as blob URL
           const blob = new Blob([frame], { type: 'image/jpeg' });
@@ -444,7 +466,8 @@ export class PreviewWindow {
     }
 
     const ctx = this.canvas.getContext('2d');
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    // Note: Don't clear canvas here - overlay script handles its own clearing
+    // via double buffering to prevent flicker
 
     try {
       this.overlayRenderer(ctx, data, this.canvas, this.img);
@@ -469,6 +492,7 @@ export class PreviewWindow {
 
   /**
    * Resize canvas to match video or container
+   * Only updates dimensions if they actually changed (to avoid clearing canvas)
    */
   _resizeCanvas() {
     if (!this.canvas) return;
@@ -477,8 +501,15 @@ export class PreviewWindow {
     const rect = (this.img && this.img.naturalWidth)
       ? this.img.getBoundingClientRect()
       : this.canvas.getBoundingClientRect();
-    this.canvas.width = rect.width;
-    this.canvas.height = rect.height;
+
+    const newWidth = Math.round(rect.width);
+    const newHeight = Math.round(rect.height);
+
+    // Only set dimensions if changed - setting canvas.width/height clears it!
+    if (this.canvas.width !== newWidth || this.canvas.height !== newHeight) {
+      this.canvas.width = newWidth;
+      this.canvas.height = newHeight;
+    }
   }
 
   /**
