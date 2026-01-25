@@ -1,9 +1,12 @@
 """
-Docker device management service - SSH-based container management
+Docker device management service - Local and SSH-based container management
 """
 
+import asyncio
 import json
 import logging
+import socket
+import subprocess
 from typing import Dict, Any, List, Optional
 
 from ..models.docker_device import (
@@ -11,13 +14,219 @@ from ..models.docker_device import (
     ContainerInfo,
     DeviceInfo,
     UpgradeRequest,
+    ManagedApp,
+    ManagedAppContainer,
 )
+from ..utils.compose_labels import LABELS, parse_container_labels
 
 logger = logging.getLogger(__name__)
 
 
 class DockerDeviceManager:
-    """Manages Docker containers on remote devices via SSH"""
+    """Manages Docker containers on local and remote devices"""
+
+    # ============================================
+    # Local Docker Management
+    # ============================================
+
+    async def check_local_docker(self) -> DeviceInfo:
+        """Check if Docker is available locally"""
+        try:
+            # Get Docker version
+            result = await asyncio.to_thread(
+                subprocess.run,
+                ["docker", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode != 0:
+                raise RuntimeError("Docker not available")
+
+            docker_version = result.stdout.strip().replace("Docker version ", "").split(",")[0]
+
+            # Get hostname
+            hostname = socket.gethostname()
+
+            return DeviceInfo(
+                hostname=hostname,
+                docker_version=docker_version,
+                os_info="Local Machine",
+            )
+        except FileNotFoundError:
+            raise RuntimeError("Docker is not installed")
+        except Exception as e:
+            logger.error(f"Local Docker check failed: {e}")
+            raise RuntimeError(f"Docker check failed: {str(e)}")
+
+    async def list_local_containers(self) -> List[ContainerInfo]:
+        """List all Docker containers on local machine"""
+        try:
+            result = await asyncio.to_thread(
+                subprocess.run,
+                [
+                    "docker", "ps", "-a", "--format",
+                    '{"id":"{{.ID}}","name":"{{.Names}}","image":"{{.Image}}","status":"{{.Status}}","ports":"{{.Ports}}","labels":"{{.Labels}}"}'
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            if result.returncode != 0:
+                raise RuntimeError(f"Docker command failed: {result.stderr}")
+
+            containers = []
+            output = result.stdout.strip()
+            if not output:
+                return containers
+
+            for line in output.split("\n"):
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line)
+                    image = data.get("image", "")
+                    if ":" in image:
+                        image_name, tag = image.rsplit(":", 1)
+                    else:
+                        image_name = image
+                        tag = "latest"
+
+                    raw_status = data.get("status", "").lower()
+                    if "up" in raw_status:
+                        status = "running"
+                    elif "exited" in raw_status:
+                        status = "exited"
+                    else:
+                        status = "stopped"
+
+                    ports_str = data.get("ports", "")
+                    ports = [p.strip() for p in ports_str.split(",") if p.strip()] if ports_str else []
+
+                    labels_str = data.get("labels", "")
+                    labels = {}
+                    if labels_str:
+                        for pair in labels_str.split(","):
+                            if "=" in pair:
+                                k, v = pair.split("=", 1)
+                                labels[k] = v
+
+                    containers.append(ContainerInfo(
+                        container_id=data.get("id", ""),
+                        name=data.get("name", ""),
+                        image=image_name,
+                        current_tag=tag,
+                        status=status,
+                        ports=ports,
+                        labels=labels,
+                    ))
+                except json.JSONDecodeError:
+                    continue
+
+            return containers
+
+        except FileNotFoundError:
+            raise RuntimeError("Docker is not installed")
+        except Exception as e:
+            logger.error(f"Failed to list local containers: {e}")
+            raise RuntimeError(f"Failed to list containers: {str(e)}")
+
+    async def list_local_managed_apps(self) -> List[ManagedApp]:
+        """List SenseCraft-managed applications on local machine, grouped by solution"""
+        containers = await self.list_local_containers()
+        return self._group_containers_by_solution(containers)
+
+    def _group_containers_by_solution(self, containers: List[ContainerInfo]) -> List[ManagedApp]:
+        """Group containers by solution_id into ManagedApp objects"""
+        # Group containers by solution_id
+        solution_groups: Dict[str, Dict[str, Any]] = {}
+
+        for container in containers:
+            sensecraft_meta = parse_container_labels(container.labels or {})
+            if not sensecraft_meta:
+                continue
+
+            solution_id = sensecraft_meta.get("solution_id")
+            if not solution_id:
+                continue
+
+            if solution_id not in solution_groups:
+                solution_groups[solution_id] = {
+                    "solution_id": solution_id,
+                    "solution_name": sensecraft_meta.get("solution_name"),
+                    "device_id": sensecraft_meta.get("device_id"),
+                    "deployed_at": sensecraft_meta.get("deployed_at"),
+                    "containers": [],
+                    "ports": [],
+                    "statuses": [],
+                }
+
+            group = solution_groups[solution_id]
+            group["containers"].append(ManagedAppContainer(
+                container_id=container.container_id,
+                container_name=container.name,
+                image=container.image,
+                tag=container.current_tag,
+                status=container.status,
+                ports=container.ports,
+            ))
+            group["ports"].extend(container.ports)
+            group["statuses"].append(container.status)
+
+        # Convert to ManagedApp list
+        managed_apps = []
+        for group in solution_groups.values():
+            # Determine aggregated status: running if any container running
+            statuses = group["statuses"]
+            if "running" in statuses:
+                status = "running"
+            elif "exited" in statuses:
+                status = "exited"
+            else:
+                status = "stopped"
+
+            managed_apps.append(ManagedApp(
+                solution_id=group["solution_id"],
+                solution_name=group["solution_name"],
+                device_id=group["device_id"],
+                deployed_at=group["deployed_at"],
+                status=status,
+                containers=group["containers"],
+                ports=list(set(group["ports"])),  # Deduplicate ports
+            ))
+
+        return managed_apps
+
+    async def local_container_action(self, container_name: str, action: str) -> Dict[str, Any]:
+        """Perform action on a local container (start/stop/restart)"""
+        if action not in ("start", "stop", "restart"):
+            raise ValueError(f"Invalid action: {action}")
+
+        try:
+            result = await asyncio.to_thread(
+                subprocess.run,
+                ["docker", action, container_name],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            if result.returncode != 0:
+                raise RuntimeError(f"Action failed: {result.stderr}")
+
+            return {
+                "success": True,
+                "message": f"Container {container_name} {action}ed successfully",
+                "output": result.stdout,
+            }
+        except Exception as e:
+            logger.error(f"Local container action {action} failed: {e}")
+            raise RuntimeError(f"Action failed: {str(e)}")
+
+    # ============================================
+    # Remote Docker Management (SSH)
+    # ============================================
 
     def _get_ssh_client(self, connection: ConnectDeviceRequest):
         """Create and connect an SSH client"""
@@ -80,10 +289,10 @@ class DockerDeviceManager:
         try:
             client = self._get_ssh_client(connection)
             try:
-                # Get container list in JSON format
+                # Get container list in JSON format with labels
                 output = self._exec_command(
                     client,
-                    'docker ps -a --format \'{"id":"{{.ID}}","name":"{{.Names}}","image":"{{.Image}}","status":"{{.Status}}","ports":"{{.Ports}}"}\''
+                    'docker ps -a --format \'{"id":"{{.ID}}","name":"{{.Names}}","image":"{{.Image}}","status":"{{.Status}}","ports":"{{.Ports}}","labels":"{{.Labels}}"}\''
                 )
 
                 containers = []
@@ -116,6 +325,15 @@ class DockerDeviceManager:
                         ports_str = data.get("ports", "")
                         ports = [p.strip() for p in ports_str.split(",") if p.strip()] if ports_str else []
 
+                        # Parse labels
+                        labels_str = data.get("labels", "")
+                        labels = {}
+                        if labels_str:
+                            for pair in labels_str.split(","):
+                                if "=" in pair:
+                                    k, v = pair.split("=", 1)
+                                    labels[k] = v
+
                         containers.append(ContainerInfo(
                             container_id=data.get("id", ""),
                             name=data.get("name", ""),
@@ -123,6 +341,7 @@ class DockerDeviceManager:
                             current_tag=tag,
                             status=status,
                             ports=ports,
+                            labels=labels,
                         ))
                     except json.JSONDecodeError:
                         continue
@@ -136,6 +355,11 @@ class DockerDeviceManager:
         except Exception as e:
             logger.error(f"Failed to list containers on {connection.host}: {e}")
             raise RuntimeError(f"Failed to list containers: {str(e)}")
+
+    async def list_managed_apps(self, connection: ConnectDeviceRequest) -> List[ManagedApp]:
+        """List only SenseCraft-managed applications on the device, grouped by solution"""
+        containers = await self.list_containers(connection)
+        return self._group_containers_by_solution(containers)
 
     async def upgrade(self, request: UpgradeRequest) -> Dict[str, Any]:
         """Upgrade a container using docker compose pull + up"""

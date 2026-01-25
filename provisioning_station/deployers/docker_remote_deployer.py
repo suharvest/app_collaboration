@@ -4,12 +4,15 @@ Remote Docker Compose deployment via SSH
 
 import asyncio
 import logging
+import os
+import tempfile
 from pathlib import Path
 from typing import Callable, Optional, Dict, Any
 
 from .base import BaseDeployer
 from ..models.device import DeviceConfig, SSHConfig
 from ..services.remote_pre_check import remote_pre_check
+from ..utils.compose_labels import create_labels, inject_labels_to_compose
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +55,11 @@ class DockerRemoteDeployer(BaseDeployer):
             "port": port,
             "username": username,
         }
+
+        # Store solution metadata for label injection
+        self._solution_id = connection.get("_solution_id")
+        self._solution_name = connection.get("_solution_name")
+        self._device_id = connection.get("_device_id")
         # Add defaults from user_inputs config
         if config.user_inputs:
             for user_input in config.user_inputs:
@@ -314,6 +322,8 @@ class DockerRemoteDeployer(BaseDeployer):
         progress_callback: Optional[Callable] = None,
     ) -> bool:
         """Upload compose files and related resources to remote"""
+        temp_files = []  # Track temp files for cleanup
+
         try:
             from scp import SCPClient
 
@@ -322,6 +332,15 @@ class DockerRemoteDeployer(BaseDeployer):
             if not compose_path or not Path(compose_path).exists():
                 logger.error(f"Compose file not found: {docker_config.compose_file}")
                 return False
+
+            # Create labels for injection
+            labels = None
+            if self._solution_id and self._device_id:
+                labels = create_labels(
+                    solution_id=self._solution_id,
+                    device_id=self._device_id,
+                    solution_name=self._solution_name,
+                )
 
             # If compose_dir is specified, upload entire directory
             if docker_config.compose_dir:
@@ -333,9 +352,10 @@ class DockerRemoteDeployer(BaseDeployer):
                     )
 
                     # Upload contents of directory (not the directory itself)
+                    # Labels will be injected to compose files during transfer
                     success = await asyncio.to_thread(
-                        self._transfer_directory_contents,
-                        client, compose_dir_path, remote_dir
+                        self._transfer_directory_contents_with_labels,
+                        client, compose_dir_path, remote_dir, labels
                     )
 
                     if not success:
@@ -344,17 +364,25 @@ class DockerRemoteDeployer(BaseDeployer):
                     logger.error(f"Compose directory not found: {docker_config.compose_dir}")
                     return False
             else:
-                # Upload just the compose file
+                # Upload just the compose file with labels injected
                 await self._report_progress(
                     progress_callback, "upload", 50,
                     f"Uploading: {docker_config.compose_file}"
                 )
 
                 remote_compose_path = f"{remote_dir}/docker-compose.yml"
-                success = await asyncio.to_thread(
-                    self._transfer_file,
-                    client, compose_path, remote_compose_path
-                )
+
+                # Inject labels before upload
+                if labels:
+                    success = await asyncio.to_thread(
+                        self._transfer_compose_with_labels,
+                        client, compose_path, remote_compose_path, labels
+                    )
+                else:
+                    success = await asyncio.to_thread(
+                        self._transfer_file,
+                        client, compose_path, remote_compose_path
+                    )
 
                 if not success:
                     return False
@@ -443,6 +471,83 @@ class DockerRemoteDeployer(BaseDeployer):
             return True
         except Exception as e:
             logger.error(f"Directory contents transfer failed: {e}")
+            return False
+
+    def _transfer_compose_with_labels(
+        self, client, local_path: str, remote_path: str, labels: Dict[str, str]
+    ) -> bool:
+        """Transfer compose file with labels injected"""
+        try:
+            from scp import SCPClient
+            import io
+
+            # Read and inject labels
+            with open(local_path, "r") as f:
+                original_content = f.read()
+
+            modified_content = inject_labels_to_compose(original_content, labels)
+
+            # Create a file-like object for SCP
+            with SCPClient(client.get_transport()) as scp:
+                # Write to temp file and upload
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.yml', delete=False) as tmp:
+                    tmp.write(modified_content)
+                    tmp_path = tmp.name
+
+                try:
+                    scp.put(tmp_path, remote_path)
+                finally:
+                    os.unlink(tmp_path)
+
+            logger.info(f"Uploaded compose file with labels to {remote_path}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Compose file transfer with labels failed: {e}")
+            return False
+
+    def _transfer_directory_contents_with_labels(
+        self, client, local_dir: str, remote_dir: str, labels: Optional[Dict[str, str]]
+    ) -> bool:
+        """Transfer directory contents, injecting labels into compose files"""
+        try:
+            from scp import SCPClient
+
+            local_path = Path(local_dir)
+            compose_names = {'docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml'}
+
+            with SCPClient(client.get_transport()) as scp:
+                for item in local_path.iterdir():
+                    remote_path = f"{remote_dir}/{item.name}"
+
+                    if item.is_file():
+                        # Check if it's a compose file that needs label injection
+                        if labels and item.name.lower() in compose_names:
+                            # Inject labels
+                            with open(item, "r") as f:
+                                original_content = f.read()
+                            modified_content = inject_labels_to_compose(original_content, labels)
+
+                            # Write to temp file and upload
+                            with tempfile.NamedTemporaryFile(mode='w', suffix='.yml', delete=False) as tmp:
+                                tmp.write(modified_content)
+                                tmp_path = tmp.name
+
+                            try:
+                                scp.put(tmp_path, remote_path)
+                            finally:
+                                os.unlink(tmp_path)
+
+                            logger.info(f"Uploaded compose file with labels: {item.name}")
+                        else:
+                            scp.put(str(item), remote_path)
+                    elif item.is_dir():
+                        scp.put(str(item), remote_dir, recursive=True)
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Directory contents transfer with labels failed: {e}")
             return False
 
     def _exec_with_timeout(
