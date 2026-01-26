@@ -12,29 +12,128 @@
 // Detect Tauri environment
 const isTauri = window.__TAURI__ !== undefined;
 
-// API base URL - Tauri mode uses dynamic port from backend sidecar
+// Backend port - will be set dynamically in Tauri mode
+let backendPort = null;
+
+// Initialize backend port for Tauri mode
+async function initBackendPort() {
+  if (!isTauri) return;
+
+  // First check if already injected
+  if (window.__BACKEND_PORT__) {
+    backendPort = window.__BACKEND_PORT__;
+    return;
+  }
+
+  // Try to get port via Tauri invoke command (Tauri 2 API)
+  try {
+    const invoke = window.__TAURI__?.core?.invoke;
+    if (invoke) {
+      const port = await invoke('get_backend_port');
+      if (port > 0) {
+        backendPort = port;
+        window.__BACKEND_PORT__ = port;
+        console.log('Got backend port via invoke:', port);
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to get backend port via invoke:', e);
+  }
+
+  // Wait for port to be injected (up to 5 seconds)
+  for (let i = 0; i < 50; i++) {
+    if (window.__BACKEND_PORT__) {
+      backendPort = window.__BACKEND_PORT__;
+      return;
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  // Fallback to default
+  console.warn('Backend port not available, using default 3260');
+  backendPort = 3260;
+}
+
+// Get the current backend port (sync version, may return cached or default)
+function getBackendPort() {
+  if (backendPort) return backendPort;
+  if (window.__BACKEND_PORT__) {
+    backendPort = window.__BACKEND_PORT__;
+    return backendPort;
+  }
+  return 3260; // fallback
+}
+
+// API base URL - computed dynamically for Tauri
+function getApiBaseUrl() {
+  if (isTauri) {
+    return `http://127.0.0.1:${getBackendPort()}/api`;
+  }
+  return '/api';
+}
+
+// Legacy constant for backwards compatibility (initialized on first use)
 let API_BASE = '/api';
 if (isTauri) {
-  const backendPort = window.__BACKEND_PORT__ || 3260;
-  API_BASE = `http://127.0.0.1:${backendPort}/api`;
+  // Initial value, will be updated when port is known
+  API_BASE = `http://127.0.0.1:${getBackendPort()}/api`;
 }
 
 // Export for use in WebSocket connections
 export function getApiBase() {
   if (isTauri) {
-    const backendPort = window.__BACKEND_PORT__ || 3260;
-    return `http://127.0.0.1:${backendPort}/api`;
+    return `http://127.0.0.1:${getBackendPort()}/api`;
   }
   return '/api';
 }
 
 export function getWsBase() {
   if (isTauri) {
-    const backendPort = window.__BACKEND_PORT__ || 3260;
-    return `ws://127.0.0.1:${backendPort}`;
+    return `ws://127.0.0.1:${getBackendPort()}`;
   }
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${window.location.host}`;
+}
+
+// Backend ready promise for Tauri mode
+let backendReadyPromise = null;
+let backendReady = !isTauri; // Non-Tauri is always ready
+
+// Initialize on module load
+if (isTauri) {
+  backendReadyPromise = initBackendPort().then(() => {
+    API_BASE = getApiBaseUrl();
+    console.log('Backend port initialized:', backendPort, 'API_BASE:', API_BASE);
+    backendReady = true;
+  });
+}
+
+// Wait for backend to be ready (for use in app initialization)
+export async function waitForBackendReady() {
+  if (!isTauri) return true;
+  if (backendReady) return true;
+  if (backendReadyPromise) {
+    await backendReadyPromise;
+  }
+
+  // Wait for backend health check to pass
+  const healthUrl = `http://127.0.0.1:${getBackendPort()}/api/health`;
+  for (let i = 0; i < 50; i++) {  // Up to 10 seconds
+    try {
+      const response = await fetch(healthUrl, { method: 'GET' });
+      if (response.ok) {
+        console.log('Backend health check passed');
+        return true;
+      }
+    } catch (e) {
+      // Backend not ready yet
+    }
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  console.warn('Backend health check timeout, proceeding anyway');
+  return backendReady;
 }
 
 // Request timeout in milliseconds
@@ -58,7 +157,9 @@ class ApiError extends Error {
 // ============================================
 
 async function request(endpoint, options = {}) {
-  const url = `${API_BASE}${endpoint}`;
+  // Use dynamic API base to handle Tauri port initialization
+  const apiBase = isTauri ? getApiBaseUrl() : '/api';
+  const url = `${apiBase}${endpoint}`;
 
   const config = {
     headers: {
@@ -233,7 +334,8 @@ export const solutionsApi = {
       formData.append('update_field', updateField);
     }
 
-    const url = `${API_BASE}/solutions/${solutionId}/assets`;
+    const apiBase = isTauri ? getApiBaseUrl() : '/api';
+    const url = `${apiBase}/solutions/${solutionId}/assets`;
     const response = await fetch(url, {
       method: 'POST',
       body: formData,
@@ -831,9 +933,20 @@ export function getAssetUrl(solutionId, path) {
   }
   // Handle paths that already include /api/
   if (path.startsWith('/api/')) {
+    // In Tauri mode, convert to full URL
+    if (isTauri) {
+      const backendPort = window.__BACKEND_PORT__ || 3260;
+      return `http://127.0.0.1:${backendPort}${path}`;
+    }
     return path;
   }
-  return `/api/solutions/${solutionId}/assets/${path}`;
+  // Build full asset URL
+  const assetPath = `/api/solutions/${solutionId}/assets/${path}`;
+  if (isTauri) {
+    const backendPort = window.__BACKEND_PORT__ || 3260;
+    return `http://127.0.0.1:${backendPort}${assetPath}`;
+  }
+  return assetPath;
 }
 
 /**

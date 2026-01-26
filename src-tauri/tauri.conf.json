@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../frontend/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "npm run dev --prefix ../frontend",
-    "beforeBuildCommand": "npm run build --prefix ../frontend"
+    "beforeDevCommand": "npm run dev --prefix frontend",
+    "beforeBuildCommand": "npm run build --prefix frontend"
   },
   "bundle": {
     "active": true,
@@ -26,17 +26,7 @@
     "resources": [
       "../solutions/**/*"
     ],
-    "targets": ["dmg", "nsis", "deb"],
-    "windows": {
-      "certificateThumbprint": null,
-      "digestAlgorithm": "sha256",
-      "timestampUrl": "",
-      "nsis": {
-        "installerIcon": "icons/icon.ico",
-        "installMode": "perUser",
-        "license": null
-      }
-    },
+    "targets": "all",
     "linux": {
       "deb": {
         "depends": ["libwebkit2gtk-4.1-0", "libssl3"],
@@ -77,14 +67,7 @@
   },
   "plugins": {
     "shell": {
-      "sidecar": true,
-      "scope": [
-        {
-          "name": "binaries/provisioning-station",
-          "sidecar": true,
-          "args": true
-        }
-      ]
+      "open": true
     }
   }
 }
