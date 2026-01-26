@@ -1,11 +1,18 @@
 """
-Himax WE2 firmware flashing deployer using sscma-micro or xmodem protocol
+Himax WE2 firmware flashing deployer using xmodem protocol
+
+IMPORTANT: SenseCAP Watcher requires special handling!
+The Watcher's ESP32 firmware monitors Himax and will reset it when detecting anomalies
+(like entering download mode). This causes flashing to fail.
+
+Solution: Hold ESP32 in reset state (DTR=False) during Himax flashing.
 """
 
 import asyncio
 import fnmatch
 import logging
 import re
+import time
 from pathlib import Path
 from typing import Callable, Optional, Dict, Any, List
 
@@ -19,10 +26,9 @@ logger = logging.getLogger(__name__)
 
 
 class HimaxDeployer(BaseDeployer):
-    """Himax WE2 firmware flashing via SSCMA tools or xmodem"""
+    """Himax WE2 firmware flashing via xmodem protocol"""
 
     # Watcher Himax WE2 USB identifiers (WCH chip)
-    # The Watcher exposes both wchusbserial (ESP32) and usbmodem (Himax) ports
     DEFAULT_VID = 0x1a86
     DEFAULT_PID = 0x55d2
 
@@ -34,6 +40,13 @@ class HimaxDeployer(BaseDeployer):
         "COM*",  # Windows
     ]
 
+    # ESP32 port patterns (for SenseCAP Watcher safe flashing)
+    ESP32_PORT_PATTERNS = [
+        "/dev/cu.wchusbserial*",
+        "/dev/tty.wchusbserial*",
+        "/dev/ttyUSB*",
+    ]
+
     async def deploy(
         self,
         config: DeviceConfig,
@@ -42,7 +55,6 @@ class HimaxDeployer(BaseDeployer):
     ) -> bool:
         port = connection.get("port")
         if not port:
-            # Try auto-detection
             port = self._auto_detect_port(config)
             if not port:
                 raise ValueError("No port specified and auto-detection failed for Himax device")
@@ -53,6 +65,14 @@ class HimaxDeployer(BaseDeployer):
 
         flash_config = config.firmware.flash_config
         firmware_source = config.firmware.source
+
+        # Check if this requires ESP32 reset hold (SenseCAP Watcher)
+        requires_esp32_hold = False
+        if hasattr(flash_config, 'requires_esp32_reset_hold'):
+            requires_esp32_hold = flash_config.requires_esp32_reset_hold
+        logger.info(f"Flash config: requires_esp32_reset_hold={requires_esp32_hold}")
+
+        esp32_serial = None
 
         try:
             # Step 1: Detect device
@@ -70,6 +90,18 @@ class HimaxDeployer(BaseDeployer):
                 progress_callback, "detect", 100, f"Device detected on {port}"
             )
 
+            # Step 1.5: Find ESP32 companion port if needed
+            esp32_port = None
+            if requires_esp32_hold:
+                esp32_port = self._find_companion_esp32_port(port)
+                if esp32_port:
+                    await self._report_progress(
+                        progress_callback, "detect", 100,
+                        f"Found ESP32 port: {esp32_port}"
+                    )
+                else:
+                    logger.warning("ESP32 port not found, flashing may be unstable")
+
             # Step 2: Get firmware path
             firmware_path = config.get_asset_path(firmware_source.path)
             if not firmware_path:
@@ -81,46 +113,21 @@ class HimaxDeployer(BaseDeployer):
                 )
                 return False
 
-            # Step 3: Prompt user to press reset button
-            await self._report_progress(
-                progress_callback, "wait_reset", 0, "Please press the RESET button on the device..."
-            )
-
-            # Wait for bootloader mode
-            bootloader_detected = await self._wait_for_bootloader(
-                port,
-                timeout=flash_config.timeout if hasattr(flash_config, 'timeout') else 30,
-                progress_callback=progress_callback,
-            )
-
-            if not bootloader_detected:
-                await self._report_progress(
-                    progress_callback, "wait_reset", 0, "Bootloader not detected. Please try pressing RESET again."
-                )
-                # Continue anyway - user might have already pressed reset
-                logger.warning("Bootloader detection timed out, attempting flash anyway")
-
+            # Step 3: Ready for flashing
             await self._report_progress(
                 progress_callback, "wait_reset", 100, "Ready for flashing"
             )
 
-            # Step 4: Flash firmware
+            # Step 4: Flash firmware using xmodem
             await self._report_progress(
                 progress_callback, "flash", 0, "Starting firmware flash..."
             )
 
             baudrate = flash_config.baudrate if hasattr(flash_config, 'baudrate') else 921600
 
-            # Try SSCMA tool first, fallback to xmodem
-            success = await self._flash_with_sscma(
-                port, firmware_path, baudrate, progress_callback
+            success = await self._flash_with_xmodem(
+                port, firmware_path, baudrate, progress_callback, esp32_port
             )
-
-            if not success:
-                # Fallback to xmodem
-                success = await self._flash_with_xmodem(
-                    port, firmware_path, baudrate, progress_callback
-                )
 
             if not success:
                 await self._report_progress(
@@ -147,12 +154,40 @@ class HimaxDeployer(BaseDeployer):
             return False
 
     def _auto_detect_port(self, config: DeviceConfig) -> Optional[str]:
-        """Auto-detect Himax WE2 serial port"""
+        """Auto-detect Himax WE2 serial port
+
+        IMPORTANT: SenseCAP Watcher exposes two serial ports with the same VID/PID:
+        - usbmodem* for Himax WE2 (what we want)
+        - wchusbserial* for ESP32-S3 (NOT what we want)
+
+        We must prioritize usbmodem ports over wchusbserial ports.
+        """
         detection = config.detection if hasattr(config, 'detection') else None
 
-        # Method 1: VID/PID matching
-        vid = None
-        pid = None
+        patterns = self.DEFAULT_PORT_PATTERNS
+        if detection and hasattr(detection, 'fallback_ports') and detection.fallback_ports:
+            patterns = detection.fallback_ports + patterns
+
+        # Method 1: Look for usbmodem ports first (Himax WE2 uses usbmodem)
+        for port in serial.tools.list_ports.comports():
+            if 'usbmodem' in port.device.lower():
+                for pattern in patterns:
+                    if fnmatch.fnmatch(port.device, pattern):
+                        logger.info(f"Found Himax device by usbmodem pattern: {port.device}")
+                        return port.device
+
+        # Method 2: Check fallback patterns (excluding wchusbserial which is ESP32)
+        for port in serial.tools.list_ports.comports():
+            if 'wchusbserial' in port.device.lower():
+                continue
+            for pattern in patterns:
+                if fnmatch.fnmatch(port.device, pattern):
+                    logger.info(f"Found Himax device by pattern: {port.device}")
+                    return port.device
+
+        # Method 3: VID/PID matching (only for usbmodem ports)
+        vid = self.DEFAULT_VID
+        pid = self.DEFAULT_PID
         if detection:
             vid_str = getattr(detection, 'usb_vendor_id', None)
             pid_str = getattr(detection, 'usb_product_id', None)
@@ -161,35 +196,12 @@ class HimaxDeployer(BaseDeployer):
             if pid_str:
                 pid = int(pid_str, 16) if pid_str.startswith('0x') else int(pid_str)
 
-        if not vid:
-            vid = self.DEFAULT_VID
-        if not pid:
-            pid = self.DEFAULT_PID
-
         for port in serial.tools.list_ports.comports():
             if port.vid == vid and port.pid == pid:
+                if 'wchusbserial' in port.device.lower():
+                    continue
                 logger.info(f"Found Himax device by VID/PID: {port.device}")
                 return port.device
-
-        # Method 2: Port pattern matching
-        patterns = self.DEFAULT_PORT_PATTERNS
-        if detection and hasattr(detection, 'fallback_ports'):
-            patterns = detection.fallback_ports + patterns
-
-        for port in serial.tools.list_ports.comports():
-            for pattern in patterns:
-                if fnmatch.fnmatch(port.device, pattern):
-                    # Prefer usbmodem ports for Himax
-                    if 'usbmodem' in port.device.lower():
-                        logger.info(f"Found Himax device by pattern: {port.device}")
-                        return port.device
-
-        # Last resort: return first matching pattern
-        for port in serial.tools.list_ports.comports():
-            for pattern in patterns:
-                if fnmatch.fnmatch(port.device, pattern):
-                    logger.info(f"Found potential Himax device: {port.device}")
-                    return port.device
 
         return None
 
@@ -200,107 +212,66 @@ class HimaxDeployer(BaseDeployer):
                 return True
         return False
 
-    async def _wait_for_bootloader(
-        self,
-        port: str,
-        timeout: int = 30,
-        progress_callback: Optional[Callable] = None,
-    ) -> bool:
-        """Wait for device to enter bootloader mode"""
+    def _find_companion_esp32_port(self, himax_port: str) -> Optional[str]:
+        """Find the companion ESP32 serial port for SenseCAP Watcher."""
+        logger.debug(f"Looking for companion ESP32 port for Himax: {himax_port}")
+
+        match = re.search(r'usbmodem(\w+)', himax_port)
+        if not match:
+            return None
+
+        himax_serial = match.group(1)
+        himax_base = himax_serial[:10] if len(himax_serial) > 10 else himax_serial[:-2]
+        himax_suffix = himax_serial[-2:] if len(himax_serial) > 2 else himax_serial
+
+        logger.debug(f"Himax serial: {himax_serial}, base: {himax_base}, suffix: {himax_suffix}")
+
+        # Find ESP32 port with DIFFERENT suffix (different USB interface)
+        for port in serial.tools.list_ports.comports():
+            if 'wchusbserial' in port.device.lower():
+                esp_match = re.search(r'wchusbserial(\w+)', port.device)
+                if esp_match:
+                    esp_serial = esp_match.group(1)
+                    esp_suffix = esp_serial[-2:] if len(esp_serial) > 2 else esp_serial
+
+                    # Same device but different interface
+                    if esp_suffix != himax_suffix:
+                        logger.info(f"Found ESP32 port: {port.device}")
+                        return port.device
+
+        # Fallback: return any wchusbserial port
+        for port in serial.tools.list_ports.comports():
+            if 'wchusbserial' in port.device.lower():
+                logger.info(f"Using fallback ESP32 port: {port.device}")
+                return port.device
+
+        return None
+
+    def _hold_esp32_reset(self, esp32_port: str) -> Optional[serial.Serial]:
+        """Hold ESP32 in reset state by controlling DTR pin."""
         try:
-            ser = serial.Serial(
-                port,
-                baudrate=115200,
-                timeout=1,
-            )
+            ser = serial.Serial()
+            ser.port = esp32_port
+            ser.baudrate = 115200
+            ser.dtr = False  # EN pin - False = hold in reset
+            ser.rts = True   # GPIO0 - True = download mode
+            ser.open()
+            logger.info(f"Holding ESP32 in reset on {esp32_port}")
+            return ser
+        except Exception as e:
+            logger.warning(f"Could not hold ESP32 in reset: {e}")
+            return None
 
-            start_time = asyncio.get_event_loop().time()
-            detected = False
-
-            while (asyncio.get_event_loop().time() - start_time) < timeout:
-                if ser.in_waiting:
-                    data = ser.read(ser.in_waiting)
-                    text = data.decode('utf-8', errors='ignore')
-                    logger.debug(f"Bootloader output: {text}")
-
-                    # Look for bootloader indicators
-                    if any(marker in text.lower() for marker in ['boot', 'ready', 'xmodem', 'download']):
-                        detected = True
-                        break
-
-                elapsed = int(asyncio.get_event_loop().time() - start_time)
-                if progress_callback and elapsed % 5 == 0:
-                    await self._report_progress(
-                        progress_callback,
-                        "wait_reset",
-                        min(50, int(elapsed / timeout * 100)),
-                        f"Waiting for reset button press... ({timeout - elapsed}s remaining)"
-                    )
-
-                await asyncio.sleep(0.5)
-
+    def _release_esp32_reset(self, ser: serial.Serial):
+        """Release ESP32 from reset state"""
+        try:
+            ser.dtr = True   # Release EN pin
+            ser.rts = False  # Release GPIO0
+            time.sleep(0.1)
             ser.close()
-            return detected
-
+            logger.info("Released ESP32 from reset")
         except Exception as e:
-            logger.warning(f"Error waiting for bootloader: {e}")
-            return False
-
-    async def _flash_with_sscma(
-        self,
-        port: str,
-        firmware_path: str,
-        baudrate: int,
-        progress_callback: Optional[Callable],
-    ) -> bool:
-        """Flash using SSCMA CLI tool"""
-        try:
-            # Try sscma-micro CLI
-            cmd = [
-                "python", "-m", "sscma.cli",
-                "flash",
-                "--port", port,
-                "--baudrate", str(baudrate),
-                firmware_path,
-            ]
-
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-
-            last_progress = 0
-            while True:
-                line = await process.stdout.readline()
-                if not line:
-                    break
-
-                line_str = line.decode().strip()
-                if not line_str:
-                    continue
-
-                logger.debug(f"sscma: {line_str}")
-
-                # Parse progress
-                match = re.search(r'(\d+)%', line_str)
-                if match and progress_callback:
-                    progress = int(match.group(1))
-                    if progress > last_progress:
-                        await self._report_progress(
-                            progress_callback, "flash", progress, f"Flashing... {progress}%"
-                        )
-                        last_progress = progress
-
-            await process.wait()
-            return process.returncode == 0
-
-        except FileNotFoundError:
-            logger.info("SSCMA CLI not found, trying alternative method")
-            return False
-        except Exception as e:
-            logger.warning(f"SSCMA flash failed: {e}")
-            return False
+            logger.warning(f"Error releasing ESP32 reset: {e}")
 
     async def _flash_with_xmodem(
         self,
@@ -308,54 +279,167 @@ class HimaxDeployer(BaseDeployer):
         firmware_path: str,
         baudrate: int,
         progress_callback: Optional[Callable],
+        esp32_port: Optional[str] = None,
     ) -> bool:
-        """Flash using xmodem protocol directly"""
-        try:
-            # Import xmodem library
-            from xmodem import XMODEM
+        """Flash using xmodem protocol with proper Himax bootloader handshake
 
-            ser = serial.Serial(
-                port,
-                baudrate=baudrate,
-                timeout=10,
+        Protocol:
+        1. Hold ESP32 in reset (if SenseCAP Watcher)
+        2. Open serial port and send "1" repeatedly to trigger bootloader menu
+        3. Wait for "Xmodem download and burn FW image"
+        4. Wait for "C" character (xmodem-CRC ready)
+        5. Transfer firmware using xmodem
+        6. Wait for reboot prompt and send "y"
+        7. Release ESP32 from reset
+        """
+        esp32_serial = None
+
+        try:
+            # Step 0: Hold ESP32 in reset if this is SenseCAP Watcher
+            if esp32_port:
+                esp32_serial = self._hold_esp32_reset(esp32_port)
+                if esp32_serial:
+                    await self._report_progress(
+                        progress_callback, "flash", 5, "ESP32 held in reset"
+                    )
+                    # Give it a moment to stabilize
+                    await asyncio.sleep(0.5)
+
+            # Step 1: Open Himax serial port
+            await self._report_progress(
+                progress_callback, "flash", 10, "Connecting to Himax..."
             )
 
-            # Read firmware file
-            firmware_size = Path(firmware_path).stat().st_size
-            bytes_sent = 0
+            ser = serial.Serial(port, baudrate=baudrate, timeout=0.01)
+            logger.info(f"Opened Himax port: {port}")
+
+            # Step 2: Wait for bootloader and send "1" to select xmodem download
+            await self._report_progress(
+                progress_callback, "flash", 15, "Waiting for bootloader (press RESET)..."
+            )
+
+            rbuf = b""
+            timeout = 30000  # 30 seconds
+            bootloader_ready = False
+
+            while timeout > 0:
+                ser.write(b"1")
+                rbuf += ser.read(128)
+
+                if b"Xmodem download and burn FW image" in rbuf:
+                    ser.write(b"1")
+                    bootloader_ready = True
+                    logger.info("Bootloader ready, xmodem mode selected")
+                    break
+
+                # Trim buffer to prevent memory issues
+                if len(rbuf) > 4096:
+                    rbuf = rbuf[-2048:]
+
+                timeout -= 10
+                await asyncio.sleep(0.01)
+
+            if not bootloader_ready:
+                logger.error("Timeout waiting for bootloader")
+                ser.close()
+                return False
+
+            await self._report_progress(
+                progress_callback, "flash", 30, "Bootloader ready"
+            )
+
+            # Step 3: Wait for "C" character (xmodem-CRC ready signal)
+            timeout = 5000  # 5 seconds
+            xmodem_ready = False
+
+            while timeout > 0:
+                c = ser.read(1)
+                if c == b"C":
+                    xmodem_ready = True
+                    # Wait for bootloader to finish outputting debug text
+                    await asyncio.sleep(0.5)
+                    # Drain any remaining output in buffer
+                    while ser.in_waiting:
+                        drained = ser.read(ser.in_waiting)
+                        logger.debug(f"Drained buffer: {drained[:50]}...")
+                        await asyncio.sleep(0.1)
+                    break
+                timeout -= 10
+                await asyncio.sleep(0.01)
+
+            if not xmodem_ready:
+                logger.error("Timeout waiting for xmodem ready signal")
+                ser.close()
+                return False
+
+            await self._report_progress(
+                progress_callback, "flash", 40, "Starting transfer..."
+            )
+
+            # Step 4: Transfer firmware using xmodem
+            ser.timeout = 2  # Longer timeout for xmodem transfer
+            ser.reset_input_buffer()  # Clear any remaining data
+            ser.reset_output_buffer()
+
+            from xmodem import XMODEM
 
             def getc(size, timeout=1):
                 return ser.read(size) or None
 
             def putc(data, timeout=1):
-                nonlocal bytes_sent
-                bytes_sent += len(data)
-                return ser.write(data)
+                return ser.write(data) or None
 
-            modem = XMODEM(getc, putc)
+            modem = XMODEM(getc, putc, mode="xmodem")
 
-            with open(firmware_path, 'rb') as f:
-                # Send file
-                def progress_handler(total, position):
-                    if progress_callback:
-                        progress = int(position / firmware_size * 100) if firmware_size > 0 else 0
-                        asyncio.create_task(
-                            self._report_progress(
-                                progress_callback, "flash", progress, f"Flashing... {progress}%"
-                            )
-                        )
+            with open(firmware_path, "rb") as f:
+                success = modem.send(f, retry=16, quiet=True)
 
-                success = modem.send(f, retry=16)
+            if not success:
+                logger.error("Xmodem transfer failed")
+                ser.close()
+                return False
+
+            logger.info("Xmodem transfer complete")
+            await self._report_progress(
+                progress_callback, "flash", 90, "Transfer complete"
+            )
+
+            # Step 5: Wait for reboot prompt and confirm
+            rbuf = b""
+            ser.timeout = 0.01
+            timeout = 10000  # 10 seconds
+
+            while timeout > 0:
+                rbuf += ser.read(128)
+                if b"Do you want to end file transmission and reboot" in rbuf:
+                    ser.write(b"y")
+                    logger.info("Sent reboot confirmation")
+                    break
+                timeout -= 10
+                await asyncio.sleep(0.01)
 
             ser.close()
-            return success
+
+            await self._report_progress(
+                progress_callback, "flash", 100, "Flash complete!"
+            )
+
+            return True
 
         except ImportError:
-            logger.warning("xmodem library not installed")
+            logger.error("xmodem library not installed")
+            await self._report_progress(
+                progress_callback, "flash", 0, "xmodem library not installed"
+            )
             return False
         except Exception as e:
             logger.error(f"xmodem flash failed: {e}")
             return False
+        finally:
+            # Always release ESP32 from reset
+            if esp32_serial:
+                self._release_esp32_reset(esp32_serial)
+                logger.info("ESP32 released from reset")
 
     @classmethod
     def list_available_ports(cls) -> List[Dict[str, Any]]:
