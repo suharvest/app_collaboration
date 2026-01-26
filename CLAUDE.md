@@ -46,6 +46,18 @@ app_collaboration/
 
 ---
 
+## 文案编写规范（必须遵守）
+
+**重要**：创建或修改 `solutions/` 目录下的任何文档前，**必须先读取** `.claude/skills/solution-copywriting/SKILL.md` 获取完整规范。
+
+规范包括：
+- 介绍页四段式结构（痛点、价值、场景、须知）
+- 部署页 section 布局规则（description vs troubleshoot 文件分工）
+- 术语通俗化对照表
+- 质量检查清单
+
+---
+
 ## 从 Wiki 文档创建新方案
 
 ### 步骤 1: 创建方案目录结构
@@ -301,6 +313,58 @@ name_zh: 新名称
 rm -rf frontend/dist
 ./dev.sh
 ```
+
+---
+
+## Tauri 桌面应用打包
+
+### 目录结构
+
+```
+app_collaboration/
+├── src-tauri/                    # Tauri Rust 项目
+│   ├── Cargo.toml
+│   ├── tauri.conf.json           # Tauri 配置
+│   ├── capabilities/default.json # 权限配置
+│   ├── binaries/                 # Sidecar 二进制文件
+│   ├── icons/                    # 应用图标
+│   └── src/main.rs               # Rust 主程序
+├── pyinstaller/                  # PyInstaller 配置
+│   └── provisioning-station.spec
+└── scripts/
+    └── build-sidecar.py          # Sidecar 构建脚本
+```
+
+### 本地构建步骤
+
+**1. 构建 Python Sidecar**
+```bash
+cd /Users/harvest/project/app_collaboration
+uv run --group build python scripts/build-sidecar.py
+```
+输出位置: `src-tauri/binaries/provisioning-station-aarch64-apple-darwin`
+
+**2. 构建 Tauri 应用**
+```bash
+cd /Users/harvest/project/app_collaboration/src-tauri  # 重要：必须在 src-tauri 目录下运行
+cargo tauri build
+```
+- `beforeBuildCommand` 会自动构建前端 (`npm run build --prefix frontend`)
+- 输出位置: `src-tauri/target/release/bundle/macos/SenseCraft Solution.app`
+- DMG 位置: `src-tauri/target/release/bundle/dmg/SenseCraft Solution_1.0.0_aarch64.dmg`
+
+### 开发模式
+```bash
+cd /Users/harvest/project/app_collaboration/src-tauri
+cargo tauri dev
+```
+
+### 架构说明
+
+- **Sidecar 模式**: Python 后端通过 PyInstaller 打包为独立可执行文件
+- **动态端口**: Tauri 使用 portpicker 选择可用端口，避免端口冲突
+- **Solutions 资源**: 通过 Tauri resources 打包到 `Contents/Resources/_up_/solutions/`
+- **端口通信**: Rust 通过 `window.eval()` 注入 `window.__BACKEND_PORT__` 到前端
 
 ---
 
