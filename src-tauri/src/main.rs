@@ -1,7 +1,7 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
 use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::CommandEvent;
@@ -12,9 +12,42 @@ static SIDECAR_STARTED: AtomicBool = AtomicBool::new(false);
 /// Global backend port - set once at startup
 static BACKEND_PORT: AtomicU16 = AtomicU16::new(0);
 
+/// Global sidecar process ID for cleanup on exit
+static SIDECAR_PID: AtomicU32 = AtomicU32::new(0);
+
 /// Get an available port for the backend server
 fn get_available_port() -> u16 {
     portpicker::pick_unused_port().expect("No available ports")
+}
+
+/// Kill the sidecar process
+fn kill_sidecar() {
+    use std::process::Command;
+
+    // First try by PID
+    let pid = SIDECAR_PID.swap(0, Ordering::SeqCst);
+    if pid > 0 {
+        #[cfg(unix)]
+        {
+            let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
+        }
+        #[cfg(windows)]
+        {
+            let _ = Command::new("taskkill").args(["/F", "/PID", &pid.to_string()]).output();
+        }
+    }
+
+    // Also try by process name as fallback
+    #[cfg(unix)]
+    {
+        let _ = Command::new("pkill").args(["-9", "-f", "provisioning-station"]).output();
+    }
+    #[cfg(windows)]
+    {
+        let _ = Command::new("taskkill").args(["/F", "/IM", "provisioning-station.exe"]).output();
+    }
+
+    SIDECAR_STARTED.store(false, Ordering::SeqCst);
 }
 
 /// Tauri command to get the backend port
@@ -63,9 +96,12 @@ fn main() {
 
             Ok(())
         })
-        .on_window_event(|_window, event| {
+        .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
-                log::info!("Window close requested, shutting down sidecar...");
+                // Kill sidecar process before window closes
+                kill_sidecar();
+                // Force quit the entire app on macOS
+                window.app_handle().exit(0);
             }
         })
         .run(tauri::generate_context!())
@@ -112,10 +148,14 @@ async fn start_sidecar(
         .expect("Failed to create sidecar command")
         .args(&args);
 
-    let (mut rx, _child) = sidecar.spawn()?;
+    let (mut rx, child) = sidecar.spawn()?;
+
+    // Store PID for cleanup on exit
+    let pid = child.pid();
+    SIDECAR_PID.store(pid, Ordering::SeqCst);
+    log::info!("Sidecar spawned with PID: {}", pid);
 
     SIDECAR_STARTED.store(true, Ordering::SeqCst);
-    log::info!("Sidecar spawned successfully");
 
     // Handle sidecar output in background
     tauri::async_runtime::spawn(async move {
