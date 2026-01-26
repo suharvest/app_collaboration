@@ -8,7 +8,7 @@
  */
 
 import { t } from './i18n.js';
-import { getApiBase } from './api.js';
+import { getApiBase, getWsBase } from './api.js';
 
 // ============================================
 // Preview API
@@ -387,8 +387,7 @@ export class PreviewWindow {
    */
   async _connectMqtt(config) {
     return new Promise((resolve, reject) => {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/api/preview/ws/mqtt`;
+      const wsUrl = `${getWsBase()}/api/preview/ws/mqtt`;
 
       this.ws = new WebSocket(wsUrl);
 
