@@ -60,13 +60,30 @@ class StreamProxy:
         self._has_v4l2m2m = self._check_v4l2m2m()
 
     def _find_ffmpeg(self) -> Optional[str]:
-        """Find FFmpeg executable"""
+        """Find FFmpeg executable, checking common installation paths"""
+        # First try PATH
         ffmpeg = shutil.which("ffmpeg")
         if ffmpeg:
             logger.info(f"Found FFmpeg at: {ffmpeg}")
-        else:
-            logger.warning("FFmpeg not found in PATH")
-        return ffmpeg
+            return ffmpeg
+
+        # Check common installation paths (Homebrew, MacPorts, etc.)
+        common_paths = [
+            "/opt/homebrew/bin/ffmpeg",      # Homebrew on Apple Silicon
+            "/usr/local/bin/ffmpeg",          # Homebrew on Intel Mac / Linux
+            "/usr/bin/ffmpeg",                # System install
+            "/opt/local/bin/ffmpeg",          # MacPorts
+            "C:\\ffmpeg\\bin\\ffmpeg.exe",    # Windows common location
+            "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
+        ]
+
+        for path in common_paths:
+            if os.path.isfile(path) and os.access(path, os.X_OK):
+                logger.info(f"Found FFmpeg at: {path}")
+                return path
+
+        logger.warning("FFmpeg not found in PATH or common locations")
+        return None
 
     def _check_v4l2m2m(self) -> bool:
         """Check if v4l2m2m hardware acceleration is available (Raspberry Pi)"""

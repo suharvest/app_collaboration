@@ -36,7 +36,7 @@ firmware:
         name: Face Detection (SCRFD)
         name_zh: 人脸检测模型 (SCRFD)
         path: assets/models/scrfd_500m_kps_int8_vela.tflite
-        flash_address: "0x200000"
+        flash_address: "0x400000"
         offset: "0x0"
         required: true
         default: true
@@ -48,13 +48,37 @@ firmware:
         name: Face Embedding (GhostFaceNet)
         name_zh: 人脸特征模型 (GhostFaceNet)
         path: assets/models/ghostfacenet_0.5_112_int8_vela.tflite
-        flash_address: "0x400000"
+        flash_address: "0x510000"
         offset: "0x0"
-        required: false
+        required: true
         default: true
         description: Face recognition embedding model for person identification
         description_zh: 人脸识别特征提取模型，用于身份识别
         size_hint: "800KB"
+
+      - id: face_detection_2
+        name: Face Detection 2 (SCRFD)
+        name_zh: 人脸检测模型 2 (SCRFD)
+        path: assets/models/scrfd_500m_kps_int8_vela.tflite
+        flash_address: "0x600000"
+        offset: "0x0"
+        required: true
+        default: true
+        description: Secondary face detection model instance
+        description_zh: 人脸检测模型第二实例
+        size_hint: "512KB"
+
+      - id: person_detection
+        name: Person Detection (Swift YOLO)
+        name_zh: 人体检测模型 (Swift YOLO)
+        path: assets/models/swift_yolo_nano_person_192_int8_vela.tflite
+        flash_address: "0x700000"
+        offset: "0x0"
+        required: true
+        default: true
+        description: Person detection model for identifying human presence
+        description_zh: 人体检测模型，用于识别人体存在
+        size_hint: "1.6MB"
 
 # User inputs (supports auto-detection, can also be manually selected)
 user_inputs:
