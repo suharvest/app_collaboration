@@ -11,7 +11,6 @@ from pathlib import Path
 # Project root directory
 project_root = Path(SPECPATH).parent
 provisioning_dir = project_root / 'provisioning_station'
-solutions_dir = project_root / 'solutions'
 
 # Determine platform-specific settings
 if sys.platform == 'win32':
@@ -26,6 +25,14 @@ else:
 
 # Hidden imports required by the application
 hiddenimports = [
+    # Main application package
+    'provisioning_station',
+    'provisioning_station.main',
+    'provisioning_station.config',
+    'provisioning_station.routers',
+    'provisioning_station.services',
+    'provisioning_station.models',
+
     # FastAPI / Uvicorn
     'uvicorn',
     'uvicorn.logging',
@@ -55,7 +62,6 @@ hiddenimports = [
 
     # YAML processing
     'yaml',
-    'ruamel.yaml',
 
     # Markdown
     'markdown',
@@ -68,6 +74,7 @@ hiddenimports = [
     'serial.tools',
     'serial.tools.list_ports',
     'esptool',
+    'xmodem',  # Himax flashing fallback
 
     # SSH/SCP
     'paramiko',
@@ -90,22 +97,22 @@ hiddenimports = [
     'anyio._backends._asyncio',
 
     # Other
-    'jinja2',
     'dotenv',
     'multipart',
     'python_multipart',
     'websockets',
-    'email_validator',
 ]
 
 # Collect data files
-datas = [
-    # Include solutions directory as data
-    (str(solutions_dir), 'solutions'),
-]
+# NOTE: solutions directory is NOT bundled here - it's bundled by Tauri as external resources
+# The sidecar will find solutions via SOLUTIONS_DIR env var or relative path
+datas = []
 
 # Collect packages that need their data files
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+
+# Collect esptool data files (stub flasher JSON files are required)
+datas += collect_data_files('esptool')
 
 # Collect all submodules for packages that have dynamic imports
 hiddenimports += collect_submodules('esptool')
@@ -113,7 +120,7 @@ hiddenimports += collect_submodules('uvicorn')
 
 # Analysis
 a = Analysis(
-    [str(provisioning_dir / 'main.py')],
+    [str(provisioning_dir / '__main__.py')],
     pathex=[str(project_root)],
     binaries=[],
     datas=datas,

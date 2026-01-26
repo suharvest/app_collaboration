@@ -101,7 +101,13 @@ async def health_check():
 def main():
     """CLI entry point"""
     import argparse
+    import os
+    import sys
     import uvicorn
+
+    # Check if running as frozen executable
+    is_frozen = getattr(sys, 'frozen', False)
+    print(f"Starting provisioning-station (frozen={is_frozen})")
 
     parser = argparse.ArgumentParser(
         description="SenseCraft Solution Provisioning Station"
@@ -119,6 +125,12 @@ def main():
         help=f"Host to bind to (default: {settings.host})"
     )
     parser.add_argument(
+        "--solutions-dir",
+        type=str,
+        default=None,
+        help="Path to solutions directory (overrides default)"
+    )
+    parser.add_argument(
         "--reload",
         action="store_true",
         default=settings.debug,
@@ -126,12 +138,29 @@ def main():
     )
     args = parser.parse_args()
 
-    uvicorn.run(
-        "provisioning_station.main:app",
-        host=args.host,
-        port=args.port,
-        reload=args.reload,
-    )
+    # Set solutions dir via environment variable if provided
+    # This will be picked up when uvicorn imports the app
+    if args.solutions_dir:
+        os.environ["PS_SOLUTIONS_DIR"] = args.solutions_dir
+
+    if is_frozen:
+        # For frozen executables, pass the app object directly to avoid
+        # module reimport issues where sys.frozen might not be preserved
+        # Also disable reload since it doesn't work with frozen apps
+        uvicorn.run(
+            app,
+            host=args.host,
+            port=args.port,
+            reload=False,
+        )
+    else:
+        # For development, use string reference to enable hot reload
+        uvicorn.run(
+            "provisioning_station.main:app",
+            host=args.host,
+            port=args.port,
+            reload=args.reload,
+        )
 
 
 if __name__ == "__main__":

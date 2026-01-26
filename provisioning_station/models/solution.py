@@ -159,6 +159,9 @@ class DeviceSection(BaseModel):
     title_zh: Optional[str] = None
     description_file: Optional[str] = None
     description_file_zh: Optional[str] = None
+    # Troubleshoot content shown below deploy button
+    troubleshoot_file: Optional[str] = None
+    troubleshoot_file_zh: Optional[str] = None
     wiring: Optional[WiringInfo] = None
 
 

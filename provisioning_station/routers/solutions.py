@@ -384,6 +384,13 @@ async def get_deployment_info(
                     solution_id, desc_file
                 )
 
+            # Load troubleshoot content (shown below deploy button)
+            troubleshoot_file = section.troubleshoot_file_zh if lang == "zh" else section.troubleshoot_file
+            if troubleshoot_file:
+                device_info["section"]["troubleshoot"] = await solution_manager.load_markdown(
+                    solution_id, troubleshoot_file
+                )
+
             # Add wiring info
             if section.wiring:
                 device_info["section"]["wiring"] = {
@@ -410,6 +417,12 @@ async def get_deployment_info(
                     if desc_file:
                         target_section["description"] = await solution_manager.load_markdown(
                             solution_id, desc_file
+                        )
+                    # Load troubleshoot content
+                    troubleshoot_file = target.section.troubleshoot_file_zh if lang == "zh" else target.section.troubleshoot_file
+                    if troubleshoot_file:
+                        target_section["troubleshoot"] = await solution_manager.load_markdown(
+                            solution_id, troubleshoot_file
                         )
                     if target.section.wiring:
                         target_section["wiring"] = {

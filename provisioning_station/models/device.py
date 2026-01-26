@@ -26,13 +26,18 @@ class PartitionConfig(BaseModel):
 
 
 class FlashConfig(BaseModel):
-    """ESP32 flash configuration"""
+    """Flash configuration for ESP32 and Himax devices"""
     chip: str = "esp32s3"
     baud_rate: int = 921600
+    baudrate: int = 921600  # Alias for Himax config
     flash_mode: str = "dio"
     flash_freq: str = "80m"
     flash_size: str = "16MB"
     partitions: List[PartitionConfig] = []
+    # Himax-specific options
+    requires_reset: bool = False
+    timeout: int = 60
+    requires_esp32_reset_hold: bool = False  # SenseCAP Watcher: hold ESP32 in reset during Himax flash
 
 
 class FirmwareSource(BaseModel):
