@@ -20,6 +20,8 @@ class DeviceDetector:
         """Detect a device based on its configuration"""
         if config.type == "esp32_usb":
             return await self._detect_esp32_usb(config)
+        elif config.type == "himax_usb":
+            return await self._detect_himax_usb(config)
         elif config.type == "docker_local":
             return await self._detect_docker_local(config)
         elif config.type == "docker_remote":
@@ -151,6 +153,118 @@ class DeviceDetector:
             }
         except Exception as e:
             logger.error(f"ESP32 detection error: {e}")
+            return {
+                "status": "error",
+                "details": {"error": str(e)},
+            }
+
+    async def _detect_himax_usb(self, config: DeviceConfig) -> Dict[str, Any]:
+        """Detect Himax WE2 device via USB serial
+
+        For SenseCAP Watcher, the device exposes multiple ports with same VID/PID:
+        - usbmodemXXXXX1: Himax WE2 (what we want)
+        - usbmodemXXXXX3: Another interface
+        - wchusbserialXXX: ESP32 (NOT what we want)
+
+        Strategy: prefer usbmodem ports ending with '1'
+        """
+        try:
+            import serial.tools.list_ports
+
+            ports = list(serial.tools.list_ports.comports())
+            detection = config.detection
+
+            # Match by VID/PID if specified
+            if detection.usb_vendor_id and detection.usb_product_id:
+                matched_ports = []
+                for port in ports:
+                    if port.vid and port.pid:
+                        vid = f"0x{port.vid:04x}"
+                        pid = f"0x{port.pid:04x}"
+
+                        if (
+                            vid.lower() == detection.usb_vendor_id.lower()
+                            and pid.lower() == detection.usb_product_id.lower()
+                        ):
+                            # For Himax, only consider usbmodem ports (not wchusbserial)
+                            if 'usbmodem' in port.device.lower():
+                                matched_ports.append((port, vid, pid))
+
+                if matched_ports:
+                    # For Himax on SenseCAP Watcher:
+                    # - usbmodemXXXXX1 = Himax WE2 (preferred)
+                    # - usbmodemXXXXX3 = Another interface
+                    # Strategy: prefer port names ending with '1'
+
+                    def get_himax_priority(item):
+                        port = item[0]
+                        device = port.device
+                        # Prefer ports ending with '1' (Himax interface)
+                        if device and device[-1].isdigit():
+                            # Lower interface number is better for Himax
+                            # Port ending '1' -> priority 1 (sorted first)
+                            # Port ending '3' -> priority 3 (sorted later)
+                            return int(device[-1])
+                        return 99  # Non-numeric ports sorted last
+
+                    matched_ports.sort(key=get_himax_priority)
+                    logger.info(
+                        f"Himax ports found, selecting {matched_ports[0][0].device} "
+                        f"from {[p[0].device for p in matched_ports]}"
+                    )
+
+                    port, vid, pid = matched_ports[0]
+                    return {
+                        "status": "detected",
+                        "connection_info": {"port": port.device},
+                        "details": {
+                            "port": port.device,
+                            "description": port.description,
+                            "manufacturer": port.manufacturer,
+                            "vid": vid,
+                            "pid": pid,
+                            "serial_number": port.serial_number,
+                            "all_matching_ports": [p[0].device for p in matched_ports],
+                        },
+                    }
+
+            # Fallback: check common usbmodem patterns
+            fallback_ports = detection.fallback_ports or [
+                "/dev/cu.usbmodem*",
+                "/dev/tty.usbmodem*",
+                "/dev/ttyACM*",
+            ]
+
+            for pattern in fallback_ports:
+                for port_path in glob_module.glob(pattern):
+                    try:
+                        import serial
+                        ser = serial.Serial(port_path, 115200, timeout=1)
+                        ser.close()
+                        return {
+                            "status": "detected",
+                            "connection_info": {"port": port_path},
+                            "details": {"port": port_path, "matched_pattern": pattern},
+                        }
+                    except Exception:
+                        continue
+
+            return {
+                "status": "not_detected",
+                "details": {
+                    "message": "No Himax device found",
+                    "available_ports": [p.device for p in ports],
+                    "searched_patterns": fallback_ports,
+                },
+            }
+
+        except ImportError:
+            return {
+                "status": "error",
+                "details": {"error": "pyserial not installed"},
+            }
+        except Exception as e:
+            logger.error(f"Himax detection error: {e}")
             return {
                 "status": "error",
                 "details": {"error": str(e)},
