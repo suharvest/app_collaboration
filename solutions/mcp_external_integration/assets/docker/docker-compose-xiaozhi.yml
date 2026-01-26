@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   xiaozhi-server:
-    image: ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:server_arm64
+    image: sensecraft-missionpack.seeed.cn/solution/xiaozhi-server:arm64
     container_name: xiaozhi-server
     restart: unless-stopped
     ports:

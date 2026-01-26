@@ -121,6 +121,8 @@ deployment:
         title_zh: 第一步 - 刷写 OpenWrt 固件
         description_file: deploy/sections/firmware.md
         description_file_zh: deploy/sections/firmware_zh.md
+        troubleshoot_file: deploy/sections/firmware_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/firmware_troubleshoot_zh.md
         wiring:
           steps:
             - Download the firmware for your region
@@ -143,6 +145,8 @@ deployment:
         title_zh: 第二步 - 配置 reSpeaker XVF3800 麦克风
         description_file: deploy/sections/respeaker.md
         description_file_zh: deploy/sections/respeaker_zh.md
+        troubleshoot_file: deploy/sections/respeaker_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/respeaker_troubleshoot_zh.md
         wiring:
           steps:
             - Connect reSpeaker to your computer via USB
@@ -174,6 +178,8 @@ deployment:
           section:
             description_file: deploy/sections/voice_local.md
             description_file_zh: deploy/sections/voice_local_zh.md
+            troubleshoot_file: deploy/sections/voice_local_troubleshoot.md
+            troubleshoot_file_zh: deploy/sections/voice_local_troubleshoot_zh.md
             wiring:
               steps:
                 - Connect reSpeaker to computer USB port
@@ -193,6 +199,8 @@ deployment:
           section:
             description_file: deploy/sections/voice_remote.md
             description_file_zh: deploy/sections/voice_remote_zh.md
+            troubleshoot_file: deploy/sections/voice_remote_troubleshoot.md
+            troubleshoot_file_zh: deploy/sections/voice_remote_troubleshoot_zh.md
             wiring:
               image: intro/gallery/wan_lan.png
               steps:

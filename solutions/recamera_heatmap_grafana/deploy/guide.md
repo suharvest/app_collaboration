@@ -1,13 +1,13 @@
-This solution deploys a real-time heatmap system with four main components:
+This solution deploys a real-time traffic heatmap system with four components:
 
-1. **InfluxDB** - Time-series database for storing detection coordinates
-2. **reCamera** - Edge AI device running person detection with Node-RED
-3. **Grafana** - Dashboard for visualization and analytics
-4. **Heatmap Page** - HTML5 canvas-based heat visualization
+1. **Database** - Stores location data detected by reCamera
+2. **reCamera** - Runs person detection on the camera, auto-blurs people and only transmits coordinates
+3. **Dashboard** - Displays traffic statistics and trends with charts
+4. **Heatmap** - Shows crowd gathering areas visually on your floor plan
 
 ## Network Requirements
 
-Ensure reCamera and your computer are on the **same network**. This is required for:
-- reCamera to send data to InfluxDB
-- Grafana to display live video feed from reCamera
-- Heatmap page to query data from InfluxDB
+Ensure reCamera and your computer are on the **same WiFi network**. This allows:
+- reCamera to send data to your computer
+- Dashboard to display live feed from reCamera
+- Heatmap to query location data from the database

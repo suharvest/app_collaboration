@@ -5,8 +5,8 @@ name_zh: 暖通自动化控制系统
 
 # ============ 介绍页内容 ============
 intro:
-  summary: KNN-based HVAC parameter prediction for automated operations
-  summary_zh: 基于 KNN 算法的暖通参数预测，实现自动化运维
+  summary: Automatically learn and apply optimal HVAC parameters from historical data
+  summary_zh: 根据历史数据自动学习最佳暖通参数，让设备像老师傅一样自动调参
 
   description_file: intro/description.md
   description_file_zh: intro/description_zh.md

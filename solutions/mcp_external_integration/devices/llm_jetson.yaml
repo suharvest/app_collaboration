@@ -14,7 +14,7 @@ detection:
 
 ssh:
   port: 22
-  default_user: root
+  default_user: recomputer
   auth_methods:
     - password
     - key
@@ -24,48 +24,46 @@ ssh:
 docker_remote:
   compose_file: assets/docker/docker-compose-llm-tts.yml
   compose_dir: assets/docker
+  additional_files:
+    - dist/mlc-qwen3-fs.tar.gz
+    - dist/models-backup.tar.gz
   remote_path: /home/{{username}}/llm_deployment
 
   environment:
-    MODEL_NAME: "qwen3-8b-instruct-q4f16_1-MLC"
+    MODEL_NAME: "{{model_name}}"
+    TTS_DEFAULT_SID: "{{tts_speaker}}"
 
   options:
     project_name: llm_tts_local
     remove_orphans: true
 
   services:
-    - name: mlc-llm
+    - name: mlc-llm-tts
       port: 8000
-      health_check_endpoint: /v1/models
-      required: true
-    - name: kokoro-tts
-      port: 8001
-      required: true
-
-  images:
-    - name: ghcr.nju.edu.cn/xinnan-tech/mlc-llm-serve:jetson
-      required: true
-    - name: ghcr.nju.edu.cn/xinnan-tech/kokoro-tts:jetson
+      health_check_endpoint: /health
       required: true
 
 user_inputs:
+  # Jetson 连接配置
   - id: host
-    name: J4012 IP Address
-    name_zh: J4012 IP 地址
+    name: Jetson IP Address
+    name_zh: Jetson IP 地址
     type: text
     required: true
     placeholder: "192.168.1.200"
-    description: IP address of the reComputer J4012 device
-    description_zh: reComputer J4012 设备的 IP 地址
+    description: IP address of the Jetson device (J4012/J3011/etc.)
+    description_zh: Jetson 设备的 IP 地址（J4012/J3011 等）
     validation:
       pattern: "^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$"
       message: Please enter a valid IP address
+    # 此值会被其他组件引用
+    export_as: JETSON_IP
 
   - id: username
     name: SSH Username
     name_zh: SSH 用户名
     type: text
-    default: root
+    default: recomputer
     required: true
     description: SSH login username
     description_zh: SSH 登录用户名
@@ -87,6 +85,72 @@ user_inputs:
     description: SSH port (default 22)
     description_zh: SSH 端口（默认 22）
 
+  # 模型配置
+  - id: model_name
+    name: LLM Model
+    name_zh: LLM 模型
+    type: select
+    required: true
+    options:
+      - value: qwen3:8b
+        label: Qwen3-8B (Recommended)
+        label_zh: Qwen3-8B（推荐）
+        description: Best quality, ~4.3GB VRAM
+        description_zh: 最佳质量，约 4.3GB 显存
+      - value: qwen3:4b
+        label: Qwen3-4B (Faster)
+        label_zh: Qwen3-4B（更快）
+        description: Good quality, ~2.5GB VRAM
+        description_zh: 较好质量，约 2.5GB 显存
+      - value: qwen3:1.7b
+        label: Qwen3-1.7B (Lightweight)
+        label_zh: Qwen3-1.7B（轻量）
+        description: Basic quality, ~1.2GB VRAM
+        description_zh: 基础质量，约 1.2GB 显存
+    default: qwen3:8b
+    description: Choose LLM model based on your Jetson memory
+    description_zh: 根据 Jetson 显存选择 LLM 模型
+
+  - id: tts_speaker
+    name: TTS Speaker
+    name_zh: TTS 说话人
+    type: select
+    required: false
+    options:
+      - value: "50"
+        label: Chinese Female (Default)
+        label_zh: 中文女声（默认）
+      - value: "0"
+        label: English Female
+        label_zh: 英文女声
+      - value: "1"
+        label: English Male
+        label_zh: 英文男声
+    default: "50"
+    description: Choose TTS speaker voice
+    description_zh: 选择语音合成说话人
+
+  # 部署方式
+  - id: deploy_method
+    name: Deployment Method
+    name_zh: 部署方式
+    type: select
+    required: true
+    options:
+      - value: offline
+        label: Offline Package (Recommended)
+        label_zh: 离线包部署（推荐）
+        description: Use pre-downloaded images and models
+        description_zh: 使用预下载的镜像和模型
+      - value: online
+        label: Online Download
+        label_zh: 在线下载
+        description: Download from registry (requires internet)
+        description_zh: 从镜像仓库下载（需要网络）
+    default: offline
+    description: Choose how to deploy images and models
+    description_zh: 选择镜像和模型的部署方式
+
 pre_checks:
   - type: docker_version
     min_version: "20.0"
@@ -101,51 +165,111 @@ steps:
   - id: connect
     name: SSH Connect
     name_zh: SSH 连接
-    description: Connect to J4012 device via SSH
-    description_zh: 通过 SSH 连接 J4012 设备
+    description: Connect to Jetson device via SSH
+    description_zh: 通过 SSH 连接 Jetson 设备
     optional: false
     default: true
 
   - id: prepare
     name: Prepare Directory
     name_zh: 准备目录
-    description: Create deployment directory and upload scripts
-    description_zh: 创建部署目录并上传脚本
+    description: Create deployment directory on Jetson
+    description_zh: 在 Jetson 上创建部署目录
     optional: false
     default: true
 
   - id: upload
-    name: Upload Files
-    name_zh: 上传文件
-    description: Upload Docker Compose files
-    description_zh: 上传 Docker Compose 文件
+    name: Upload Deployment Package
+    name_zh: 上传部署包
+    description: Upload Docker image and model files to Jetson
+    description_zh: 上传 Docker 镜像和模型文件到 Jetson
     optional: false
     default: true
+    show_when:
+      field: deploy_method
+      value: offline
+
+  - id: import_image
+    name: Import Docker Image
+    name_zh: 导入 Docker 镜像
+    description: Import container image from uploaded package
+    description_zh: 从上传的包导入容器镜像
+    optional: false
+    default: true
+    show_when:
+      field: deploy_method
+      value: offline
+    command: |
+      gunzip -c mlc-qwen3-fs.tar.gz | docker import \
+        --change 'CMD ["/app/proxy/start.sh"]' \
+        --change 'ENV MLC_BACKEND_URL=http://localhost:8001' \
+        --change 'ENV MODEL_ALIAS={{model_name}}' \
+        --change 'ENV PROXY_PORT=8000' \
+        --change 'ENV TTS_MODEL_DIR=/data/models/kokoro-multi-lang-v1_1' \
+        --change 'ENV TTS_DEFAULT_SID={{tts_speaker}}' \
+        --change 'ENV WARMUP_ENABLED=true' \
+        --change 'WORKDIR /app' \
+        --change 'EXPOSE 8000' \
+        - mlc-qwen3-proxy:v1.0
+
+  - id: restore_models
+    name: Restore Model Files
+    name_zh: 恢复模型文件
+    description: Extract model files to Docker volume
+    description_zh: 解压模型文件到 Docker 卷
+    optional: false
+    default: true
+    show_when:
+      field: deploy_method
+      value: offline
+    command: |
+      docker volume create mlc_models
+      docker run --rm -v mlc_models:/data -v $(pwd):/backup alpine \
+        tar xzf /backup/models-backup.tar.gz -C /data
 
   - id: pull_images
-    name: Pull MLC-LLM and Kokoro Images
-    name_zh: 拉取 MLC-LLM 和 Kokoro 镜像
-    description: Download MLC-LLM and Kokoro TTS container images
-    description_zh: 下载 MLC-LLM 和 Kokoro TTS 容器镜像
+    name: Pull Docker Images
+    name_zh: 拉取 Docker 镜像
+    description: Download container images from registry
+    description_zh: 从镜像仓库下载容器镜像
     optional: false
     default: true
+    show_when:
+      field: deploy_method
+      value: online
 
   - id: start_services
-    name: Start Services & Init Model
-    name_zh: 启动服务并初始化模型
-    description: Launch MLC-LLM and Kokoro TTS (first run may take 10-30 min to load model)
-    description_zh: 启动 MLC-LLM 和 Kokoro TTS（首次运行可能需要 10-30 分钟加载模型）
+    name: Start LLM & TTS Service
+    name_zh: 启动 LLM 和 TTS 服务
+    description: Launch the AI service container
+    description_zh: 启动 AI 服务容器
     optional: false
     default: true
+    command: |
+      docker run -d --name mlc-qwen3 \
+        --runtime nvidia \
+        --network host \
+        -v mlc_models:/data \
+        mlc-qwen3-proxy:v1.0
 
   - id: health_check
     name: Health Check
     name_zh: 健康检查
-    description: Verify MLC-LLM and Kokoro TTS are running correctly
-    description_zh: 验证 MLC-LLM 和 Kokoro TTS 运行正常
+    description: Verify LLM and TTS services are running
+    description_zh: 验证 LLM 和 TTS 服务运行正常
     optional: false
     default: true
+    command: |
+      curl -s http://localhost:8000/health && \
+      curl -s http://localhost:8000/v1/models
 
 post_deployment:
-  message: "LLM & TTS services are running on {{host}}. MLC-LLM: http://{{host}}:8000, Kokoro TTS: http://{{host}}:8001"
-  message_zh: "LLM 和 TTS 服务已在 {{host}} 上运行。MLC-LLM: http://{{host}}:8000, Kokoro TTS: http://{{host}}:8001"
+  message: "LLM & TTS service is running on {{host}}:8000. Model: {{model_name}}"
+  message_zh: "LLM 和 TTS 服务已在 {{host}}:8000 上运行。模型: {{model_name}}"
+  exports:
+    - key: JETSON_IP
+      value: "{{host}}"
+    - key: JETSON_LLM_URL
+      value: "http://{{host}}:8000/v1"
+    - key: JETSON_TTS_URL
+      value: "http://{{host}}:8000"
