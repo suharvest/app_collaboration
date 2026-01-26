@@ -181,36 +181,21 @@ class HimaxDeployer(BaseDeployer):
     def _auto_detect_port(self, config: DeviceConfig) -> Optional[str]:
         """Auto-detect Himax WE2 serial port
 
-        IMPORTANT: SenseCAP Watcher exposes two serial ports with the same VID/PID:
-        - usbmodem* for Himax WE2 (what we want)
+        IMPORTANT: SenseCAP Watcher exposes multiple serial ports:
+        - usbmodem* with VID:PID 1A86:55D2 for Himax WE2 (what we want)
         - wchusbserial* for ESP32-S3 (NOT what we want)
 
-        We must prioritize usbmodem ports over wchusbserial ports.
+        There may be OTHER usbmodem devices with different VID/PID - we must
+        check VID/PID to ensure we get the correct Watcher port.
+
+        Priority:
+        1. VID/PID match + usbmodem pattern (most reliable)
+        2. VID/PID match + fallback patterns
+        3. Fallback to any usbmodem with matching VID/PID
         """
         detection = config.detection if hasattr(config, 'detection') else None
 
-        patterns = self.DEFAULT_PORT_PATTERNS
-        if detection and hasattr(detection, 'fallback_ports') and detection.fallback_ports:
-            patterns = detection.fallback_ports + patterns
-
-        # Method 1: Look for usbmodem ports first (Himax WE2 uses usbmodem)
-        for port in serial.tools.list_ports.comports():
-            if 'usbmodem' in port.device.lower():
-                for pattern in patterns:
-                    if fnmatch.fnmatch(port.device, pattern):
-                        logger.info(f"Found Himax device by usbmodem pattern: {port.device}")
-                        return port.device
-
-        # Method 2: Check fallback patterns (excluding wchusbserial which is ESP32)
-        for port in serial.tools.list_ports.comports():
-            if 'wchusbserial' in port.device.lower():
-                continue
-            for pattern in patterns:
-                if fnmatch.fnmatch(port.device, pattern):
-                    logger.info(f"Found Himax device by pattern: {port.device}")
-                    return port.device
-
-        # Method 3: VID/PID matching (only for usbmodem ports)
+        # Get expected VID/PID
         vid = self.DEFAULT_VID
         pid = self.DEFAULT_PID
         if detection:
@@ -221,12 +206,53 @@ class HimaxDeployer(BaseDeployer):
             if pid_str:
                 pid = int(pid_str, 16) if pid_str.startswith('0x') else int(pid_str)
 
+        patterns = self.DEFAULT_PORT_PATTERNS
+        if detection and hasattr(detection, 'fallback_ports') and detection.fallback_ports:
+            patterns = detection.fallback_ports + patterns
+
+        # Method 1: VID/PID match + usbmodem pattern (most reliable for Watcher)
+        # This ensures we get the Watcher's Himax port, not some other usbmodem device
+        # Watcher has two usbmodem ports: ending with '1' (Himax) and '3' (another interface)
+        # We need to prefer the one ending with '1'
+        usbmodem_candidates = []
+        for port in serial.tools.list_ports.comports():
+            if port.vid == vid and port.pid == pid:
+                if 'usbmodem' in port.device.lower():
+                    for pattern in patterns:
+                        if fnmatch.fnmatch(port.device, pattern):
+                            usbmodem_candidates.append(port.device)
+
+        if usbmodem_candidates:
+            # Sort to prefer ports ending with '1' over '3' (Himax vs ESP32 interface)
+            usbmodem_candidates.sort(key=lambda x: x[-1])
+            selected = usbmodem_candidates[0]
+            logger.info(f"Found Himax device by VID/PID + usbmodem: {selected}")
+            if len(usbmodem_candidates) > 1:
+                logger.debug(f"Other candidates: {usbmodem_candidates[1:]}")
+            return selected
+
+        # Method 2: VID/PID match + any pattern (excluding wchusbserial)
         for port in serial.tools.list_ports.comports():
             if port.vid == vid and port.pid == pid:
                 if 'wchusbserial' in port.device.lower():
                     continue
-                logger.info(f"Found Himax device by VID/PID: {port.device}")
-                return port.device
+                for pattern in patterns:
+                    if fnmatch.fnmatch(port.device, pattern):
+                        logger.info(f"Found Himax device by VID/PID: {port.device}")
+                        return port.device
+
+        # Method 3: Fallback - usbmodem pattern only (without VID/PID check)
+        # This is less reliable but kept for backwards compatibility
+        for port in serial.tools.list_ports.comports():
+            if 'usbmodem' in port.device.lower():
+                # Skip if we know this is a different device
+                if port.vid and port.vid != vid:
+                    logger.debug(f"Skipping {port.device} - different VID {port.vid:#x}")
+                    continue
+                for pattern in patterns:
+                    if fnmatch.fnmatch(port.device, pattern):
+                        logger.info(f"Found Himax device by usbmodem pattern: {port.device}")
+                        return port.device
 
         return None
 
@@ -298,6 +324,31 @@ class HimaxDeployer(BaseDeployer):
         except Exception as e:
             logger.warning(f"Error releasing ESP32 reset: {e}")
 
+    def _open_serial_port(self, port: str, baudrate: int, timeout: int = 60) -> serial.Serial:
+        """Open serial port with proper settings matching official xmodem_send.py
+
+        Critical settings:
+        - xonxoff=0, rtscts=0: Disable flow control (essential!)
+        - timeout=60: Long timeout for stable communication
+        """
+        ser = serial.Serial()
+        ser.port = port
+        ser.timeout = timeout
+        ser.baudrate = baudrate
+        ser.bytesize = serial.EIGHTBITS
+        ser.stopbits = serial.STOPBITS_ONE
+        ser.xonxoff = 0  # Disable XON/XOFF flow control
+        ser.rtscts = 0   # Disable RTS/CTS flow control
+        ser.parity = serial.PARITY_NONE
+        ser.open()
+        ser.flushInput()
+        ser.flushOutput()
+        return ser
+
+    def _send_at_command(self, ser: serial.Serial, command: str):
+        """Send AT command with carriage return (matching official script)"""
+        ser.write(bytes(command + "\r", encoding='ascii'))
+
     async def _flash_with_xmodem(
         self,
         port: str,
@@ -308,14 +359,15 @@ class HimaxDeployer(BaseDeployer):
     ) -> bool:
         """Flash using xmodem protocol with proper Himax bootloader handshake
 
-        Protocol:
+        Protocol (matching official xmodem_send.py):
         1. Hold ESP32 in reset (if SenseCAP Watcher)
-        2. Open serial port and send "1" repeatedly to trigger bootloader menu
-        3. Wait for "Xmodem download and burn FW image"
-        4. Wait for "C" character (xmodem-CRC ready)
-        5. Transfer firmware using xmodem
-        6. Wait for reboot prompt and send "y"
-        7. Release ESP32 from reset
+        2. Open serial port with proper settings
+        3. Send "1" repeatedly until "Send data using the xmodem protocol"
+        4. sleep(1), flushInput(), send "1" again
+        5. Let xmodem library handle the 'C' handshake
+        6. Transfer firmware using xmodem
+        7. Wait for reboot prompt and send "y"
+        8. Release ESP32 from reset
         """
         esp32_serial = None
 
@@ -330,12 +382,12 @@ class HimaxDeployer(BaseDeployer):
                     # Give it a moment to stabilize
                     await asyncio.sleep(0.5)
 
-            # Step 1: Open Himax serial port
+            # Step 1: Open Himax serial port with proper settings
             await self._report_progress(
                 progress_callback, "flash", 10, "Connecting to Himax..."
             )
 
-            ser = serial.Serial(port, baudrate=baudrate, timeout=0.01)
+            ser = self._open_serial_port(port, baudrate, timeout=60)
             logger.info(f"Opened Himax port: {port}")
 
             # Step 2: Wait for bootloader and send "1" to select xmodem download
@@ -343,26 +395,27 @@ class HimaxDeployer(BaseDeployer):
                 progress_callback, "flash", 15, "Waiting for bootloader (press RESET)..."
             )
 
-            rbuf = b""
-            timeout = 30000  # 30 seconds
+            # Use short timeout for rapid polling during bootloader detection
+            ser.timeout = 0.5  # 500ms for each readline
+
             bootloader_ready = False
+            start_time = time.time()
+            timeout_sec = 30
 
-            while timeout > 0:
-                ser.write(b"1")
-                rbuf += ser.read(128)
+            while (time.time() - start_time) < timeout_sec:
+                response = ser.readline().strip()
+                if response:
+                    logger.debug(f"Device: {response}")
+                self._send_at_command(ser, '1')
 
-                if b"Xmodem download and burn FW image" in rbuf:
-                    ser.write(b"1")
+                # Match official script: look for "Send data using the xmodem protocol"
+                if b'Send data using the xmodem protocol' in response:
                     bootloader_ready = True
-                    logger.info("Bootloader ready, xmodem mode selected")
+                    logger.info("Bootloader ready, xmodem mode detected")
                     break
 
-                # Trim buffer to prevent memory issues
-                if len(rbuf) > 4096:
-                    rbuf = rbuf[-2048:]
-
-                timeout -= 10
-                await asyncio.sleep(0.01)
+            # Restore timeout for xmodem transfer
+            ser.timeout = 60
 
             if not bootloader_ready:
                 logger.error("Timeout waiting for bootloader")
@@ -373,46 +426,26 @@ class HimaxDeployer(BaseDeployer):
                 progress_callback, "flash", 30, "Bootloader ready"
             )
 
-            # Step 3: Wait for "C" character (xmodem-CRC ready signal)
-            timeout = 5000  # 5 seconds
-            xmodem_ready = False
-
-            while timeout > 0:
-                c = ser.read(1)
-                if c == b"C":
-                    xmodem_ready = True
-                    # Wait for bootloader to finish outputting debug text
-                    await asyncio.sleep(0.5)
-                    # Drain any remaining output in buffer
-                    while ser.in_waiting:
-                        drained = ser.read(ser.in_waiting)
-                        logger.debug(f"Drained buffer: {drained[:50]}...")
-                        await asyncio.sleep(0.1)
-                    break
-                timeout -= 10
-                await asyncio.sleep(0.01)
-
-            if not xmodem_ready:
-                logger.error("Timeout waiting for xmodem ready signal")
-                ser.close()
-                return False
+            # Step 3: Match official script sequence exactly
+            # sleep(1), flushInput(), send '1' again, then start xmodem
+            await asyncio.sleep(1)
+            ser.flushInput()
+            self._send_at_command(ser, '1')
 
             await self._report_progress(
                 progress_callback, "flash", 40, "Starting transfer..."
             )
 
             # Step 4: Transfer firmware using xmodem
-            ser.timeout = 2  # Longer timeout for xmodem transfer
-            ser.reset_input_buffer()  # Clear any remaining data
-            ser.reset_output_buffer()
-
+            # Let xmodem library handle the 'C' handshake internally
             from xmodem import XMODEM
 
+            # Match official xmodem_send.py - don't convert empty reads to None
             def getc(size, timeout=1):
-                return ser.read(size) or None
+                return ser.read(size)
 
             def putc(data, timeout=1):
-                return ser.write(data) or None
+                return ser.write(data)
 
             modem = XMODEM(getc, putc, mode="xmodem")
 
@@ -430,18 +463,18 @@ class HimaxDeployer(BaseDeployer):
             )
 
             # Step 5: Wait for reboot prompt and confirm
-            rbuf = b""
-            ser.timeout = 0.01
-            timeout = 10000  # 10 seconds
+            start_time = time.time()
+            timeout_sec = 60
 
-            while timeout > 0:
-                rbuf += ser.read(128)
-                if b"Do you want to end file transmission and reboot" in rbuf:
-                    ser.write(b"y")
+            while (time.time() - start_time) < timeout_sec:
+                response = ser.readline().strip()
+                if response:
+                    logger.debug(f"Device: {response}")
+                # Use shorter pattern to handle split reads
+                if b"reboot system? (y)" in response or b"end file transmission" in response:
+                    self._send_at_command(ser, 'y')
                     logger.info("Sent reboot confirmation")
                     break
-                timeout -= 10
-                await asyncio.sleep(0.01)
 
             ser.close()
 
@@ -532,20 +565,46 @@ class HimaxDeployer(BaseDeployer):
     async def _wait_for_reboot_prompt(
         self,
         ser: serial.Serial,
-        timeout: int = 30
+        timeout: int = 60
     ) -> bool:
-        """Wait for the reboot confirmation prompt from bootloader"""
-        rbuf = b""
-        start = time.time()
+        """Wait for the reboot confirmation prompt from bootloader
 
-        while (time.time() - start) < timeout:
-            rbuf += ser.read(256)
-            if b"Do you want to end file transmission and reboot" in rbuf:
-                return True
-            # Trim buffer to prevent memory issues
-            if len(rbuf) > 4096:
-                rbuf = rbuf[-2048:]
-            await asyncio.sleep(0.01)
+        Use shorter readline timeout to allow multiple retries within overall timeout.
+        """
+        old_timeout = ser.timeout
+        ser.timeout = 5  # Shorter timeout for multiple retries
+        start = time.time()
+        retry_count = 0
+
+        try:
+            while (time.time() - start) < timeout:
+                retry_count += 1
+                try:
+                    response = ser.readline()
+                    if response:
+                        response_str = response.strip()
+                        if response_str:
+                            # Log readable text
+                            try:
+                                text = response_str.decode('ascii', errors='ignore')
+                                if text:
+                                    logger.info(f"Device: {text}")
+                            except:
+                                logger.debug(f"Device (binary): {response_str[:50]}")
+
+                        # Check for prompt - use shorter patterns
+                        if b"reboot system? (y)" in response or b"end file transmission" in response:
+                            return True
+                    else:
+                        # Empty response - log occasionally for debugging
+                        if retry_count % 6 == 1:  # Every 30 seconds
+                            logger.debug(f"Waiting for device response... ({int(time.time() - start)}s elapsed)")
+                except Exception as e:
+                    logger.debug(f"readline error: {e}")
+
+            logger.error(f"Timeout after {timeout}s waiting for reboot prompt (tried {retry_count} times)")
+        finally:
+            ser.timeout = old_timeout
 
         return False
 
@@ -554,52 +613,52 @@ class HimaxDeployer(BaseDeployer):
         ser: serial.Serial,
         timeout: int = 30
     ) -> bool:
-        """Wait for bootloader and enter xmodem download mode"""
-        rbuf = b""
-        timeout_ms = timeout * 1000
+        """Wait for bootloader and enter xmodem download mode
 
-        while timeout_ms > 0:
-            ser.write(b"1")
-            rbuf += ser.read(128)
+        Matches official xmodem_send.py behavior:
+        - Use readline() with timeout
+        - Send "1\r" command
+        - Look for "Send data using the xmodem protocol"
 
-            if b"Xmodem download and burn FW image" in rbuf:
-                ser.write(b"1")
-                logger.info("Bootloader ready, xmodem mode selected")
-                return True
+        Note: Use short serial timeout (0.5s) for rapid polling during detection,
+        then restore to 60s for actual xmodem transfer.
+        """
+        # Use shorter timeout for rapid polling during bootloader detection
+        old_timeout = ser.timeout
+        ser.timeout = 0.5  # 500ms timeout for each readline
 
-            # Trim buffer to prevent memory issues
-            if len(rbuf) > 4096:
-                rbuf = rbuf[-2048:]
+        start_time = time.time()
 
-            timeout_ms -= 10
-            await asyncio.sleep(0.01)
+        try:
+            while (time.time() - start_time) < timeout:
+                response = ser.readline().strip()
+                if response:
+                    logger.debug(f"Device: {response}")
+                self._send_at_command(ser, '1')
+
+                # Match official script: look for "Send data using the xmodem protocol"
+                if b'Send data using the xmodem protocol' in response:
+                    logger.info("Bootloader ready, xmodem mode detected")
+                    return True
+        finally:
+            # Restore original timeout for xmodem transfer
+            ser.timeout = old_timeout
 
         logger.error("Timeout waiting for bootloader")
         return False
 
-    async def _wait_for_xmodem_ready(
-        self,
-        ser: serial.Serial,
-        timeout: int = 5
-    ) -> bool:
-        """Wait for 'C' character indicating xmodem-CRC ready"""
-        timeout_ms = timeout * 1000
+    def _prepare_for_xmodem(self, ser: serial.Serial):
+        """Prepare serial port for xmodem transfer (matching official script)
 
-        while timeout_ms > 0:
-            c = ser.read(1)
-            if c == b"C":
-                # Wait for bootloader to finish outputting debug text
-                await asyncio.sleep(0.5)
-                # Drain any remaining output
-                while ser.in_waiting:
-                    ser.read(ser.in_waiting)
-                    await asyncio.sleep(0.1)
-                return True
-            timeout_ms -= 10
-            await asyncio.sleep(0.01)
-
-        logger.error("Timeout waiting for xmodem ready signal")
-        return False
+        After detecting bootloader ready:
+        1. sleep(1)
+        2. flushInput()
+        3. send '1' command
+        Then let xmodem library handle the 'C' handshake
+        """
+        time.sleep(1)
+        ser.flushInput()
+        self._send_at_command(ser, '1')
 
     def _resolve_model_path(self, model: HimaxModelConfig, base_path: str) -> str:
         """Resolve model file path (local or download)"""
@@ -644,15 +703,16 @@ class HimaxDeployer(BaseDeployer):
     ) -> bool:
         """Flash base firmware followed by multiple AI models
 
-        Protocol flow:
-        1. Enter bootloader (send '1', wait for xmodem prompt)
-        2. Send base firmware via xmodem
-        3. For each model:
-           a. Wait for reboot prompt, send 'n' to continue
+        Protocol flow (matching official xmodem_send.py):
+        1. Enter bootloader (send '1\r', wait for xmodem prompt)
+        2. sleep(1), flushInput(), send '1\r' again
+        3. Send base firmware via xmodem (library handles 'C' handshake)
+        4. For each model:
+           a. Wait for reboot prompt, send 'n\r' to continue
            b. Send preamble packet with flash address
-           c. Wait for reboot prompt, send 'n'
+           c. Wait for reboot prompt, send 'n\r'
            d. Send model file via xmodem
-        4. After all models, send 'y' to reboot
+        5. After all models, send 'y\r' to reboot
         """
         packet_size = 128 if protocol == "xmodem" else 1024
         esp32_serial = None
@@ -667,12 +727,12 @@ class HimaxDeployer(BaseDeployer):
                     )
                     await asyncio.sleep(0.5)
 
-            # Step 1: Open Himax serial port
+            # Step 1: Open Himax serial port with proper settings
             await self._report_progress(
                 progress_callback, "flash", 10, "Connecting to Himax..."
             )
 
-            ser = serial.Serial(port, baudrate=baudrate, timeout=0.01)
+            ser = self._open_serial_port(port, baudrate, timeout=60)
             logger.info(f"Opened Himax port: {port}")
 
             # Step 2: Wait for bootloader
@@ -688,35 +748,35 @@ class HimaxDeployer(BaseDeployer):
                 progress_callback, "flash", 20, "Bootloader ready"
             )
 
-            # Step 3: Wait for xmodem ready signal ('C')
-            if not await self._wait_for_xmodem_ready(ser, timeout=5):
-                ser.close()
-                return False
+            # Step 3: Prepare for xmodem (matching official script sequence)
+            self._prepare_for_xmodem(ser)
 
             await self._report_progress(
                 progress_callback, "flash", 25, "Starting base firmware transfer..."
             )
 
             # Step 4: Transfer base firmware using xmodem
-            ser.timeout = 2
-            ser.reset_input_buffer()
-            ser.reset_output_buffer()
-
+            # Let xmodem library handle the 'C' handshake internally
             from xmodem import XMODEM
 
+            # Match official xmodem_send.py - don't convert empty reads to None
             def getc(size, timeout=1):
-                return ser.read(size) or None
+                return ser.read(size)
 
             def putc(data, timeout=1):
-                return ser.write(data) or None
+                return ser.write(data)
 
             modem = XMODEM(getc, putc, mode=protocol)
 
-            with open(firmware_path, "rb") as f:
-                if not modem.send(f, retry=16, quiet=True):
-                    logger.error("Base firmware xmodem transfer failed")
-                    ser.close()
-                    return False
+            # Run blocking xmodem in thread to allow WebSocket updates
+            def send_firmware():
+                with open(firmware_path, "rb") as f:
+                    return modem.send(f, retry=16, quiet=True)
+
+            if not await asyncio.to_thread(send_firmware):
+                logger.error("Base firmware xmodem transfer failed")
+                ser.close()
+                return False
 
             logger.info("Base firmware transfer complete")
             await self._report_progress(
@@ -749,12 +809,11 @@ class HimaxDeployer(BaseDeployer):
                         return False
 
                     # Wait for reboot prompt
-                    ser.timeout = 0.1
                     await self._report_progress(
                         progress_callback, "flash", progress_base,
                         f"[{idx + 1}/{total_models}] Waiting for reboot prompt..."
                     )
-                    if not await self._wait_for_reboot_prompt(ser, timeout=30):
+                    if not await self._wait_for_reboot_prompt(ser, timeout=60):
                         logger.error(f"Timeout waiting for reboot prompt before model {model.id}")
                         await self._report_progress(
                             progress_callback, "flash", progress_base,
@@ -763,39 +822,37 @@ class HimaxDeployer(BaseDeployer):
                         ser.close()
                         return False
 
-                    # Send 'n' to continue (not reboot)
-                    ser.write(b'n')
-                    logger.info(f"Continuing to flash model: {model.id}")
+                    # Send 'n' to continue (not reboot) - matching official script
                     await asyncio.sleep(1)
-                    ser.reset_input_buffer()
+                    ser.flushInput()
+                    self._send_at_command(ser, 'n')
+                    logger.info(f"Continuing to flash model: {model.id}")
 
-                    # Wait for xmodem ready and send preamble
+                    # Send preamble - xmodem library handles handshake
                     await self._report_progress(
                         progress_callback, "flash", progress_base,
                         f"[{idx + 1}/{total_models}] Sending preamble @ {model.flash_address}..."
                     )
-                    if not await self._wait_for_xmodem_ready(ser, timeout=5):
-                        logger.error("Timeout waiting for xmodem ready before preamble")
-                        await self._report_progress(
-                            progress_callback, "flash", progress_base,
-                            f"Timeout waiting for xmodem ready (preamble)"
-                        )
-                        ser.close()
-                        return False
 
-                    ser.timeout = 2
-                    ser.reset_input_buffer()
-                    ser.reset_output_buffer()
-
-                    # Send preamble packet with flash address
+                    # Generate preamble packet with flash address
                     preamble = self._generate_preamble(
                         model.flash_address, model.offset, packet_size
                     )
                     logger.info(f"Sending preamble for {model.id} at {model.flash_address}")
+                    logger.info(f"Preamble bytes: {preamble[:20].hex()}...")
 
-                    import io
-                    preamble_stream = io.BytesIO(preamble)
-                    if not modem.send(preamble_stream, retry=16, quiet=True):
+                    import tempfile
+                    import os
+                    preamble_file = os.path.join(tempfile.gettempdir(), f"_temp_model_{idx}_preamble.bin")
+                    with open(preamble_file, 'wb') as f:
+                        f.write(preamble)
+
+                    # Run blocking xmodem in thread to allow WebSocket updates
+                    def send_preamble():
+                        with open(preamble_file, 'rb') as stream:
+                            return modem.send(stream, retry=16)
+
+                    if not await asyncio.to_thread(send_preamble):
                         logger.error(f"Failed to send preamble for model {model.id}")
                         await self._report_progress(
                             progress_callback, "flash", progress_base,
@@ -804,13 +861,20 @@ class HimaxDeployer(BaseDeployer):
                         ser.close()
                         return False
 
+                    # Small delay for device to process preamble
+                    logger.debug(f"Preamble sent, waiting for device response...")
+                    await asyncio.sleep(0.5)
+
+                    # Debug: check if there's any data waiting
+                    if ser.in_waiting:
+                        logger.debug(f"Data waiting after preamble: {ser.in_waiting} bytes")
+
                     # Wait for reboot prompt again
-                    ser.timeout = 0.1
                     await self._report_progress(
                         progress_callback, "flash", progress_base,
                         f"[{idx + 1}/{total_models}] Preamble sent, waiting..."
                     )
-                    if not await self._wait_for_reboot_prompt(ser, timeout=30):
+                    if not await self._wait_for_reboot_prompt(ser, timeout=60):
                         logger.error(f"Timeout waiting for reboot prompt after preamble for model {model.id}")
                         await self._report_progress(
                             progress_callback, "flash", progress_base,
@@ -819,48 +883,38 @@ class HimaxDeployer(BaseDeployer):
                         ser.close()
                         return False
 
-                    # Send 'n' to continue
-                    ser.write(b'n')
+                    # Send 'n' to continue - matching official script
                     await asyncio.sleep(1)
-                    ser.reset_input_buffer()
+                    ser.flushInput()
+                    self._send_at_command(ser, 'n')
 
-                    # Wait for xmodem ready and send model file
+                    # Send model file - xmodem library handles handshake
                     await self._report_progress(
                         progress_callback, "flash", progress_base,
                         f"[{idx + 1}/{total_models}] Sending model file..."
                     )
-                    if not await self._wait_for_xmodem_ready(ser, timeout=5):
-                        logger.error(f"Timeout waiting for xmodem ready before model {model.id}")
+
+                    logger.info(f"Sending model file: {model_path}")
+
+                    # Run blocking xmodem in thread to allow WebSocket updates
+                    def send_model():
+                        with open(model_path, "rb") as f:
+                            return modem.send(f, retry=16, quiet=True)
+
+                    if not await asyncio.to_thread(send_model):
+                        logger.error(f"Failed to send model {model.id}")
                         await self._report_progress(
                             progress_callback, "flash", progress_base,
-                            f"Timeout waiting for xmodem ready (model)"
+                            f"Failed to send model file"
                         )
                         ser.close()
                         return False
 
-                    ser.timeout = 2
-                    ser.reset_input_buffer()
-                    ser.reset_output_buffer()
-
-                    # Send model file
-                    logger.info(f"Sending model file: {model_path}")
-
-                    with open(model_path, "rb") as f:
-                        if not modem.send(f, retry=16, quiet=True):
-                            logger.error(f"Failed to send model {model.id}")
-                            await self._report_progress(
-                                progress_callback, "flash", progress_base,
-                                f"Failed to send model file"
-                            )
-                            ser.close()
-                            return False
-
                     logger.info(f"Model {model.id} transfer complete")
 
-            # Step 6: Send 'y' to reboot after all models
-            ser.timeout = 0.1
-            if await self._wait_for_reboot_prompt(ser, timeout=30):
-                ser.write(b'y')
+            # Step 6: Send 'y' to reboot after all models - matching official script
+            if await self._wait_for_reboot_prompt(ser, timeout=60):
+                self._send_at_command(ser, 'y')
                 logger.info("Sent reboot confirmation")
 
             ser.close()
