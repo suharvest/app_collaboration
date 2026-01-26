@@ -6,6 +6,7 @@ import './main.css';
 import { router } from './modules/router.js';
 import { i18n, t } from './modules/i18n.js';
 import { toast } from './modules/toast.js';
+import { waitForBackendReady } from './modules/api.js';
 
 // Import pages
 import { renderSolutionsPage } from './pages/solutions.js';
@@ -17,7 +18,9 @@ import { renderManagementPage } from './pages/solution-management.js';
 import { renderSettingsPage } from './pages/settings.js';
 
 // Initialize application
-function initApp() {
+async function initApp() {
+  // Wait for backend to be ready (Tauri mode)
+  await waitForBackendReady();
   // Initialize i18n
   i18n.updateDOM();
 
@@ -123,7 +126,7 @@ function updateActiveNavItem(route) {
 
 // Wait for DOM to be ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initApp);
+  document.addEventListener('DOMContentLoaded', () => initApp());
 } else {
   initApp();
 }

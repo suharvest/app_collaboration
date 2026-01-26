@@ -66,8 +66,8 @@ function renderSolutionIntro(solution, descriptionHtml) {
     initializeSelections(solution);
   }
 
-  // cover_image URL is already complete from API
-  const coverImage = solution.cover_image || PLACEHOLDER_IMAGE;
+  // Use getAssetUrl to handle Tauri mode (converts relative /api/... paths to full URLs)
+  const coverImage = solution.cover_image ? getAssetUrl(solution.id, solution.cover_image) : PLACEHOLDER_IMAGE;
 
   return `
     <div class="back-btn" id="back-btn">
@@ -204,9 +204,8 @@ function renderHeroCarousel(solution, coverImage, gallery) {
   // Build slides: cover image first, then gallery images
   const slides = [{ src: coverImage, type: 'image', caption: '' }];
   for (const item of gallery) {
-    const src = item.src?.startsWith('/') || item.src?.startsWith('http')
-      ? item.src
-      : getAssetUrl(solution.id, item.src);
+    // Use getAssetUrl for all paths - it handles /api/ paths, relative paths, and absolute URLs
+    const src = getAssetUrl(solution.id, item.src);
     slides.push({ src, type: item.type || 'image', caption: getLocalizedField(item, 'caption') });
   }
 
@@ -237,8 +236,8 @@ function renderHeroCarousel(solution, coverImage, gallery) {
 function renderRequiredDevice(solutionId, device) {
   const name = getLocalizedField(device, 'name');
   const description = getLocalizedField(device, 'description');
-  // API returns full URL for device image
-  const image = device.image || DEVICE_PLACEHOLDER;
+  // Use getAssetUrl to handle Tauri mode
+  const image = device.image ? getAssetUrl(solutionId, device.image) : DEVICE_PLACEHOLDER;
 
   return `
     <div class="required-device">
@@ -258,7 +257,7 @@ function renderRequiredDevice(solutionId, device) {
 
 function renderRequiredDeviceInline(solutionId, device) {
   const name = getLocalizedField(device, 'name');
-  const image = device.image || DEVICE_PLACEHOLDER;
+  const image = device.image ? getAssetUrl(solutionId, device.image) : DEVICE_PLACEHOLDER;
 
   return `
     <a href="${device.product_url || '#'}" target="${device.product_url ? '_blank' : '_self'}" class="device-chip">
@@ -411,14 +410,14 @@ function renderDeviceChipWithDropdown(group, solution) {
     const quantity = deviceSelections[group.id] || group.default_count || 1;
     selectedDevice = group.device_info || catalog[group.device_ref] || {};
     selectedName = getLocalizedField(selectedDevice, 'name') || group.device_ref;
-    selectedImage = selectedDevice.image || DEVICE_PLACEHOLDER;
+    selectedImage = selectedDevice.image ? getAssetUrl(solution.id, selectedDevice.image) : DEVICE_PLACEHOLDER;
     quantityBadge = `<span class="chip-qty-badge">×${quantity}</span>`;
   } else if (group.type === 'single') {
     const selectedRef = deviceSelections[group.id];
     const option = group.options?.find(o => o.device_ref === selectedRef);
     selectedDevice = option?.device_info || catalog[selectedRef] || {};
     selectedName = getLocalizedField(selectedDevice, 'name') || selectedRef;
-    selectedImage = selectedDevice.image || DEVICE_PLACEHOLDER;
+    selectedImage = selectedDevice.image ? getAssetUrl(solution.id, selectedDevice.image) : DEVICE_PLACEHOLDER;
   } else if (group.type === 'multiple') {
     const selectedRefs = deviceSelections[group.id] || [];
     if (selectedRefs.length > 0) {
@@ -426,7 +425,7 @@ function renderDeviceChipWithDropdown(group, solution) {
       const option = group.options?.find(o => o.device_ref === firstRef);
       selectedDevice = option?.device_info || catalog[firstRef] || {};
       selectedName = getLocalizedField(selectedDevice, 'name') || firstRef;
-      selectedImage = selectedDevice.image || DEVICE_PLACEHOLDER;
+      selectedImage = selectedDevice.image ? getAssetUrl(solution.id, selectedDevice.image) : DEVICE_PLACEHOLDER;
       if (selectedRefs.length > 1) {
         quantityBadge = `<span class="chip-qty-badge">+${selectedRefs.length - 1}</span>`;
       }
@@ -467,6 +466,7 @@ function renderDropdownPanel(group, solution) {
   if (group.type === 'quantity') {
     const currentValue = deviceSelections[group.id] || group.default_count || 1;
     const device = group.device_info || catalog[group.device_ref] || {};
+    const deviceImage = device.image ? getAssetUrl(solution.id, device.image) : DEVICE_PLACEHOLDER;
     const purchaseUrl = device.product_url;
     return `
       <div class="chip-dropdown-panel">
@@ -509,7 +509,7 @@ function renderDropdownPanel(group, solution) {
     const device = option.device_info || catalog[option.device_ref] || {};
     const name = getLocalizedField(device, 'name') || option.device_ref;
     const description = getLocalizedField(device, 'description');
-    const image = device.image || DEVICE_PLACEHOLDER;
+    const image = device.image ? getAssetUrl(solution.id, device.image) : DEVICE_PLACEHOLDER;
     const purchaseUrl = device.product_url;
 
     return `
@@ -542,7 +542,7 @@ function renderDropdownPanel(group, solution) {
         const device = option.device_info || catalog[option.device_ref] || {};
         const name = getLocalizedField(device, 'name') || option.device_ref;
         const label = getLocalizedField(option, 'label');
-        const image = device.image || DEVICE_PLACEHOLDER;
+        const image = device.image ? getAssetUrl(solution.id, device.image) : DEVICE_PLACEHOLDER;
         const purchaseUrl = device.product_url;
         const isSelected = currentValues.includes(option.device_ref);
 

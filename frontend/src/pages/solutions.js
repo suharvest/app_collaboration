@@ -58,7 +58,8 @@ function renderSolutionCard(solution) {
   const name = getLocalizedField(solution, 'name');
   // API returns flat structure, not nested under intro
   const summary = getLocalizedField(solution, 'summary');
-  const coverImage = solution.cover_image || PLACEHOLDER_IMAGE;
+  // Use getAssetUrl to handle Tauri mode (converts relative /api/... paths to full URLs)
+  const coverImage = solution.cover_image ? getAssetUrl(solution.id, solution.cover_image) : PLACEHOLDER_IMAGE;
 
   return `
     <div class="solution-card" data-solution-id="${solution.id}">

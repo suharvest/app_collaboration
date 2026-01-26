@@ -3,7 +3,7 @@
  * Provides CRUD operations for solutions with file upload support
  */
 
-import { solutionsApi } from '../modules/api.js';
+import { solutionsApi, getAssetUrl } from '../modules/api.js';
 import { t, i18n, getLocalizedField } from '../modules/i18n.js';
 import { toast } from '../modules/toast.js';
 
@@ -87,6 +87,9 @@ async function loadSolutions() {
 function renderSolutionsTable() {
   const container = document.getElementById('solutions-table-container');
 
+  // Guard against null container (page may have been navigated away)
+  if (!container) return;
+
   if (solutions.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
@@ -119,7 +122,7 @@ function renderSolutionsTable() {
             <td class="font-mono text-sm">${solution.id}</td>
             <td>
               <div class="solution-name-cell">
-                ${solution.cover_image ? `<img src="${solution.cover_image}" alt="" class="solution-thumb">` : ''}
+                ${solution.cover_image ? `<img src="${getAssetUrl(solution.id, solution.cover_image)}" alt="" class="solution-thumb">` : ''}
                 <span>${getLocalizedField(solution, 'name')}</span>
               </div>
             </td>

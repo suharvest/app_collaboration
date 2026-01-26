@@ -8,19 +8,24 @@
  */
 
 import { t } from './i18n.js';
+import { getApiBase } from './api.js';
 
 // ============================================
 // Preview API
 // ============================================
 
-const API_BASE = '/api/preview';
+// Dynamic API base for Tauri compatibility
+function getPreviewApiBase() {
+  const apiBase = getApiBase();
+  return `${apiBase.replace('/api', '')}/api/preview`;
+}
 
 export const previewApi = {
   /**
    * Start an RTSP to MJPEG stream
    */
   async startMjpegStream(rtspUrl, streamId = null, fps = 10, quality = 5) {
-    const response = await fetch(`${API_BASE}/mjpeg/start`, {
+    const response = await fetch(`${getPreviewApiBase()}/mjpeg/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rtsp_url: rtspUrl, stream_id: streamId, fps, quality }),
@@ -36,7 +41,7 @@ export const previewApi = {
    * Stop a stream
    */
   async stopStream(streamId) {
-    const response = await fetch(`${API_BASE}/stream/${streamId}/stop`, {
+    const response = await fetch(`${getPreviewApiBase()}/stream/${streamId}/stop`, {
       method: 'POST',
     });
     return response.ok;
@@ -46,7 +51,7 @@ export const previewApi = {
    * Get stream status
    */
   async getStreamStatus(streamId) {
-    const response = await fetch(`${API_BASE}/stream/${streamId}/status`);
+    const response = await fetch(`${getPreviewApiBase()}/stream/${streamId}/status`);
     if (!response.ok) return null;
     return response.json();
   },
@@ -55,7 +60,7 @@ export const previewApi = {
    * Get preview service status
    */
   async getStatus() {
-    const response = await fetch(`${API_BASE}/status`);
+    const response = await fetch(`${getPreviewApiBase()}/status`);
     return response.json();
   },
 };
@@ -261,10 +266,16 @@ export class PreviewWindow {
    * Start reading MJPEG frames from the streaming endpoint
    */
   _startMjpegReader(url) {
-    // In dev mode, bypass Vite proxy and connect directly to backend
-    // Vite proxy doesn't support streaming responses properly
+    // Build full URL for the MJPEG stream
+    // In Tauri mode or dev mode, we need the full URL
     let fullUrl = url;
-    if (window.location.port === '5173') {
+    const isTauri = window.__TAURI__ !== undefined;
+
+    if (isTauri) {
+      // Tauri mode: use backend port
+      const backendPort = window.__BACKEND_PORT__ || 3260;
+      fullUrl = `http://127.0.0.1:${backendPort}${url}`;
+    } else if (window.location.port === '5173') {
       // Dev mode: connect directly to backend at port 3260
       fullUrl = `http://${window.location.hostname}:3260${url}`;
     }
