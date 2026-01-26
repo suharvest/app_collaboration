@@ -1231,6 +1231,64 @@
     @apply mb-0;
   }
 
+  /* Model Selection (for Himax multi-model flashing) */
+  .model-selection {
+    @apply bg-gray-50 rounded-lg p-4 mb-4;
+  }
+
+  .model-selection .input-label {
+    @apply block mb-1.5 text-text-secondary text-13 font-medium;
+  }
+
+  .model-selection .input-desc {
+    @apply mb-3;
+  }
+
+  .model-list {
+    @apply flex flex-col gap-2;
+  }
+
+  .model-item {
+    @apply flex flex-wrap items-start gap-3 p-3 bg-white border border-border rounded-lg cursor-pointer;
+    transition: border-color 0.2s, background-color 0.2s;
+  }
+
+  .model-item:hover {
+    @apply border-primary bg-primary/5;
+  }
+
+  .model-item.required {
+    @apply bg-primary/5 border-primary/30;
+  }
+
+  .model-item input[type="checkbox"] {
+    @apply mt-0.5 w-4 h-4 rounded border-border text-primary focus:ring-primary;
+  }
+
+  .model-item input[type="checkbox"]:disabled {
+    @apply opacity-60 cursor-not-allowed;
+  }
+
+  .model-info {
+    @apply flex flex-wrap items-center gap-2 flex-1;
+  }
+
+  .model-name {
+    @apply font-medium text-text-primary text-sm;
+  }
+
+  .model-size {
+    @apply text-text-muted text-xs bg-gray-100 px-1.5 py-0.5 rounded;
+  }
+
+  .model-desc {
+    @apply w-full m-0 mt-1 text-text-secondary text-xs leading-relaxed;
+  }
+
+  .badge.required {
+    @apply bg-primary text-white px-2 py-0.5 rounded text-xs font-medium;
+  }
+
   /* Logs Section */
   .deploy-logs {
     @apply mt-4 border-t border-border pt-4;
