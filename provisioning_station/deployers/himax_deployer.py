@@ -735,10 +735,31 @@ class HimaxDeployer(BaseDeployer):
                         f"Flashing model {idx + 1}/{total_models}: {model_name}"
                     )
 
+                    # Resolve model path first to fail fast
+                    try:
+                        model_path = self._resolve_model_path(model, base_path)
+                        logger.info(f"Model file resolved: {model_path}")
+                    except FileNotFoundError as e:
+                        logger.error(f"Model file not found: {e}")
+                        await self._report_progress(
+                            progress_callback, "flash", progress_base,
+                            f"Model file not found: {model.path}"
+                        )
+                        ser.close()
+                        return False
+
                     # Wait for reboot prompt
                     ser.timeout = 0.1
+                    await self._report_progress(
+                        progress_callback, "flash", progress_base,
+                        f"[{idx + 1}/{total_models}] Waiting for reboot prompt..."
+                    )
                     if not await self._wait_for_reboot_prompt(ser, timeout=30):
                         logger.error(f"Timeout waiting for reboot prompt before model {model.id}")
+                        await self._report_progress(
+                            progress_callback, "flash", progress_base,
+                            f"Timeout waiting for reboot prompt"
+                        )
                         ser.close()
                         return False
 
@@ -749,8 +770,16 @@ class HimaxDeployer(BaseDeployer):
                     ser.reset_input_buffer()
 
                     # Wait for xmodem ready and send preamble
+                    await self._report_progress(
+                        progress_callback, "flash", progress_base,
+                        f"[{idx + 1}/{total_models}] Sending preamble @ {model.flash_address}..."
+                    )
                     if not await self._wait_for_xmodem_ready(ser, timeout=5):
                         logger.error("Timeout waiting for xmodem ready before preamble")
+                        await self._report_progress(
+                            progress_callback, "flash", progress_base,
+                            f"Timeout waiting for xmodem ready (preamble)"
+                        )
                         ser.close()
                         return False
 
@@ -768,13 +797,25 @@ class HimaxDeployer(BaseDeployer):
                     preamble_stream = io.BytesIO(preamble)
                     if not modem.send(preamble_stream, retry=16, quiet=True):
                         logger.error(f"Failed to send preamble for model {model.id}")
+                        await self._report_progress(
+                            progress_callback, "flash", progress_base,
+                            f"Failed to send preamble"
+                        )
                         ser.close()
                         return False
 
                     # Wait for reboot prompt again
                     ser.timeout = 0.1
+                    await self._report_progress(
+                        progress_callback, "flash", progress_base,
+                        f"[{idx + 1}/{total_models}] Preamble sent, waiting..."
+                    )
                     if not await self._wait_for_reboot_prompt(ser, timeout=30):
                         logger.error(f"Timeout waiting for reboot prompt after preamble for model {model.id}")
+                        await self._report_progress(
+                            progress_callback, "flash", progress_base,
+                            f"Timeout after preamble"
+                        )
                         ser.close()
                         return False
 
@@ -784,8 +825,16 @@ class HimaxDeployer(BaseDeployer):
                     ser.reset_input_buffer()
 
                     # Wait for xmodem ready and send model file
+                    await self._report_progress(
+                        progress_callback, "flash", progress_base,
+                        f"[{idx + 1}/{total_models}] Sending model file..."
+                    )
                     if not await self._wait_for_xmodem_ready(ser, timeout=5):
                         logger.error(f"Timeout waiting for xmodem ready before model {model.id}")
+                        await self._report_progress(
+                            progress_callback, "flash", progress_base,
+                            f"Timeout waiting for xmodem ready (model)"
+                        )
                         ser.close()
                         return False
 
@@ -794,12 +843,15 @@ class HimaxDeployer(BaseDeployer):
                     ser.reset_output_buffer()
 
                     # Send model file
-                    model_path = self._resolve_model_path(model, base_path)
                     logger.info(f"Sending model file: {model_path}")
 
                     with open(model_path, "rb") as f:
                         if not modem.send(f, retry=16, quiet=True):
                             logger.error(f"Failed to send model {model.id}")
+                            await self._report_progress(
+                                progress_callback, "flash", progress_base,
+                                f"Failed to send model file"
+                            )
                             ser.close()
                             return False
 
