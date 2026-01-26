@@ -279,7 +279,25 @@ export class PreviewWindow {
       // Dev mode: connect directly to backend at port 3260
       fullUrl = `http://${window.location.hostname}:3260${url}`;
     }
-    console.log('[MJPEG] Starting fetch:', fullUrl);
+    console.log('[MJPEG] Starting stream:', fullUrl);
+
+    // For Tauri/Safari, use native img.src with MJPEG URL directly
+    // This works better than fetch+ReadableStream which has WebKit issues
+    // For dev mode through Vite proxy, we need fetch+parser approach
+    const useNativeImg = isTauri || (window.location.port !== '5173');
+
+    if (useNativeImg) {
+      // Native MJPEG: set img.src directly
+      // Browsers handle multipart/x-mixed-replace automatically
+      console.log('[MJPEG] Using native img.src approach');
+      this.img.src = fullUrl;
+      // First frame will trigger img.onload event which is already handled
+      return;
+    }
+
+    // For dev mode with Vite proxy: use fetch + manual frame parsing
+    // because Vite proxy doesn't handle multipart/x-mixed-replace well
+    console.log('[MJPEG] Using fetch+parser approach (dev mode)');
     fetch(fullUrl, { signal: this._abortController.signal, mode: 'cors' })
       .then(response => {
         console.log('[MJPEG] Response:', response.status, response.headers.get('content-type'));
