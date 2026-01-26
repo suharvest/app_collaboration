@@ -46,6 +46,7 @@ class DeviceDetector:
 
             # Match by VID/PID if specified
             if detection.usb_vendor_id and detection.usb_product_id:
+                matched_ports = []
                 for port in ports:
                     if port.vid and port.pid:
                         vid = f"0x{port.vid:04x}"
@@ -55,17 +56,66 @@ class DeviceDetector:
                             vid.lower() == detection.usb_vendor_id.lower()
                             and pid.lower() == detection.usb_product_id.lower()
                         ):
-                            return {
-                                "status": "detected",
-                                "connection_info": {"port": port.device},
-                                "details": {
-                                    "port": port.device,
-                                    "description": port.description,
-                                    "manufacturer": port.manufacturer,
-                                    "vid": vid,
-                                    "pid": pid,
-                                },
-                            }
+                            matched_ports.append((port, vid, pid))
+
+                if matched_ports:
+                    # For dual-serial USB devices (like ESP32-S3 with USB-JTAG + UART):
+                    # - Multiple ports share the same serial_number but differ in interface
+                    # - Port name typically ends with: serial_number + interface_number
+                    # - Interface 1 (*51) = JTAG/debug, Interface 3 (*53) = UART (for flashing)
+                    # Strategy: prefer port names ending with '3' (UART interface)
+
+                    # Group by serial number to detect dual-serial devices
+                    by_serial = {}
+                    for port, vid, pid in matched_ports:
+                        sn = port.serial_number or "unknown"
+                        if sn not in by_serial:
+                            by_serial[sn] = []
+                        by_serial[sn].append((port, vid, pid))
+
+                    # Select best port from each serial number group
+                    best_port = None
+                    for sn, port_list in by_serial.items():
+                        if len(port_list) > 1:
+                            # Dual-serial device detected
+                            # Strategy: prefer higher interface number (UART is usually interface 2/3)
+                            def get_interface_priority(item):
+                                port = item[0]
+                                # Windows: use interface field directly
+                                if port.interface is not None:
+                                    try:
+                                        return int(port.interface)
+                                    except (ValueError, TypeError):
+                                        pass
+                                # macOS/Linux: extract from port name (e.g., *51 -> 1, *53 -> 3)
+                                # Port name format: /dev/cu.usbmodemXXXXXXXXXXN where N is interface
+                                device = port.device
+                                if device and device[-1].isdigit():
+                                    return int(device[-1])
+                                return 0
+
+                            port_list.sort(key=get_interface_priority, reverse=True)
+                            logger.info(
+                                f"Dual-serial device detected (serial={sn}), "
+                                f"selecting {port_list[0][0].device} from {[p[0].device for p in port_list]}"
+                            )
+                        best_port = port_list[0]
+
+                    if best_port:
+                        port, vid, pid = best_port
+                        return {
+                            "status": "detected",
+                            "connection_info": {"port": port.device},
+                            "details": {
+                                "port": port.device,
+                                "description": port.description,
+                                "manufacturer": port.manufacturer,
+                                "vid": vid,
+                                "pid": pid,
+                                "serial_number": port.serial_number,
+                                "all_matching_ports": [p[0].device for p in matched_ports],
+                            },
+                        }
 
             # Fallback: check common port patterns (cross-platform)
             fallback_ports = detection.fallback_ports or self._get_platform_port_patterns()

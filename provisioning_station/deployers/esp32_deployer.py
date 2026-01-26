@@ -5,13 +5,25 @@ ESP32 firmware flashing deployer using esptool
 import asyncio
 import logging
 import re
+import sys
+import io
 from pathlib import Path
 from typing import Callable, Optional, Dict, Any
+from contextlib import redirect_stdout, redirect_stderr
 
 from .base import BaseDeployer
 from ..models.device import DeviceConfig
 
 logger = logging.getLogger(__name__)
+
+
+def is_frozen() -> bool:
+    """Check if running as frozen executable (PyInstaller).
+
+    This must be a function, not a module-level variable, because when uvicorn
+    imports the module in a worker process, sys.frozen may not be set yet.
+    """
+    return getattr(sys, 'frozen', False)
 
 
 class ESP32Deployer(BaseDeployer):
@@ -33,12 +45,38 @@ class ESP32Deployer(BaseDeployer):
         flash_config = config.firmware.flash_config
 
         try:
-            # Step 1: Detect chip
+            # Step 1: Detect chip with retry logic
             await self._report_progress(
                 progress_callback, "detect", 0, "Detecting ESP32 chip..."
             )
 
-            detect_result = await self._run_esptool(["--port", port, "chip_id"])
+            # Try detection with automatic reset first
+            detect_result = await self._run_esptool([
+                "--port", port,
+                "--before", "default_reset",
+                "--after", "no_reset",
+                "chip_id"
+            ])
+
+            if not detect_result["success"]:
+                # First attempt failed, prompt user for manual boot mode
+                await self._report_progress(
+                    progress_callback,
+                    "detect",
+                    30,
+                    "Auto-detect failed. Please enter download mode: Hold BOOT button, press RESET, then release BOOT"
+                )
+
+                # Wait a moment for user to enter boot mode
+                await asyncio.sleep(3)
+
+                # Retry detection
+                detect_result = await self._run_esptool([
+                    "--port", port,
+                    "--before", "no_reset",
+                    "--after", "no_reset",
+                    "chip_id"
+                ])
 
             if not detect_result["success"]:
                 await self._report_progress(
@@ -154,8 +192,111 @@ class ESP32Deployer(BaseDeployer):
             )
             return False
 
+    def _run_esptool_internal(self, args: list) -> dict:
+        """Run esptool using Python API (synchronous, for frozen apps)"""
+        # Extract port from args for cleanup
+        port = None
+        for i, arg in enumerate(args):
+            if arg == "--port" and i + 1 < len(args):
+                port = args[i + 1]
+                break
+
+        try:
+            import esptool
+            from esptool.util import FatalError
+
+            # Capture stdout and stderr
+            stdout_capture = io.StringIO()
+            stderr_capture = io.StringIO()
+
+            # esptool.main(argv) uses argv directly (not sys.argv format)
+            # Do NOT prepend 'esptool.py' - esptool will treat it as a subcommand
+            full_args = args
+
+            try:
+                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                    esptool.main(full_args)
+
+                return {
+                    "success": True,
+                    "stdout": stdout_capture.getvalue(),
+                    "stderr": stderr_capture.getvalue(),
+                    "error": None,
+                }
+            except SystemExit as e:
+                # esptool calls sys.exit() on completion
+                stdout_val = stdout_capture.getvalue()
+                stderr_val = stderr_capture.getvalue()
+
+                if e.code == 0:
+                    return {
+                        "success": True,
+                        "stdout": stdout_val,
+                        "stderr": stderr_val,
+                        "error": None,
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "stdout": stdout_val,
+                        "stderr": stderr_val,
+                        "error": stderr_val or f"esptool exited with code {e.code}",
+                    }
+            except FatalError as e:
+                # esptool FatalError (connection failed, etc.)
+                stdout_val = stdout_capture.getvalue()
+                stderr_val = stderr_capture.getvalue()
+                return {
+                    "success": False,
+                    "stdout": stdout_val,
+                    "stderr": stderr_val,
+                    "error": str(e),
+                }
+            finally:
+                # Ensure serial port is released after esptool operation
+                # esptool may leave port open on connection failure
+                if port:
+                    self._cleanup_serial_port(port)
+
+        except ImportError as e:
+            return {"success": False, "error": f"esptool module not available: {str(e)}"}
+        except Exception as e:
+            logger.exception("Unexpected error in esptool")
+            if port:
+                self._cleanup_serial_port(port)
+            return {"success": False, "error": str(e)}
+
+    def _cleanup_serial_port(self, port: str):
+        """Force close serial port if it was left open by esptool"""
+        try:
+            import serial
+            # Try to open and immediately close to release any locks
+            ser = serial.Serial()
+            ser.port = port
+            ser.baudrate = 115200
+            ser.timeout = 0.1
+            try:
+                ser.open()
+                ser.close()
+            except serial.SerialException:
+                # Port might already be closed or unavailable, that's fine
+                pass
+        except Exception as e:
+            logger.debug(f"Serial port cleanup for {port}: {e}")
+
     async def _run_esptool(self, args: list) -> dict:
         """Run esptool command"""
+        frozen = is_frozen()
+        logger.info(f"Running esptool, frozen={frozen}, sys.frozen={getattr(sys, 'frozen', 'NOT_SET')}")
+
+        # For frozen apps, use Python API directly
+        if frozen:
+            logger.info("Using Python API for esptool (frozen mode)")
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, self._run_esptool_internal, args)
+
+        # For development, try subprocess first
+        logger.info("Using subprocess for esptool (development mode)")
         try:
             cmd = ["esptool.py"] + args
             process = await asyncio.create_subprocess_exec(
@@ -189,16 +330,140 @@ class ESP32Deployer(BaseDeployer):
                     "stderr": stderr.decode(),
                     "error": stderr.decode() if process.returncode != 0 else None,
                 }
-            except Exception as e:
-                return {"success": False, "error": f"esptool not found: {str(e)}"}
+            except Exception:
+                # Fall back to Python API
+                logger.info("Falling back to esptool Python API")
+                loop = asyncio.get_event_loop()
+                return await loop.run_in_executor(None, self._run_esptool_internal, args)
 
         except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _run_esptool_with_progress_internal(
+        self, args: list, output_lines: list
+    ) -> dict:
+        """Run esptool with output capture for progress parsing (synchronous)"""
+        # Extract port from args for cleanup
+        port = None
+        for i, arg in enumerate(args):
+            if arg == "--port" and i + 1 < len(args):
+                port = args[i + 1]
+                break
+
+        try:
+            import esptool
+            from esptool.util import FatalError
+
+            class LineCapture(io.StringIO):
+                """StringIO that also appends lines to a list"""
+                def __init__(self, lines_list):
+                    super().__init__()
+                    self.lines_list = lines_list
+
+                def write(self, s):
+                    super().write(s)
+                    # Split by newlines and add non-empty lines
+                    for line in s.split('\n'):
+                        line = line.strip()
+                        if line:
+                            self.lines_list.append(line)
+                    return len(s)
+
+            stdout_capture = LineCapture(output_lines)
+            stderr_capture = LineCapture(output_lines)
+
+            # esptool.main(argv) uses argv directly (not sys.argv format)
+            # Do NOT prepend 'esptool.py' - esptool will treat it as a subcommand
+            full_args = args
+
+            try:
+                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                    esptool.main(full_args)
+                return {"success": True}
+            except SystemExit as e:
+                if e.code == 0:
+                    return {"success": True}
+                else:
+                    error_context = "\n".join(output_lines[-5:]) if output_lines else "Unknown error"
+                    return {"success": False, "error": error_context}
+            except FatalError as e:
+                # esptool FatalError (connection failed, etc.)
+                error_context = "\n".join(output_lines[-5:]) if output_lines else str(e)
+                return {"success": False, "error": error_context}
+            finally:
+                # Ensure serial port is released after esptool operation
+                if port:
+                    self._cleanup_serial_port(port)
+
+        except ImportError as e:
+            return {"success": False, "error": f"esptool module not available: {str(e)}"}
+        except Exception as e:
+            logger.exception("Unexpected error in esptool with progress")
+            if port:
+                self._cleanup_serial_port(port)
             return {"success": False, "error": str(e)}
 
     async def _run_esptool_with_progress(
         self, args: list, progress_callback: Optional[Callable]
     ) -> dict:
         """Run esptool with real-time progress parsing"""
+
+        # For frozen apps, use Python API with polling
+        if is_frozen():
+            import concurrent.futures
+
+            output_lines = []
+            last_progress = 0
+
+            loop = asyncio.get_event_loop()
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
+            future = loop.run_in_executor(
+                executor,
+                self._run_esptool_with_progress_internal,
+                args,
+                output_lines
+            )
+
+            # Poll for progress while esptool runs
+            processed_lines = 0
+            while not future.done():
+                await asyncio.sleep(0.1)
+
+                # Process new output lines
+                while processed_lines < len(output_lines):
+                    line_str = output_lines[processed_lines]
+                    processed_lines += 1
+
+                    logger.debug(f"esptool: {line_str}")
+
+                    # Parse progress
+                    if "Writing at" in line_str and "%" in line_str:
+                        match = re.search(r"\((\d+)\s*%\)", line_str)
+                        if match and progress_callback:
+                            progress = int(match.group(1))
+                            if progress >= last_progress + 5 or progress == 100:
+                                progress_callback(progress, f"Flashing... {progress}%")
+                                last_progress = progress
+                    elif progress_callback and line_str and not line_str.startswith(".."):
+                        progress_callback(last_progress, line_str)
+
+            # Process any remaining lines
+            while processed_lines < len(output_lines):
+                line_str = output_lines[processed_lines]
+                processed_lines += 1
+                logger.debug(f"esptool: {line_str}")
+
+                if "Writing at" in line_str and "%" in line_str:
+                    match = re.search(r"\((\d+)\s*%\)", line_str)
+                    if match and progress_callback:
+                        progress = int(match.group(1))
+                        progress_callback(progress, f"Flashing... {progress}%")
+
+            executor.shutdown(wait=False)
+            return await future
+
+        # For development, use subprocess with streaming
         try:
             cmd = ["esptool.py"] + args
             try:
@@ -209,11 +474,23 @@ class ESP32Deployer(BaseDeployer):
                 )
             except FileNotFoundError:
                 cmd = ["python", "-m", "esptool"] + args
-                process = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.STDOUT,
-                )
+                try:
+                    process = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.STDOUT,
+                    )
+                except FileNotFoundError:
+                    # Fall back to Python API
+                    logger.info("Falling back to esptool Python API for progress")
+                    output_lines = []
+                    loop = asyncio.get_event_loop()
+                    return await loop.run_in_executor(
+                        None,
+                        self._run_esptool_with_progress_internal,
+                        args,
+                        output_lines
+                    )
 
             last_progress = 0
             all_output = []

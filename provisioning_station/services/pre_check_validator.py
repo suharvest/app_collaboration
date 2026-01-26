@@ -7,6 +7,7 @@ import logging
 import re
 import shutil
 import socket
+import sys
 from typing import List, Dict, Any, Optional
 
 from pydantic import BaseModel
@@ -14,6 +15,15 @@ from pydantic import BaseModel
 from ..models.device import PreCheck
 
 logger = logging.getLogger(__name__)
+
+
+def is_frozen() -> bool:
+    """Check if running as frozen executable (PyInstaller).
+
+    This must be a function, not a module-level variable, because when uvicorn
+    imports the module in a worker process, sys.frozen may not be set yet.
+    """
+    return getattr(sys, 'frozen', False)
 
 
 class CheckResult(BaseModel):
@@ -238,49 +248,88 @@ class PreCheckValidator:
     async def _validate_esptool_version(self, check: PreCheck) -> CheckResult:
         """Check esptool version"""
         try:
-            process = await asyncio.create_subprocess_exec(
-                "esptool.py", "version",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, _ = await process.communicate()
+            version_str = None
 
-            if process.returncode != 0:
-                # Try with python -m esptool
-                process = await asyncio.create_subprocess_exec(
-                    "python", "-m", "esptool", "version",
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                stdout, _ = await process.communicate()
+            # For frozen apps, check esptool module directly
+            if is_frozen():
+                try:
+                    import esptool
+                    # Get version from module
+                    version_str = getattr(esptool, '__version__', None)
+                    if not version_str:
+                        # Try getting from esptool.version module
+                        try:
+                            from esptool import __version__
+                            version_str = __version__
+                        except ImportError:
+                            pass
+                    if not version_str:
+                        # Module exists but version unknown
+                        return CheckResult(
+                            type=check.type,
+                            passed=True,
+                            message="esptool is available (bundled)",
+                        )
+                except ImportError:
+                    return CheckResult(
+                        type=check.type,
+                        passed=False,
+                        message="esptool module is not bundled",
+                    )
+            else:
+                # For development, try subprocess
+                try:
+                    process = await asyncio.create_subprocess_exec(
+                        "esptool.py", "version",
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    stdout, _ = await process.communicate()
 
-            if process.returncode != 0:
-                return CheckResult(
-                    type=check.type,
-                    passed=False,
-                    message="esptool is not installed",
-                )
+                    if process.returncode != 0:
+                        # Try with python -m esptool
+                        process = await asyncio.create_subprocess_exec(
+                            "python", "-m", "esptool", "version",
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE,
+                        )
+                        stdout, _ = await process.communicate()
 
-            version_str = stdout.decode().strip()
-            match = re.search(r"(\d+\.\d+(?:\.\d+)?)", version_str)
-            if match:
-                current_version = match.group(1)
-
-                if check.min_version:
-                    if self._compare_versions(current_version, check.min_version) < 0:
+                    if process.returncode != 0:
                         return CheckResult(
                             type=check.type,
                             passed=False,
-                            message=f"esptool version {current_version} is below required {check.min_version}",
-                            details={"current_version": current_version, "required_version": check.min_version},
+                            message="esptool is not installed",
                         )
 
-                return CheckResult(
-                    type=check.type,
-                    passed=True,
-                    message=f"esptool version {current_version}",
-                    details={"version": current_version},
-                )
+                    version_str = stdout.decode().strip()
+                except FileNotFoundError:
+                    return CheckResult(
+                        type=check.type,
+                        passed=False,
+                        message="esptool is not installed",
+                    )
+
+            if version_str:
+                match = re.search(r"(\d+\.\d+(?:\.\d+)?)", version_str)
+                if match:
+                    current_version = match.group(1)
+
+                    if check.min_version:
+                        if self._compare_versions(current_version, check.min_version) < 0:
+                            return CheckResult(
+                                type=check.type,
+                                passed=False,
+                                message=f"esptool version {current_version} is below required {check.min_version}",
+                                details={"current_version": current_version, "required_version": check.min_version},
+                            )
+
+                    return CheckResult(
+                        type=check.type,
+                        passed=True,
+                        message=f"esptool version {current_version}",
+                        details={"version": current_version},
+                    )
 
             return CheckResult(
                 type=check.type,
@@ -288,12 +337,6 @@ class PreCheckValidator:
                 message="esptool is available",
             )
 
-        except FileNotFoundError:
-            return CheckResult(
-                type=check.type,
-                passed=False,
-                message="esptool is not installed",
-            )
         except Exception as e:
             return CheckResult(
                 type=check.type,
