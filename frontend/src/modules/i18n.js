@@ -105,6 +105,11 @@ const translations = {
       wiring: {
         title: 'Wiring Instructions',
       },
+      models: {
+        title: 'Select Models to Flash',
+        description: 'Choose which AI models to flash with the base firmware',
+        required: 'Required',
+      },
       docker: {
         notInstalled: 'Docker Not Installed',
         installHint: 'This will automatically install Docker on the remote device. The process may take a few minutes.',
@@ -458,6 +463,11 @@ const translations = {
       postInstructions: '部署后操作',
       wiring: {
         title: '接线说明',
+      },
+      models: {
+        title: '选择要烧录的模型',
+        description: '选择要与基础固件一起烧录的 AI 模型',
+        required: '必需',
       },
       docker: {
         notInstalled: '未检测到 Docker',

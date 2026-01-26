@@ -27,6 +27,34 @@ firmware:
     # SenseCAP Watcher specific: ESP32 firmware monitors Himax and resets it
     # when detecting anomalies. We need to hold ESP32 in reset during flashing.
     requires_esp32_reset_hold: true
+    protocol: xmodem  # xmodem (128B) or xmodem1k (1024B)
+
+    # Multi-model configuration
+    # These AI models are flashed after the base firmware at specified flash addresses
+    models:
+      - id: face_detection
+        name: Face Detection (SCRFD)
+        name_zh: 人脸检测模型 (SCRFD)
+        path: assets/models/scrfd_500m_kps_int8_vela.tflite
+        flash_address: "0x200000"
+        offset: "0x0"
+        required: true
+        default: true
+        description: Core face detection model for identifying faces in video stream
+        description_zh: 核心人脸检测模型，用于识别视频流中的人脸
+        size_hint: "512KB"
+
+      - id: face_embedding
+        name: Face Embedding (GhostFaceNet)
+        name_zh: 人脸特征模型 (GhostFaceNet)
+        path: assets/models/ghostfacenet_0.5_112_int8_vela.tflite
+        flash_address: "0x400000"
+        offset: "0x0"
+        required: false
+        default: true
+        description: Face recognition embedding model for person identification
+        description_zh: 人脸识别特征提取模型，用于身份识别
+        size_hint: "800KB"
 
 # User inputs (supports auto-detection, can also be manually selected)
 user_inputs:
@@ -38,6 +66,14 @@ user_inputs:
     description: Select the USB port for Himax WE2 (usbmodem)
     description_zh: 选择 Himax WE2 的串口（usbmodem 开头）
     auto_detect: true
+
+  - id: model_selection
+    name: Models to Flash
+    name_zh: 选择要烧录的模型
+    type: model_select
+    required: false
+    description: Select AI models to flash with the base firmware
+    description_zh: 选择要与基础固件一起烧录的 AI 模型
 
 steps:
   - id: detect
@@ -57,10 +93,10 @@ steps:
     default: true
 
   - id: flash
-    name: Flash Firmware
-    name_zh: 烧录固件
-    description: Write face recognition firmware
-    description_zh: 写入人脸识别固件
+    name: Flash Firmware & Models
+    name_zh: 烧录固件和模型
+    description: Write base firmware and selected AI models
+    description_zh: 写入基础固件和选定的 AI 模型
     optional: false
     default: true
 

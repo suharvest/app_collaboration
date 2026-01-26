@@ -557,8 +557,11 @@ function renderSelectedDeviceContent(device) {
       <!-- Connection Settings -->
       ${device.type === 'ssh_deb' || device.type === 'docker_remote' || device.type === 'recamera_cpp' || device.type === 'recamera_nodered' ? renderSSHForm(device) : ''}
 
-      <!-- Serial Port Selector (for ESP32 devices) -->
-      ${device.type === 'esp32_usb' ? renderSerialPortSelector(device) : ''}
+      <!-- Serial Port Selector (for ESP32/Himax devices) -->
+      ${device.type === 'esp32_usb' || device.type === 'himax_usb' ? renderSerialPortSelector(device) : ''}
+
+      <!-- Model Selection (for Himax devices with models) -->
+      ${device.type === 'himax_usb' ? renderModelSelection(device) : ''}
 
       <!-- Deploy Action Area -->
       <div class="deploy-action-area">
@@ -1099,6 +1102,53 @@ function renderSerialPortSelector(device) {
   `;
 }
 
+/**
+ * Render model selection UI for Himax devices
+ */
+function renderModelSelection(device) {
+  const models = device.details?.firmware?.flash_config?.models || [];
+  if (!models.length) return '';
+
+  return `
+    <div class="model-selection" id="model-select-${device.id}">
+      <label class="input-label">${t('deploy.models.title')}</label>
+      <p class="input-desc text-xs text-text-muted mb-2">${t('deploy.models.description')}</p>
+      <div class="model-list">
+        ${models.map(model => {
+          const modelName = getLocalizedField(model, 'name');
+          const modelDesc = getLocalizedField(model, 'description');
+          return `
+            <label class="model-item ${model.required ? 'required' : ''}">
+              <input type="checkbox"
+                     name="model_${model.id}"
+                     value="${model.id}"
+                     data-device="${device.id}"
+                     ${model.required || model.default ? 'checked' : ''}
+                     ${model.required ? 'disabled' : ''}>
+              <div class="model-info">
+                <span class="model-name">${escapeHtml(modelName)}</span>
+                ${model.size_hint ? `<span class="model-size">${model.size_hint}</span>` : ''}
+                ${model.required ? `<span class="badge required">${t('deploy.models.required')}</span>` : ''}
+              </div>
+              ${modelDesc ? `<p class="model-desc">${escapeHtml(modelDesc)}</p>` : ''}
+            </label>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Get selected model IDs for a device
+ */
+function getSelectedModels(deviceId) {
+  const checkboxes = document.querySelectorAll(
+    `input[data-device="${deviceId}"]:checked`
+  );
+  return Array.from(checkboxes).map(cb => cb.value);
+}
+
 function renderLogEntry(log) {
   return `
     <div class="deploy-log-entry ${log.level}">
@@ -1556,7 +1606,7 @@ async function refreshSerialPorts(clickedBtn = null) {
     const devices = deployment.devices || [];
 
     devices.forEach(device => {
-      if (device.type === 'esp32_usb') {
+      if (device.type === 'esp32_usb' || device.type === 'himax_usb') {
         const select = document.getElementById(`serial-port-${device.id}`);
         if (select) {
           const currentValue = select.value;
@@ -1986,6 +2036,13 @@ async function startDeployment(deviceId) {
     const select = document.getElementById(`serial-port-${deviceId}`);
     params.device_connections[deviceId] = {
       port: select?.value || state.port,
+    };
+  } else if (effectiveType === 'himax_usb') {
+    const select = document.getElementById(`serial-port-${deviceId}`);
+    const selectedModels = getSelectedModels(deviceId);
+    params.device_connections[deviceId] = {
+      port: select?.value || state.port,
+      selected_models: selectedModels,
     };
   } else if (effectiveType === 'ssh_deb' || effectiveType === 'docker_remote') {
     params.device_connections[deviceId] = {

@@ -25,6 +25,23 @@ class PartitionConfig(BaseModel):
     file: str
 
 
+class HimaxModelConfig(BaseModel):
+    """Himax AI model configuration for multi-model flashing"""
+    id: str                                   # Unique identifier, e.g., "face_detection"
+    name: str                                 # Display name
+    name_zh: Optional[str] = None             # Chinese display name
+    path: str                                 # Local path (relative to assets)
+    url: Optional[str] = None                 # Remote download URL (optional)
+    flash_address: str                        # Flash address, e.g., "0xB7B000"
+    offset: str = "0x0"                       # Offset, usually "0x0"
+    required: bool = False                    # Whether required
+    default: bool = True                      # Whether selected by default
+    description: Optional[str] = None
+    description_zh: Optional[str] = None
+    size_hint: Optional[str] = None           # File size hint, e.g., "512KB"
+    checksum: Optional[Dict[str, str]] = None # Checksum for verification
+
+
 class FlashConfig(BaseModel):
     """Flash configuration for ESP32 and Himax devices"""
     chip: str = "esp32s3"
@@ -38,6 +55,8 @@ class FlashConfig(BaseModel):
     requires_reset: bool = False
     timeout: int = 60
     requires_esp32_reset_hold: bool = False  # SenseCAP Watcher: hold ESP32 in reset during Himax flash
+    protocol: str = "xmodem"                  # "xmodem" (128B) or "xmodem1k" (1024B)
+    models: List[HimaxModelConfig] = []       # AI models to flash after base firmware
 
 
 class FirmwareSource(BaseModel):

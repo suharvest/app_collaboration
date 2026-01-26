@@ -20,9 +20,13 @@ import serial
 import serial.tools.list_ports
 
 from .base import BaseDeployer
-from ..models.device import DeviceConfig
+from ..models.device import DeviceConfig, HimaxModelConfig
 
 logger = logging.getLogger(__name__)
+
+# Preamble magic bytes for multi-model flashing
+PREAMBLE_HEADER = bytes([0xC0, 0x5A])
+PREAMBLE_FOOTER = bytes([0x5A, 0xC0])
 
 
 class HimaxDeployer(BaseDeployer):
@@ -125,9 +129,30 @@ class HimaxDeployer(BaseDeployer):
 
             baudrate = flash_config.baudrate if hasattr(flash_config, 'baudrate') else 921600
 
-            success = await self._flash_with_xmodem(
-                port, firmware_path, baudrate, progress_callback, esp32_port
-            )
+            # Get user-selected models (if any)
+            selected_model_ids = connection.get("selected_models", [])
+            models_config = getattr(flash_config, 'models', [])
+            models_to_flash = self._get_models_to_flash(models_config, selected_model_ids)
+
+            # Get protocol type (xmodem or xmodem1k)
+            protocol = getattr(flash_config, 'protocol', 'xmodem')
+
+            # Use multi-model flashing if models are configured
+            if models_to_flash:
+                success = await self._flash_with_xmodem_multimodel(
+                    port=port,
+                    firmware_path=firmware_path,
+                    baudrate=baudrate,
+                    protocol=protocol,
+                    models=models_to_flash,
+                    base_path=config.base_path,
+                    progress_callback=progress_callback,
+                    esp32_port=esp32_port
+                )
+            else:
+                success = await self._flash_with_xmodem(
+                    port, firmware_path, baudrate, progress_callback, esp32_port
+                )
 
             if not success:
                 await self._report_progress(
@@ -462,3 +487,355 @@ class HimaxDeployer(BaseDeployer):
                 })
 
         return ports
+
+    def _get_models_to_flash(
+        self,
+        models_config: List[HimaxModelConfig],
+        selected_ids: List[str]
+    ) -> List[HimaxModelConfig]:
+        """Determine which models to flash based on user selection"""
+        if not models_config:
+            return []
+        if selected_ids:
+            # User made explicit selection
+            return [m for m in models_config if m.id in selected_ids]
+        else:
+            # Default: flash required=True or default=True models
+            return [m for m in models_config if m.required or m.default]
+
+    def _generate_preamble(
+        self,
+        flash_address: str,
+        offset: str,
+        packet_size: int = 128
+    ) -> bytes:
+        """Generate preamble packet for model flashing
+
+        Preamble format:
+          [0xC0, 0x5A]           - 2 bytes magic header
+          [flash_address]        - 4 bytes, little-endian
+          [offset]               - 4 bytes, little-endian
+          [0x5A, 0xC0]           - 2 bytes magic footer
+          [0xFF * padding]       - fill to packet_size
+        """
+        addr = int(flash_address, 16)
+        off = int(offset, 16)
+
+        preamble = PREAMBLE_HEADER
+        preamble += addr.to_bytes(4, 'little')
+        preamble += off.to_bytes(4, 'little')
+        preamble += PREAMBLE_FOOTER
+        preamble += bytes([0xFF] * (packet_size - 12))
+
+        return preamble
+
+    async def _wait_for_reboot_prompt(
+        self,
+        ser: serial.Serial,
+        timeout: int = 30
+    ) -> bool:
+        """Wait for the reboot confirmation prompt from bootloader"""
+        rbuf = b""
+        start = time.time()
+
+        while (time.time() - start) < timeout:
+            rbuf += ser.read(256)
+            if b"Do you want to end file transmission and reboot" in rbuf:
+                return True
+            # Trim buffer to prevent memory issues
+            if len(rbuf) > 4096:
+                rbuf = rbuf[-2048:]
+            await asyncio.sleep(0.01)
+
+        return False
+
+    async def _wait_for_bootloader(
+        self,
+        ser: serial.Serial,
+        timeout: int = 30
+    ) -> bool:
+        """Wait for bootloader and enter xmodem download mode"""
+        rbuf = b""
+        timeout_ms = timeout * 1000
+
+        while timeout_ms > 0:
+            ser.write(b"1")
+            rbuf += ser.read(128)
+
+            if b"Xmodem download and burn FW image" in rbuf:
+                ser.write(b"1")
+                logger.info("Bootloader ready, xmodem mode selected")
+                return True
+
+            # Trim buffer to prevent memory issues
+            if len(rbuf) > 4096:
+                rbuf = rbuf[-2048:]
+
+            timeout_ms -= 10
+            await asyncio.sleep(0.01)
+
+        logger.error("Timeout waiting for bootloader")
+        return False
+
+    async def _wait_for_xmodem_ready(
+        self,
+        ser: serial.Serial,
+        timeout: int = 5
+    ) -> bool:
+        """Wait for 'C' character indicating xmodem-CRC ready"""
+        timeout_ms = timeout * 1000
+
+        while timeout_ms > 0:
+            c = ser.read(1)
+            if c == b"C":
+                # Wait for bootloader to finish outputting debug text
+                await asyncio.sleep(0.5)
+                # Drain any remaining output
+                while ser.in_waiting:
+                    ser.read(ser.in_waiting)
+                    await asyncio.sleep(0.1)
+                return True
+            timeout_ms -= 10
+            await asyncio.sleep(0.01)
+
+        logger.error("Timeout waiting for xmodem ready signal")
+        return False
+
+    def _resolve_model_path(self, model: HimaxModelConfig, base_path: str) -> str:
+        """Resolve model file path (local or download)"""
+        local_path = Path(base_path) / model.path
+        if local_path.exists():
+            return str(local_path)
+
+        # If URL is provided, download the model
+        if model.url:
+            return self._download_model(model)
+
+        raise FileNotFoundError(f"Model file not found: {model.path}")
+
+    def _download_model(self, model: HimaxModelConfig) -> str:
+        """Download model file to temporary directory with caching"""
+        import tempfile
+        import urllib.request
+
+        cache_dir = Path(tempfile.gettempdir()) / "himax_models"
+        cache_dir.mkdir(exist_ok=True)
+
+        filename = Path(model.path).name
+        cache_path = cache_dir / filename
+
+        if not cache_path.exists():
+            logger.info(f"Downloading model: {model.url}")
+            urllib.request.urlretrieve(model.url, cache_path)
+            # TODO: Validate checksum if provided
+
+        return str(cache_path)
+
+    async def _flash_with_xmodem_multimodel(
+        self,
+        port: str,
+        firmware_path: str,
+        baudrate: int,
+        protocol: str,
+        models: List[HimaxModelConfig],
+        base_path: str,
+        progress_callback: Optional[Callable],
+        esp32_port: Optional[str] = None,
+    ) -> bool:
+        """Flash base firmware followed by multiple AI models
+
+        Protocol flow:
+        1. Enter bootloader (send '1', wait for xmodem prompt)
+        2. Send base firmware via xmodem
+        3. For each model:
+           a. Wait for reboot prompt, send 'n' to continue
+           b. Send preamble packet with flash address
+           c. Wait for reboot prompt, send 'n'
+           d. Send model file via xmodem
+        4. After all models, send 'y' to reboot
+        """
+        packet_size = 128 if protocol == "xmodem" else 1024
+        esp32_serial = None
+
+        try:
+            # Step 0: Hold ESP32 in reset if this is SenseCAP Watcher
+            if esp32_port:
+                esp32_serial = self._hold_esp32_reset(esp32_port)
+                if esp32_serial:
+                    await self._report_progress(
+                        progress_callback, "flash", 5, "ESP32 held in reset"
+                    )
+                    await asyncio.sleep(0.5)
+
+            # Step 1: Open Himax serial port
+            await self._report_progress(
+                progress_callback, "flash", 10, "Connecting to Himax..."
+            )
+
+            ser = serial.Serial(port, baudrate=baudrate, timeout=0.01)
+            logger.info(f"Opened Himax port: {port}")
+
+            # Step 2: Wait for bootloader
+            await self._report_progress(
+                progress_callback, "flash", 15, "Waiting for bootloader (press RESET)..."
+            )
+
+            if not await self._wait_for_bootloader(ser, timeout=30):
+                ser.close()
+                return False
+
+            await self._report_progress(
+                progress_callback, "flash", 20, "Bootloader ready"
+            )
+
+            # Step 3: Wait for xmodem ready signal ('C')
+            if not await self._wait_for_xmodem_ready(ser, timeout=5):
+                ser.close()
+                return False
+
+            await self._report_progress(
+                progress_callback, "flash", 25, "Starting base firmware transfer..."
+            )
+
+            # Step 4: Transfer base firmware using xmodem
+            ser.timeout = 2
+            ser.reset_input_buffer()
+            ser.reset_output_buffer()
+
+            from xmodem import XMODEM
+
+            def getc(size, timeout=1):
+                return ser.read(size) or None
+
+            def putc(data, timeout=1):
+                return ser.write(data) or None
+
+            modem = XMODEM(getc, putc, mode=protocol)
+
+            with open(firmware_path, "rb") as f:
+                if not modem.send(f, retry=16, quiet=True):
+                    logger.error("Base firmware xmodem transfer failed")
+                    ser.close()
+                    return False
+
+            logger.info("Base firmware transfer complete")
+            await self._report_progress(
+                progress_callback, "flash", 35, "Base firmware complete"
+            )
+
+            # Step 5: Flash each model
+            if models:
+                total_models = len(models)
+                for idx, model in enumerate(models):
+                    progress_base = 35 + int((idx / total_models) * 55)
+                    model_name = model.name_zh if model.name_zh else model.name
+
+                    await self._report_progress(
+                        progress_callback, "flash", progress_base,
+                        f"Flashing model {idx + 1}/{total_models}: {model_name}"
+                    )
+
+                    # Wait for reboot prompt
+                    ser.timeout = 0.1
+                    if not await self._wait_for_reboot_prompt(ser, timeout=30):
+                        logger.error(f"Timeout waiting for reboot prompt before model {model.id}")
+                        ser.close()
+                        return False
+
+                    # Send 'n' to continue (not reboot)
+                    ser.write(b'n')
+                    logger.info(f"Continuing to flash model: {model.id}")
+                    await asyncio.sleep(1)
+                    ser.reset_input_buffer()
+
+                    # Wait for xmodem ready and send preamble
+                    if not await self._wait_for_xmodem_ready(ser, timeout=5):
+                        logger.error("Timeout waiting for xmodem ready before preamble")
+                        ser.close()
+                        return False
+
+                    ser.timeout = 2
+                    ser.reset_input_buffer()
+                    ser.reset_output_buffer()
+
+                    # Send preamble packet with flash address
+                    preamble = self._generate_preamble(
+                        model.flash_address, model.offset, packet_size
+                    )
+                    logger.info(f"Sending preamble for {model.id} at {model.flash_address}")
+
+                    import io
+                    preamble_stream = io.BytesIO(preamble)
+                    if not modem.send(preamble_stream, retry=16, quiet=True):
+                        logger.error(f"Failed to send preamble for model {model.id}")
+                        ser.close()
+                        return False
+
+                    # Wait for reboot prompt again
+                    ser.timeout = 0.1
+                    if not await self._wait_for_reboot_prompt(ser, timeout=30):
+                        logger.error(f"Timeout waiting for reboot prompt after preamble for model {model.id}")
+                        ser.close()
+                        return False
+
+                    # Send 'n' to continue
+                    ser.write(b'n')
+                    await asyncio.sleep(1)
+                    ser.reset_input_buffer()
+
+                    # Wait for xmodem ready and send model file
+                    if not await self._wait_for_xmodem_ready(ser, timeout=5):
+                        logger.error(f"Timeout waiting for xmodem ready before model {model.id}")
+                        ser.close()
+                        return False
+
+                    ser.timeout = 2
+                    ser.reset_input_buffer()
+                    ser.reset_output_buffer()
+
+                    # Send model file
+                    model_path = self._resolve_model_path(model, base_path)
+                    logger.info(f"Sending model file: {model_path}")
+
+                    with open(model_path, "rb") as f:
+                        if not modem.send(f, retry=16, quiet=True):
+                            logger.error(f"Failed to send model {model.id}")
+                            ser.close()
+                            return False
+
+                    logger.info(f"Model {model.id} transfer complete")
+
+            # Step 6: Send 'y' to reboot after all models
+            ser.timeout = 0.1
+            if await self._wait_for_reboot_prompt(ser, timeout=30):
+                ser.write(b'y')
+                logger.info("Sent reboot confirmation")
+
+            ser.close()
+
+            await self._report_progress(
+                progress_callback, "flash", 100, "Flash complete!"
+            )
+
+            return True
+
+        except ImportError:
+            logger.error("xmodem library not installed")
+            await self._report_progress(
+                progress_callback, "flash", 0, "xmodem library not installed"
+            )
+            return False
+        except FileNotFoundError as e:
+            logger.error(f"Model file not found: {e}")
+            await self._report_progress(
+                progress_callback, "flash", 0, f"Model file not found: {e}"
+            )
+            return False
+        except Exception as e:
+            logger.error(f"Multi-model flash failed: {e}")
+            return False
+        finally:
+            # Always release ESP32 from reset
+            if esp32_serial:
+                self._release_esp32_reset(esp32_serial)
+                logger.info("ESP32 released from reset")
