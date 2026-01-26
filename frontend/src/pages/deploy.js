@@ -539,6 +539,7 @@ function renderSelectedDeviceContent(device) {
   const state = deviceStates[device.id] || {};
   const section = device.section || {};
   const sectionDescription = section.description || '';
+  const sectionTroubleshoot = section.troubleshoot || '';
   const isCompleted = state.deploymentStatus === 'completed';
 
   return `
@@ -568,6 +569,13 @@ function renderSelectedDeviceContent(device) {
           ${getDeployButtonContent(state, false)}
         </button>
       </div>
+
+      <!-- Troubleshoot Section (shown below deploy button) -->
+      ${sectionTroubleshoot ? `
+        <div class="deploy-troubleshoot">
+          <div class="markdown-content">${sectionTroubleshoot}</div>
+        </div>
+      ` : ''}
 
       <!-- Logs Section -->
       <div class="deploy-logs" id="logs-${device.id}">
@@ -612,6 +620,7 @@ function renderDeploySection(device, stepNumber) {
   const section = device.section || {};
   const sectionTitle = getLocalizedField(section, 'title') || name;
   const sectionDescription = section.description || '';
+  const sectionTroubleshoot = section.troubleshoot || '';
   const isManual = device.type === 'manual';
   const isScript = device.type === 'script';
   const isPreview = device.type === 'preview';
@@ -793,6 +802,13 @@ function renderDeploySection(device, stepNumber) {
             </button>
           </div>
         `}
+
+        <!-- Troubleshoot Section (shown below deploy button) -->
+        ${sectionTroubleshoot ? `
+          <div class="deploy-troubleshoot">
+            <div class="markdown-content">${sectionTroubleshoot}</div>
+          </div>
+        ` : ''}
 
         <!-- Logs Section (collapsible) -->
         <div class="deploy-logs" id="logs-${device.id}">
