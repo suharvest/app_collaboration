@@ -783,8 +783,8 @@ function renderDeploySection(device, stepNumber) {
             </div>
           ` : ''}
 
-          <!-- Serial Port Selector (for ESP32 devices) -->
-          ${device.type === 'esp32_usb' ? renderSerialPortSelector(device) : ''}
+          <!-- Serial Port Selector (for ESP32/Himax USB devices) -->
+          ${device.type === 'esp32_usb' || device.type === 'himax_usb' ? renderSerialPortSelector(device) : ''}
 
           <!-- Deploy Action Area -->
           <div class="deploy-action-area">
