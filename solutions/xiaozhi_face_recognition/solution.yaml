@@ -85,6 +85,8 @@ deployment:
         title_zh: 第一步 - 烧录小智固件
         description_file: deploy/sections/flash_esp32.md
         description_file_zh: deploy/sections/flash_esp32_zh.md
+        troubleshoot_file: deploy/sections/flash_esp32_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/flash_esp32_troubleshoot_zh.md
         wiring:
           steps:
             - Connect Watcher to computer via USB-C cable
@@ -107,6 +109,8 @@ deployment:
         title_zh: 第二步 - 烧录人脸识别固件
         description_file: deploy/sections/flash_himax.md
         description_file_zh: deploy/sections/flash_himax_zh.md
+        troubleshoot_file: deploy/sections/flash_himax_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/flash_himax_troubleshoot_zh.md
         wiring:
           steps:
             - Ensure Watcher is connected via USB-C

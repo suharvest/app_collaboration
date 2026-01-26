@@ -24,6 +24,9 @@ firmware:
     baudrate: 921600
     requires_reset: true
     timeout: 60
+    # SenseCAP Watcher specific: ESP32 firmware monitors Himax and resets it
+    # when detecting anomalies. We need to hold ESP32 in reset during flashing.
+    requires_esp32_reset_hold: true
 
 # User inputs (supports auto-detection, can also be manually selected)
 user_inputs:

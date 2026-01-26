@@ -5,8 +5,8 @@ name_zh: 实时热力图与 Grafana 数据仪表板集成
 
 # ============ 介绍页内容 ============
 intro:
-  summary: Use reCamera for person detection with privacy blur and real-time heatmap visualization on Grafana dashboard
-  summary_zh: 使用 reCamera 进行人员检测、隐私模糊处理，并在 Grafana 仪表板上实时显示热力图
+  summary: Turn foot traffic into visual heatmaps with automatic privacy protection - see where people gather without storing faces
+  summary_zh: 把人流变成直观的分布图，自动打码保护隐私 - 看清人群聚集区域，不存储人脸
 
   description_file: intro/description.md
   description_file_zh: intro/description_zh.md
@@ -123,6 +123,8 @@ deployment:
           section:
             description_file: deploy/sections/backend_local.md
             description_file_zh: deploy/sections/backend_local_zh.md
+            troubleshoot_file: deploy/sections/backend_local_troubleshoot.md
+            troubleshoot_file_zh: deploy/sections/backend_local_troubleshoot_zh.md
             wiring:
               image: intro/gallery/architecture.svg
               steps:
@@ -163,6 +165,8 @@ deployment:
         title_zh: 第二步 - 配置 reCamera Node-RED
         description_file: deploy/sections/recamera.md
         description_file_zh: deploy/sections/recamera_zh.md
+        troubleshoot_file: deploy/sections/recamera_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/recamera_troubleshoot_zh.md
 
     # Step 3: 配置 Grafana 数据源和仪表板
     - id: grafana
@@ -175,6 +179,8 @@ deployment:
         title_zh: 第三步 - 配置 Grafana 仪表板
         description_file: deploy/sections/grafana.md
         description_file_zh: deploy/sections/grafana_zh.md
+        troubleshoot_file: deploy/sections/grafana_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/grafana_troubleshoot_zh.md
 
     # Step 4: 校准和热力图配置
     - id: heatmap
@@ -187,6 +193,8 @@ deployment:
         title_zh: 第四步 - 校准并配置热力图页面
         description_file: deploy/sections/heatmap.md
         description_file_zh: deploy/sections/heatmap_zh.md
+        troubleshoot_file: deploy/sections/heatmap_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/heatmap_troubleshoot_zh.md
 
   order:
     - backend

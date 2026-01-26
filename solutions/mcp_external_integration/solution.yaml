@@ -390,8 +390,8 @@ deployment:
 
   order:
     - warehouse
+    - jetson_llm_tts    # 仅边缘计算方案显示，需在语音服务前部署
     - voice_service
-    - jetson_llm_tts    # 仅边缘计算方案显示
     - sensecraft
     - mcp_bridge
     - demo

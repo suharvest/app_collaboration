@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   backend:
-    image: seeedstudio/warehouse-backend:latest
+    image: sensecraft-missionpack.seeed.cn/solution/warehouse-backend:latest
     container_name: mcp_warehouse_backend
     ports:
       - "2124:2124"
@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: seeedstudio/warehouse-frontend:latest
+    image: sensecraft-missionpack.seeed.cn/solution/warehouse-frontend:latest
     container_name: mcp_warehouse_frontend
     ports:
       - "2125:80"

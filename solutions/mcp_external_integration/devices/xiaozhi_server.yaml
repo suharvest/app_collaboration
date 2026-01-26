@@ -166,11 +166,13 @@ user_inputs:
     type: text
     required: false
     placeholder: "192.168.1.200"
-    description: "IP address of Jetson device running LLM/TTS"
-    description_zh: "运行 LLM/TTS 的 Jetson 设备 IP 地址"
+    description: "IP address of Jetson device running LLM/TTS (auto-filled if deployed in previous step)"
+    description_zh: "运行 LLM/TTS 的 Jetson 设备 IP 地址（如已在上一步部署则自动填充）"
     show_when:
       field: deploy_mode
       value: edge_computing
+    # 从 Jetson 部署步骤获取值
+    import_from: JETSON_IP
 
 pre_checks:
   - type: docker_version
