@@ -150,7 +150,7 @@ deployment:
           name_zh: YOLO26 (~3 FPS)
           description: Legacy model with direct bbox output
           description_zh: 传统模型，直接输出边界框
-          config_file: devices/recamera.yaml
+          config_file: devices/recamera_yolo26.yaml
           section:
             description_file: deploy/sections/deploy_app.md
             description_file_zh: deploy/sections/deploy_app_zh.md
