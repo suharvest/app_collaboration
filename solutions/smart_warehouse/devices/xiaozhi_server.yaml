@@ -1,0 +1,229 @@
+version: "1.0"
+id: xiaozhi_server
+name: Xiaozhi Voice Server (Local)
+name_zh: 小智语音服务（本机）
+type: docker_local
+
+detection:
+  method: local
+  requirements:
+    - docker_installed
+    - docker_running
+    - docker_compose_installed
+
+docker:
+  compose_file: assets/docker/docker-compose-xiaozhi.yml
+
+  environment:
+    TZ: Asia/Shanghai
+
+  options:
+    project_name: xiaozhi_voice
+    remove_orphans: true
+    build: false
+
+  services:
+    - name: xiaozhi-server
+      port: 18000
+      health_check_endpoint: /xiaozhi/ota/
+      health_check_port: 18003
+      required: true
+    - name: mcp-endpoint
+      port: 18004
+      required: true
+
+  images:
+    - name: ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:server_arm64
+      required: true
+    - name: ghcr.nju.edu.cn/xinnan-tech/mcp-endpoint-server:latest
+      required: true
+
+user_inputs:
+  # 部署方案选择
+  - id: deploy_mode
+    name: Deployment Mode
+    name_zh: 部署方案
+    type: select
+    required: true
+    options:
+      - value: private_cloud
+        label: Private Cloud (Cloud LLM/TTS)
+        label_zh: 私有云方案（云端 LLM/TTS）
+      - value: edge_computing
+        label: Edge Computing (Jetson LLM/TTS)
+        label_zh: 边缘计算方案（Jetson LLM/TTS）
+    default: private_cloud
+    description: Choose deployment architecture
+    description_zh: 选择部署架构
+
+  # 私有云方案 - LLM 配置
+  - id: llm_base_url
+    name: LLM API Base URL
+    name_zh: LLM API 地址
+    type: text
+    required: false
+    placeholder: "https://api.deepseek.com/v1"
+    description: "OpenAI-compatible API endpoint (e.g., DeepSeek, OpenAI, Moonshot)"
+    description_zh: "兼容 OpenAI 的 API 端点（如 DeepSeek、OpenAI、月之暗面）"
+    show_when:
+      field: deploy_mode
+      value: private_cloud
+
+  - id: llm_model_name
+    name: LLM Model Name
+    name_zh: LLM 模型名称
+    type: text
+    required: false
+    placeholder: "deepseek-chat"
+    description: "Model name to use"
+    description_zh: "使用的模型名称"
+    show_when:
+      field: deploy_mode
+      value: private_cloud
+
+  - id: llm_api_key
+    name: LLM API Key
+    name_zh: LLM API 密钥
+    type: password
+    required: false
+    placeholder: "sk-..."
+    description: "API key for LLM service"
+    description_zh: "LLM 服务的 API 密钥"
+    show_when:
+      field: deploy_mode
+      value: private_cloud
+
+  # 私有云方案 - TTS 配置
+  - id: tts_type
+    name: TTS Provider
+    name_zh: TTS 服务商
+    type: select
+    required: false
+    options:
+      - value: openai
+        label: OpenAI TTS
+        label_zh: OpenAI TTS
+      - value: azure
+        label: Azure Speech
+        label_zh: Azure 语音
+      - value: volcengine
+        label: Volcengine (火山引擎)
+        label_zh: 火山引擎
+      - value: aliyun
+        label: Aliyun (阿里云)
+        label_zh: 阿里云
+      - value: edge
+        label: Edge TTS (Free)
+        label_zh: Edge TTS（免费）
+    default: edge
+    description: "Choose TTS service provider"
+    description_zh: "选择 TTS 服务商"
+    show_when:
+      field: deploy_mode
+      value: private_cloud
+
+  - id: tts_base_url
+    name: TTS API Base URL
+    name_zh: TTS API 地址
+    type: text
+    required: false
+    placeholder: "https://api.openai.com/v1"
+    description: "TTS API endpoint (not needed for Edge TTS)"
+    description_zh: "TTS API 端点（Edge TTS 不需要）"
+    show_when:
+      field: deploy_mode
+      value: private_cloud
+
+  - id: tts_api_key
+    name: TTS API Key
+    name_zh: TTS API 密钥
+    type: password
+    required: false
+    placeholder: "sk-..."
+    description: "API key for TTS service (not needed for Edge TTS)"
+    description_zh: "TTS 服务的 API 密钥（Edge TTS 不需要）"
+    show_when:
+      field: deploy_mode
+      value: private_cloud
+
+  - id: tts_voice
+    name: TTS Voice
+    name_zh: TTS 语音
+    type: text
+    required: false
+    placeholder: "zh-CN-XiaoxiaoNeural"
+    description: "Voice ID or name"
+    description_zh: "语音 ID 或名称"
+    default: "zh-CN-XiaoxiaoNeural"
+    show_when:
+      field: deploy_mode
+      value: private_cloud
+
+  # 边缘计算方案 - Jetson 配置
+  - id: jetson_ip
+    name: Jetson IP Address
+    name_zh: Jetson IP 地址
+    type: text
+    required: false
+    placeholder: "192.168.1.200"
+    description: "IP address of Jetson device running LLM/TTS (auto-filled if deployed in previous step)"
+    description_zh: "运行 LLM/TTS 的 Jetson 设备 IP 地址（如已在上一步部署则自动填充）"
+    show_when:
+      field: deploy_mode
+      value: edge_computing
+    # 从 Jetson 部署步骤获取值
+    import_from: JETSON_IP
+
+pre_checks:
+  - type: docker_version
+    min_version: "20.0"
+    description: Check Docker version
+  - type: docker_compose_version
+    min_version: "2.0"
+    description: Check Docker Compose version
+  - type: port_available
+    ports:
+      - 18000
+      - 18003
+      - 18004
+    description: Check if ports are available
+  - type: disk_space
+    min_gb: 3
+    description: Check available disk space
+
+steps:
+  - id: pull_images
+    name: Pull Docker Images
+    name_zh: 拉取 Docker 镜像
+    description: Download xiaozhi-server and mcp-endpoint images
+    description_zh: 下载小智语音服务和 MCP 端点镜像
+    optional: false
+    default: true
+
+  - id: create_volumes
+    name: Create Data Volumes
+    name_zh: 创建数据卷
+    description: Set up persistent storage for models and config
+    description_zh: 设置模型和配置的持久化存储
+    optional: false
+    default: true
+
+  - id: start_services
+    name: Start Services
+    name_zh: 启动服务
+    description: Launch xiaozhi-server and mcp-endpoint containers
+    description_zh: 启动小智语音服务和 MCP 端点容器
+    optional: false
+    default: true
+
+  - id: health_check
+    name: Health Check
+    name_zh: 健康检查
+    description: Verify all services are running correctly
+    description_zh: 验证所有服务运行正常
+    optional: false
+    default: true
+
+post_deployment:
+  message: "Xiaozhi voice server is running. WebSocket: ws://localhost:18000/xiaozhi/v1/"
+  message_zh: "小智语音服务已启动。WebSocket: ws://localhost:18000/xiaozhi/v1/"

@@ -1,0 +1,665 @@
+version: "1.0"
+id: smart_warehouse
+name: Smart Warehouse Management
+name_zh: 智慧仓管方案
+
+# ============ 介绍页内容 ============
+intro:
+  summary: Voice-controlled warehouse operations - query inventory, record shipments, all hands-free while driving forklifts or wearing gloves.
+  summary_zh: 语音操控仓库管理——戴着手套、开着叉车也能查库存、记发货，告别来回跑电脑的麻烦。
+
+  description_file: intro/description.md
+  description_file_zh: intro/description_zh.md
+
+  cover_image: intro/gallery/wms-watcher-scenario.png
+
+  gallery:
+    - type: image
+      src: intro/gallery/wms-watcher-scenario.png
+      caption: Voice control warehouse system
+      caption_zh: 语音控制仓库管理系统
+    - type: image
+      src: intro/gallery/architecture.png
+      caption: System architecture diagram
+      caption_zh: 系统架构图
+    - type: image
+      src: intro/gallery/xiaozhi-stock-in.png
+      caption: Voice stock-in demo
+      caption_zh: 语音入库演示
+
+  category: voice_ai
+  tags:
+    - mcp
+    - voice
+    - watcher
+    - integration
+    - warehouse
+
+  # Device Catalog
+  device_catalog:
+    sensecap_watcher:
+      name: SenseCAP Watcher
+      name_zh: SenseCAP Watcher
+      image: intro/gallery/mcp-connected.png
+      product_url: https://www.seeedstudio.com/sensecap-watcher
+      description: AI-powered wearable voice assistant (ESP32-S3)
+      description_zh: AI 驱动的可穿戴语音助手（ESP32-S3）
+
+    recomputer_r1100:
+      name: reComputer R1100
+      name_zh: reComputer R1100
+      image: intro/gallery/api-endpoint.png
+      product_url: https://www.seeedstudio.com/recomputer-r1100
+      description: Edge gateway for warehouse system and voice server
+      description_zh: 边缘网关，运行仓管系统和语音服务
+
+    recomputer_j4012:
+      name: reComputer J4012
+      name_zh: reComputer J4012
+      image: intro/gallery/api-endpoint.png
+      product_url: https://www.seeedstudio.com/recomputer-j4012
+      description: Edge AI computer (Jetson Orin NX 16GB) for local LLM and TTS
+      description_zh: 边缘 AI 计算机（Jetson Orin NX 16GB），用于本地 LLM 和 TTS 推理
+
+  # Presets - Multiple deployment schemes (each with its own complete device list)
+  presets:
+    - id: sensecraft_cloud
+      name: SenseCraft Cloud
+      name_zh: SenseCraft 云方案
+      badge: Recommended
+      badge_zh: 推荐
+      description: Use SenseCraft cloud for device management
+      description_zh: 使用 SenseCraft 云平台进行设备管理
+      device_groups:
+        - id: watcher
+          name: Voice Assistant
+          name_zh: 语音助手
+          type: single
+          required: true
+          options:
+            - device_ref: sensecap_watcher
+          default: sensecap_watcher
+      architecture_image: intro/gallery/architecture-cloud.png
+      links:
+        wiki: https://wiki.seeedstudio.com/cn/mcp_external_system_integration/
+        github: https://github.com/suharvest/warehouse_system
+      section:
+        title: Cloud Deployment Guide
+        title_zh: 云方案部署指南
+        description_file: deploy/sections/cloud_guide.md
+        description_file_zh: deploy/sections/cloud_guide_zh.md
+      # Preset-specific deployment devices
+      devices:
+        - id: warehouse
+          name: Warehouse System
+          name_zh: 仓库管理系统
+          type: docker_deploy
+          required: true
+          config_file: devices/recomputer.yaml
+          section:
+            title: Deploy Warehouse System
+            title_zh: 部署仓库管理系统
+          targets:
+            local:
+              name: Local Deployment
+              name_zh: 本机部署
+              description: Deploy on this computer
+              description_zh: 部署到当前电脑
+              default: true
+              config_file: devices/recomputer.yaml
+              section:
+                description_file: deploy/sections/warehouse_local.md
+                description_file_zh: deploy/sections/warehouse_local_zh.md
+                wiring:
+                  image: intro/gallery/api-endpoint.png
+                  steps:
+                    - Ensure Docker is installed and running
+                    - Click Deploy button to start services
+                  steps_zh:
+                    - 确保 Docker 已安装并运行
+                    - 点击部署按钮启动服务
+            remote:
+              name: Remote Deployment
+              name_zh: 远程部署
+              description: Deploy to a remote device via SSH
+              description_zh: 通过 SSH 部署到远程设备
+              config_file: devices/warehouse_remote.yaml
+              section:
+                description_file: deploy/sections/warehouse_remote.md
+                description_file_zh: deploy/sections/warehouse_remote_zh.md
+                wiring:
+                  image: intro/gallery/api-endpoint.png
+                  steps:
+                    - Connect target device to network
+                    - Enter IP address and SSH credentials
+                    - Click Deploy to install on remote device
+                  steps_zh:
+                    - 将目标设备连接到网络
+                    - 输入 IP 地址和 SSH 凭据
+                    - 点击部署安装到远程设备
+        - id: voice_service
+          name: Voice AI Service
+          name_zh: 语音 AI 服务
+          type: docker_deploy
+          required: true
+          config_file: devices/xiaozhi_server.yaml
+          section:
+            title: Deploy Voice AI Service
+            title_zh: 部署语音 AI 服务
+          targets:
+            local:
+              name: Local Deployment
+              name_zh: 本机部署
+              description: Deploy voice service on this computer
+              description_zh: 在当前电脑部署语音服务
+              config_file: devices/xiaozhi_server.yaml
+              section:
+                description_file: deploy/sections/voice_local.md
+                description_file_zh: deploy/sections/voice_local_zh.md
+            remote:
+              name: Remote Deployment (R1100)
+              name_zh: 远程部署（R1100）
+              description: Deploy to reComputer R1100 via SSH
+              description_zh: 通过 SSH 部署到 reComputer R1100
+              default: true
+              config_file: devices/xiaozhi_remote.yaml
+              section:
+                description_file: deploy/sections/voice_remote.md
+                description_file_zh: deploy/sections/voice_remote_zh.md
+        - id: sensecraft
+          name: SenseCraft Platform
+          name_zh: SenseCraft 平台配置
+          type: manual
+          required: true
+          section:
+            title: Configure SenseCraft Platform
+            title_zh: 配置 SenseCraft 平台
+            description_file: deploy/sections/sensecraft.md
+            description_file_zh: deploy/sections/sensecraft_zh.md
+            wiring:
+              image: intro/gallery/mcp-connected.png
+              steps:
+                - Power on the SenseCAP Watcher
+                - Connect Watcher to WiFi via QR code
+                - Login to SenseCraft AI platform and bind device
+                - Get MCP Endpoint from Watcher Agent settings
+              steps_zh:
+                - 开启 SenseCAP Watcher 电源
+                - 扫码连接 Watcher 到 WiFi
+                - 登录 SenseCraft AI 平台并绑定设备
+                - 从 Watcher Agent 设置获取 MCP 端点
+        - id: mcp_bridge
+          name: MCP Bridge Service
+          name_zh: MCP 桥接服务
+          type: script
+          required: true
+          config_file: devices/mcp_bridge.yaml
+          section:
+            title: Enable MCP Bridge Service
+            title_zh: 启用 MCP 桥接服务
+            description_file: deploy/sections/mcp_bridge.md
+            description_file_zh: deploy/sections/mcp_bridge_zh.md
+            wiring:
+              image: intro/gallery/mcp-endpoint.png
+              steps:
+                - Get MCP endpoint from SenseCraft AI platform
+                - Create API key in warehouse system
+                - Configure and start MCP bridge
+              steps_zh:
+                - 从 SenseCraft AI 平台获取 MCP 端点
+                - 在仓库系统中创建 API 密钥
+                - 配置并启动 MCP 桥接器
+        - id: demo
+          name: Demo & Testing
+          name_zh: 效果体验
+          type: manual
+          required: false
+          section:
+            title: Try Voice Commands
+            title_zh: 体验语音指令
+            description_file: deploy/sections/demo.md
+            description_file_zh: deploy/sections/demo_zh.md
+            wiring:
+              image: intro/gallery/xiaozhi-stock-in.png
+              steps:
+                - Speak to Watcher to query inventory
+                - Try stock-in and stock-out commands
+                - Check results in warehouse web interface
+              steps_zh:
+                - 对 Watcher 说话查询库存
+                - 尝试入库和出库指令
+                - 在仓库网页界面查看结果
+
+    - id: private_cloud
+      name: Private Cloud
+      name_zh: 私有云方案
+      description: Self-hosted deployment for data privacy
+      description_zh: 自托管部署，保障数据隐私
+      device_groups:
+        - id: watcher
+          name: Voice Assistant
+          name_zh: 语音助手
+          type: single
+          required: true
+          options:
+            - device_ref: sensecap_watcher
+          default: sensecap_watcher
+        - id: ai_compute
+          name: AI Compute (J4012)
+          name_zh: AI 算力（J4012）
+          type: single
+          required: false
+          options:
+            - device_ref: recomputer_j4012
+          default: recomputer_j4012
+      architecture_image: intro/gallery/architecture-cloud.png
+      links:
+        wiki: https://wiki.seeedstudio.com/cn/mcp_external_system_integration/
+        github: https://github.com/suharvest/warehouse_system
+      section:
+        title: Private Cloud Deployment Guide
+        title_zh: 私有云部署指南
+        description_file: deploy/sections/private_guide.md
+        description_file_zh: deploy/sections/private_guide_zh.md
+      # Preset-specific deployment devices
+      devices:
+        - id: warehouse
+          name: Warehouse System
+          name_zh: 仓库管理系统
+          type: docker_deploy
+          required: true
+          config_file: devices/recomputer.yaml
+          section:
+            title: Deploy Warehouse System
+            title_zh: 部署仓库管理系统
+          targets:
+            local:
+              name: Local Deployment
+              name_zh: 本机部署
+              description: Deploy on this computer
+              description_zh: 部署到当前电脑
+              default: true
+              config_file: devices/recomputer.yaml
+              section:
+                description_file: deploy/sections/warehouse_local.md
+                description_file_zh: deploy/sections/warehouse_local_zh.md
+                wiring:
+                  image: intro/gallery/api-endpoint.png
+                  steps:
+                    - Ensure Docker is installed and running
+                    - Click Deploy button to start services
+                  steps_zh:
+                    - 确保 Docker 已安装并运行
+                    - 点击部署按钮启动服务
+            remote:
+              name: Remote Deployment
+              name_zh: 远程部署
+              description: Deploy to a remote device via SSH
+              description_zh: 通过 SSH 部署到远程设备
+              config_file: devices/warehouse_remote.yaml
+              section:
+                description_file: deploy/sections/warehouse_remote.md
+                description_file_zh: deploy/sections/warehouse_remote_zh.md
+                wiring:
+                  image: intro/gallery/api-endpoint.png
+                  steps:
+                    - Connect target device to network
+                    - Enter IP address and SSH credentials
+                    - Click Deploy to install on remote device
+                  steps_zh:
+                    - 将目标设备连接到网络
+                    - 输入 IP 地址和 SSH 凭据
+                    - 点击部署安装到远程设备
+        - id: voice_service
+          name: Voice AI Service
+          name_zh: 语音 AI 服务
+          type: docker_deploy
+          required: true
+          config_file: devices/xiaozhi_server.yaml
+          section:
+            title: Deploy Voice AI Service
+            title_zh: 部署语音 AI 服务
+          targets:
+            local:
+              name: Local Deployment
+              name_zh: 本机部署
+              description: Deploy voice service on this computer
+              description_zh: 在当前电脑部署语音服务
+              config_file: devices/xiaozhi_server.yaml
+              section:
+                description_file: deploy/sections/voice_local.md
+                description_file_zh: deploy/sections/voice_local_zh.md
+            remote:
+              name: Remote Deployment (R1100)
+              name_zh: 远程部署（R1100）
+              description: Deploy to reComputer R1100 via SSH
+              description_zh: 通过 SSH 部署到 reComputer R1100
+              default: true
+              config_file: devices/xiaozhi_remote.yaml
+              section:
+                description_file: deploy/sections/voice_remote.md
+                description_file_zh: deploy/sections/voice_remote_zh.md
+        - id: xiaozhi_console
+          name: Xiaozhi Control Panel
+          name_zh: 智控台配置
+          type: manual
+          required: true
+          section:
+            title: Configure Xiaozhi Control Panel
+            title_zh: 配置智控台
+            description_file: deploy/sections/xiaozhi_server.md
+            description_file_zh: deploy/sections/xiaozhi_server_zh.md
+            wiring:
+              image: intro/gallery/api-endpoint.png
+              steps:
+                - Access control panel at http://server-ip:8002
+                - Register admin account (first user is admin)
+                - Configure LLM/TTS API keys in Model Configuration
+                - Copy MCP Endpoint address from Parameters
+              steps_zh:
+                - 访问智控台 http://服务器IP:8002
+                - 注册管理员账号（首个用户为管理员）
+                - 在「模型配置」中配置 LLM/TTS API 密钥
+                - 从「参数管理」复制 MCP 端点地址
+        - id: mcp_bridge
+          name: MCP Bridge Service
+          name_zh: MCP 桥接服务
+          type: script
+          required: true
+          config_file: devices/mcp_bridge.yaml
+          section:
+            title: Enable MCP Bridge Service
+            title_zh: 启用 MCP 桥接服务
+            description_file: deploy/sections/mcp_bridge.md
+            description_file_zh: deploy/sections/mcp_bridge_zh.md
+            wiring:
+              image: intro/gallery/mcp-endpoint.png
+              steps:
+                - Get MCP endpoint from SenseCraft AI platform
+                - Create API key in warehouse system
+                - Configure and start MCP bridge
+              steps_zh:
+                - 从 SenseCraft AI 平台获取 MCP 端点
+                - 在仓库系统中创建 API 密钥
+                - 配置并启动 MCP 桥接器
+        - id: demo
+          name: Demo & Testing
+          name_zh: 效果体验
+          type: manual
+          required: false
+          section:
+            title: Try Voice Commands
+            title_zh: 体验语音指令
+            description_file: deploy/sections/demo.md
+            description_file_zh: deploy/sections/demo_zh.md
+            wiring:
+              image: intro/gallery/xiaozhi-stock-in.png
+              steps:
+                - Speak to Watcher to query inventory
+                - Try stock-in and stock-out commands
+                - Check results in warehouse web interface
+              steps_zh:
+                - 对 Watcher 说话查询库存
+                - 尝试入库和出库指令
+                - 在仓库网页界面查看结果
+
+    - id: edge_computing
+      name: Edge Computing
+      name_zh: 边缘计算方案
+      description: All processing on local edge device
+      description_zh: 所有处理在本地边缘设备完成
+      device_groups:
+        - id: watcher
+          name: Voice Assistant
+          name_zh: 语音助手
+          type: single
+          required: true
+          options:
+            - device_ref: sensecap_watcher
+          default: sensecap_watcher
+        - id: ai_compute
+          name: AI Compute (J4012)
+          name_zh: AI 算力（J4012）
+          type: single
+          required: false
+          options:
+            - device_ref: recomputer_j4012
+          default: recomputer_j4012
+      architecture_image: intro/gallery/architecture-cloud.png
+      links:
+        wiki: https://wiki.seeedstudio.com/cn/mcp_external_system_integration/
+        github: https://github.com/suharvest/warehouse_system
+      section:
+        title: Edge Computing Deployment Guide
+        title_zh: 边缘计算部署指南
+        description_file: deploy/sections/edge_guide.md
+        description_file_zh: deploy/sections/edge_guide_zh.md
+      # Preset-specific deployment devices
+      devices:
+        - id: warehouse
+          name: Warehouse System
+          name_zh: 仓库管理系统
+          type: docker_deploy
+          required: true
+          config_file: devices/recomputer.yaml
+          section:
+            title: Deploy Warehouse System
+            title_zh: 部署仓库管理系统
+          targets:
+            local:
+              name: Local Deployment
+              name_zh: 本机部署
+              description: Deploy on this computer
+              description_zh: 部署到当前电脑
+              default: true
+              config_file: devices/recomputer.yaml
+              section:
+                description_file: deploy/sections/warehouse_local.md
+                description_file_zh: deploy/sections/warehouse_local_zh.md
+                wiring:
+                  image: intro/gallery/api-endpoint.png
+                  steps:
+                    - Ensure Docker is installed and running
+                    - Click Deploy button to start services
+                  steps_zh:
+                    - 确保 Docker 已安装并运行
+                    - 点击部署按钮启动服务
+            remote:
+              name: Remote Deployment
+              name_zh: 远程部署
+              description: Deploy to a remote device via SSH
+              description_zh: 通过 SSH 部署到远程设备
+              config_file: devices/warehouse_remote.yaml
+              section:
+                description_file: deploy/sections/warehouse_remote.md
+                description_file_zh: deploy/sections/warehouse_remote_zh.md
+                wiring:
+                  image: intro/gallery/api-endpoint.png
+                  steps:
+                    - Connect target device to network
+                    - Enter IP address and SSH credentials
+                    - Click Deploy to install on remote device
+                  steps_zh:
+                    - 将目标设备连接到网络
+                    - 输入 IP 地址和 SSH 凭据
+                    - 点击部署安装到远程设备
+        - id: jetson_llm_tts
+          name: Jetson LLM & TTS
+          name_zh: Jetson LLM 与 TTS 服务
+          type: docker_deploy
+          required: false
+          config_file: devices/llm_jetson.yaml
+          section:
+            title: Deploy LLM & TTS on Jetson
+            title_zh: 在 Jetson 上部署 LLM 和 TTS
+            description_file: deploy/sections/llm_local.md
+            description_file_zh: deploy/sections/llm_local_zh.md
+        - id: voice_service
+          name: Voice AI Service
+          name_zh: 语音 AI 服务
+          type: docker_deploy
+          required: true
+          config_file: devices/xiaozhi_server.yaml
+          section:
+            title: Deploy Voice AI Service
+            title_zh: 部署语音 AI 服务
+          targets:
+            local:
+              name: Local Deployment
+              name_zh: 本机部署
+              description: Deploy voice service on this computer
+              description_zh: 在当前电脑部署语音服务
+              config_file: devices/xiaozhi_server.yaml
+              section:
+                description_file: deploy/sections/voice_local.md
+                description_file_zh: deploy/sections/voice_local_zh.md
+            remote:
+              name: Remote Deployment (R1100)
+              name_zh: 远程部署（R1100）
+              description: Deploy to reComputer R1100 via SSH
+              description_zh: 通过 SSH 部署到 reComputer R1100
+              default: true
+              config_file: devices/xiaozhi_remote.yaml
+              section:
+                description_file: deploy/sections/voice_remote.md
+                description_file_zh: deploy/sections/voice_remote_zh.md
+        - id: xiaozhi_console
+          name: Xiaozhi Control Panel
+          name_zh: 智控台配置
+          type: manual
+          required: true
+          section:
+            title: Configure Xiaozhi Control Panel
+            title_zh: 配置智控台
+            description_file: deploy/sections/xiaozhi_server.md
+            description_file_zh: deploy/sections/xiaozhi_server_zh.md
+            wiring:
+              image: intro/gallery/api-endpoint.png
+              steps:
+                - Access control panel at http://server-ip:8002
+                - Register admin account (first user is admin)
+                - Configure LLM/TTS API keys in Model Configuration
+                - Copy MCP Endpoint address from Parameters
+              steps_zh:
+                - 访问智控台 http://服务器IP:8002
+                - 注册管理员账号（首个用户为管理员）
+                - 在「模型配置」中配置 LLM/TTS API 密钥
+                - 从「参数管理」复制 MCP 端点地址
+        - id: mcp_bridge
+          name: MCP Bridge Service
+          name_zh: MCP 桥接服务
+          type: script
+          required: true
+          config_file: devices/mcp_bridge.yaml
+          section:
+            title: Enable MCP Bridge Service
+            title_zh: 启用 MCP 桥接服务
+            description_file: deploy/sections/mcp_bridge.md
+            description_file_zh: deploy/sections/mcp_bridge_zh.md
+            wiring:
+              image: intro/gallery/mcp-endpoint.png
+              steps:
+                - Get MCP endpoint from SenseCraft AI platform
+                - Create API key in warehouse system
+                - Configure and start MCP bridge
+              steps_zh:
+                - 从 SenseCraft AI 平台获取 MCP 端点
+                - 在仓库系统中创建 API 密钥
+                - 配置并启动 MCP 桥接器
+        - id: demo
+          name: Demo & Testing
+          name_zh: 效果体验
+          type: manual
+          required: false
+          section:
+            title: Try Voice Commands
+            title_zh: 体验语音指令
+            description_file: deploy/sections/demo.md
+            description_file_zh: deploy/sections/demo_zh.md
+            wiring:
+              image: intro/gallery/xiaozhi-stock-in.png
+              steps:
+                - Speak to Watcher to query inventory
+                - Try stock-in and stock-out commands
+                - Check results in warehouse web interface
+              steps_zh:
+                - 对 Watcher 说话查询库存
+                - 尝试入库和出库指令
+                - 在仓库网页界面查看结果
+
+  stats:
+    deployed_count: 0
+    likes_count: 0
+    difficulty: beginner
+    estimated_time: 30min
+
+  links:
+    wiki: https://wiki.seeedstudio.com/cn/mcp_external_system_integration/
+    github: https://github.com/suharvest/warehouse_system
+
+  # 合作伙伴 - 可提供现场部署服务
+  partners:
+    - name: 深圳矽递科技
+      name_zh: 深圳矽递科技
+      logo: intro/partners/seeed.png
+      regions:
+        - 广东省
+        - 全国远程
+      regions_en:
+        - Guangdong
+        - Remote (China)
+      contact: solutions@seeed.cc
+      website: https://www.seeedstudio.com.cn
+
+    - name: 上海智联方案
+      name_zh: 上海智联方案
+      logo: intro/partners/partner2.png
+      regions:
+        - 上海市
+        - 江苏省
+        - 浙江省
+      regions_en:
+        - Shanghai
+        - Jiangsu
+        - Zhejiang
+      contact: contact@example.com
+
+    - name: 北京创智科技
+      name_zh: 北京创智科技
+      logo: intro/partners/partner3.png
+      regions:
+        - 北京市
+        - 天津市
+        - 河北省
+      regions_en:
+        - Beijing
+        - Tianjin
+        - Hebei
+      contact: info@example.com
+
+# ============ 部署页内容 ============
+deployment:
+  guide_file: deploy/guide.md
+  guide_file_zh: deploy/guide_zh.md
+
+  # 部署模式: sequential (按顺序执行)
+  selection_mode: sequential
+
+  # 设备列表已移至各 preset 中，此处保留空列表以保持向后兼容
+  devices: []
+
+  # 部署顺序由各 preset.devices 定义，此处保留空列表
+  order: []
+
+  post_deployment:
+    success_message_file: deploy/success.md
+    success_message_file_zh: deploy/success_zh.md
+    next_steps:
+      - title: Access Web Interface
+        title_zh: 访问Web界面
+        action: open_url
+        url: "http://localhost:2125"
+      - title: View Wiki Documentation
+        title_zh: 查看Wiki文档
+        action: open_url
+        url: "https://wiki.seeedstudio.com/cn/mcp_external_system_integration/"

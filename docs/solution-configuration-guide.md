@@ -12,6 +12,7 @@
    - [设备目录 (device_catalog)](#设备目录-device_catalog)
    - [设备组 (device_groups)](#设备组-device_groups)
    - [预设套餐 (presets)](#预设套餐-presets)
+   - [Preset 专属部署设备 (preset.devices)](#preset-专属部署设备-presetdevices)
    - [部署配置 (deployment)](#部署配置-deployment)
 3. [设备配置文件](#设备配置文件)
 4. [完整示例](#完整示例)
@@ -196,6 +197,10 @@ intro:
 
 **这是核心功能**：定义不同规模/场景的部署方案，用户可以一键选择。
 
+每个 preset 包含：
+- **device_groups**：该套餐需要的设备选择（显示在介绍页）
+- **devices**：该套餐的完整部署步骤（显示在部署页）
+
 ```yaml
   presets:
     # ========== 入门套件 ==========
@@ -206,10 +211,18 @@ intro:
       description_zh: 小型办公室（500平方米以内）
       badge: Popular                 # 角标（显示在套餐卡片上）
       badge_zh: 热门
-      selections:                    # 设备组选择
-        gateway: gateway_us915       # 组ID: 设备引用ID
-        beacons: 6                   # 组ID: 数量
-        tracker: 1
+      device_groups:                 # 设备组（介绍页选择）
+        - id: gateway
+          name: LoRaWAN Gateway
+          type: single
+          options:
+            - device_ref: gateway_us915
+          default: gateway_us915
+        - id: beacons
+          name: BLE Beacons
+          type: quantity
+          device_ref: bc01_beacon
+          default_count: 6
       architecture_image: intro/gallery/starter_arch.png  # 架构图
       links:
         wiki: https://wiki.seeedstudio.com/...
@@ -219,6 +232,16 @@ intro:
         title_zh: 入门套件部署指南
         description_file: deploy/sections/starter_guide.md
         description_file_zh: deploy/sections/starter_guide_zh.md
+      devices:                       # 该套餐的部署步骤
+        - id: beacons
+          name: Deploy BLE Beacons
+          name_zh: 部署 BLE 信标
+          type: manual
+          # ... 完整设备配置 ...
+        - id: app_server
+          name: Deploy Application
+          type: docker_deploy
+          # ... 完整设备配置 ...
 
     # ========== 标准配置 ==========
     - id: standard
@@ -226,13 +249,21 @@ intro:
       name_zh: 标准配置
       description: Medium facility (500-2000 sqm)
       description_zh: 中型设施（500-2000平方米）
-      selections:
-        gateway: gateway_us915
-        beacons: 15
-        tracker: 3
+      device_groups:
+        - id: gateway
+          type: single
+          options:
+            - device_ref: gateway_us915
+          default: gateway_us915
+        - id: beacons
+          type: quantity
+          device_ref: bc01_beacon
+          default_count: 15
       links:
         wiki: https://wiki.seeedstudio.com/...
         github: https://github.com/...
+      devices:
+        # ... 该套餐的部署步骤 ...
 
     # ========== 企业版 ==========
     - id: enterprise
@@ -240,12 +271,15 @@ intro:
       name_zh: 企业版
       description: Large facility (2000+ sqm)
       description_zh: 大型设施（2000平方米以上）
-      selections:
-        gateway: gateway_us915
-        beacons: 30
-        tracker: 10
+      device_groups:
+        - id: beacons
+          type: quantity
+          device_ref: bc01_beacon
+          default_count: 30
       links:
         wiki: https://wiki.seeedstudio.com/...
+      devices:
+        # ... 该套餐的部署步骤 ...
 ```
 
 **Preset 字段说明**：
@@ -256,10 +290,105 @@ intro:
 | `name` / `name_zh` | string | 是 | 套餐名称 |
 | `description` / `description_zh` | string | 否 | 套餐描述 |
 | `badge` / `badge_zh` | string | 否 | 角标文字（如"热门"、"推荐"） |
-| `selections` | dict | 是 | 设备组选择，格式为 `组ID: 设备ID或数量` |
+| `device_groups` | list | 否 | 设备组定义，用于介绍页的设备选择 |
 | `architecture_image` | string | 否 | 该套餐的架构图 |
 | `links` | object | 否 | 相关链接（wiki、github） |
 | `section` | object | 否 | 套餐专属的部署指南 |
+| `devices` | list | **是** | 该套餐的完整部署步骤列表 |
+
+---
+
+### Preset 专属部署设备 (preset.devices)
+
+**重要变更**：从 v1.1 开始，每个 preset 包含自己独立的 `devices` 列表，定义该套餐的完整部署流程。
+
+#### 为什么这样设计？
+
+旧方式（已废弃）：
+```yaml
+# ❌ 旧方式：使用 show_when 条件过滤全局设备列表
+deployment:
+  devices:
+    - id: step1
+      show_when:
+        preset: preset_a    # 仅在 preset_a 时显示
+    - id: step2
+      show_when:
+        preset: [preset_a, preset_b]  # 在两个 preset 时显示
+```
+
+新方式（推荐）：
+```yaml
+# ✅ 新方式：每个 preset 有完整的设备列表
+intro:
+  presets:
+    - id: preset_a
+      devices:
+        - id: step1
+          name: Step 1
+          type: manual
+          # ... 完整配置
+        - id: step2
+          name: Step 2
+          type: docker_deploy
+          # ... 完整配置
+
+    - id: preset_b
+      devices:
+        - id: step2
+          name: Step 2
+          type: docker_deploy
+          # ... 完整配置
+        - id: step3
+          name: Step 3
+          type: esp32_usb
+          # ... 完整配置
+
+deployment:
+  devices: []   # 留空，设备定义已移至各 preset
+  order: []     # 留空，顺序由 preset.devices 数组顺序决定
+```
+
+#### 优势
+
+1. **更清晰**：一眼看出每个套餐包含哪些部署步骤
+2. **更灵活**：不同套餐可以有完全不同的步骤顺序
+3. **无歧义**：不需要理解复杂的 show_when 条件逻辑
+4. **易维护**：修改一个套餐不会影响其他套餐
+
+#### preset.devices 设备字段
+
+每个 preset 中的设备支持以下类型和字段：
+
+```yaml
+devices:
+  - id: unique_step_id           # 步骤唯一标识
+    name: Step Name              # 英文名称
+    name_zh: 步骤名称             # 中文名称
+    type: manual                 # 类型：manual | esp32_usb | docker_deploy | preview
+    required: true               # 是否必须完成
+    config_file: devices/xxx.yaml  # 设备配置文件（部分类型需要）
+    section:                     # 步骤说明
+      title: Step Title
+      title_zh: 步骤标题
+      description_file: deploy/sections/step.md
+      description_file_zh: deploy/sections/step_zh.md
+      troubleshoot_file: deploy/sections/step_troubleshoot.md
+      wiring:
+        image: intro/gallery/wiring.png
+        steps: [...]
+        steps_zh: [...]
+    targets:                     # 多目标部署（可选）
+      local:
+        name: Local Deployment
+        default: true
+        config_file: devices/local.yaml
+        section: {...}
+      remote:
+        name: Remote Deployment
+        config_file: devices/remote.yaml
+        section: {...}
+```
 
 ---
 
@@ -267,20 +396,20 @@ intro:
 
 #### 基础结构
 
+> **注意**：从 v1.1 开始，部署设备定义已移至各 `preset.devices` 中。
+> `deployment.devices` 和 `deployment.order` 保留为空数组以保持向后兼容。
+
 ```yaml
 deployment:
   guide_file: deploy/guide.md
   guide_file_zh: deploy/guide_zh.md
   selection_mode: sequential         # sequential | single_choice
 
-  devices:
-    # 部署步骤列表
-    - id: step1
-      ...
+  # 设备列表已移至各 preset.devices 中
+  devices: []
 
-  order:                             # 步骤执行顺序
-    - step1
-    - step2
+  # 顺序由各 preset.devices 数组顺序决定
+  order: []
 
   post_deployment:                   # 部署后操作
     success_message_file: deploy/success.md
@@ -389,35 +518,27 @@ deployment:
         description_file: deploy/sections/preview.md
 ```
 
-#### 条件显示 (show_when)
+#### 条件显示 (show_when) - 已废弃
 
-根据选择的 preset 显示/隐藏特定步骤：
+> **已废弃**：从 v1.1 开始，不再使用 `show_when.preset` 条件。
+> 请改用 `preset.devices` 方式，将设备直接定义在各自的 preset 中。
 
 ```yaml
+# ❌ 旧方式（已废弃）
+deployment:
   devices:
-    # 只在选择 face_recognition preset 时显示
     - id: face_esp32
-      name: Flash Face Recognition Firmware
-      name_zh: 烧录人脸识别固件
-      type: esp32_usb
-      required: true
       show_when:
-        preset: face_recognition     # 只在该 preset 下显示
-      config_file: devices/watcher_esp32.yaml
-      section:
-        ...
+        preset: face_recognition
+      ...
 
-    # 只在选择 display_cast preset 时显示
-    - id: display_service
-      name: Deploy Display Service
-      name_zh: 部署投屏服务
-      type: docker_deploy
-      required: true
-      show_when:
-        preset: display_cast
-      config_file: devices/display_local.yaml
-      section:
-        ...
+# ✅ 新方式
+intro:
+  presets:
+    - id: face_recognition
+      devices:
+        - id: face_esp32
+          ...
 ```
 
 ---
@@ -643,49 +764,7 @@ intro:
       image: intro/gallery/gateway.png
       product_url: https://www.seeedstudio.com/...
 
-    gateway_eu868:
-      name: SenseCAP M2 Gateway (EU868)
-      name_zh: SenseCAP M2 网关 (EU868)
-      image: intro/gallery/gateway.png
-      product_url: https://www.seeedstudio.com/...
-
-  # ========== 设备组 ==========
-  device_groups:
-    - id: gateway
-      name: LoRaWAN Gateway
-      name_zh: LoRaWAN 网关
-      type: single
-      required: true
-      options:
-        - device_ref: gateway_us915
-          label: Americas (US915)
-          label_zh: 美洲 (US915)
-        - device_ref: gateway_eu868
-          label: Europe (EU868)
-          label_zh: 欧洲 (EU868)
-      default: gateway_us915
-
-    - id: beacons
-      name: BLE Beacons
-      name_zh: BLE 信标
-      type: quantity
-      required: true
-      device_ref: bc01_beacon
-      min_count: 3
-      max_count: 100
-      default_count: 6
-
-    - id: tracker
-      name: T1000 Tracker
-      name_zh: T1000 追踪器
-      type: quantity
-      required: true
-      device_ref: t1000_tracker
-      min_count: 1
-      max_count: 50
-      default_count: 1
-
-  # ========== 预设套餐 ==========
+  # ========== 预设套餐（每个 preset 包含完整的 devices 列表） ==========
   presets:
     - id: starter
       name: Starter Kit
@@ -694,37 +773,122 @@ intro:
       description_zh: 小型办公室（500平方米以内）
       badge: Popular
       badge_zh: 热门
-      selections:
-        gateway: gateway_us915
-        beacons: 6
-        tracker: 1
+      device_groups:
+        - id: gateway
+          name: LoRaWAN Gateway
+          type: single
+          options:
+            - device_ref: gateway_us915
+          default: gateway_us915
+        - id: beacons
+          name: BLE Beacons
+          type: quantity
+          device_ref: bc01_beacon
+          default_count: 6
       links:
         wiki: https://wiki.seeedstudio.com/...
         github: https://github.com/...
+      # 该套餐的完整部署步骤
+      devices:
+        - id: beacons
+          name: Deploy BLE Beacons
+          name_zh: 部署 BLE 信标
+          type: manual
+          required: true
+          section:
+            title: Step 1 - Deploy BLE Beacons
+            title_zh: 第一步 - 部署 BLE 信标
+            description_file: deploy/sections/beacons.md
+            description_file_zh: deploy/sections/beacons_zh.md
+        - id: gateway
+          name: Setup LoRaWAN Gateway
+          name_zh: 设置 LoRaWAN 网关
+          type: manual
+          required: true
+          section:
+            title: Step 2 - Setup Gateway
+            title_zh: 第二步 - 设置网关
+            description_file: deploy/sections/gateway.md
+            description_file_zh: deploy/sections/gateway_zh.md
+        - id: app_server
+          name: Deploy Application
+          name_zh: 部署应用程序
+          type: docker_deploy
+          required: true
+          config_file: devices/app_local.yaml
+          section:
+            title: Step 3 - Deploy Application
+            title_zh: 第三步 - 部署应用程序
+          targets:
+            local:
+              name: Local Deployment
+              name_zh: 本机部署
+              default: true
+              config_file: devices/app_local.yaml
+              section:
+                description_file: deploy/sections/app_local.md
+            remote:
+              name: Remote Deployment
+              name_zh: 远程部署
+              config_file: devices/app_remote.yaml
+              section:
+                description_file: deploy/sections/app_remote.md
+        - id: tracker
+          name: Configure Tracker
+          name_zh: 配置追踪器
+          type: manual
+          required: true
+          section:
+            title: Step 4 - Configure Tracker
+            title_zh: 第四步 - 配置追踪器
+            description_file: deploy/sections/tracker.md
+            description_file_zh: deploy/sections/tracker_zh.md
 
     - id: standard
       name: Standard Setup
       name_zh: 标准配置
       description: Medium facility (500-2000 sqm)
       description_zh: 中型设施（500-2000平方米）
-      selections:
-        gateway: gateway_us915
-        beacons: 15
-        tracker: 3
+      device_groups:
+        - id: beacons
+          type: quantity
+          device_ref: bc01_beacon
+          default_count: 15
       links:
         wiki: https://wiki.seeedstudio.com/...
+      devices:
+        # 与 starter 相同的步骤，但可以有不同的配置
+        - id: beacons
+          # ... 同上
+        - id: gateway
+          # ... 同上
+        - id: app_server
+          # ... 同上
+        - id: tracker
+          # ... 同上
 
     - id: enterprise
       name: Enterprise
       name_zh: 企业版
       description: Large facility (2000+ sqm)
       description_zh: 大型设施（2000平方米以上）
-      selections:
-        gateway: gateway_us915
-        beacons: 30
-        tracker: 10
+      device_groups:
+        - id: beacons
+          type: quantity
+          device_ref: bc01_beacon
+          default_count: 30
       links:
         wiki: https://wiki.seeedstudio.com/...
+      devices:
+        # 企业版可能有额外的步骤
+        - id: beacons
+          # ... 同上
+        - id: gateway
+          # ... 同上
+        - id: app_server
+          # ... 同上
+        - id: tracker
+          # ... 同上
 
   stats:
     difficulty: intermediate
@@ -734,75 +898,15 @@ intro:
     wiki: https://wiki.seeedstudio.com/...
     github: https://github.com/...
 
-# ========== 部署配置 ==========
+# ========== 部署配置（设备已移至 preset.devices） ==========
 deployment:
   guide_file: deploy/guide.md
   guide_file_zh: deploy/guide_zh.md
   selection_mode: sequential
 
-  devices:
-    - id: beacons
-      name: Deploy BLE Beacons
-      name_zh: 部署 BLE 信标
-      type: manual
-      required: true
-      section:
-        title: Step 1 - Deploy BLE Beacons
-        title_zh: 第一步 - 部署 BLE 信标
-        description_file: deploy/sections/beacons.md
-        description_file_zh: deploy/sections/beacons_zh.md
-
-    - id: gateway
-      name: Setup LoRaWAN Gateway
-      name_zh: 设置 LoRaWAN 网关
-      type: manual
-      required: true
-      section:
-        title: Step 2 - Setup Gateway
-        title_zh: 第二步 - 设置网关
-        description_file: deploy/sections/gateway.md
-        description_file_zh: deploy/sections/gateway_zh.md
-
-    - id: app_server
-      name: Deploy Application
-      name_zh: 部署应用程序
-      type: docker_deploy
-      required: true
-      config_file: devices/app_local.yaml
-      section:
-        title: Step 3 - Deploy Application
-        title_zh: 第三步 - 部署应用程序
-      targets:
-        local:
-          name: Local Deployment
-          name_zh: 本机部署
-          default: true
-          config_file: devices/app_local.yaml
-          section:
-            description_file: deploy/sections/app_local.md
-        remote:
-          name: Remote Deployment
-          name_zh: 远程部署
-          config_file: devices/app_remote.yaml
-          section:
-            description_file: deploy/sections/app_remote.md
-
-    - id: tracker
-      name: Configure Tracker
-      name_zh: 配置追踪器
-      type: manual
-      required: true
-      section:
-        title: Step 4 - Configure Tracker
-        title_zh: 第四步 - 配置追踪器
-        description_file: deploy/sections/tracker.md
-        description_file_zh: deploy/sections/tracker_zh.md
-
-  order:
-    - beacons
-    - gateway
-    - app_server
-    - tracker
+  # 设备列表已移至各 preset.devices 中
+  devices: []
+  order: []
 
   post_deployment:
     success_message_file: deploy/success.md
@@ -813,7 +917,7 @@ deployment:
         url: http://localhost:5173
 ```
 
-### 示例 2：多功能组合方案（基于 Preset 条件显示）
+### 示例 2：多功能组合方案（每个 preset 有不同的部署步骤）
 
 ```yaml
 version: "1.0"
@@ -832,27 +936,9 @@ intro:
       image: intro/gallery/recomputer.svg
     hdmi_display: {}
 
-  device_groups:
-    - id: voice_assistant
-      name: Voice Assistant Device
-      name_zh: 语音助手设备
-      type: single
-      required: true
-      options:
-        - device_ref: sensecap_watcher
-      default: sensecap_watcher
-
-    - id: edge_device
-      name: Edge Computing Device
-      name_zh: 边缘计算设备
-      type: single
-      required: false
-      options:
-        - device_ref: recomputer_r1000
-      default: recomputer_r1000
-
-  # 两种功能作为 preset
+  # ========== 两种功能作为独立的 preset ==========
   presets:
+    # ===== 人脸识别功能 =====
     - id: face_recognition
       name: Face Recognition
       name_zh: 人脸识别
@@ -860,89 +946,114 @@ intro:
       badge_zh: 推荐
       description: Add face recognition to Xiaozhi
       description_zh: 给小智装上"眼睛"
-      selections:
-        voice_assistant: sensecap_watcher
+      device_groups:
+        - id: voice_assistant
+          name: Voice Assistant Device
+          type: single
+          options:
+            - device_ref: sensecap_watcher
+          default: sensecap_watcher
       architecture_image: intro/gallery/demo.svg
+      # 人脸识别功能的部署步骤
+      devices:
+        - id: face_esp32
+          name: Flash Xiaozhi Firmware
+          name_zh: 烧录小智固件
+          type: esp32_usb
+          required: true
+          config_file: devices/watcher_esp32.yaml
+          section:
+            title: "Step 1: Flash Xiaozhi Firmware"
+            title_zh: "第一步：烧录小智固件"
+            description_file: deploy/sections/flash_esp32.md
+        - id: face_himax
+          name: Flash Face Recognition Firmware
+          name_zh: 烧录人脸识别固件
+          type: himax_usb
+          required: true
+          config_file: devices/watcher_himax.yaml
+          section:
+            title: "Step 2: Flash Face Recognition"
+            title_zh: "第二步：烧录人脸识别固件"
+            description_file: deploy/sections/flash_himax.md
+        - id: face_configure
+          name: Configure Xiaozhi
+          name_zh: 配置小智
+          type: manual
+          required: true
+          section:
+            title: "Step 3: Configure Xiaozhi"
+            title_zh: "第三步：配置小智"
+            description_file: deploy/sections/configure_xiaozhi.md
+        - id: face_enrollment
+          name: Face Enrollment
+          name_zh: 人脸录入
+          type: manual
+          required: false
+          section:
+            title: "Step 4: Enroll Faces"
+            title_zh: "第四步：录入人脸"
+            description_file: deploy/sections/face_enrollment.md
 
+    # ===== 投屏功能 =====
     - id: display_cast
       name: Display Cast
       name_zh: 大屏投屏
       description: Cast conversations to large display
       description_zh: 把对话投射到电视/大屏
-      selections:
-        voice_assistant: sensecap_watcher
-        edge_device: recomputer_r1000
+      device_groups:
+        - id: voice_assistant
+          type: single
+          options:
+            - device_ref: sensecap_watcher
+          default: sensecap_watcher
+        - id: edge_device
+          name: Edge Computing Device
+          type: single
+          options:
+            - device_ref: recomputer_r1000
+          default: recomputer_r1000
       architecture_image: intro/gallery/architecture.svg
+      # 投屏功能的部署步骤
+      devices:
+        - id: display_watcher
+          name: Flash Watcher Firmware
+          name_zh: 烧录 Watcher 固件
+          type: esp32_usb
+          required: true
+          config_file: devices/display_watcher.yaml
+          section:
+            title: "Step 1: Flash Watcher Firmware"
+            title_zh: "第一步：烧录 Watcher 固件"
+            description_file: deploy/sections/display_watcher.md
+        - id: display_service
+          name: Deploy Display Service
+          name_zh: 部署投屏服务
+          type: docker_deploy
+          required: true
+          section:
+            title: "Step 2: Deploy Display Service"
+            title_zh: "第二步：部署投屏服务"
+          targets:
+            local:
+              name: Local Deployment
+              name_zh: 本机部署
+              default: true
+              config_file: devices/display_local.yaml
+              section:
+                description_file: deploy/sections/display_local.md
+            remote:
+              name: Remote Deployment
+              name_zh: 远程部署
+              config_file: devices/recomputer.yaml
+              section:
+                description_file: deploy/sections/display_remote.md
 
+# ========== 部署配置（设备已移至 preset.devices） ==========
 deployment:
   selection_mode: sequential
-
-  devices:
-    # ===== 人脸识别功能的步骤 =====
-    - id: face_esp32
-      name: Flash Xiaozhi Firmware
-      name_zh: 烧录小智固件
-      type: esp32_usb
-      required: true
-      show_when:
-        preset: face_recognition    # 只在人脸识别 preset 下显示
-      config_file: devices/watcher_esp32.yaml
-      section:
-        title: "Step 1: Flash Xiaozhi Firmware"
-        title_zh: "第一步：烧录小智固件"
-
-    - id: face_himax
-      name: Flash Face Recognition Firmware
-      name_zh: 烧录人脸识别固件
-      type: himax_usb
-      required: true
-      show_when:
-        preset: face_recognition
-      config_file: devices/watcher_himax.yaml
-      section:
-        title: "Step 2: Flash Face Recognition"
-        title_zh: "第二步：烧录人脸识别固件"
-
-    # ===== 投屏功能的步骤 =====
-    - id: display_watcher
-      name: Flash Watcher Firmware
-      name_zh: 烧录 Watcher 固件
-      type: esp32_usb
-      required: true
-      show_when:
-        preset: display_cast        # 只在投屏 preset 下显示
-      config_file: devices/display_watcher.yaml
-      section:
-        title: "Step 1: Flash Watcher Firmware"
-        title_zh: "第一步：烧录 Watcher 固件"
-
-    - id: display_service
-      name: Deploy Display Service
-      name_zh: 部署投屏服务
-      type: docker_deploy
-      required: true
-      show_when:
-        preset: display_cast
-      config_file: devices/display_local.yaml
-      section:
-        title: "Step 2: Deploy Display Service"
-        title_zh: "第二步：部署投屏服务"
-      targets:
-        local:
-          name: Local Deployment
-          name_zh: 本机部署
-          default: true
-          config_file: devices/display_local.yaml
-        remote:
-          name: Remote Deployment
-          name_zh: 远程部署
-          config_file: devices/recomputer.yaml
-
-  order:
-    - face_esp32
-    - face_himax
-    - display_watcher
-    - display_service
+  devices: []
+  order: []
 ```
 
 ---
@@ -954,13 +1065,39 @@ deployment:
 - **按规模分**：入门版、标准版、企业版
 - **按场景分**：家用、商用、工业
 - **按功能分**：基础功能、增强功能（如示例 2）
+- **每个 preset 独立**：不同 preset 可以有完全不同的部署步骤
 
-### 2. 设备目录复用
+### 2. preset.devices 设计原则
+
+```yaml
+# ✅ 推荐：每个 preset 定义完整的 devices 列表
+presets:
+  - id: cloud
+    devices:
+      - id: step1
+      - id: step2
+      - id: step3_cloud  # 云方案特有步骤
+  - id: edge
+    devices:
+      - id: step1
+      - id: step2
+      - id: step3_edge   # 边缘方案特有步骤
+      - id: step4_edge   # 边缘方案额外步骤
+
+# ❌ 避免：不要使用 show_when 条件（已废弃）
+deployment:
+  devices:
+    - id: step1
+      show_when:
+        preset: cloud    # 已废弃，请使用 preset.devices
+```
+
+### 3. 设备目录复用
 
 - 同类设备不同型号使用不同 key（如 `gateway_us915`、`gateway_eu868`）
 - 通用属性放在设备定义中，特定描述放在 device_group 的 label
 
-### 3. 文件组织
+### 4. 文件组织
 
 ```
 solutions/your_solution/
@@ -985,15 +1122,17 @@ solutions/your_solution/
     └── app_remote.yaml
 ```
 
-### 4. 国际化规范
+### 5. 国际化规范
 
 - 所有面向用户的字段都应提供 `_zh` 版本
 - 文件名使用 `filename.md` / `filename_zh.md` 格式
 - YAML 字段使用 `field` / `field_zh` 格式
 
-### 5. 测试清单
+### 6. 测试清单
 
-- [ ] 每个 preset 都能正常选择和显示
+- [ ] 每个 preset 都有 `devices` 列表
+- [ ] 每个 preset 的 devices 列表顺序正确
+- [ ] `deployment.devices` 和 `deployment.order` 为空数组
 - [ ] 设备组的 default 值存在于 options 中
 - [ ] 所有引用的文件路径都存在
 - [ ] 中英文版本内容完整
