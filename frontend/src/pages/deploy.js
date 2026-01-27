@@ -30,6 +30,7 @@ import { setupEventHandlers } from './deploy/handlers.js';
 
 // Import device operations
 import { detectDevices } from './deploy/devices.js';
+import { getFilteredDevices } from './deploy/utils.js';
 
 // ============================================
 // Main Page Entry Point
@@ -101,8 +102,10 @@ export async function renderDeployPage(params) {
 
     const devices = deploymentInfo.devices || [];
 
-    // Initialize device states - first section expanded by default
-    devices.forEach((device, index) => {
+    // Initialize device states for filtered devices (preset-specific or global)
+    // This ensures states exist for devices that will actually be rendered
+    const filteredDevices = getFilteredDevices(devices);
+    filteredDevices.forEach((device, index) => {
       setDeviceState(device.id, createInitialDeviceState(device, index));
     });
 
