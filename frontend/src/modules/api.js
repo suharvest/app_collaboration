@@ -257,9 +257,14 @@ export const solutionsApi = {
    * @param {string} groupId - Device group ID
    * @param {string} selectedDevice - Selected device ref
    * @param {string} lang - Language code
+   * @param {string} presetId - Optional preset ID
    */
-  getDeviceGroupSection(id, groupId, selectedDevice, lang = 'en') {
-    return request(`/solutions/${id}/device-group/${groupId}/section?selected_device=${encodeURIComponent(selectedDevice)}&lang=${lang}`);
+  getDeviceGroupSection(id, groupId, selectedDevice, lang = 'en', presetId = null) {
+    let url = `/solutions/${id}/device-group/${groupId}/section?selected_device=${encodeURIComponent(selectedDevice)}&lang=${lang}`;
+    if (presetId) {
+      url += `&preset_id=${encodeURIComponent(presetId)}`;
+    }
+    return request(url);
   },
 
   /**

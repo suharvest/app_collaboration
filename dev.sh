@@ -20,16 +20,48 @@ BLUE='\033[0;34m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
 
-# Function to cleanup on exit
-cleanup() {
-    echo ""
-    echo "Shutting down..."
-    kill $BACKEND_PID 2>/dev/null || true
-    kill $FRONTEND_PID 2>/dev/null || true
-    exit 0
+# Track child PIDs
+BACKEND_PID=""
+FRONTEND_PID=""
+CLEANUP_DONE=0
+
+# Function to kill process and all its children
+kill_tree() {
+    local pid=$1
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        # Kill all child processes first
+        pkill -P "$pid" 2>/dev/null || true
+        # Then kill the parent
+        kill "$pid" 2>/dev/null || true
+        # Wait for process to terminate
+        wait "$pid" 2>/dev/null || true
+    fi
 }
 
-trap cleanup SIGINT SIGTERM
+# Function to cleanup on exit
+cleanup() {
+    # Prevent duplicate cleanup
+    if [ "$CLEANUP_DONE" -eq 1 ]; then
+        return
+    fi
+    CLEANUP_DONE=1
+
+    echo ""
+    echo "Shutting down..."
+
+    # Kill process trees
+    kill_tree "$BACKEND_PID"
+    kill_tree "$FRONTEND_PID"
+
+    # Extra cleanup: kill any remaining processes on our ports
+    lsof -ti:$BACKEND_PORT | xargs kill -9 2>/dev/null || true
+    lsof -ti:$FRONTEND_PORT | xargs kill -9 2>/dev/null || true
+
+    echo "All processes terminated."
+}
+
+# Trap all exit signals
+trap cleanup SIGINT SIGTERM EXIT
 
 # Check dependencies
 if ! command -v uv &> /dev/null; then
@@ -79,4 +111,12 @@ echo "  Press Ctrl+C to stop all servers"
 echo "=========================================="
 
 # Wait for either process to exit
-wait
+# Using a loop so that signals can interrupt wait
+while true; do
+    # Check if processes are still running
+    if ! kill -0 "$BACKEND_PID" 2>/dev/null && ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
+        echo "All processes have exited."
+        break
+    fi
+    sleep 1
+done
