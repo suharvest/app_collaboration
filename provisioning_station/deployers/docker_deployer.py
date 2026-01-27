@@ -1,10 +1,14 @@
 """
 Docker deployment deployer
+
+NOTE: Local Docker deployment is only supported on Linux and macOS.
+Windows is not supported as deployment target.
 """
 
 import asyncio
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Callable, Optional, Dict, Any
 
@@ -24,6 +28,17 @@ class DockerDeployer(BaseDeployer):
         connection: Dict[str, Any],
         progress_callback: Optional[Callable] = None,
     ) -> bool:
+        # Platform check - local Docker deployment not supported on Windows
+        if sys.platform == "win32":
+            await self._report_progress(
+                progress_callback,
+                "check_os",
+                0,
+                "Local Docker deployment is not supported on Windows. "
+                "Please use a Linux or macOS host, or deploy to a remote Linux device.",
+            )
+            return False
+
         if not config.docker:
             raise ValueError("No Docker configuration")
 

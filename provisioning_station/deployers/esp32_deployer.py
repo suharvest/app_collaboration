@@ -267,22 +267,54 @@ class ESP32Deployer(BaseDeployer):
             return {"success": False, "error": str(e)}
 
     def _cleanup_serial_port(self, port: str):
-        """Force close serial port if it was left open by esptool"""
+        """Force close serial port if it was left open by esptool
+
+        On Windows, serial ports may not be released immediately after a process
+        exits, so we retry with exponential backoff.
+        """
+        import time
+
         try:
             import serial
-            # Try to open and immediately close to release any locks
-            ser = serial.Serial()
-            ser.port = port
-            ser.baudrate = 115200
-            ser.timeout = 0.1
+        except ImportError:
+            logger.debug("pyserial not available for port cleanup")
+            return
+
+        # Retry settings - more attempts on Windows where port release is slower
+        max_retries = 5 if sys.platform == "win32" else 2
+        base_delay = 0.2  # 200ms initial delay
+
+        for attempt in range(max_retries):
             try:
+                # Try to open and immediately close to release any locks
+                ser = serial.Serial()
+                ser.port = port
+                ser.baudrate = 115200
+                ser.timeout = 0.1
+
                 ser.open()
                 ser.close()
-            except serial.SerialException:
-                # Port might already be closed or unavailable, that's fine
-                pass
-        except Exception as e:
-            logger.debug(f"Serial port cleanup for {port}: {e}")
+                logger.debug(f"Serial port {port} cleaned up successfully")
+                return
+            except serial.SerialException as e:
+                if attempt < max_retries - 1:
+                    # Exponential backoff: 200ms, 400ms, 800ms, 1600ms, 3200ms
+                    delay = base_delay * (2 ** attempt)
+                    logger.debug(
+                        f"Serial port {port} busy, retrying in {delay:.1f}s "
+                        f"(attempt {attempt + 1}/{max_retries}): {e}"
+                    )
+                    time.sleep(delay)
+                else:
+                    # Final attempt failed - port might already be closed or
+                    # held by another process, which is acceptable
+                    logger.debug(
+                        f"Serial port {port} cleanup failed after {max_retries} "
+                        f"attempts: {e}"
+                    )
+            except Exception as e:
+                logger.debug(f"Unexpected error during serial port cleanup for {port}: {e}")
+                return
 
     async def _run_esptool(self, args: list) -> dict:
         """Run esptool command"""
@@ -308,9 +340,9 @@ class ESP32Deployer(BaseDeployer):
 
             return {
                 "success": process.returncode == 0,
-                "stdout": stdout.decode(),
-                "stderr": stderr.decode(),
-                "error": stderr.decode() if process.returncode != 0 else None,
+                "stdout": stdout.decode("utf-8", errors="replace"),
+                "stderr": stderr.decode("utf-8", errors="replace"),
+                "error": stderr.decode("utf-8", errors="replace") if process.returncode != 0 else None,
             }
 
         except FileNotFoundError:
@@ -326,9 +358,9 @@ class ESP32Deployer(BaseDeployer):
 
                 return {
                     "success": process.returncode == 0,
-                    "stdout": stdout.decode(),
-                    "stderr": stderr.decode(),
-                    "error": stderr.decode() if process.returncode != 0 else None,
+                    "stdout": stdout.decode("utf-8", errors="replace"),
+                    "stderr": stderr.decode("utf-8", errors="replace"),
+                    "error": stderr.decode("utf-8", errors="replace") if process.returncode != 0 else None,
                 }
             except Exception:
                 # Fall back to Python API

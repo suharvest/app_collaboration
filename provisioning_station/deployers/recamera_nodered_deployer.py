@@ -11,12 +11,24 @@ When switching from C++ to Node-RED:
 
 import asyncio
 import logging
+import shlex
 from typing import Callable, Optional, Dict, Any, List
 
 from .nodered_deployer import NodeRedDeployer
 from ..models.device import DeviceConfig
 
 logger = logging.getLogger(__name__)
+
+
+def _build_sudo_cmd(password: str, cmd: str) -> str:
+    """
+    Build a sudo command with proper password escaping.
+
+    Uses printf instead of echo to avoid issues with special characters
+    (single quotes, backslashes, etc.) in passwords.
+    """
+    escaped_password = shlex.quote(password)
+    return f"printf '%s\\n' {escaped_password} | sudo -S {cmd}"
 
 # C++ services that conflict with Node-RED (need to stop and disable)
 CPP_CONFLICT_SERVICES = [
@@ -150,23 +162,25 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
         # Find all C++ related services
         for svc_name in CPP_CONFLICT_SERVICES:
             # Stop and disable S* version
-            stop_cmd = f"echo '{password}' | sudo -S sh -c 'for f in /etc/init.d/S*{svc_name}*; do [ -f \"$f\" ] && $f stop 2>/dev/null; done' || true"
+            stop_script = f'for f in /etc/init.d/S*{svc_name}*; do [ -f "$f" ] && $f stop 2>/dev/null; done'
+            stop_cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(stop_script)}") + " || true"
             await self._exec_cmd(client, stop_cmd)
 
             # Rename S* to K* to disable auto-start
-            disable_cmd = f"""echo '{password}' | sudo -S sh -c '
-for svc in /etc/init.d/S*{svc_name}*; do
+            disable_script = f'''for svc in /etc/init.d/S*{svc_name}*; do
     if [ -f "$svc" ]; then
         new_name=$(echo "$svc" | sed "s|/S|/K|")
         mv "$svc" "$new_name" 2>/dev/null && echo "Disabled: $svc -> $new_name"
     fi
-done' || true"""
+done'''
+            disable_cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(disable_script)}") + " || true"
             result = await self._exec_cmd(client, disable_cmd)
             if result and "Disabled:" in result:
                 logger.info(result.strip())
 
         # Also scan for other custom S9* services and stop them
-        scan_cmd = f"echo '{password}' | sudo -S sh -c 'for f in /etc/init.d/S9*; do [ -f \"$f\" ] && basename \"$f\"; done' 2>/dev/null || true"
+        scan_script = 'for f in /etc/init.d/S9*; do [ -f "$f" ] && basename "$f"; done'
+        scan_cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(scan_script)}") + " 2>/dev/null || true"
         result = await self._exec_cmd(client, scan_cmd)
         if result:
             for svc in result.strip().split('\n'):
@@ -177,7 +191,7 @@ done' || true"""
                 if any(nr in svc.lower() for nr in ['node-red', 'sscma-node', 'sscma-supervisor']):
                     continue
                 # Stop other S9* services
-                cmd = f"echo '{password}' | sudo -S /etc/init.d/{svc} stop 2>/dev/null || true"
+                cmd = _build_sudo_cmd(password, f"/etc/init.d/{svc} stop 2>/dev/null || true")
                 await self._exec_cmd(client, cmd)
 
     async def _restore_nodered_services(
@@ -188,13 +202,13 @@ done' || true"""
         """Restore Node-RED services that may have been disabled (K* → S*)."""
         for svc_name in NODERED_SERVICES:
             # Rename K* back to S* to enable auto-start
-            restore_cmd = f"""echo '{password}' | sudo -S sh -c '
-for svc in /etc/init.d/K*{svc_name}*; do
+            restore_script = f'''for svc in /etc/init.d/K*{svc_name}*; do
     if [ -f "$svc" ]; then
         new_name=$(echo "$svc" | sed "s|/K|/S|")
         mv "$svc" "$new_name" 2>/dev/null && echo "Restored: $svc -> $new_name"
     fi
-done' || true"""
+done'''
+            restore_cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(restore_script)}") + " || true"
             result = await self._exec_cmd(client, restore_cmd)
             if result and "Restored:" in result:
                 logger.info(result.strip())
@@ -206,9 +220,9 @@ done' || true"""
     ) -> None:
         """Kill any remaining C++ processes."""
         kill_cmds = [
-            f"echo '{password}' | sudo -S pkill -f 'yolo26-detector' 2>/dev/null || true",
-            f"echo '{password}' | sudo -S pkill -f 'sensecraft' 2>/dev/null || true",
-            f"echo '{password}' | sudo -S pkill -f 'sscma-cpp' 2>/dev/null || true",
+            _build_sudo_cmd(password, "pkill -f 'yolo26-detector' 2>/dev/null || true"),
+            _build_sudo_cmd(password, "pkill -f 'sensecraft' 2>/dev/null || true"),
+            _build_sudo_cmd(password, "pkill -f 'sscma-cpp' 2>/dev/null || true"),
         ]
         for cmd in kill_cmds:
             await self._exec_cmd(client, cmd)

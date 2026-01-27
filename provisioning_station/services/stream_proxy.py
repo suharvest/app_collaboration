@@ -67,18 +67,50 @@ class StreamProxy:
             logger.info(f"Found FFmpeg at: {ffmpeg}")
             return ffmpeg
 
-        # Check common installation paths (Homebrew, MacPorts, etc.)
-        common_paths = [
-            "/opt/homebrew/bin/ffmpeg",      # Homebrew on Apple Silicon
-            "/usr/local/bin/ffmpeg",          # Homebrew on Intel Mac / Linux
-            "/usr/bin/ffmpeg",                # System install
-            "/opt/local/bin/ffmpeg",          # MacPorts
-            "C:\\ffmpeg\\bin\\ffmpeg.exe",    # Windows common location
-            "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
-        ]
+        # Platform-specific paths
+        if platform.system() == "Windows":
+            # Expand environment variables for Windows paths
+            home = Path.home()
+            common_paths = [
+                # Standard installation locations
+                "C:\\ffmpeg\\bin\\ffmpeg.exe",
+                "C:\\ffmpeg\\ffmpeg.exe",
+                "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
+                "C:\\Program Files (x86)\\ffmpeg\\bin\\ffmpeg.exe",
+                # Package managers
+                str(home / "scoop" / "apps" / "ffmpeg" / "current" / "bin" / "ffmpeg.exe"),
+                str(home / "scoop" / "shims" / "ffmpeg.exe"),
+                os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg*\ffmpeg-*\bin\ffmpeg.exe"),
+                os.path.expandvars(r"%ChocolateyInstall%\bin\ffmpeg.exe"),
+                # User directories
+                str(home / "ffmpeg" / "bin" / "ffmpeg.exe"),
+                str(home / "ffmpeg" / "ffmpeg.exe"),
+                str(home / "bin" / "ffmpeg.exe"),
+                # Tools directory
+                "C:\\tools\\ffmpeg\\bin\\ffmpeg.exe",
+                "C:\\tools\\ffmpeg\\ffmpeg.exe",
+            ]
+        else:
+            # Unix-like systems (macOS, Linux)
+            common_paths = [
+                "/opt/homebrew/bin/ffmpeg",      # Homebrew on Apple Silicon
+                "/usr/local/bin/ffmpeg",          # Homebrew on Intel Mac / Linux
+                "/usr/bin/ffmpeg",                # System install
+                "/opt/local/bin/ffmpeg",          # MacPorts
+                "/snap/bin/ffmpeg",               # Snap on Linux
+                str(Path.home() / ".local" / "bin" / "ffmpeg"),  # User local
+            ]
 
         for path in common_paths:
-            if os.path.isfile(path) and os.access(path, os.X_OK):
+            # Handle glob patterns for WinGet
+            if "*" in path:
+                import glob
+                matches = glob.glob(path)
+                for match in matches:
+                    if os.path.isfile(match) and os.access(match, os.X_OK):
+                        logger.info(f"Found FFmpeg at: {match}")
+                        return match
+            elif os.path.isfile(path) and os.access(path, os.X_OK):
                 logger.info(f"Found FFmpeg at: {path}")
                 return path
 
