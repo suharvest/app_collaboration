@@ -317,6 +317,90 @@ class RemotePreCheckService:
             logger.error(f"Failed to start Docker: {e}")
             return False
 
+    async def check_remote_os(
+        self,
+        ssh_client,
+    ) -> RemoteCheckResult:
+        """
+        Check if remote device is running a supported Linux OS.
+
+        This application only supports deploying to Linux systems.
+        Windows and macOS targets are not supported.
+        """
+        try:
+            # Check uname to determine OS type
+            exit_code, stdout, stderr = await asyncio.to_thread(
+                self._exec_command,
+                ssh_client,
+                "uname -s",
+                timeout=30
+            )
+
+            if exit_code != 0:
+                return RemoteCheckResult(
+                    check_type="remote_os",
+                    passed=False,
+                    message=f"Failed to detect remote OS: {stderr[:200]}",
+                    details={"error": stderr},
+                )
+
+            os_name = stdout.strip().lower()
+
+            # Check for supported OS (Linux only)
+            if os_name == "linux":
+                # Get more details about the Linux distribution
+                exit_code, distro_info, _ = await asyncio.to_thread(
+                    self._exec_command,
+                    ssh_client,
+                    "cat /etc/os-release 2>/dev/null | head -5 || echo 'Unknown Linux'",
+                    timeout=30
+                )
+
+                return RemoteCheckResult(
+                    check_type="remote_os",
+                    passed=True,
+                    message="Remote device is running Linux",
+                    details={
+                        "os": "Linux",
+                        "distro_info": distro_info.strip()[:500],
+                    },
+                )
+
+            elif os_name == "darwin":
+                return RemoteCheckResult(
+                    check_type="remote_os",
+                    passed=False,
+                    message="Remote device is running macOS. Only Linux targets are supported for deployment.",
+                    can_auto_fix=False,
+                    details={"os": "macOS"},
+                )
+
+            elif "mingw" in os_name or "msys" in os_name or "cygwin" in os_name:
+                return RemoteCheckResult(
+                    check_type="remote_os",
+                    passed=False,
+                    message="Remote device appears to be running Windows. Only Linux targets are supported for deployment.",
+                    can_auto_fix=False,
+                    details={"os": "Windows", "uname": os_name},
+                )
+
+            else:
+                return RemoteCheckResult(
+                    check_type="remote_os",
+                    passed=False,
+                    message=f"Unsupported remote OS: {os_name}. Only Linux targets are supported.",
+                    can_auto_fix=False,
+                    details={"os": os_name},
+                )
+
+        except Exception as e:
+            logger.error(f"Remote OS check failed: {e}")
+            return RemoteCheckResult(
+                check_type="remote_os",
+                passed=False,
+                message=f"Failed to check remote OS: {str(e)}",
+            )
+
     def _exec_command(
         self,
         client,

@@ -307,6 +307,21 @@ class RestoreManager:
                 )
                 self._add_log(operation, "info", "SSH connection established")
 
+                # Check remote OS is Linux
+                operation.message = "Checking remote operating system..."
+                await self._notify_progress(operation)
+
+                stdin, stdout, stderr = ssh.exec_command("uname -s", timeout=30)
+                os_name = stdout.read().decode('utf-8', errors='ignore').strip().lower()
+
+                if os_name != "linux":
+                    raise RuntimeError(
+                        f"Remote device is not running Linux (detected: {os_name}). "
+                        f"Only Linux devices are supported for restore operations."
+                    )
+
+                self._add_log(operation, "info", "Confirmed remote device is running Linux")
+
                 for i, restore_op in enumerate(restore_ops):
                     op_name = restore_op.get("name", f"Step {i + 1}")
                     op_command = restore_op.get("command", "")
