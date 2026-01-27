@@ -1,12 +1,12 @@
 version: "1.0"
 id: missionpack_knn
-name: HVAC Automation Control System
-name_zh: 暖通自动化控制系统
+name: HVAC Automation Control
+name_zh: 暖通自动化控制
 
 # ============ 介绍页内容 ============
 intro:
-  summary: Automatically learn and apply optimal HVAC parameters from historical data
-  summary_zh: 根据历史数据自动学习最佳暖通参数，让设备像老师傅一样自动调参
+  summary: Intelligently adjust air conditioning based on occupancy and environment, saving energy automatically
+  summary_zh: 根据人流和环境智能调节空调温度，自动节省能耗
 
   description_file: intro/description.md
   description_file_zh: intro/description_zh.md
@@ -42,26 +42,22 @@ intro:
       description: Optional - only needed for remote deployment
       description_zh: 可选 - 仅远程部署时需要
 
-  # Device Groups
-  device_groups:
-    - id: edge_device
-      name: Edge Device
-      name_zh: 边缘设备
-      type: single
-      required: false
-      description: Only needed for remote deployment
-      description_zh: 仅远程部署时需要
-      options:
-        - device_ref: recomputer_r
-      default: recomputer_r
-
   # Presets
   presets:
     - id: default
       name: Standard Deployment
       name_zh: 标准部署
-      selections:
-        edge_device: recomputer_r
+      device_groups:
+        - id: edge_device
+          name: Edge Device
+          name_zh: 边缘设备
+          type: single
+          required: false
+          description: Only needed for remote deployment
+          description_zh: 仅远程部署时需要
+          options:
+            - device_ref: recomputer_r
+          default: recomputer_r
       links:
         github: https://github.com/seeed-solution/missionpack-knn
       section:

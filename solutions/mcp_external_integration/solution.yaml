@@ -1,12 +1,12 @@
 version: "1.0"
 id: mcp_external_integration
-name: Smart Warehouse Solution
-name_zh: 智慧仓管方案
+name: Smart Warehouse Management
+name_zh: 智慧仓库管理
 
 # ============ 介绍页内容 ============
 intro:
-  summary: Enable voice commands to trigger API calls to existing business systems using SenseCAP Watcher and MCP bridge.
-  summary_zh: 使用SenseCAP Watcher和MCP桥接器，实现语音指令直接调用现有业务系统API，让操作员在戴手套或驾驶叉车时也能查询库存或记录发货。
+  summary: Voice-controlled warehouse operations - query inventory, record shipments, all hands-free while driving forklifts or wearing gloves.
+  summary_zh: 语音操控仓库管理——戴着手套、开着叉车也能查库存、记发货，告别来回跑电脑的麻烦。
 
   description_file: intro/description.md
   description_file_zh: intro/description_zh.md
@@ -61,35 +61,6 @@ intro:
       description: Edge AI computer (Jetson Orin NX 16GB) for local LLM and TTS
       description_zh: 边缘 AI 计算机（Jetson Orin NX 16GB），用于本地 LLM 和 TTS 推理
 
-  # Device Groups
-  device_groups:
-    - id: watcher
-      name: Voice Assistant
-      name_zh: 语音助手
-      type: single
-      required: true
-      options:
-        - device_ref: sensecap_watcher
-      default: sensecap_watcher
-
-    - id: warehouse_box
-      name: Warehouse Box (R1100)
-      name_zh: 仓管盒子（R1100）
-      type: single
-      required: true
-      options:
-        - device_ref: recomputer_r1100
-      default: recomputer_r1100
-
-    - id: ai_compute
-      name: AI Compute (J4012)
-      name_zh: AI 算力（J4012）
-      type: single
-      required: false
-      options:
-        - device_ref: recomputer_j4012
-      default: recomputer_j4012
-
   # Presets - Multiple deployment schemes (different device requirements)
   presets:
     - id: sensecraft_cloud
@@ -99,8 +70,15 @@ intro:
       badge_zh: 推荐
       description: Use SenseCraft cloud for device management
       description_zh: 使用 SenseCraft 云平台进行设备管理
-      selections:
-        watcher: sensecap_watcher
+      device_groups:
+        - id: watcher
+          name: Voice Assistant
+          name_zh: 语音助手
+          type: single
+          required: true
+          options:
+            - device_ref: sensecap_watcher
+          default: sensecap_watcher
       architecture_image: intro/gallery/architecture-cloud.png
       links:
         wiki: https://wiki.seeedstudio.com/cn/mcp_external_system_integration/
@@ -116,9 +94,23 @@ intro:
       name_zh: 私有云方案
       description: Self-hosted deployment for data privacy
       description_zh: 自托管部署，保障数据隐私
-      selections:
-        watcher: sensecap_watcher
-        edge_computer: recomputer_j4012
+      device_groups:
+        - id: watcher
+          name: Voice Assistant
+          name_zh: 语音助手
+          type: single
+          required: true
+          options:
+            - device_ref: sensecap_watcher
+          default: sensecap_watcher
+        - id: ai_compute
+          name: AI Compute (J4012)
+          name_zh: AI 算力（J4012）
+          type: single
+          required: false
+          options:
+            - device_ref: recomputer_j4012
+          default: recomputer_j4012
       architecture_image: intro/gallery/architecture-cloud.png
       links:
         wiki: https://wiki.seeedstudio.com/cn/mcp_external_system_integration/
@@ -134,9 +126,23 @@ intro:
       name_zh: 边缘计算方案
       description: All processing on local edge device
       description_zh: 所有处理在本地边缘设备完成
-      selections:
-        watcher: sensecap_watcher
-        edge_computer: recomputer_j4012
+      device_groups:
+        - id: watcher
+          name: Voice Assistant
+          name_zh: 语音助手
+          type: single
+          required: true
+          options:
+            - device_ref: sensecap_watcher
+          default: sensecap_watcher
+        - id: ai_compute
+          name: AI Compute (J4012)
+          name_zh: AI 算力（J4012）
+          type: single
+          required: false
+          options:
+            - device_ref: recomputer_j4012
+          default: recomputer_j4012
       architecture_image: intro/gallery/architecture-cloud.png
       links:
         wiki: https://wiki.seeedstudio.com/cn/mcp_external_system_integration/
