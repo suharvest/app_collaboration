@@ -94,7 +94,7 @@ class Preset(BaseModel):
     description_zh: Optional[str] = None
     badge: Optional[str] = None
     badge_zh: Optional[str] = None
-    selections: Dict[str, Any] = {}
+    device_groups: List[DeviceGroup] = []  # Device groups for this preset
     architecture_image: Optional[str] = None  # Architecture diagram for this preset
     links: Optional[PresetLinks] = None  # Per-preset wiki/github links
     section: Optional[DeviceGroupSection] = None  # Level 1: preset deployment guide
@@ -139,8 +139,7 @@ class SolutionIntro(BaseModel):
     required_devices: List[RequiredDevice] = []  # Legacy field
     # New device configuration system
     device_catalog: Dict[str, DeviceCatalogItem] = {}
-    device_groups: List[DeviceGroup] = []
-    presets: List[Preset] = []
+    presets: List[Preset] = []  # Presets now contain device_groups directly
     partners: List[Partner] = []  # Deployment partners
     stats: SolutionStats = Field(default_factory=SolutionStats)
     links: SolutionLinks = Field(default_factory=SolutionLinks)
@@ -230,6 +229,11 @@ class DeviceTarget(BaseModel):
     section: Optional[DeviceSection] = None
 
 
+class DeviceShowWhen(BaseModel):
+    """Conditional display rules for devices"""
+    preset: Optional[str] = None  # Show device only when this preset is selected
+
+
 class DeviceRef(BaseModel):
     """Device reference in solution"""
     id: str
@@ -237,6 +241,7 @@ class DeviceRef(BaseModel):
     name_zh: Optional[str] = None
     type: str  # esp32_usb | docker_local | ssh_deb | script | manual | preview
     required: bool = True
+    show_when: Optional[DeviceShowWhen] = None  # Conditional display rules
     config_file: Optional[str] = None  # Optional for manual/script types
     targets: Optional[Dict[str, DeviceTarget]] = None  # Alternative deployment targets
     user_inputs: List[UserInput] = []  # User inputs for script types

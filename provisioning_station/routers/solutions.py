@@ -256,9 +256,9 @@ async def get_solution(
     for device_id, device in solution.intro.device_catalog.items():
         device_catalog[device_id] = resolve_device_info(device_id, device)
 
-    # Build device groups with resolved device info
-    device_groups = []
-    for group in solution.intro.device_groups:
+    # Helper function to resolve device group info
+    def resolve_device_group(group):
+        """Resolve device info for a device group"""
         group_data = group.model_dump()
         # Resolve device_ref for quantity type (check local then global)
         if group.type == "quantity" and group.device_ref:
@@ -277,12 +277,25 @@ async def get_solution(
                     opt_data["device_info"] = resolve_device_info(opt.device_ref, None)
                 resolved_options.append(opt_data)
             group_data["options"] = resolved_options
-        device_groups.append(group_data)
+        return group_data
 
-    # Build presets
+    # Build presets with resolved device groups
     presets = []
     for preset in solution.intro.presets:
-        presets.append(preset.model_dump())
+        preset_data = preset.model_dump()
+        # Resolve device groups within each preset
+        if preset.device_groups:
+            preset_data["device_groups"] = [resolve_device_group(g) for g in preset.device_groups]
+        presets.append(preset_data)
+
+    # For backward compatibility: collect all device groups from presets for top-level device_groups field
+    device_groups = []
+    seen_group_ids = set()
+    for preset in solution.intro.presets:
+        for group in preset.device_groups:
+            if group.id not in seen_group_ids:
+                device_groups.append(resolve_device_group(group))
+                seen_group_ids.add(group.id)
 
     # Build partners with logo URLs
     partners = []
@@ -348,6 +361,7 @@ async def get_deployment_info(
             "name_zh": device.name_zh,
             "type": device.type,
             "required": device.required,
+            "show_when": device.show_when.model_dump() if device.show_when else None,
         }
 
         # Load device config to get SSH settings, user_inputs, preview settings, etc.
@@ -456,9 +470,9 @@ async def get_deployment_info(
                 "url": step.url,
             })
 
-    # Build device groups with section content
-    device_groups = []
-    for group in solution.intro.device_groups:
+    # Helper function to build device group data with section content
+    async def build_device_group_data(group):
+        """Build device group data with section content"""
         group_data = group.model_dump()
 
         # Process section for this device group
@@ -478,23 +492,45 @@ async def get_deployment_info(
         else:
             group_data["section"] = None
 
-        device_groups.append(group_data)
+        return group_data
 
-    # Build presets with section content
+    # Build presets with section content and device groups
     presets = []
     for preset in solution.intro.presets:
         preset_data = preset.model_dump()
+        # Load preset section
         if preset.section:
+            # Build selections from device_groups defaults for template variable replacement
+            selections = {}
+            for group in preset.device_groups:
+                if group.type == 'single' and group.default:
+                    selections[group.id] = group.default
+                elif group.type == 'multiple' and group.default_selections:
+                    selections[group.id] = group.default_selections[0]
+                elif group.type == 'quantity':
+                    selections[group.id] = group.default_count
             section_data = await load_preset_section(
                 solution_id,
                 preset.section,
-                preset.selections,
+                selections,
                 lang,
             )
             preset_data["section"] = section_data
         else:
             preset_data["section"] = None
+        # Build device groups with section content
+        if preset.device_groups:
+            preset_data["device_groups"] = [await build_device_group_data(g) for g in preset.device_groups]
         presets.append(preset_data)
+
+    # For backward compatibility: collect all device groups from presets
+    device_groups = []
+    seen_group_ids = set()
+    for preset in solution.intro.presets:
+        for group in preset.device_groups:
+            if group.id not in seen_group_ids:
+                device_groups.append(await build_device_group_data(group))
+                seen_group_ids.add(group.id)
 
     return {
         "solution_id": solution_id,
@@ -527,6 +563,7 @@ async def get_device_group_section(
     solution_id: str,
     group_id: str,
     selected_device: str = Query(..., description="Selected device ref"),
+    preset_id: str = Query(None, description="Preset ID to find device group in"),
     lang: str = Query("en", pattern="^(en|zh)$"),
 ):
     """Get device group section content with template variable replacement"""
@@ -534,12 +571,26 @@ async def get_device_group_section(
     if not solution:
         raise HTTPException(status_code=404, detail="Solution not found")
 
-    # Find the device group
+    # Find the device group within presets
     group = None
-    for g in solution.intro.device_groups:
-        if g.id == group_id:
-            group = g
-            break
+    if preset_id:
+        # Find group in specific preset
+        for preset in solution.intro.presets:
+            if preset.id == preset_id:
+                for g in preset.device_groups:
+                    if g.id == group_id:
+                        group = g
+                        break
+                break
+    else:
+        # Search all presets for the group
+        for preset in solution.intro.presets:
+            for g in preset.device_groups:
+                if g.id == group_id:
+                    group = g
+                    break
+            if group:
+                break
 
     if not group:
         raise HTTPException(status_code=404, detail="Device group not found")
@@ -565,7 +616,7 @@ async def get_preset_section(
 ):
     """Get preset section content with template variable replacement.
 
-    Selections are passed as query parameters (group_id=device_ref).
+    Selections are built from the preset's device_groups defaults.
     """
     solution = solution_manager.get_solution(solution_id)
     if not solution:
@@ -584,8 +635,15 @@ async def get_preset_section(
     if not preset.section:
         return {"section": None}
 
-    # Use preset's default selections
-    selections = dict(preset.selections)
+    # Build selections from device_groups defaults
+    selections = {}
+    for group in preset.device_groups:
+        if group.type == 'single' and group.default:
+            selections[group.id] = group.default
+        elif group.type == 'multiple' and group.default_selections:
+            selections[group.id] = group.default_selections[0]
+        elif group.type == 'quantity':
+            selections[group.id] = group.default_count
 
     section_data = await load_preset_section(
         solution_id,
