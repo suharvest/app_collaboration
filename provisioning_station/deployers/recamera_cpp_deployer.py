@@ -14,6 +14,7 @@ Key features:
 
 import asyncio
 import logging
+import shlex
 from pathlib import Path
 from typing import Callable, Optional, Dict, Any, List
 
@@ -21,6 +22,26 @@ from .base import BaseDeployer
 from ..models.device import DeviceConfig
 
 logger = logging.getLogger(__name__)
+
+
+def _build_sudo_cmd(password: str, cmd: str) -> str:
+    """
+    Build a sudo command with proper password escaping.
+
+    Uses printf instead of echo to avoid issues with special characters
+    (single quotes, backslashes, etc.) in passwords.
+
+    Args:
+        password: The sudo password
+        cmd: The command to run with sudo
+
+    Returns:
+        A shell command string that safely pipes the password to sudo
+    """
+    # Use shlex.quote to safely escape the password for the shell
+    # printf '%s\n' handles special characters better than echo
+    escaped_password = shlex.quote(password)
+    return f"printf '%s\\n' {escaped_password} | sudo -S {cmd}"
 
 # Default conflicting services on reCamera
 DEFAULT_CONFLICT_SERVICES = [
@@ -169,7 +190,7 @@ class ReCameraCppDeployer(BaseDeployer):
                         await self._cleanup_orphaned_scripts(client, service_name, password)
 
                     deb_name = Path(binary_config.deb_package.path).name
-                    install_cmd = f"echo '{password}' | sudo -S opkg install --force-reinstall /tmp/{deb_name}"
+                    install_cmd = _build_sudo_cmd(password, f"opkg install --force-reinstall /tmp/{deb_name}")
 
                     exit_code, stdout, stderr = await self._exec_sudo(
                         client, install_cmd, password, timeout=120
@@ -309,7 +330,7 @@ class ReCameraCppDeployer(BaseDeployer):
             # Try both S* and K* versions
             for prefix in ["S", "K"]:
                 svc_name = service if service.startswith(prefix) else f"{prefix}{service.lstrip('SK')}"
-                cmd = f"echo '{password}' | sudo -S /etc/init.d/{svc_name} stop 2>/dev/null || true"
+                cmd = _build_sudo_cmd(password, f"/etc/init.d/{svc_name} stop 2>/dev/null || true")
                 await self._exec_sudo(client, cmd, password, timeout=30)
 
         # Wait for services to stop
@@ -359,12 +380,12 @@ class ReCameraCppDeployer(BaseDeployer):
             filename = model.filename or Path(model.path).name
 
             # Create target directory
-            cmd = f"echo '{password}' | sudo -S mkdir -p {target_dir}"
+            cmd = _build_sudo_cmd(password, f"mkdir -p {shlex.quote(target_dir)}")
             await self._exec_sudo(client, cmd, password, timeout=30)
 
             # Copy model file
             src_name = Path(model.path).name
-            cmd = f"echo '{password}' | sudo -S cp /tmp/{src_name} {target_dir}/{filename}"
+            cmd = _build_sudo_cmd(password, f"cp /tmp/{shlex.quote(src_name)} {shlex.quote(target_dir)}/{shlex.quote(filename)}")
             await self._exec_sudo(client, cmd, password, timeout=60)
 
     async def _deploy_init_script(
@@ -390,15 +411,15 @@ class ReCameraCppDeployer(BaseDeployer):
 
         # Deploy custom script
         src_name = Path(init_config.path).name
-        cmd = f"echo '{password}' | sudo -S cp /tmp/{src_name} {script_path}"
+        cmd = _build_sudo_cmd(password, f"cp /tmp/{shlex.quote(src_name)} {shlex.quote(script_path)}")
         await self._exec_sudo(client, cmd, password, timeout=30)
 
         # Remove old scripts with same name but different priority
-        cleanup_cmd = f"echo '{password}' | sudo -S sh -c 'ls /etc/init.d/*{service_name} 2>/dev/null | grep -v {script_path} | xargs rm -f 2>/dev/null || true'"
+        cleanup_cmd = _build_sudo_cmd(password, f"sh -c 'ls /etc/init.d/*{service_name} 2>/dev/null | grep -v {script_path} | xargs rm -f 2>/dev/null || true'")
         await self._exec_sudo(client, cleanup_cmd, password, timeout=30)
 
         # Make executable
-        cmd = f"echo '{password}' | sudo -S chmod +x {script_path}"
+        cmd = _build_sudo_cmd(password, f"chmod +x {shlex.quote(script_path)}")
         await self._exec_sudo(client, cmd, password, timeout=30)
 
     async def _configure_mqtt(
@@ -418,20 +439,21 @@ class ReCameraCppDeployer(BaseDeployer):
 
         # Add configuration
         config_cmds = [
-            f"echo '{password}' | sudo -S sh -c 'echo \"listener {mqtt_config.port} 0.0.0.0\" >> /etc/mosquitto/mosquitto.conf'",
+            _build_sudo_cmd(password, f"sh -c 'echo \"listener {mqtt_config.port} 0.0.0.0\" >> /etc/mosquitto/mosquitto.conf'"),
         ]
 
         if mqtt_config.allow_anonymous:
             config_cmds.append(
-                f"echo '{password}' | sudo -S sh -c 'echo \"allow_anonymous true\" >> /etc/mosquitto/mosquitto.conf'"
+                _build_sudo_cmd(password, "sh -c 'echo \"allow_anonymous true\" >> /etc/mosquitto/mosquitto.conf'")
             )
 
         for cmd in config_cmds:
             await self._exec_sudo(client, cmd, password, timeout=30)
 
-        # Restart mosquitto
-        restart_cmd = f"echo '{password}' | sudo -S killall mosquitto 2>/dev/null; sleep 1; echo '{password}' | sudo -S /usr/sbin/mosquitto -c /etc/mosquitto/mosquitto.conf -d"
-        await self._exec_sudo(client, restart_cmd, password, timeout=30)
+        # Restart mosquitto (need two separate sudo commands)
+        await self._exec_sudo(client, _build_sudo_cmd(password, "killall mosquitto 2>/dev/null || true"), password, timeout=30)
+        await asyncio.sleep(1)
+        await self._exec_sudo(client, _build_sudo_cmd(password, "/usr/sbin/mosquitto -c /etc/mosquitto/mosquitto.conf -d"), password, timeout=30)
 
     async def _disable_services(
         self,
@@ -442,13 +464,13 @@ class ReCameraCppDeployer(BaseDeployer):
         """Disable services by renaming S* to K*."""
         for service in services:
             # Find and rename S* services
-            cmd = f"""echo '{password}' | sudo -S sh -c '
-for svc in /etc/init.d/S*{service}*; do
+            shell_script = f'''for svc in /etc/init.d/S*{service}*; do
     if [ -f "$svc" ]; then
         new_name=$(echo $svc | sed "s|/S|/K|")
         mv "$svc" "$new_name" 2>/dev/null || true
     fi
-done'"""
+done'''
+            cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(shell_script)}")
             await self._exec_sudo(client, cmd, password, timeout=30)
 
     async def _start_service(
@@ -468,7 +490,7 @@ done'"""
 
         script_path = f"/etc/init.d/S{priority:02d}{service_name}"
 
-        cmd = f"echo '{password}' | sudo -S {script_path} start"
+        cmd = _build_sudo_cmd(password, f"{script_path} start")
         exit_code, stdout, stderr = await self._exec_sudo(client, cmd, password, timeout=60)
 
         if exit_code != 0:
@@ -494,7 +516,7 @@ done'"""
 
         # Check via init script status
         script_path = f"/etc/init.d/S{priority:02d}{service_name}"
-        cmd = f"echo '{password}' | sudo -S {script_path} status"
+        cmd = _build_sudo_cmd(password, f"{script_path} status")
         exit_code, stdout, _ = await self._exec_sudo(client, cmd, password, timeout=30)
 
         if "running" in stdout.lower():
@@ -551,12 +573,12 @@ done'"""
         may have been renamed to K* (disabled). Remove it before installing
         the new deb package which will create a fresh S* script.
         """
-        cleanup_cmd = f"""echo '{password}' | sudo -S sh -c '
-for svc in /etc/init.d/K*{service_name}*; do
+        shell_script = f'''for svc in /etc/init.d/K*{service_name}*; do
     if [ -f "$svc" ]; then
         rm -f "$svc" && echo "Removed orphaned: $svc"
     fi
-done' 2>/dev/null || true"""
+done'''
+        cleanup_cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(shell_script)}") + " 2>/dev/null || true"
 
         exit_code, stdout, _ = await self._exec_sudo(
             client, cleanup_cmd, password, timeout=30

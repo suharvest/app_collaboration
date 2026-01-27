@@ -12,6 +12,7 @@ from typing import Callable, Optional, Dict, Any
 
 from .base import BaseDeployer
 from ..models.device import DeviceConfig
+from ..services.remote_pre_check import remote_pre_check
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,22 @@ class SSHBinaryDeployer(BaseDeployer):
             )
 
             try:
+                # Step 1.5: Check remote OS is Linux
+                await self._report_progress(
+                    progress_callback, "check_os", 0, "Checking remote operating system..."
+                )
+
+                os_check = await remote_pre_check.check_remote_os(client)
+                if not os_check.passed:
+                    await self._report_progress(
+                        progress_callback, "check_os", 0, os_check.message
+                    )
+                    return False
+
+                await self._report_progress(
+                    progress_callback, "check_os", 100, os_check.message
+                )
+
                 # Step 2: Pre-deploy hook (stop conflicting services)
                 await self._report_progress(
                     progress_callback, "prepare", 0, "Preparing deployment..."

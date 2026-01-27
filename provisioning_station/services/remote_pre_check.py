@@ -162,23 +162,42 @@ class RemotePreCheckService:
         ssh_client,
         progress_callback: Optional[Callable] = None,
     ) -> bool:
-        """Install Docker on remote device"""
+        """Install Docker on remote device (supports Debian/Ubuntu and generic Linux)"""
         try:
             if progress_callback:
-                await progress_callback("install_docker", 0, "Installing Docker...")
+                await progress_callback("install_docker", 0, "Detecting system...")
 
-            # Detect OS
-            exit_code, stdout, _ = await asyncio.to_thread(
-                self._exec_command,
-                ssh_client,
-                "cat /etc/os-release",
-                timeout=30
+            # Detect distro and init system
+            distro = await self.detect_distro(ssh_client)
+            init_system = await self.detect_init_system(ssh_client)
+
+            distro_id = distro["id"]
+            distro_like = distro["like"]
+
+            logger.info(f"Installing Docker on {distro['name']} ({distro_id}), init: {init_system}")
+
+            if progress_callback:
+                await progress_callback("install_docker", 10, f"Installing Docker on {distro['name']}...")
+
+            # Check for OpenWrt - Docker is not typically supported
+            if distro_id == "openwrt":
+                logger.warning("OpenWrt detected - Docker installation may not be supported")
+                if progress_callback:
+                    await progress_callback(
+                        "install_docker", 0,
+                        "OpenWrt detected. Docker is not typically supported on OpenWrt due to resource constraints. "
+                        "Please use a device with full Linux support."
+                    )
+                return False
+
+            # Determine if Debian-based
+            is_debian_based = (
+                distro_id in ("debian", "ubuntu", "raspbian", "linuxmint") or
+                "debian" in distro_like or "ubuntu" in distro_like
             )
 
-            is_debian = "debian" in stdout.lower() or "ubuntu" in stdout.lower()
-
-            if is_debian:
-                # Install Docker on Debian/Ubuntu
+            if is_debian_based:
+                # Install Docker on Debian/Ubuntu using official method
                 install_script = """
                     set -e
 
@@ -190,7 +209,7 @@ class RemotePreCheckService:
 
                     # Add Docker's official GPG key
                     sudo install -m 0755 -d /etc/apt/keyrings
-                    curl -fsSL https://download.docker.com/linux/$(. /etc/os-release && echo "$ID")/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+                    curl -fsSL https://download.docker.com/linux/$(. /etc/os-release && echo "$ID")/gpg | sudo gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg
                     sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
                     # Set up repository
@@ -203,12 +222,20 @@ class RemotePreCheckService:
                     # Add current user to docker group
                     sudo usermod -aG docker $USER
 
-                    # Start Docker service
-                    sudo systemctl enable docker
-                    sudo systemctl start docker
-
                     echo "Docker installation completed"
                 """
+
+                # Start service based on init system
+                if init_system == "systemd":
+                    install_script += """
+                    sudo systemctl enable docker
+                    sudo systemctl start docker
+                    """
+                else:
+                    install_script += """
+                    sudo update-rc.d docker defaults 2>/dev/null || true
+                    sudo /etc/init.d/docker start 2>/dev/null || sudo service docker start || true
+                    """
             else:
                 # Generic install script using convenience script
                 install_script = """
@@ -216,11 +243,20 @@ class RemotePreCheckService:
                     curl -fsSL https://get.docker.com -o get-docker.sh
                     sudo sh get-docker.sh
                     sudo usermod -aG docker $USER
-                    sudo systemctl enable docker
-                    sudo systemctl start docker
-                    rm get-docker.sh
+                    rm -f get-docker.sh
                     echo "Docker installation completed"
                 """
+
+                # Start service based on init system
+                if init_system == "systemd":
+                    install_script += """
+                    sudo systemctl enable docker
+                    sudo systemctl start docker
+                    """
+                else:
+                    install_script += """
+                    sudo /etc/init.d/docker start 2>/dev/null || sudo service docker start || true
+                    """
 
             if progress_callback:
                 await progress_callback("install_docker", 20, "Running installation script...")
@@ -285,20 +321,136 @@ class RemotePreCheckService:
             logger.error(f"Failed to fix Docker permission: {e}")
             return False
 
+    async def detect_init_system(
+        self,
+        ssh_client,
+    ) -> str:
+        """
+        Detect the init system on remote device.
+
+        Returns:
+            "systemd" - For Ubuntu/Debian with systemd
+            "procd" - For OpenWrt
+            "sysvinit" - For traditional init.d systems (reCamera, etc.)
+            "unknown" - If detection fails
+        """
+        try:
+            # Check for systemd (Ubuntu, Debian, most modern Linux)
+            exit_code, stdout, _ = await asyncio.to_thread(
+                self._exec_command,
+                ssh_client,
+                "systemctl --version 2>/dev/null | head -1",
+                timeout=10
+            )
+            if exit_code == 0 and "systemd" in stdout.lower():
+                return "systemd"
+
+            # Check for procd (OpenWrt)
+            exit_code, stdout, _ = await asyncio.to_thread(
+                self._exec_command,
+                ssh_client,
+                "[ -f /sbin/procd ] && echo procd",
+                timeout=10
+            )
+            if exit_code == 0 and "procd" in stdout:
+                return "procd"
+
+            # Check for SysVinit style (init.d scripts)
+            exit_code, stdout, _ = await asyncio.to_thread(
+                self._exec_command,
+                ssh_client,
+                "[ -d /etc/init.d ] && echo sysvinit",
+                timeout=10
+            )
+            if exit_code == 0 and "sysvinit" in stdout:
+                return "sysvinit"
+
+            return "unknown"
+
+        except Exception as e:
+            logger.warning(f"Init system detection failed: {e}")
+            return "unknown"
+
+    async def detect_distro(
+        self,
+        ssh_client,
+    ) -> Dict[str, str]:
+        """
+        Detect the Linux distribution on remote device.
+
+        Returns dict with keys: id, name, version, like (e.g., debian-based)
+        """
+        try:
+            exit_code, stdout, _ = await asyncio.to_thread(
+                self._exec_command,
+                ssh_client,
+                "cat /etc/os-release 2>/dev/null",
+                timeout=10
+            )
+
+            distro = {"id": "unknown", "name": "Unknown Linux", "version": "", "like": ""}
+
+            if exit_code == 0 and stdout:
+                for line in stdout.strip().split("\n"):
+                    if "=" in line:
+                        key, _, value = line.partition("=")
+                        value = value.strip('"').strip("'")
+                        if key == "ID":
+                            distro["id"] = value.lower()
+                        elif key == "NAME":
+                            distro["name"] = value
+                        elif key == "VERSION_ID":
+                            distro["version"] = value
+                        elif key == "ID_LIKE":
+                            distro["like"] = value.lower()
+
+            # Special detection for OpenWrt (may not have standard os-release)
+            if distro["id"] == "unknown":
+                exit_code, stdout, _ = await asyncio.to_thread(
+                    self._exec_command,
+                    ssh_client,
+                    "[ -f /etc/openwrt_release ] && echo openwrt",
+                    timeout=10
+                )
+                if exit_code == 0 and "openwrt" in stdout:
+                    distro["id"] = "openwrt"
+                    distro["name"] = "OpenWrt"
+
+            return distro
+
+        except Exception as e:
+            logger.warning(f"Distro detection failed: {e}")
+            return {"id": "unknown", "name": "Unknown Linux", "version": "", "like": ""}
+
     async def start_docker_service(
         self,
         ssh_client,
         progress_callback: Optional[Callable] = None,
     ) -> bool:
-        """Start Docker daemon on remote device"""
+        """Start Docker daemon on remote device (supports systemd and sysvinit)"""
         try:
             if progress_callback:
-                await progress_callback("start_docker", 0, "Starting Docker service...")
+                await progress_callback("start_docker", 0, "Detecting init system...")
+
+            init_system = await self.detect_init_system(ssh_client)
+            logger.info(f"Detected init system: {init_system}")
+
+            if progress_callback:
+                await progress_callback("start_docker", 20, f"Starting Docker ({init_system})...")
+
+            if init_system == "systemd":
+                cmd = "sudo systemctl start docker && sudo systemctl enable docker"
+            elif init_system in ("sysvinit", "procd"):
+                # For OpenWrt/SysVinit systems
+                cmd = "sudo /etc/init.d/docker start 2>/dev/null || sudo service docker start 2>/dev/null || true"
+            else:
+                # Try systemd first, fall back to init.d
+                cmd = "(sudo systemctl start docker 2>/dev/null || sudo /etc/init.d/docker start 2>/dev/null || sudo service docker start 2>/dev/null) && echo started"
 
             exit_code, stdout, stderr = await asyncio.to_thread(
                 self._exec_command,
                 ssh_client,
-                "sudo systemctl start docker && sudo systemctl enable docker",
+                cmd,
                 timeout=60
             )
 
@@ -316,6 +468,90 @@ class RemotePreCheckService:
         except Exception as e:
             logger.error(f"Failed to start Docker: {e}")
             return False
+
+    async def check_remote_os(
+        self,
+        ssh_client,
+    ) -> RemoteCheckResult:
+        """
+        Check if remote device is running a supported Linux OS.
+
+        This application only supports deploying to Linux systems.
+        Windows and macOS targets are not supported.
+        """
+        try:
+            # Check uname to determine OS type
+            exit_code, stdout, stderr = await asyncio.to_thread(
+                self._exec_command,
+                ssh_client,
+                "uname -s",
+                timeout=30
+            )
+
+            if exit_code != 0:
+                return RemoteCheckResult(
+                    check_type="remote_os",
+                    passed=False,
+                    message=f"Failed to detect remote OS: {stderr[:200]}",
+                    details={"error": stderr},
+                )
+
+            os_name = stdout.strip().lower()
+
+            # Check for supported OS (Linux only)
+            if os_name == "linux":
+                # Get more details about the Linux distribution
+                exit_code, distro_info, _ = await asyncio.to_thread(
+                    self._exec_command,
+                    ssh_client,
+                    "cat /etc/os-release 2>/dev/null | head -5 || echo 'Unknown Linux'",
+                    timeout=30
+                )
+
+                return RemoteCheckResult(
+                    check_type="remote_os",
+                    passed=True,
+                    message="Remote device is running Linux",
+                    details={
+                        "os": "Linux",
+                        "distro_info": distro_info.strip()[:500],
+                    },
+                )
+
+            elif os_name == "darwin":
+                return RemoteCheckResult(
+                    check_type="remote_os",
+                    passed=False,
+                    message="Remote device is running macOS. Only Linux targets are supported for deployment.",
+                    can_auto_fix=False,
+                    details={"os": "macOS"},
+                )
+
+            elif "mingw" in os_name or "msys" in os_name or "cygwin" in os_name:
+                return RemoteCheckResult(
+                    check_type="remote_os",
+                    passed=False,
+                    message="Remote device appears to be running Windows. Only Linux targets are supported for deployment.",
+                    can_auto_fix=False,
+                    details={"os": "Windows", "uname": os_name},
+                )
+
+            else:
+                return RemoteCheckResult(
+                    check_type="remote_os",
+                    passed=False,
+                    message=f"Unsupported remote OS: {os_name}. Only Linux targets are supported.",
+                    can_auto_fix=False,
+                    details={"os": os_name},
+                )
+
+        except Exception as e:
+            logger.error(f"Remote OS check failed: {e}")
+            return RemoteCheckResult(
+                check_type="remote_os",
+                passed=False,
+                message=f"Failed to check remote OS: {str(e)}",
+            )
 
     def _exec_command(
         self,

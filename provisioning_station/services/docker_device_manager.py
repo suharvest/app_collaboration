@@ -229,19 +229,38 @@ class DockerDeviceManager:
     # ============================================
 
     def _get_ssh_client(self, connection: ConnectDeviceRequest):
-        """Create and connect an SSH client"""
+        """Create and connect an SSH client
+
+        Raises:
+            paramiko.AuthenticationException: If authentication fails
+            paramiko.SSHException: If SSH connection fails
+            OSError: If network connection fails
+        """
         import paramiko
 
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(
-            hostname=connection.host,
-            port=connection.port,
-            username=connection.username,
-            password=connection.password,
-            timeout=10,
-        )
-        return client
+        try:
+            client.connect(
+                hostname=connection.host,
+                port=connection.port,
+                username=connection.username,
+                password=connection.password,
+                timeout=10,
+            )
+            return client
+        except paramiko.AuthenticationException:
+            raise RuntimeError(
+                f"Authentication failed for {connection.username}@{connection.host}. "
+                "Please check your username and password."
+            )
+        except paramiko.SSHException as e:
+            raise RuntimeError(f"SSH connection error: {e}")
+        except OSError as e:
+            raise RuntimeError(
+                f"Cannot connect to {connection.host}:{connection.port}. "
+                f"Network error: {e}"
+            )
 
     def _exec_command(self, client, command: str, timeout: int = 30) -> str:
         """Execute a command and return stdout"""

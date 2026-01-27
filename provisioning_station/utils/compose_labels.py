@@ -5,12 +5,13 @@ Adds SenseCraft labels to compose files for tracking deployed applications.
 """
 
 import logging
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
+
 import yaml
-import tempfile
-import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -116,26 +117,39 @@ def inject_labels_to_compose_file(
         Path to the modified compose file
     """
     try:
-        with open(compose_path, "r") as f:
+        with open(compose_path, "r", encoding="utf-8") as f:
             original_content = f.read()
 
         modified_content = inject_labels_to_compose(original_content, labels)
 
         if output_path:
-            with open(output_path, "w") as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 f.write(modified_content)
             return output_path
         else:
             # Create temp file in same directory to preserve relative paths
+            # On Windows, we must close the file descriptor before writing
+            # because Windows locks files opened by mkstemp
             compose_dir = Path(compose_path).parent
             temp_fd, temp_path = tempfile.mkstemp(
                 suffix=".yml",
                 prefix="compose_",
                 dir=str(compose_dir)
             )
-            with open(temp_path, "w") as f:
-                f.write(modified_content)
-            return temp_path
+            try:
+                # Close the file descriptor first (required for Windows)
+                os.close(temp_fd)
+                # Now write to the file with explicit UTF-8 encoding
+                with open(temp_path, "w", encoding="utf-8") as f:
+                    f.write(modified_content)
+                return temp_path
+            except Exception:
+                # Clean up temp file on error
+                try:
+                    os.unlink(temp_path)
+                except Exception:
+                    pass
+                raise
 
     except Exception as e:
         logger.error(f"Failed to process compose file: {e}")

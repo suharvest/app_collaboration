@@ -3,11 +3,15 @@ Kiosk mode configuration service
 
 Handles enabling/disabling Kiosk mode for deployed applications.
 Kiosk mode auto-starts the application in fullscreen on device boot.
+
+NOTE: Kiosk mode is currently only supported on Linux systems with X11/Wayland.
+Windows and macOS are not supported.
 """
 
 import asyncio
 import json
 import logging
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -83,8 +87,26 @@ class KioskManager:
             kiosk_user: System user account to run Kiosk mode
             app_url: Application URL (defaults to deployment URL)
             password: SSH password for remote deployments
+
+        Note:
+            Kiosk mode is only supported on Linux systems. Windows and macOS
+            do not have equivalent desktop autostart functionality.
         """
         try:
+            # Platform check - Kiosk mode only works on Linux
+            if sys.platform == "win32":
+                return KioskConfigResponse(
+                    success=False,
+                    message="Kiosk mode is not supported on Windows. "
+                            "This feature requires Linux with X11/Wayland desktop environment.",
+                )
+            elif sys.platform == "darwin":
+                return KioskConfigResponse(
+                    success=False,
+                    message="Kiosk mode is not supported on macOS. "
+                            "This feature requires Linux with X11/Wayland desktop environment.",
+                )
+
             # Get deployment info
             history = await deployment_history.get_history(limit=100)
             record = next((r for r in history if r.deployment_id == deployment_id), None)
@@ -300,6 +322,39 @@ class KioskManager:
             logger.error(f"Local Kiosk unconfiguration failed: {e}")
             return False
 
+    async def _get_remote_home_dir(self, client, kiosk_user: str) -> Optional[str]:
+        """Get the home directory of a user on remote system"""
+        try:
+            # Use getent to get user's home directory (works on Linux/OpenWrt)
+            stdin, stdout, stderr = await asyncio.to_thread(
+                client.exec_command,
+                f"getent passwd {kiosk_user} | cut -d: -f6",
+                timeout=10
+            )
+            exit_code = stdout.channel.recv_exit_status()
+            if exit_code == 0:
+                home_dir = stdout.read().decode().strip()
+                if home_dir:
+                    return home_dir
+
+            # Fallback: use eval echo ~user
+            stdin, stdout, stderr = await asyncio.to_thread(
+                client.exec_command,
+                f"eval echo ~{kiosk_user}",
+                timeout=10
+            )
+            exit_code = stdout.channel.recv_exit_status()
+            if exit_code == 0:
+                home_dir = stdout.read().decode().strip()
+                if home_dir and not home_dir.startswith("~"):
+                    return home_dir
+
+            # Last resort: assume /home/{user}
+            return f"/home/{kiosk_user}"
+        except Exception as e:
+            logger.warning(f"Failed to get remote home dir, using default: {e}")
+            return f"/home/{kiosk_user}"
+
     async def _configure_remote_kiosk(
         self,
         host: str,
@@ -327,19 +382,23 @@ class KioskManager:
             )
 
             try:
-                # Create kiosk script content
+                # Get the actual home directory for kiosk_user
+                home_dir = await self._get_remote_home_dir(client, kiosk_user)
+                logger.info(f"Remote home directory for {kiosk_user}: {home_dir}")
+
+                # Create kiosk script content (with dynamic home path)
                 kiosk_script = self._generate_kiosk_script(app_url)
-                autostart_content = self._generate_autostart_desktop(kiosk_user)
+                autostart_content = self._generate_autostart_desktop_with_home(kiosk_user, home_dir)
 
                 # Execute configuration commands
                 commands = [
-                    f"mkdir -p /home/{kiosk_user}/.local/bin",
-                    f"mkdir -p /home/{kiosk_user}/.config/autostart",
-                    f"cat > /home/{kiosk_user}/.local/bin/kiosk.sh << 'KIOSK_EOF'\n{kiosk_script}\nKIOSK_EOF",
-                    f"chmod +x /home/{kiosk_user}/.local/bin/kiosk.sh",
-                    f"cat > /home/{kiosk_user}/.config/autostart/kiosk.desktop << 'DESKTOP_EOF'\n{autostart_content}\nDESKTOP_EOF",
-                    f"chown -R {kiosk_user}:{kiosk_user} /home/{kiosk_user}/.local/bin/kiosk.sh",
-                    f"chown -R {kiosk_user}:{kiosk_user} /home/{kiosk_user}/.config/autostart/kiosk.desktop",
+                    f"mkdir -p {home_dir}/.local/bin",
+                    f"mkdir -p {home_dir}/.config/autostart",
+                    f"cat > {home_dir}/.local/bin/kiosk.sh << 'KIOSK_EOF'\n{kiosk_script}\nKIOSK_EOF",
+                    f"chmod +x {home_dir}/.local/bin/kiosk.sh",
+                    f"cat > {home_dir}/.config/autostart/kiosk.desktop << 'DESKTOP_EOF'\n{autostart_content}\nDESKTOP_EOF",
+                    f"chown -R {kiosk_user}:{kiosk_user} {home_dir}/.local/bin/kiosk.sh",
+                    f"chown -R {kiosk_user}:{kiosk_user} {home_dir}/.config/autostart/kiosk.desktop",
                 ]
 
                 for cmd in commands:
@@ -390,9 +449,12 @@ class KioskManager:
             )
 
             try:
+                # Get the actual home directory for kiosk_user
+                home_dir = await self._get_remote_home_dir(client, kiosk_user)
+
                 commands = [
-                    f"rm -f /home/{kiosk_user}/.config/autostart/kiosk.desktop",
-                    f"rm -f /home/{kiosk_user}/.local/bin/kiosk.sh",
+                    f"rm -f {home_dir}/.config/autostart/kiosk.desktop",
+                    f"rm -f {home_dir}/.local/bin/kiosk.sh",
                 ]
 
                 for cmd in commands:
@@ -465,25 +527,42 @@ fi
 '''
 
     def _generate_autostart_desktop(self, kiosk_user: str) -> str:
-        """Generate autostart desktop entry content"""
+        """Generate autostart desktop entry content (for local use)"""
+        import os
+        home_dir = os.path.expanduser(f"~{kiosk_user}")
+        return self._generate_autostart_desktop_with_home(kiosk_user, home_dir)
+
+    def _generate_autostart_desktop_with_home(self, kiosk_user: str, home_dir: str) -> str:
+        """Generate autostart desktop entry content with explicit home directory"""
         return f'''[Desktop Entry]
 Type=Application
 Name=HVAC Kiosk
 Comment=HVAC Automation Control System Kiosk Mode
-Exec=/home/{kiosk_user}/.local/bin/kiosk.sh
+Exec={home_dir}/.local/bin/kiosk.sh
 X-GNOME-Autostart-enabled=true
 Hidden=false
 NoDisplay=false
 '''
 
+    def _get_local_home_dir(self, kiosk_user: str) -> Path:
+        """Get the home directory of a local user"""
+        import os
+        # Try to expand ~user
+        home_dir = os.path.expanduser(f"~{kiosk_user}")
+        if home_dir.startswith("~"):
+            # Expansion failed, fall back to /home/{user}
+            return Path(f"/home/{kiosk_user}")
+        return Path(home_dir)
+
     async def _configure_kiosk_manually(self, kiosk_user: str, app_url: str) -> bool:
         """Fallback manual Kiosk configuration"""
         try:
+            home_dir = self._get_local_home_dir(kiosk_user)
             script_content = self._generate_kiosk_script(app_url)
-            autostart_content = self._generate_autostart_desktop(kiosk_user)
+            autostart_content = self._generate_autostart_desktop_with_home(kiosk_user, str(home_dir))
 
-            script_dir = Path(f"/home/{kiosk_user}/.local/bin")
-            autostart_dir = Path(f"/home/{kiosk_user}/.config/autostart")
+            script_dir = home_dir / ".local" / "bin"
+            autostart_dir = home_dir / ".config" / "autostart"
 
             script_dir.mkdir(parents=True, exist_ok=True)
             autostart_dir.mkdir(parents=True, exist_ok=True)
@@ -502,8 +581,9 @@ NoDisplay=false
     async def _unconfigure_kiosk_manually(self, kiosk_user: str) -> bool:
         """Fallback manual Kiosk unconfiguration"""
         try:
-            script_path = Path(f"/home/{kiosk_user}/.local/bin/kiosk.sh")
-            autostart_path = Path(f"/home/{kiosk_user}/.config/autostart/kiosk.desktop")
+            home_dir = self._get_local_home_dir(kiosk_user)
+            script_path = home_dir / ".local" / "bin" / "kiosk.sh"
+            autostart_path = home_dir / ".config" / "autostart" / "kiosk.desktop"
 
             if script_path.exists():
                 script_path.unlink()
