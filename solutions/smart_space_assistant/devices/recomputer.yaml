@@ -1,0 +1,152 @@
+version: "1.0"
+id: recomputer
+name: Display Service (Remote)
+name_zh: 投屏服务（远程）
+type: docker_remote
+
+detection:
+  method: network_scan
+  manual_entry: true
+  requirements:
+    - docker_installed
+    - docker_running
+
+ssh:
+  port: 22
+  default_user: recomputer
+  auth_methods:
+    - password
+    - key
+  connection_timeout: 30
+  command_timeout: 600
+
+docker_remote:
+  compose_file: assets/docker/docker-compose.yml
+  compose_dir: assets/docker
+  remote_path: /home/{{username}}/xiaozhi_display
+
+  environment:
+    TZ: Asia/Shanghai
+    RD_DEVICE_NAME: "{{device_name}}"
+    RD_NO_AUDIO: "{{no_audio}}"
+
+  options:
+    project_name: xiaozhi_display
+    remove_orphans: true
+
+  services:
+    - name: xiaozhi-display
+      port: 8765
+      health_check_endpoint: /
+      required: true
+
+  images:
+    - name: sensecraft-missionpack.seeed.cn/solution/xiaozhi-display:latest
+      required: true
+
+user_inputs:
+  - id: host
+    name: Device IP
+    name_zh: 设备 IP 地址
+    type: text
+    required: true
+    placeholder: "192.168.1.100"
+    description: IP address of reComputer or Raspberry Pi
+    description_zh: reComputer 或树莓派的 IP 地址
+    validation:
+      pattern: "^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$"
+      message: Please enter a valid IP address
+
+  - id: username
+    name: SSH Username
+    name_zh: SSH 用户名
+    type: text
+    default: recomputer
+    required: true
+    description: SSH login username
+    description_zh: SSH 登录用户名
+
+  - id: password
+    name: SSH Password
+    name_zh: SSH 密码
+    type: password
+    required: true
+    description: SSH login password
+    description_zh: SSH 登录密码
+
+  - id: device_name
+    name: Display Name
+    name_zh: 显示名称
+    type: text
+    default: "Xiaozhi Display"
+    required: false
+    placeholder: "Living Room Display"
+    description: Device name shown in mDNS and Web UI
+    description_zh: 在 mDNS 和 Web 界面显示的设备名称
+
+  - id: no_audio
+    name: Disable Audio
+    name_zh: 禁用音频
+    type: checkbox
+    default: "false"
+    required: false
+    description: Disable audio output (for displays without speakers)
+    description_zh: 禁用音频输出（适用于无扬声器的显示器）
+
+pre_checks:
+  - type: docker_version
+    min_version: "20.0"
+    description: Check Docker version
+
+steps:
+  - id: connect
+    name: SSH Connect
+    name_zh: SSH 连接
+    description: Connect to remote device via SSH
+    description_zh: 通过 SSH 连接远程设备
+    optional: false
+    default: true
+
+  - id: prepare
+    name: Prepare Directory
+    name_zh: 准备目录
+    description: Create deployment directory on remote
+    description_zh: 在远程设备上创建部署目录
+    optional: false
+    default: true
+
+  - id: upload
+    name: Upload Files
+    name_zh: 上传文件
+    description: Upload Docker Compose files
+    description_zh: 上传 Docker Compose 文件
+    optional: false
+    default: true
+
+  - id: pull_images
+    name: Pull Docker Images
+    name_zh: 拉取 Docker 镜像
+    description: Download container image from registry
+    description_zh: 从镜像仓库下载容器镜像
+    optional: false
+    default: true
+
+  - id: start_services
+    name: Start Services
+    name_zh: 启动服务
+    description: Launch Docker container
+    description_zh: 启动 Docker 容器
+    optional: false
+    default: true
+
+  - id: health_check
+    name: Health Check
+    name_zh: 健康检查
+    description: Verify service is running correctly
+    description_zh: 验证服务运行正常
+    optional: false
+    default: true
+
+post_deployment:
+  open_browser: true
+  url: "http://{{host}}:8765"

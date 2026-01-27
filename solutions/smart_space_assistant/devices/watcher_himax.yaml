@@ -1,0 +1,137 @@
+version: "1.0"
+id: watcher_himax
+name: Himax WE2 Face Recognition
+name_zh: Himax WE2 人脸识别
+type: himax_usb
+
+# Auto-detection configuration
+detection:
+  method: usb_serial
+  # Watcher Himax WE2 USB identifiers (WCH chip)
+  usb_vendor_id: "0x1a86"
+  usb_product_id: "0x55d2"
+  # Fallback port patterns
+  fallback_ports:
+    - "/dev/cu.usbmodem*"
+    - "/dev/tty.usbmodem*"
+    - "/dev/ttyACM*"
+
+firmware:
+  source:
+    type: local
+    path: assets/watcher_firmware/face_recognition.img
+  flash_config:
+    baudrate: 921600
+    requires_reset: true
+    timeout: 60
+    # SenseCAP Watcher specific: ESP32 firmware monitors Himax and resets it
+    # when detecting anomalies. We need to hold ESP32 in reset during flashing.
+    requires_esp32_reset_hold: true
+    protocol: xmodem  # xmodem (128B) or xmodem1k (1024B)
+
+    # Multi-model configuration
+    # These AI models are flashed after the base firmware at specified flash addresses
+    models:
+      - id: face_detection
+        name: Face Detection (SCRFD)
+        name_zh: 人脸检测模型 (SCRFD)
+        path: assets/models/scrfd_500m_kps_int8_vela.tflite
+        flash_address: "0x400000"
+        offset: "0x0"
+        required: true
+        default: true
+        description: Core face detection model for identifying faces in video stream
+        description_zh: 核心人脸检测模型，用于识别视频流中的人脸
+        size_hint: "512KB"
+
+      - id: face_embedding
+        name: Face Embedding (GhostFaceNet)
+        name_zh: 人脸特征模型 (GhostFaceNet)
+        path: assets/models/ghostfacenet_0.5_112_int8_vela.tflite
+        flash_address: "0x510000"
+        offset: "0x0"
+        required: true
+        default: true
+        description: Face recognition embedding model for person identification
+        description_zh: 人脸识别特征提取模型，用于身份识别
+        size_hint: "800KB"
+
+      - id: face_detection_2
+        name: Face Detection 2 (SCRFD)
+        name_zh: 人脸检测模型 2 (SCRFD)
+        path: assets/models/scrfd_500m_kps_int8_vela.tflite
+        flash_address: "0x600000"
+        offset: "0x0"
+        required: true
+        default: true
+        description: Secondary face detection model instance
+        description_zh: 人脸检测模型第二实例
+        size_hint: "512KB"
+
+      - id: person_detection
+        name: Person Detection (Swift YOLO)
+        name_zh: 人体检测模型 (Swift YOLO)
+        path: assets/models/swift_yolo_nano_person_192_int8_vela.tflite
+        flash_address: "0x700000"
+        offset: "0x0"
+        required: true
+        default: true
+        description: Person detection model for identifying human presence
+        description_zh: 人体检测模型，用于识别人体存在
+        size_hint: "1.6MB"
+
+# User inputs (supports auto-detection, can also be manually selected)
+user_inputs:
+  - id: serial_port
+    name: Serial Port
+    name_zh: 串口
+    type: serial_port
+    required: true
+    description: Select the USB port for Himax WE2 (usbmodem)
+    description_zh: 选择 Himax WE2 的串口（usbmodem 开头）
+    auto_detect: true
+
+  - id: model_selection
+    name: Models to Flash
+    name_zh: 选择要烧录的模型
+    type: model_select
+    required: false
+    description: Select AI models to flash with the base firmware
+    description_zh: 选择要与基础固件一起烧录的 AI 模型
+
+steps:
+  - id: detect
+    name: Detect Device
+    name_zh: 检测设备
+    description: Auto-scan USB ports for Himax WE2
+    description_zh: 自动扫描 USB 端口查找 Himax WE2
+    optional: false
+    default: true
+
+  - id: wait_reset
+    name: Wait for Reset
+    name_zh: 等待重启按钮
+    description: Press the reset button when prompted
+    description_zh: 提示时按下重启按钮
+    optional: false
+    default: true
+
+  - id: flash
+    name: Flash Firmware & Models
+    name_zh: 烧录固件和模型
+    description: Write base firmware and selected AI models
+    description_zh: 写入基础固件和选定的 AI 模型
+    optional: false
+    default: true
+
+  - id: verify
+    name: Verify
+    name_zh: 验证
+    description: Verify firmware installation
+    description_zh: 验证固件安装
+    optional: true
+    default: true
+
+post_deployment:
+  reset_device: false
+  wait_for_ready: 5
