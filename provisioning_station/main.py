@@ -3,9 +3,13 @@ FastAPI application entry point
 """
 
 import asyncio
+import atexit
 import logging
+import signal
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
 # Configure application logging (uvicorn only sets up its own loggers)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:\t %(name)s - %(message)s")
@@ -21,13 +25,76 @@ from .services.solution_manager import solution_manager
 from .services.stream_proxy import get_stream_proxy
 from .services.mqtt_bridge import get_mqtt_bridge, is_mqtt_available
 
+# Global flag to track if cleanup has been performed
+_cleanup_done = False
+_event_loop: Optional[asyncio.AbstractEventLoop] = None
+
+
+def _sync_cleanup():
+    """Synchronous cleanup for atexit handler (last resort)"""
+    global _cleanup_done
+    if _cleanup_done:
+        return
+
+    print("Running synchronous cleanup (atexit)...")
+
+    # Try to stop FFmpeg processes synchronously
+    try:
+        stream_proxy = get_stream_proxy()
+        # Kill any running FFmpeg processes directly
+        for stream_id, stream_info in list(stream_proxy._streams.items()):
+            if stream_info.process and stream_info.process.returncode is None:
+                try:
+                    stream_info.process.kill()
+                    print(f"Killed FFmpeg process for stream {stream_id}")
+                except Exception as e:
+                    print(f"Error killing FFmpeg process: {e}")
+    except Exception as e:
+        print(f"Sync cleanup error: {e}")
+
+    _cleanup_done = True
+
+
+async def _async_cleanup():
+    """Async cleanup for graceful shutdown"""
+    global _cleanup_done
+    if _cleanup_done:
+        return
+
+    print("Running async cleanup...")
+
+    try:
+        await get_stream_proxy().stop_all()
+        print("Stream proxy stopped")
+    except Exception as e:
+        print(f"Stream proxy cleanup error: {e}")
+
+    try:
+        if is_mqtt_available():
+            await get_mqtt_bridge().stop_all()
+            print("MQTT bridge stopped")
+    except Exception as e:
+        print(f"MQTT bridge cleanup error: {e}")
+
+    _cleanup_done = True
+    print("Async cleanup completed")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
+    global _event_loop
+
     # Startup
     print(f"Starting {settings.app_name} v{settings.app_version}")
     print(f"Solutions directory: {settings.solutions_dir}")
+    print(f"Platform: {sys.platform}")
+
+    # Store event loop for signal handlers
+    _event_loop = asyncio.get_running_loop()
+
+    # Register atexit handler as last resort cleanup
+    atexit.register(_sync_cleanup)
 
     # Ensure directories exist
     settings.logs_dir.mkdir(parents=True, exist_ok=True)
@@ -39,16 +106,11 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
-    print("Shutting down...")
+    # Shutdown - this runs when uvicorn receives SIGTERM/SIGINT
+    print("Shutting down (lifespan)...")
 
     # Cleanup preview services
-    try:
-        await get_stream_proxy().stop_all()
-        if is_mqtt_available():
-            await get_mqtt_bridge().stop_all()
-    except Exception as e:
-        print(f"Preview cleanup error: {e}")
+    await _async_cleanup()
 
 
 app = FastAPI(
