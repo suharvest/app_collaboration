@@ -96,6 +96,22 @@ class DockerRemoteDeployer(BaseDeployer):
             )
 
             try:
+                # Step 1.5: Check remote OS is Linux
+                await self._report_progress(
+                    progress_callback, "check_os", 0, "Checking remote operating system..."
+                )
+
+                os_check = await remote_pre_check.check_remote_os(client)
+                if not os_check.passed:
+                    await self._report_progress(
+                        progress_callback, "check_os", 0, os_check.message
+                    )
+                    return False
+
+                await self._report_progress(
+                    progress_callback, "check_os", 100, os_check.message
+                )
+
                 # Step 2: Check Docker on remote device
                 auto_install_docker = connection.get("auto_install_docker", False)
 
