@@ -168,16 +168,28 @@ deploy/
 
 ### solution.yaml section 配置
 
+> **注意**：从 v1.1 开始，部署步骤定义在 `intro.presets[].devices` 中。
+
 ```yaml
-section:
-  title: 烧录固件
-  title_zh: 烧录固件
-  # 部署按钮上方的内容（准备工作）
-  description_file: deploy/sections/flash.md
-  description_file_zh: deploy/sections/flash_zh.md
-  # 部署按钮下方的内容（故障排查）
-  troubleshoot_file: deploy/sections/flash_troubleshoot.md
-  troubleshoot_file_zh: deploy/sections/flash_troubleshoot_zh.md
+intro:
+  presets:
+    - id: preset_id
+      devices:
+        - id: flash_firmware
+          name: Flash Firmware
+          name_zh: 烧录固件
+          type: esp32_usb
+          required: true
+          config_file: devices/esp32.yaml
+          section:
+            title: 烧录固件
+            title_zh: 烧录固件
+            # 部署按钮上方的内容（准备工作）
+            description_file: deploy/sections/flash.md
+            description_file_zh: deploy/sections/flash_zh.md
+            # 部署按钮下方的内容（故障排查）
+            troubleshoot_file: deploy/sections/flash_troubleshoot.md
+            troubleshoot_file_zh: deploy/sections/flash_troubleshoot_zh.md
 ```
 
 ### description 文件内容（部署按钮上方）
@@ -316,10 +328,52 @@ post_deployment:
 | 优先级 | 方案 | 主要问题 |
 |-------|------|---------|
 | P0 | missionpack_knn | 文案抽象，术语多 |
-| P0 | mcp_external_integration | 步骤复杂，缺架构说明 |
+| P0 | smart_warehouse | 步骤复杂，缺架构说明 |
 | P1 | recamera_heatmap_grafana | 术语多，缺应用示例 |
 | P1 | smart_retail_voice_ai | 缺接线图 |
-| P1 | xiaozhi_face_recognition | section 有"完成后"错位 |
+| P1 | smart_space_assistant | section 有"完成后"错位 |
 | P2 | indoor_positioning_ble_lorawan | 定位模式解释不直观 |
-| P2 | xiaozhi_display | 信息不足 |
-| ✓ | recamera_retail_heatmap | 结构良好，作为参考 |
+| ✓ | recamera_heatmap_grafana | 结构良好，作为参考 |
+
+---
+
+## 八、配置结构说明
+
+### 新架构：preset.devices
+
+从 v1.1 开始，部署步骤定义在 `intro.presets[].devices` 中，不再使用 `deployment.devices`。
+
+```yaml
+intro:
+  presets:
+    - id: preset_a
+      name: Preset A
+      devices:
+        - id: step1
+          name: Step 1
+          type: manual
+          section:
+            description_file: deploy/sections/step1.md
+            troubleshoot_file: deploy/sections/step1_troubleshoot.md
+        - id: step2
+          name: Step 2
+          type: docker_deploy
+          section:
+            description_file: deploy/sections/step2.md
+
+deployment:
+  devices: []   # 保持为空
+  order: []     # 保持为空
+```
+
+### 优势
+
+1. **更清晰**：一眼看出每个套餐包含哪些部署步骤
+2. **更灵活**：不同套餐可以有完全不同的步骤顺序
+3. **无歧义**：不需要理解复杂的 show_when 条件逻辑
+
+### 参考文档
+
+- 完整配置指南：`docs/solution-configuration-guide.md`
+- 从 Wiki 创建方案：`.claude/skills/add-solution-from-wiki.md`
+- 修改现有方案：`.claude/skills/modify-solution.md`
