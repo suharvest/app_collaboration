@@ -448,6 +448,16 @@ class DockerRemoteDeployer(BaseDeployer):
                     timeout=timeout,
                 )
             return client
+        except paramiko.AuthenticationException:
+            logger.error(f"SSH authentication failed for {username}@{host}")
+            return None
+        except paramiko.SSHException as e:
+            logger.error(f"SSH error connecting to {host}: {e}")
+            return None
+        except OSError as e:
+            # Network errors (connection refused, timeout, etc.)
+            logger.error(f"Network error connecting to {host}: {e}")
+            return None
         except Exception as e:
             logger.error(f"SSH connection failed: {e}")
             return None
