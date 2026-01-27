@@ -65,6 +65,78 @@ intro:
           options:
             - device_ref: sensecap_watcher
           default: sensecap_watcher
+      devices:
+        # Step 1: 烧录小智 ESP32 固件
+        - id: face_esp32
+          name: Flash Xiaozhi Firmware
+          name_zh: 烧录小智固件
+          type: esp32_usb
+          required: true
+          config_file: devices/watcher_esp32.yaml
+          section:
+            title: "Step 1: Flash Xiaozhi Firmware"
+            title_zh: "第一步：烧录小智固件"
+            description_file: deploy/sections/flash_esp32.md
+            description_file_zh: deploy/sections/flash_esp32_zh.md
+            troubleshoot_file: deploy/sections/flash_esp32_troubleshoot.md
+            troubleshoot_file_zh: deploy/sections/flash_esp32_troubleshoot_zh.md
+            wiring:
+              steps:
+                - Connect Watcher to computer via USB-C cable
+                - Select the serial port (wchusbserial)
+                - Click Flash to program the firmware
+              steps_zh:
+                - 用 USB-C 线连接 Watcher 到电脑
+                - 选择串口（wchusbserial 开头）
+                - 点击烧录按钮写入固件
+
+        # Step 2: 烧录人脸识别固件 (Himax WE2)
+        - id: face_himax
+          name: Flash Face Recognition Firmware
+          name_zh: 烧录人脸识别固件
+          type: himax_usb
+          required: true
+          config_file: devices/watcher_himax.yaml
+          section:
+            title: "Step 2: Flash Face Recognition Firmware"
+            title_zh: "第二步：烧录人脸识别固件"
+            description_file: deploy/sections/flash_himax.md
+            description_file_zh: deploy/sections/flash_himax_zh.md
+            troubleshoot_file: deploy/sections/flash_himax_troubleshoot.md
+            troubleshoot_file_zh: deploy/sections/flash_himax_troubleshoot_zh.md
+            wiring:
+              steps:
+                - Ensure Watcher is connected via USB-C
+                - Select the serial port (usbmodem)
+                - Click Flash and press reset button when prompted
+              steps_zh:
+                - 确保 Watcher 已通过 USB-C 线连接
+                - 选择串口（usbmodem 开头）
+                - 点击烧录并按提示按下重启按钮
+
+        # Step 3: 配置小智
+        - id: face_configure
+          name: Configure Xiaozhi
+          name_zh: 配置小智
+          type: manual
+          required: false
+          section:
+            title: "Step 3: Configure Xiaozhi"
+            title_zh: "第三步：配置小智"
+            description_file: deploy/sections/configure_xiaozhi.md
+            description_file_zh: deploy/sections/configure_xiaozhi_zh.md
+
+        # Step 4: 人脸录入指南
+        - id: face_enrollment
+          name: Face Enrollment Guide
+          name_zh: 人脸录入指南
+          type: manual
+          required: false
+          section:
+            title: "Step 4: Enroll Faces"
+            title_zh: "第四步：录入人脸"
+            description_file: deploy/sections/face_enrollment.md
+            description_file_zh: deploy/sections/face_enrollment_zh.md
 
     - id: display_cast
       name: Display Cast
@@ -96,6 +168,77 @@ intro:
           options:
             - device_ref: recomputer_r1000
           default: recomputer_r1000
+      devices:
+        # Step 1: 烧录 Watcher 投屏固件
+        - id: display_watcher
+          name: Flash Watcher Firmware
+          name_zh: 烧录 Watcher 固件
+          type: esp32_usb
+          required: true
+          config_file: devices/display_watcher.yaml
+          section:
+            title: "Step 1: Flash Watcher Firmware"
+            title_zh: "第一步：烧录 Watcher 固件"
+            description_file: deploy/sections/display_watcher.md
+            description_file_zh: deploy/sections/display_watcher_zh.md
+            wiring:
+              steps:
+                - Connect Watcher to computer via USB-C
+                - Select the serial port
+                - Click Flash to program the firmware
+              steps_zh:
+                - 使用 USB-C 线连接 Watcher 到电脑
+                - 选择串口
+                - 点击烧录按钮写入固件
+
+        # Step 2: 部署投屏服务
+        - id: display_service
+          name: Deploy Display Service
+          name_zh: 部署投屏服务
+          type: docker_deploy
+          required: true
+          config_file: devices/display_local.yaml
+          section:
+            title: "Step 2: Deploy Display Service"
+            title_zh: "第二步：部署投屏服务"
+          targets:
+            local:
+              name: Local Deployment
+              name_zh: 本机部署
+              description: Deploy on this computer
+              description_zh: 部署到当前电脑
+              default: true
+              config_file: devices/display_local.yaml
+              section:
+                description_file: deploy/sections/display_local.md
+                description_file_zh: deploy/sections/display_local_zh.md
+                wiring:
+                  image: intro/gallery/architecture.svg
+                  steps:
+                    - Ensure Docker is installed and running
+                    - Click Deploy button to start services
+                  steps_zh:
+                    - 确保 Docker 已安装并运行
+                    - 点击部署按钮启动服务
+            remote:
+              name: Remote Deployment
+              name_zh: 远程部署
+              description: Deploy to reComputer/Raspberry Pi via SSH
+              description_zh: 通过 SSH 部署到 reComputer/树莓派
+              config_file: devices/recomputer.yaml
+              section:
+                description_file: deploy/sections/display_remote.md
+                description_file_zh: deploy/sections/display_remote_zh.md
+                wiring:
+                  image: intro/gallery/architecture.svg
+                  steps:
+                    - Connect target device to network
+                    - Enter IP address and SSH credentials
+                    - Click Deploy to install on remote device
+                  steps_zh:
+                    - 将目标设备连接到网络
+                    - 输入 IP 地址和 SSH 凭据
+                    - 点击部署安装到远程设备
 
   stats:
     deployed_count: 0
@@ -110,171 +253,8 @@ deployment:
 
   selection_mode: sequential
 
-  devices:
-    # ============ 人脸识别功能步骤 ============
-    # Step 1: 烧录小智 ESP32 固件
-    - id: face_esp32
-      name: Flash Xiaozhi Firmware
-      name_zh: 烧录小智固件
-      type: esp32_usb
-      required: true
-      show_when:
-        preset: face_recognition
-      config_file: devices/watcher_esp32.yaml
-      section:
-        title: "Step 1: Flash Xiaozhi Firmware"
-        title_zh: "第一步：烧录小智固件"
-        description_file: deploy/sections/flash_esp32.md
-        description_file_zh: deploy/sections/flash_esp32_zh.md
-        troubleshoot_file: deploy/sections/flash_esp32_troubleshoot.md
-        troubleshoot_file_zh: deploy/sections/flash_esp32_troubleshoot_zh.md
-        wiring:
-          steps:
-            - Connect Watcher to computer via USB-C cable
-            - Select the serial port (wchusbserial)
-            - Click Flash to program the firmware
-          steps_zh:
-            - 用 USB-C 线连接 Watcher 到电脑
-            - 选择串口（wchusbserial 开头）
-            - 点击烧录按钮写入固件
-
-    # Step 2: 烧录人脸识别固件 (Himax WE2)
-    - id: face_himax
-      name: Flash Face Recognition Firmware
-      name_zh: 烧录人脸识别固件
-      type: himax_usb
-      required: true
-      show_when:
-        preset: face_recognition
-      config_file: devices/watcher_himax.yaml
-      section:
-        title: "Step 2: Flash Face Recognition Firmware"
-        title_zh: "第二步：烧录人脸识别固件"
-        description_file: deploy/sections/flash_himax.md
-        description_file_zh: deploy/sections/flash_himax_zh.md
-        troubleshoot_file: deploy/sections/flash_himax_troubleshoot.md
-        troubleshoot_file_zh: deploy/sections/flash_himax_troubleshoot_zh.md
-        wiring:
-          steps:
-            - Ensure Watcher is connected via USB-C
-            - Select the serial port (usbmodem)
-            - Click Flash and press reset button when prompted
-          steps_zh:
-            - 确保 Watcher 已通过 USB-C 线连接
-            - 选择串口（usbmodem 开头）
-            - 点击烧录并按提示按下重启按钮
-
-    # Step 3: 配置小智
-    - id: face_configure
-      name: Configure Xiaozhi
-      name_zh: 配置小智
-      type: manual
-      required: false
-      show_when:
-        preset: face_recognition
-      section:
-        title: "Step 3: Configure Xiaozhi"
-        title_zh: "第三步：配置小智"
-        description_file: deploy/sections/configure_xiaozhi.md
-        description_file_zh: deploy/sections/configure_xiaozhi_zh.md
-
-    # Step 4: 人脸录入指南
-    - id: face_enrollment
-      name: Face Enrollment Guide
-      name_zh: 人脸录入指南
-      type: manual
-      required: false
-      show_when:
-        preset: face_recognition
-      section:
-        title: "Step 4: Enroll Faces"
-        title_zh: "第四步：录入人脸"
-        description_file: deploy/sections/face_enrollment.md
-        description_file_zh: deploy/sections/face_enrollment_zh.md
-
-    # ============ 投屏功能步骤 ============
-    # Step 1: 烧录 Watcher 投屏固件
-    - id: display_watcher
-      name: Flash Watcher Firmware
-      name_zh: 烧录 Watcher 固件
-      type: esp32_usb
-      required: true
-      show_when:
-        preset: display_cast
-      config_file: devices/display_watcher.yaml
-      section:
-        title: "Step 1: Flash Watcher Firmware"
-        title_zh: "第一步：烧录 Watcher 固件"
-        description_file: deploy/sections/display_watcher.md
-        description_file_zh: deploy/sections/display_watcher_zh.md
-        wiring:
-          steps:
-            - Connect Watcher to computer via USB-C
-            - Select the serial port
-            - Click Flash to program the firmware
-          steps_zh:
-            - 使用 USB-C 线连接 Watcher 到电脑
-            - 选择串口
-            - 点击烧录按钮写入固件
-
-    # Step 2: 部署投屏服务
-    - id: display_service
-      name: Deploy Display Service
-      name_zh: 部署投屏服务
-      type: docker_deploy
-      required: true
-      show_when:
-        preset: display_cast
-      config_file: devices/display_local.yaml
-      section:
-        title: "Step 2: Deploy Display Service"
-        title_zh: "第二步：部署投屏服务"
-      targets:
-        local:
-          name: Local Deployment
-          name_zh: 本机部署
-          description: Deploy on this computer
-          description_zh: 部署到当前电脑
-          default: true
-          config_file: devices/display_local.yaml
-          section:
-            description_file: deploy/sections/display_local.md
-            description_file_zh: deploy/sections/display_local_zh.md
-            wiring:
-              image: intro/gallery/architecture.svg
-              steps:
-                - Ensure Docker is installed and running
-                - Click Deploy button to start services
-              steps_zh:
-                - 确保 Docker 已安装并运行
-                - 点击部署按钮启动服务
-        remote:
-          name: Remote Deployment
-          name_zh: 远程部署
-          description: Deploy to reComputer/Raspberry Pi via SSH
-          description_zh: 通过 SSH 部署到 reComputer/树莓派
-          config_file: devices/recomputer.yaml
-          section:
-            description_file: deploy/sections/display_remote.md
-            description_file_zh: deploy/sections/display_remote_zh.md
-            wiring:
-              image: intro/gallery/architecture.svg
-              steps:
-                - Connect target device to network
-                - Enter IP address and SSH credentials
-                - Click Deploy to install on remote device
-              steps_zh:
-                - 将目标设备连接到网络
-                - 输入 IP 地址和 SSH 凭据
-                - 点击部署安装到远程设备
-
-  order:
-    - face_esp32
-    - face_himax
-    - face_configure
-    - face_enrollment
-    - display_watcher
-    - display_service
+  devices: []
+  order: []
 
   post_deployment:
     success_message_file: deploy/success.md

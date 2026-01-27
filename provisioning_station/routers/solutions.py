@@ -494,6 +494,94 @@ async def get_deployment_info(
 
         return group_data
 
+    # Helper function to build device info for preset.devices
+    async def build_preset_device_info(device):
+        """Build device info for a device reference within a preset"""
+        device_info = {
+            "id": device.id,
+            "name": device.name if lang == "en" else (device.name_zh or device.name),
+            "name_zh": device.name_zh,
+            "type": device.type,
+            "required": device.required,
+        }
+
+        # Load device config to get SSH settings, user_inputs, preview settings, etc.
+        if device.config_file:
+            config = await solution_manager.load_device_config(solution_id, device.config_file)
+            if config:
+                if config.ssh:
+                    device_info["ssh"] = config.ssh.model_dump()
+                if config.user_inputs:
+                    device_info["user_inputs"] = [inp.model_dump() for inp in config.user_inputs]
+                if device.type == "preview":
+                    device_info["preview"] = {
+                        "user_inputs": [inp.model_dump() for inp in config.user_inputs] if config.user_inputs else [],
+                        "video": config.video.model_dump() if config.video else None,
+                        "mqtt": config.mqtt.model_dump() if config.mqtt else None,
+                        "overlay": config.overlay.model_dump() if config.overlay else None,
+                        "display": config.display.model_dump() if config.display else None,
+                    }
+
+        if device.section:
+            section = device.section
+            device_info["section"] = {
+                "title": section.title if lang == "en" else (section.title_zh or section.title),
+                "title_zh": section.title_zh,
+            }
+
+            desc_file = section.description_file_zh if lang == "zh" else section.description_file
+            if desc_file:
+                device_info["section"]["description"] = await solution_manager.load_markdown(
+                    solution_id, desc_file
+                )
+
+            troubleshoot_file = section.troubleshoot_file_zh if lang == "zh" else section.troubleshoot_file
+            if troubleshoot_file:
+                device_info["section"]["troubleshoot"] = await solution_manager.load_markdown(
+                    solution_id, troubleshoot_file
+                )
+
+            if section.wiring:
+                device_info["section"]["wiring"] = {
+                    "image": f"/api/solutions/{solution_id}/assets/{section.wiring.image}" if section.wiring.image else None,
+                    "steps": section.wiring.steps_zh if lang == "zh" else section.wiring.steps,
+                }
+
+        # Process targets
+        if device.targets:
+            targets_data = {}
+            for target_id, target in device.targets.items():
+                target_info = {
+                    "name": target.name if lang == "en" else (target.name_zh or target.name),
+                    "name_zh": target.name_zh,
+                    "description": target.description if lang == "en" else (target.description_zh or target.description),
+                    "description_zh": target.description_zh,
+                    "default": target.default,
+                    "config_file": target.config_file,
+                }
+                if target.section:
+                    target_section = {}
+                    desc_file = target.section.description_file_zh if lang == "zh" else target.section.description_file
+                    if desc_file:
+                        target_section["description"] = await solution_manager.load_markdown(
+                            solution_id, desc_file
+                        )
+                    troubleshoot_file = target.section.troubleshoot_file_zh if lang == "zh" else target.section.troubleshoot_file
+                    if troubleshoot_file:
+                        target_section["troubleshoot"] = await solution_manager.load_markdown(
+                            solution_id, troubleshoot_file
+                        )
+                    if target.section.wiring:
+                        target_section["wiring"] = {
+                            "image": f"/api/solutions/{solution_id}/assets/{target.section.wiring.image}" if target.section.wiring.image else None,
+                            "steps": target.section.wiring.steps_zh if lang == "zh" else target.section.wiring.steps,
+                        }
+                    target_info["section"] = target_section
+                targets_data[target_id] = target_info
+            device_info["targets"] = targets_data
+
+        return device_info
+
     # Build presets with section content and device groups
     presets = []
     for preset in solution.intro.presets:
@@ -521,6 +609,9 @@ async def get_deployment_info(
         # Build device groups with section content
         if preset.device_groups:
             preset_data["device_groups"] = [await build_device_group_data(g) for g in preset.device_groups]
+        # Build preset-specific devices
+        if preset.devices:
+            preset_data["devices"] = [await build_preset_device_info(d) for d in preset.devices]
         presets.append(preset_data)
 
     # For backward compatibility: collect all device groups from presets

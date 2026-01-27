@@ -120,6 +120,119 @@ intro:
     links:
       wiki: https://wiki.seeedstudio.com/cn/solutions/indoor-positioning-bluetooth-lorawan-tracker/
       github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
+    devices:
+    - id: beacons
+      name: Deploy BLE Beacons
+      name_zh: 部署 BLE 信标
+      type: manual
+      required: true
+      section:
+        title: Step 1 - Deploy BLE Beacons
+        title_zh: 第一步 - 部署 BLE 信标
+        description_file: deploy/sections/beacons.md
+        description_file_zh: deploy/sections/beacons_zh.md
+        troubleshoot_file: deploy/sections/beacons_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/beacons_troubleshoot_zh.md
+        wiring:
+          steps:
+          - Place BLE beacons at strategic locations in your facility
+          - Record each beacon's MAC address and installation location
+          - Configure beacons using SenseCraft app if needed
+          steps_zh:
+          - 在设施中的战略位置放置 BLE 信标
+          - 记录每个信标的 MAC 地址和安装位置
+          - 如需要，使用 SenseCraft 应用配置信标
+    - id: gateway
+      name: Setup LoRaWAN Gateway
+      name_zh: 设置 LoRaWAN 网关
+      type: manual
+      required: true
+      section:
+        title: Step 2 - Setup LoRaWAN Gateway
+        title_zh: 第二步 - 设置 LoRaWAN 网关
+        description_file: deploy/sections/gateway.md
+        description_file_zh: deploy/sections/gateway_zh.md
+        troubleshoot_file: deploy/sections/gateway_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/gateway_troubleshoot_zh.md
+        wiring:
+          steps:
+          - Power on the LoRaWAN gateway and connect to internet
+          - Register the gateway on SenseCraft Data or ChirpStack
+          - Verify gateway is online
+          steps_zh:
+          - 打开 LoRaWAN 网关并连接互联网
+          - 在 SenseCraft Data 或 ChirpStack 上注册网关
+          - 验证网关在线状态
+    - id: app_server
+      name: Deploy Positioning Application
+      name_zh: 部署定位应用程序
+      type: docker_deploy
+      required: true
+      config_file: devices/app_local.yaml
+      section:
+        title: Step 3 - Deploy Positioning Application
+        title_zh: 第三步 - 部署定位应用程序
+      targets:
+        local:
+          name: Local Deployment
+          name_zh: 本机部署
+          description: Deploy on this computer
+          description_zh: 部署到当前电脑
+          default: true
+          config_file: devices/app_local.yaml
+          section:
+            description_file: deploy/sections/app_local.md
+            description_file_zh: deploy/sections/app_local_zh.md
+            troubleshoot_file: deploy/sections/app_local_troubleshoot.md
+            troubleshoot_file_zh: deploy/sections/app_local_troubleshoot_zh.md
+            wiring:
+              steps:
+              - Ensure Docker is installed and running
+              - Click Deploy button to start services
+              steps_zh:
+              - 确保 Docker 已安装并运行
+              - 点击部署按钮启动服务
+        remote:
+          name: Remote Deployment
+          name_zh: 远程部署
+          description: Deploy to remote server via SSH
+          description_zh: 通过 SSH 部署到远程服务器
+          config_file: devices/app_remote.yaml
+          section:
+            description_file: deploy/sections/app_remote.md
+            description_file_zh: deploy/sections/app_remote_zh.md
+            troubleshoot_file: deploy/sections/app_remote_troubleshoot.md
+            troubleshoot_file_zh: deploy/sections/app_remote_troubleshoot_zh.md
+            wiring:
+              steps:
+              - Connect target device to network
+              - Enter IP address and SSH credentials
+              - Click Deploy to install on remote device
+              steps_zh:
+              - 将目标设备连接到网络
+              - 输入 IP 地址和 SSH 凭据
+              - 点击部署安装到远程设备
+    - id: tracker
+      name: Configure and Activate Tracker
+      name_zh: 配置并激活追踪器
+      type: manual
+      required: true
+      section:
+        title: Step 4 - Configure and Activate Tracker
+        title_zh: 第四步 - 配置并激活追踪器
+        description_file: deploy/sections/tracker.md
+        description_file_zh: deploy/sections/tracker_zh.md
+        troubleshoot_file: deploy/sections/tracker_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/tracker_troubleshoot_zh.md
+        wiring:
+          steps:
+          - Activate SenseCAP T1000 tracker
+          - Join to your LoRaWAN network server
+          - Enable BLE scanning mode
+          steps_zh:
+          - 激活 SenseCAP T1000 追踪器
+          - 加入到您的 LoRaWAN 网络服务器
+          - 启用 BLE 扫描模式
   - id: standard
     name: Standard Setup
     name_zh: 标准配置
@@ -169,6 +282,119 @@ intro:
     links:
       wiki: https://wiki.seeedstudio.com/cn/solutions/indoor-positioning-bluetooth-lorawan-tracker/
       github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
+    devices:
+    - id: beacons
+      name: Deploy BLE Beacons
+      name_zh: 部署 BLE 信标
+      type: manual
+      required: true
+      section:
+        title: Step 1 - Deploy BLE Beacons
+        title_zh: 第一步 - 部署 BLE 信标
+        description_file: deploy/sections/beacons.md
+        description_file_zh: deploy/sections/beacons_zh.md
+        troubleshoot_file: deploy/sections/beacons_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/beacons_troubleshoot_zh.md
+        wiring:
+          steps:
+          - Place BLE beacons at strategic locations in your facility
+          - Record each beacon's MAC address and installation location
+          - Configure beacons using SenseCraft app if needed
+          steps_zh:
+          - 在设施中的战略位置放置 BLE 信标
+          - 记录每个信标的 MAC 地址和安装位置
+          - 如需要，使用 SenseCraft 应用配置信标
+    - id: gateway
+      name: Setup LoRaWAN Gateway
+      name_zh: 设置 LoRaWAN 网关
+      type: manual
+      required: true
+      section:
+        title: Step 2 - Setup LoRaWAN Gateway
+        title_zh: 第二步 - 设置 LoRaWAN 网关
+        description_file: deploy/sections/gateway.md
+        description_file_zh: deploy/sections/gateway_zh.md
+        troubleshoot_file: deploy/sections/gateway_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/gateway_troubleshoot_zh.md
+        wiring:
+          steps:
+          - Power on the LoRaWAN gateway and connect to internet
+          - Register the gateway on SenseCraft Data or ChirpStack
+          - Verify gateway is online
+          steps_zh:
+          - 打开 LoRaWAN 网关并连接互联网
+          - 在 SenseCraft Data 或 ChirpStack 上注册网关
+          - 验证网关在线状态
+    - id: app_server
+      name: Deploy Positioning Application
+      name_zh: 部署定位应用程序
+      type: docker_deploy
+      required: true
+      config_file: devices/app_local.yaml
+      section:
+        title: Step 3 - Deploy Positioning Application
+        title_zh: 第三步 - 部署定位应用程序
+      targets:
+        local:
+          name: Local Deployment
+          name_zh: 本机部署
+          description: Deploy on this computer
+          description_zh: 部署到当前电脑
+          default: true
+          config_file: devices/app_local.yaml
+          section:
+            description_file: deploy/sections/app_local.md
+            description_file_zh: deploy/sections/app_local_zh.md
+            troubleshoot_file: deploy/sections/app_local_troubleshoot.md
+            troubleshoot_file_zh: deploy/sections/app_local_troubleshoot_zh.md
+            wiring:
+              steps:
+              - Ensure Docker is installed and running
+              - Click Deploy button to start services
+              steps_zh:
+              - 确保 Docker 已安装并运行
+              - 点击部署按钮启动服务
+        remote:
+          name: Remote Deployment
+          name_zh: 远程部署
+          description: Deploy to remote server via SSH
+          description_zh: 通过 SSH 部署到远程服务器
+          config_file: devices/app_remote.yaml
+          section:
+            description_file: deploy/sections/app_remote.md
+            description_file_zh: deploy/sections/app_remote_zh.md
+            troubleshoot_file: deploy/sections/app_remote_troubleshoot.md
+            troubleshoot_file_zh: deploy/sections/app_remote_troubleshoot_zh.md
+            wiring:
+              steps:
+              - Connect target device to network
+              - Enter IP address and SSH credentials
+              - Click Deploy to install on remote device
+              steps_zh:
+              - 将目标设备连接到网络
+              - 输入 IP 地址和 SSH 凭据
+              - 点击部署安装到远程设备
+    - id: tracker
+      name: Configure and Activate Tracker
+      name_zh: 配置并激活追踪器
+      type: manual
+      required: true
+      section:
+        title: Step 4 - Configure and Activate Tracker
+        title_zh: 第四步 - 配置并激活追踪器
+        description_file: deploy/sections/tracker.md
+        description_file_zh: deploy/sections/tracker_zh.md
+        troubleshoot_file: deploy/sections/tracker_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/tracker_troubleshoot_zh.md
+        wiring:
+          steps:
+          - Activate SenseCAP T1000 tracker
+          - Join to your LoRaWAN network server
+          - Enable BLE scanning mode
+          steps_zh:
+          - 激活 SenseCAP T1000 追踪器
+          - 加入到您的 LoRaWAN 网络服务器
+          - 启用 BLE 扫描模式
   - id: enterprise
     name: Enterprise
     name_zh: 企业版
@@ -218,6 +444,119 @@ intro:
     links:
       wiki: https://wiki.seeedstudio.com/cn/solutions/indoor-positioning-bluetooth-lorawan-tracker/
       github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
+    devices:
+    - id: beacons
+      name: Deploy BLE Beacons
+      name_zh: 部署 BLE 信标
+      type: manual
+      required: true
+      section:
+        title: Step 1 - Deploy BLE Beacons
+        title_zh: 第一步 - 部署 BLE 信标
+        description_file: deploy/sections/beacons.md
+        description_file_zh: deploy/sections/beacons_zh.md
+        troubleshoot_file: deploy/sections/beacons_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/beacons_troubleshoot_zh.md
+        wiring:
+          steps:
+          - Place BLE beacons at strategic locations in your facility
+          - Record each beacon's MAC address and installation location
+          - Configure beacons using SenseCraft app if needed
+          steps_zh:
+          - 在设施中的战略位置放置 BLE 信标
+          - 记录每个信标的 MAC 地址和安装位置
+          - 如需要，使用 SenseCraft 应用配置信标
+    - id: gateway
+      name: Setup LoRaWAN Gateway
+      name_zh: 设置 LoRaWAN 网关
+      type: manual
+      required: true
+      section:
+        title: Step 2 - Setup LoRaWAN Gateway
+        title_zh: 第二步 - 设置 LoRaWAN 网关
+        description_file: deploy/sections/gateway.md
+        description_file_zh: deploy/sections/gateway_zh.md
+        troubleshoot_file: deploy/sections/gateway_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/gateway_troubleshoot_zh.md
+        wiring:
+          steps:
+          - Power on the LoRaWAN gateway and connect to internet
+          - Register the gateway on SenseCraft Data or ChirpStack
+          - Verify gateway is online
+          steps_zh:
+          - 打开 LoRaWAN 网关并连接互联网
+          - 在 SenseCraft Data 或 ChirpStack 上注册网关
+          - 验证网关在线状态
+    - id: app_server
+      name: Deploy Positioning Application
+      name_zh: 部署定位应用程序
+      type: docker_deploy
+      required: true
+      config_file: devices/app_local.yaml
+      section:
+        title: Step 3 - Deploy Positioning Application
+        title_zh: 第三步 - 部署定位应用程序
+      targets:
+        local:
+          name: Local Deployment
+          name_zh: 本机部署
+          description: Deploy on this computer
+          description_zh: 部署到当前电脑
+          default: true
+          config_file: devices/app_local.yaml
+          section:
+            description_file: deploy/sections/app_local.md
+            description_file_zh: deploy/sections/app_local_zh.md
+            troubleshoot_file: deploy/sections/app_local_troubleshoot.md
+            troubleshoot_file_zh: deploy/sections/app_local_troubleshoot_zh.md
+            wiring:
+              steps:
+              - Ensure Docker is installed and running
+              - Click Deploy button to start services
+              steps_zh:
+              - 确保 Docker 已安装并运行
+              - 点击部署按钮启动服务
+        remote:
+          name: Remote Deployment
+          name_zh: 远程部署
+          description: Deploy to remote server via SSH
+          description_zh: 通过 SSH 部署到远程服务器
+          config_file: devices/app_remote.yaml
+          section:
+            description_file: deploy/sections/app_remote.md
+            description_file_zh: deploy/sections/app_remote_zh.md
+            troubleshoot_file: deploy/sections/app_remote_troubleshoot.md
+            troubleshoot_file_zh: deploy/sections/app_remote_troubleshoot_zh.md
+            wiring:
+              steps:
+              - Connect target device to network
+              - Enter IP address and SSH credentials
+              - Click Deploy to install on remote device
+              steps_zh:
+              - 将目标设备连接到网络
+              - 输入 IP 地址和 SSH 凭据
+              - 点击部署安装到远程设备
+    - id: tracker
+      name: Configure and Activate Tracker
+      name_zh: 配置并激活追踪器
+      type: manual
+      required: true
+      section:
+        title: Step 4 - Configure and Activate Tracker
+        title_zh: 第四步 - 配置并激活追踪器
+        description_file: deploy/sections/tracker.md
+        description_file_zh: deploy/sections/tracker_zh.md
+        troubleshoot_file: deploy/sections/tracker_troubleshoot.md
+        troubleshoot_file_zh: deploy/sections/tracker_troubleshoot_zh.md
+        wiring:
+          steps:
+          - Activate SenseCAP T1000 tracker
+          - Join to your LoRaWAN network server
+          - Enable BLE scanning mode
+          steps_zh:
+          - 激活 SenseCAP T1000 追踪器
+          - 加入到您的 LoRaWAN 网络服务器
+          - 启用 BLE 扫描模式
   stats:
     deployed_count: 0
     likes_count: 0
@@ -233,124 +572,8 @@ deployment:
   guide_file: deploy/guide.md
   guide_file_zh: deploy/guide_zh.md
   selection_mode: sequential
-  devices:
-  - id: beacons
-    name: Deploy BLE Beacons
-    name_zh: 部署 BLE 信标
-    type: manual
-    required: true
-    section:
-      title: Step 1 - Deploy BLE Beacons
-      title_zh: 第一步 - 部署 BLE 信标
-      description_file: deploy/sections/beacons.md
-      description_file_zh: deploy/sections/beacons_zh.md
-      troubleshoot_file: deploy/sections/beacons_troubleshoot.md
-      troubleshoot_file_zh: deploy/sections/beacons_troubleshoot_zh.md
-      wiring:
-        steps:
-        - Place BLE beacons at strategic locations in your facility
-        - Record each beacon's MAC address and installation location
-        - Configure beacons using SenseCraft app if needed
-        steps_zh:
-        - 在设施中的战略位置放置 BLE 信标
-        - 记录每个信标的 MAC 地址和安装位置
-        - 如需要，使用 SenseCraft 应用配置信标
-  - id: gateway
-    name: Setup LoRaWAN Gateway
-    name_zh: 设置 LoRaWAN 网关
-    type: manual
-    required: true
-    section:
-      title: Step 2 - Setup LoRaWAN Gateway
-      title_zh: 第二步 - 设置 LoRaWAN 网关
-      description_file: deploy/sections/gateway.md
-      description_file_zh: deploy/sections/gateway_zh.md
-      troubleshoot_file: deploy/sections/gateway_troubleshoot.md
-      troubleshoot_file_zh: deploy/sections/gateway_troubleshoot_zh.md
-      wiring:
-        steps:
-        - Power on the LoRaWAN gateway and connect to internet
-        - Register the gateway on SenseCraft Data or ChirpStack
-        - Verify gateway is online
-        steps_zh:
-        - 打开 LoRaWAN 网关并连接互联网
-        - 在 SenseCraft Data 或 ChirpStack 上注册网关
-        - 验证网关在线状态
-  - id: app_server
-    name: Deploy Positioning Application
-    name_zh: 部署定位应用程序
-    type: docker_deploy
-    required: true
-    config_file: devices/app_local.yaml
-    section:
-      title: Step 3 - Deploy Positioning Application
-      title_zh: 第三步 - 部署定位应用程序
-    targets:
-      local:
-        name: Local Deployment
-        name_zh: 本机部署
-        description: Deploy on this computer
-        description_zh: 部署到当前电脑
-        default: true
-        config_file: devices/app_local.yaml
-        section:
-          description_file: deploy/sections/app_local.md
-          description_file_zh: deploy/sections/app_local_zh.md
-          troubleshoot_file: deploy/sections/app_local_troubleshoot.md
-          troubleshoot_file_zh: deploy/sections/app_local_troubleshoot_zh.md
-          wiring:
-            steps:
-            - Ensure Docker is installed and running
-            - Click Deploy button to start services
-            steps_zh:
-            - 确保 Docker 已安装并运行
-            - 点击部署按钮启动服务
-      remote:
-        name: Remote Deployment
-        name_zh: 远程部署
-        description: Deploy to remote server via SSH
-        description_zh: 通过 SSH 部署到远程服务器
-        config_file: devices/app_remote.yaml
-        section:
-          description_file: deploy/sections/app_remote.md
-          description_file_zh: deploy/sections/app_remote_zh.md
-          troubleshoot_file: deploy/sections/app_remote_troubleshoot.md
-          troubleshoot_file_zh: deploy/sections/app_remote_troubleshoot_zh.md
-          wiring:
-            steps:
-            - Connect target device to network
-            - Enter IP address and SSH credentials
-            - Click Deploy to install on remote device
-            steps_zh:
-            - 将目标设备连接到网络
-            - 输入 IP 地址和 SSH 凭据
-            - 点击部署安装到远程设备
-  - id: tracker
-    name: Configure and Activate Tracker
-    name_zh: 配置并激活追踪器
-    type: manual
-    required: true
-    section:
-      title: Step 4 - Configure and Activate Tracker
-      title_zh: 第四步 - 配置并激活追踪器
-      description_file: deploy/sections/tracker.md
-      description_file_zh: deploy/sections/tracker_zh.md
-      troubleshoot_file: deploy/sections/tracker_troubleshoot.md
-      troubleshoot_file_zh: deploy/sections/tracker_troubleshoot_zh.md
-      wiring:
-        steps:
-        - Activate SenseCAP T1000 tracker
-        - Join to your LoRaWAN network server
-        - Enable BLE scanning mode
-        steps_zh:
-        - 激活 SenseCAP T1000 追踪器
-        - 加入到您的 LoRaWAN 网络服务器
-        - 启用 BLE 扫描模式
-  order:
-  - beacons
-  - gateway
-  - app_server
-  - tracker
+  devices: []
+  order: []
   post_deployment:
     success_message_file: deploy/success.md
     success_message_file_zh: deploy/success_zh.md

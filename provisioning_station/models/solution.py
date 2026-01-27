@@ -98,6 +98,7 @@ class Preset(BaseModel):
     architecture_image: Optional[str] = None  # Architecture diagram for this preset
     links: Optional[PresetLinks] = None  # Per-preset wiki/github links
     section: Optional[DeviceGroupSection] = None  # Level 1: preset deployment guide
+    devices: List["DeviceRef"] = []  # Preset-specific deployment devices
 
 
 class SolutionStats(BaseModel):

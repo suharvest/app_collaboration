@@ -65,6 +65,52 @@ intro:
         title_zh: 部署指南
         description_file: deploy/guide.md
         description_file_zh: deploy/guide_zh.md
+      devices:
+        - id: hvac
+          name: HVAC Control System
+          name_zh: 暖通控制系统
+          type: docker_deploy
+          required: true
+          targets:
+            local:
+              name: Local Deployment
+              name_zh: 本机部署
+              default: true
+              config_file: devices/local.yaml
+              section:
+                title: Deploy on This Machine
+                title_zh: 在本机部署
+                description_file: deploy/sections/hvac_local.md
+                description_file_zh: deploy/sections/hvac_local_zh.md
+                wiring:
+                  image: intro/gallery/architecture.svg
+                  steps:
+                    - Ensure Docker is installed and running
+                    - Click deploy to start the container
+                    - Access the web interface at localhost:8280
+                  steps_zh:
+                    - 确保 Docker 已安装并运行
+                    - 点击部署启动容器
+                    - 通过 localhost:8280 访问 Web 界面
+            remote:
+              name: Remote Deployment
+              name_zh: 远程部署
+              config_file: devices/remote.yaml
+              section:
+                title: Deploy to Remote Device
+                title_zh: 部署到远程设备
+                description_file: deploy/sections/hvac_remote.md
+                description_file_zh: deploy/sections/hvac_remote_zh.md
+                wiring:
+                  image: intro/gallery/recomputer.svg
+                  steps:
+                    - Connect to remote device via SSH
+                    - Deploy Docker container remotely
+                    - Access the web interface at device IP:8280
+                  steps_zh:
+                    - 通过 SSH 连接远程设备
+                    - 远程部署 Docker 容器
+                    - 通过设备 IP:8280 访问 Web 界面
 
   stats:
     deployed_count: 0
@@ -77,55 +123,9 @@ deployment:
   guide_file: deploy/guide.md
   guide_file_zh: deploy/guide_zh.md
 
-  devices:
-    - id: hvac
-      name: HVAC Control System
-      name_zh: 暖通控制系统
-      type: docker_deploy
-      required: true
-      targets:
-        local:
-          name: Local Deployment
-          name_zh: 本机部署
-          default: true
-          config_file: devices/local.yaml
-          section:
-            title: Deploy on This Machine
-            title_zh: 在本机部署
-            description_file: deploy/sections/hvac_local.md
-            description_file_zh: deploy/sections/hvac_local_zh.md
-            wiring:
-              image: intro/gallery/architecture.svg
-              steps:
-                - Ensure Docker is installed and running
-                - Click deploy to start the container
-                - Access the web interface at localhost:8280
-              steps_zh:
-                - 确保 Docker 已安装并运行
-                - 点击部署启动容器
-                - 通过 localhost:8280 访问 Web 界面
-        remote:
-          name: Remote Deployment
-          name_zh: 远程部署
-          config_file: devices/remote.yaml
-          section:
-            title: Deploy to Remote Device
-            title_zh: 部署到远程设备
-            description_file: deploy/sections/hvac_remote.md
-            description_file_zh: deploy/sections/hvac_remote_zh.md
-            wiring:
-              image: intro/gallery/recomputer.svg
-              steps:
-                - Connect to remote device via SSH
-                - Deploy Docker container remotely
-                - Access the web interface at device IP:8280
-              steps_zh:
-                - 通过 SSH 连接远程设备
-                - 远程部署 Docker 容器
-                - 通过设备 IP:8280 访问 Web 界面
+  devices: []
 
-  order:
-    - hvac
+  order: []
 
   post_deployment:
     success_message_file: deploy/success.md
