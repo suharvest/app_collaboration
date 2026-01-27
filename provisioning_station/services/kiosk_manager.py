@@ -3,11 +3,15 @@ Kiosk mode configuration service
 
 Handles enabling/disabling Kiosk mode for deployed applications.
 Kiosk mode auto-starts the application in fullscreen on device boot.
+
+NOTE: Kiosk mode is currently only supported on Linux systems with X11/Wayland.
+Windows and macOS are not supported.
 """
 
 import asyncio
 import json
 import logging
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -83,8 +87,26 @@ class KioskManager:
             kiosk_user: System user account to run Kiosk mode
             app_url: Application URL (defaults to deployment URL)
             password: SSH password for remote deployments
+
+        Note:
+            Kiosk mode is only supported on Linux systems. Windows and macOS
+            do not have equivalent desktop autostart functionality.
         """
         try:
+            # Platform check - Kiosk mode only works on Linux
+            if sys.platform == "win32":
+                return KioskConfigResponse(
+                    success=False,
+                    message="Kiosk mode is not supported on Windows. "
+                            "This feature requires Linux with X11/Wayland desktop environment.",
+                )
+            elif sys.platform == "darwin":
+                return KioskConfigResponse(
+                    success=False,
+                    message="Kiosk mode is not supported on macOS. "
+                            "This feature requires Linux with X11/Wayland desktop environment.",
+                )
+
             # Get deployment info
             history = await deployment_history.get_history(limit=100)
             record = next((r for r in history if r.deployment_id == deployment_id), None)

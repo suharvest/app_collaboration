@@ -122,9 +122,9 @@ class DeviceDetector:
             # Fallback: check common port patterns (cross-platform)
             fallback_ports = detection.fallback_ports or self._get_platform_port_patterns()
 
-            for pattern in fallback_ports:
-                for port_path in glob_module.glob(pattern):
-                    # Verify it's accessible
+            # On Windows, glob doesn't work for COM ports - use pyserial directly
+            if sys.platform == "win32":
+                for port_path in self._get_windows_com_ports():
                     try:
                         import serial
                         ser = serial.Serial(port_path, 115200, timeout=1)
@@ -132,10 +132,26 @@ class DeviceDetector:
                         return {
                             "status": "detected",
                             "connection_info": {"port": port_path},
-                            "details": {"port": port_path, "matched_pattern": pattern},
+                            "details": {"port": port_path, "matched_pattern": "COM*"},
                         }
                     except Exception:
                         continue
+            else:
+                # Unix-like: use glob patterns
+                for pattern in fallback_ports:
+                    for port_path in glob_module.glob(pattern):
+                        # Verify it's accessible
+                        try:
+                            import serial
+                            ser = serial.Serial(port_path, 115200, timeout=1)
+                            ser.close()
+                            return {
+                                "status": "detected",
+                                "connection_info": {"port": port_path},
+                                "details": {"port": port_path, "matched_pattern": pattern},
+                            }
+                        except Exception:
+                            continue
 
             return {
                 "status": "not_detected",
@@ -229,14 +245,18 @@ class DeviceDetector:
                     }
 
             # Fallback: check common usbmodem patterns
-            fallback_ports = detection.fallback_ports or [
-                "/dev/cu.usbmodem*",
-                "/dev/tty.usbmodem*",
-                "/dev/ttyACM*",
-            ]
+            if sys.platform == "win32":
+                fallback_ports = detection.fallback_ports or ["COM*"]
+            else:
+                fallback_ports = detection.fallback_ports or [
+                    "/dev/cu.usbmodem*",
+                    "/dev/tty.usbmodem*",
+                    "/dev/ttyACM*",
+                ]
 
-            for pattern in fallback_ports:
-                for port_path in glob_module.glob(pattern):
+            # On Windows, use pyserial to enumerate COM ports
+            if sys.platform == "win32":
+                for port_path in self._get_windows_com_ports():
                     try:
                         import serial
                         ser = serial.Serial(port_path, 115200, timeout=1)
@@ -244,10 +264,24 @@ class DeviceDetector:
                         return {
                             "status": "detected",
                             "connection_info": {"port": port_path},
-                            "details": {"port": port_path, "matched_pattern": pattern},
+                            "details": {"port": port_path, "matched_pattern": "COM*"},
                         }
                     except Exception:
                         continue
+            else:
+                for pattern in fallback_ports:
+                    for port_path in glob_module.glob(pattern):
+                        try:
+                            import serial
+                            ser = serial.Serial(port_path, 115200, timeout=1)
+                            ser.close()
+                            return {
+                                "status": "detected",
+                                "connection_info": {"port": port_path},
+                                "details": {"port": port_path, "matched_pattern": pattern},
+                            }
+                        except Exception:
+                            continue
 
             return {
                 "status": "not_detected",
@@ -271,9 +305,19 @@ class DeviceDetector:
             }
 
     def _get_platform_port_patterns(self) -> List[str]:
-        """Get platform-specific serial port patterns"""
+        """Get platform-specific serial port patterns
+
+        Note: On Windows, glob patterns like 'COM*' don't work directly.
+        We return patterns for documentation but the actual detection
+        uses pyserial's list_ports which works cross-platform.
+        """
         if sys.platform == "win32":
-            return ["COM*"]
+            # Windows COM port patterns - used for documentation/filtering
+            # glob.glob won't match these; we rely on pyserial list_ports
+            # Common USB-Serial adapters create ports like COM3, COM4, etc.
+            return [
+                "COM*",  # Generic COM ports
+            ]
         elif sys.platform == "darwin":
             return [
                 "/dev/tty.usbserial-*",
@@ -288,6 +332,18 @@ class DeviceDetector:
                 "/dev/ttyUSB*",
                 "/dev/ttyACM*",
             ]
+
+    def _get_windows_com_ports(self) -> List[str]:
+        """Get available COM ports on Windows using pyserial"""
+        try:
+            import serial.tools.list_ports
+            ports = []
+            for port in serial.tools.list_ports.comports():
+                if port.device.upper().startswith("COM"):
+                    ports.append(port.device)
+            return sorted(ports, key=lambda x: int(x[3:]) if x[3:].isdigit() else 999)
+        except Exception:
+            return []
 
     async def _detect_docker_local(self, config: DeviceConfig) -> Dict[str, Any]:
         """Check local Docker availability"""

@@ -257,7 +257,7 @@ class ScriptDeployer(BaseDeployer):
             stdout, stderr = await process.communicate()
             if process.returncode != 0:
                 logger.error(f"Command failed: {cmd}")
-                logger.error(f"stderr: {stderr.decode()}")
+                logger.error(f"stderr: {stderr.decode('utf-8', errors='replace')}")
                 return False
             return True
 
@@ -362,7 +362,7 @@ class ScriptDeployer(BaseDeployer):
                         timeout=1.0,
                     )
                     if line:
-                        line_str = line.decode().strip()
+                        line_str = line.decode("utf-8", errors="replace").strip()
                         logger.debug(f"Process output: {line_str}")
 
                         # Update progress with log output

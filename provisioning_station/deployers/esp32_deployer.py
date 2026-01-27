@@ -308,9 +308,9 @@ class ESP32Deployer(BaseDeployer):
 
             return {
                 "success": process.returncode == 0,
-                "stdout": stdout.decode(),
-                "stderr": stderr.decode(),
-                "error": stderr.decode() if process.returncode != 0 else None,
+                "stdout": stdout.decode("utf-8", errors="replace"),
+                "stderr": stderr.decode("utf-8", errors="replace"),
+                "error": stderr.decode("utf-8", errors="replace") if process.returncode != 0 else None,
             }
 
         except FileNotFoundError:
@@ -326,9 +326,9 @@ class ESP32Deployer(BaseDeployer):
 
                 return {
                     "success": process.returncode == 0,
-                    "stdout": stdout.decode(),
-                    "stderr": stderr.decode(),
-                    "error": stderr.decode() if process.returncode != 0 else None,
+                    "stdout": stdout.decode("utf-8", errors="replace"),
+                    "stderr": stderr.decode("utf-8", errors="replace"),
+                    "error": stderr.decode("utf-8", errors="replace") if process.returncode != 0 else None,
                 }
             except Exception:
                 # Fall back to Python API
