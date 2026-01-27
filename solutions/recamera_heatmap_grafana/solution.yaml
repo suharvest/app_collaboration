@@ -1,12 +1,12 @@
 version: "1.0"
 id: recamera_heatmap_grafana
-name: Real-time Heatmap with Grafana Dashboard
-name_zh: 实时热力图与 Grafana 数据仪表板集成
+name: Smart Retail People Flow Heatmap
+name_zh: 智慧零售人流热力图
 
 # ============ 介绍页内容 ============
 intro:
-  summary: Turn foot traffic into visual heatmaps with automatic privacy protection - see where people gather without storing faces
-  summary_zh: 把人流变成直观的分布图，自动打码保护隐私 - 看清人群聚集区域，不存储人脸
+  summary: See which shelves attract customers, which aisles get ignored - make data-driven decisions on product placement and promotion locations
+  summary_zh: 看清哪个货架前人多、哪条过道没人走，用数据优化商品陈列和促销位置
 
   description_file: intro/description.md
   description_file_zh: intro/description_zh.md
@@ -32,6 +32,7 @@ intro:
     - yolo
     - privacy
     - analytics
+    - retail
 
   # Device Catalog
   device_catalog:
@@ -40,78 +41,151 @@ intro:
       name_zh: reCamera
       image: intro/gallery/recamera.svg
       product_url: https://www.seeedstudio.com/reCamera-2002w-8GB-p-6250.html
-      description: AI camera with built-in YOLO model for person detection
-      description_zh: 内置 YOLO 模型的 AI 摄像头，用于人员检测
+      description: AI camera that detects people and automatically protects privacy
+      description_zh: AI 摄像头，自动识别人员位置并打码保护隐私
 
     computer:
       name: Computer (Windows/Linux)
       name_zh: 电脑 (Windows/Linux)
-      description: For running InfluxDB database and Grafana dashboard
-      description_zh: 用于运行 InfluxDB 数据库和 Grafana 仪表板
+      description: For running the data statistics dashboard
+      description_zh: 用于运行数据统计面板
 
-  # Device Groups
-  device_groups:
-    - id: camera
-      name: AI Camera
-      name_zh: AI 摄像头
-      type: single
-      required: true
-      options:
-        - device_ref: recamera
-      default: recamera
-
-    - id: server
-      name: Backend Server
-      name_zh: 后端服务器
-      type: single
-      required: true
-      options:
-        - device_ref: computer
-      default: computer
-
-  # Presets
+  # Presets - 两种部署方式
   presets:
-    - id: default
-      name: Standard Deployment
-      name_zh: 标准部署
-      selections:
-        camera: recamera
-        server: computer
+    # 简单模式：只有相机，实时预览热力图
+    - id: simple
+      name: Simple Preview
+      name_zh: 简单预览
+      badge: Quick Start
+      badge_zh: 快速上手
+      description: Just reCamera - real-time heatmap preview without backend
+      description_zh: 仅需 reCamera，实时热力图预览，无需后端服务
+      device_groups:
+        - id: camera
+          name: AI Camera
+          name_zh: AI 摄像头
+          type: single
+          required: true
+          options:
+            - device_ref: recamera
+          default: recamera
+      links:
+        wiki: https://wiki.seeedstudio.com/
+        github: https://github.com/Seeed-Studio/sscma-example-sg200x
+      section:
+        title: Simple Deployment
+        title_zh: 简单部署
+        description_file: deploy/sections/simple_guide.md
+        description_file_zh: deploy/sections/simple_guide_zh.md
+
+    # 完整模式：相机 + Grafana 仪表板
+    - id: grafana
+      name: Grafana Dashboard
+      name_zh: Grafana 仪表板
+      description: Full analytics with InfluxDB storage and Grafana visualization
+      description_zh: 完整分析方案，包含 InfluxDB 存储和 Grafana 可视化
+      device_groups:
+        - id: camera
+          name: AI Camera
+          name_zh: AI 摄像头
+          type: single
+          required: true
+          options:
+            - device_ref: recamera
+          default: recamera
+        - id: server
+          name: Backend Server
+          name_zh: 后端服务器
+          type: single
+          required: true
+          options:
+            - device_ref: computer
+          default: computer
       links:
         wiki: https://wiki.seeedstudio.com/cn/integration_of_real-time_heat_map_with_grafana_data_dashboard/
         github: https://github.com/xr686/reCamera-with-Heatmap
       section:
-        title: Deployment Guide
-        title_zh: 部署指南
+        title: Grafana Deployment
+        title_zh: Grafana 部署
         description_file: deploy/guide.md
         description_file_zh: deploy/guide_zh.md
 
   stats:
     deployed_count: 0
     likes_count: 0
-    difficulty: intermediate
-    estimated_time: 60min
+    difficulty: beginner
+    estimated_time: 15min
 
 # ============ 部署页内容 ============
 deployment:
   guide_file: deploy/guide.md
   guide_file_zh: deploy/guide_zh.md
 
-  # 部署模式: sequential (按顺序执行)
   selection_mode: sequential
 
   devices:
-    # Step 1: 部署 InfluxDB + Grafana 后端
+    # ========== Simple 模式专用步骤 ==========
+    # Step 1 (Simple): 部署检测器到 reCamera
+    - id: deploy_detector
+      name: Deploy Detector
+      name_zh: 部署检测器
+      type: recamera_cpp
+      required: true
+      show_when:
+        preset: simple
+      config_file: devices/recamera_yolo11.yaml
+      targets:
+        yolo11:
+          name: YOLO11 (~8 FPS)
+          name_zh: YOLO11 (~8 FPS)
+          description: Faster detection with DFL decoding, recommended
+          description_zh: 更快的检测速度，使用 DFL 解码，推荐使用
+          default: true
+          config_file: devices/recamera_yolo11.yaml
+          section:
+            description_file: deploy/sections/deploy_yolo11.md
+            description_file_zh: deploy/sections/deploy_yolo11_zh.md
+        yolo26:
+          name: YOLO26 (~3 FPS)
+          name_zh: YOLO26 (~3 FPS)
+          description: Legacy model with direct bbox output
+          description_zh: 传统模型，直接输出边界框
+          config_file: devices/recamera.yaml
+          section:
+            description_file: deploy/sections/deploy_app.md
+            description_file_zh: deploy/sections/deploy_app_zh.md
+      section:
+        title: Step 1 - Deploy People Detection Service
+        title_zh: 第一步 - 部署人流检测服务
+
+    # Step 2 (Simple): 实时热力图预览
+    - id: preview
+      name: Live Preview with Heatmap
+      name_zh: 热力图实时预览
+      type: preview
+      required: false
+      show_when:
+        preset: simple
+      config_file: devices/preview.yaml
+      section:
+        title: Step 2 - Real-time Heatmap Preview
+        title_zh: 第二步 - 实时热力图预览
+        description_file: deploy/sections/preview.md
+        description_file_zh: deploy/sections/preview_zh.md
+
+    # ========== Grafana 模式专用步骤 ==========
+    # Step 1 (Grafana): 部署 InfluxDB + Grafana 后端
     - id: backend
       name: Deploy InfluxDB + Grafana
       name_zh: 部署 InfluxDB + Grafana
       type: docker_deploy
       required: true
+      show_when:
+        preset: grafana
       config_file: devices/backend.yaml
       section:
         title: Step 1 - Deploy Backend Services
         title_zh: 第一步 - 部署后端服务
-      # 部署目标选择：本机或远程
       targets:
         local:
           name: Local Deployment
@@ -153,12 +227,14 @@ deployment:
                 - 输入 IP 地址和 SSH 凭据
                 - 点击部署安装到远程设备
 
-    # Step 2: 配置 reCamera Node-RED
+    # Step 2 (Grafana): 配置 reCamera Node-RED
     - id: recamera
       name: Configure reCamera
       name_zh: 配置 reCamera
       type: recamera_nodered
       required: true
+      show_when:
+        preset: grafana
       config_file: devices/recamera.yaml
       section:
         title: Step 2 - Configure reCamera Node-RED
@@ -168,12 +244,14 @@ deployment:
         troubleshoot_file: deploy/sections/recamera_troubleshoot.md
         troubleshoot_file_zh: deploy/sections/recamera_troubleshoot_zh.md
 
-    # Step 3: 配置 Grafana 数据源和仪表板
-    - id: grafana
+    # Step 3 (Grafana): 配置 Grafana 数据源和仪表板
+    - id: grafana_config
       name: Configure Grafana Dashboard
       name_zh: 配置 Grafana 仪表板
       type: manual
       required: true
+      show_when:
+        preset: grafana
       section:
         title: Step 3 - Configure Grafana Dashboard
         title_zh: 第三步 - 配置 Grafana 仪表板
@@ -182,12 +260,14 @@ deployment:
         troubleshoot_file: deploy/sections/grafana_troubleshoot.md
         troubleshoot_file_zh: deploy/sections/grafana_troubleshoot_zh.md
 
-    # Step 4: 校准和热力图配置
+    # Step 4 (Grafana): 校准和热力图配置
     - id: heatmap
       name: Calibrate and Configure Heatmap
       name_zh: 校准并配置热力图
       type: manual
       required: true
+      show_when:
+        preset: grafana
       section:
         title: Step 4 - Calibrate and Configure Heatmap Page
         title_zh: 第四步 - 校准并配置热力图页面
@@ -197,9 +277,13 @@ deployment:
         troubleshoot_file_zh: deploy/sections/heatmap_troubleshoot_zh.md
 
   order:
+    # Simple 模式步骤
+    - deploy_detector
+    - preview
+    # Grafana 模式步骤
     - backend
     - recamera
-    - grafana
+    - grafana_config
     - heatmap
 
   post_deployment:
