@@ -2,9 +2,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
+use std::sync::Mutex;
+use std::time::Duration;
 use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
-use tauri_plugin_shell::process::CommandEvent;
+use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 
 /// Global flag to track sidecar state
 static SIDECAR_STARTED: AtomicBool = AtomicBool::new(false);
@@ -15,39 +17,183 @@ static BACKEND_PORT: AtomicU16 = AtomicU16::new(0);
 /// Global sidecar process ID for cleanup on exit
 static SIDECAR_PID: AtomicU32 = AtomicU32::new(0);
 
+/// Global sidecar child handle for graceful shutdown
+static SIDECAR_CHILD: Mutex<Option<CommandChild>> = Mutex::new(None);
+
+/// Graceful shutdown timeout in seconds
+const GRACEFUL_SHUTDOWN_TIMEOUT_SECS: u64 = 5;
+
 /// Get an available port for the backend server
 fn get_available_port() -> u16 {
     portpicker::pick_unused_port().expect("No available ports")
 }
 
-/// Kill the sidecar process
-fn kill_sidecar() {
-    use std::process::Command;
-
-    // First try by PID
-    let pid = SIDECAR_PID.swap(0, Ordering::SeqCst);
-    if pid > 0 {
-        #[cfg(unix)]
-        {
-            let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
-        }
-        #[cfg(windows)]
-        {
-            let _ = Command::new("taskkill").args(["/F", "/PID", &pid.to_string()]).output();
-        }
-    }
-
-    // Also try by process name as fallback
+/// Check if a process is still running (cross-platform)
+fn is_process_running(pid: u32) -> bool {
     #[cfg(unix)]
     {
-        let _ = Command::new("pkill").args(["-9", "-f", "provisioning-station"]).output();
+        // On Unix, kill with signal 0 checks if process exists
+        use std::process::Command;
+        Command::new("kill")
+            .args(["-0", &pid.to_string()])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
     }
     #[cfg(windows)]
     {
-        let _ = Command::new("taskkill").args(["/F", "/IM", "provisioning-station.exe"]).output();
+        use std::process::Command;
+        // Use tasklist to check if process exists
+        Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {}", pid), "/NH"])
+            .output()
+            .map(|o| {
+                let output = String::from_utf8_lossy(&o.stdout);
+                output.contains(&pid.to_string())
+            })
+            .unwrap_or(false)
+    }
+}
+
+/// Send graceful termination signal (cross-platform)
+fn send_terminate_signal(pid: u32) -> bool {
+    #[cfg(unix)]
+    {
+        use std::process::Command;
+        // SIGTERM (15) for graceful shutdown
+        Command::new("kill")
+            .args(["-15", &pid.to_string()])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        // taskkill without /F sends WM_CLOSE for graceful shutdown
+        Command::new("taskkill")
+            .args(["/PID", &pid.to_string()])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+}
+
+/// Force kill a process (cross-platform)
+fn force_kill_process(pid: u32) -> bool {
+    #[cfg(unix)]
+    {
+        use std::process::Command;
+        // SIGKILL (9) for force kill
+        Command::new("kill")
+            .args(["-9", &pid.to_string()])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        // taskkill with /F forces termination
+        Command::new("taskkill")
+            .args(["/F", "/PID", &pid.to_string()])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+}
+
+/// Force kill by process name as fallback (cross-platform)
+fn force_kill_by_name() {
+    #[cfg(unix)]
+    {
+        use std::process::Command;
+        let _ = Command::new("pkill")
+            .args(["-9", "-f", "provisioning-station"])
+            .output();
+    }
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        let _ = Command::new("taskkill")
+            .args(["/F", "/IM", "provisioning-station.exe"])
+            .output();
+    }
+}
+
+/// Gracefully shutdown the sidecar with timeout
+/// Returns true if process exited gracefully, false if force killed
+fn shutdown_sidecar_graceful() -> bool {
+    let pid = SIDECAR_PID.swap(0, Ordering::SeqCst);
+
+    if pid == 0 {
+        log::info!("No sidecar PID to kill");
+        SIDECAR_STARTED.store(false, Ordering::SeqCst);
+        return true;
     }
 
+    // Check if process is still running
+    if !is_process_running(pid) {
+        log::info!("Sidecar process {} already exited", pid);
+        SIDECAR_STARTED.store(false, Ordering::SeqCst);
+        return true;
+    }
+
+    log::info!("Sending graceful termination signal to sidecar (PID: {})", pid);
+
+    // First, try to use the Tauri child handle if available
+    if let Ok(mut guard) = SIDECAR_CHILD.lock() {
+        if let Some(child) = guard.take() {
+            log::info!("Using Tauri child handle for graceful shutdown");
+            let _ = child.kill();
+        }
+    }
+
+    // Also send system-level termination signal
+    send_terminate_signal(pid);
+
+    // Wait for graceful shutdown with timeout
+    let check_interval = Duration::from_millis(100);
+    let max_checks = (GRACEFUL_SHUTDOWN_TIMEOUT_SECS * 1000 / 100) as u32;
+
+    for i in 0..max_checks {
+        std::thread::sleep(check_interval);
+
+        if !is_process_running(pid) {
+            log::info!("Sidecar exited gracefully after {}ms", (i + 1) * 100);
+            SIDECAR_STARTED.store(false, Ordering::SeqCst);
+            return true;
+        }
+
+        if i > 0 && i % 10 == 0 {
+            log::info!("Waiting for sidecar to exit... ({}ms elapsed)", (i + 1) * 100);
+        }
+    }
+
+    // Graceful shutdown timed out, force kill
+    log::warn!(
+        "Sidecar did not exit gracefully within {}s, force killing",
+        GRACEFUL_SHUTDOWN_TIMEOUT_SECS
+    );
+
+    force_kill_process(pid);
+
+    // Wait a bit more for force kill to take effect
+    for _ in 0..10 {
+        std::thread::sleep(Duration::from_millis(100));
+        if !is_process_running(pid) {
+            log::info!("Sidecar force killed successfully");
+            SIDECAR_STARTED.store(false, Ordering::SeqCst);
+            return false;
+        }
+    }
+
+    // Last resort: kill by name
+    log::warn!("Force kill by PID failed, trying by process name");
+    force_kill_by_name();
+
     SIDECAR_STARTED.store(false, Ordering::SeqCst);
+    false
 }
 
 /// Tauri command to get the backend port
@@ -97,11 +243,28 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                // Kill sidecar process before window closes
-                kill_sidecar();
-                // Force quit the entire app on macOS
-                window.app_handle().exit(0);
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // Prevent default close behavior to ensure cleanup completes
+                api.prevent_close();
+
+                let app_handle = window.app_handle().clone();
+
+                // Perform graceful shutdown in a separate thread to avoid blocking
+                std::thread::spawn(move || {
+                    log::info!("Window close requested, initiating graceful shutdown...");
+
+                    // Gracefully shutdown sidecar with timeout
+                    let graceful = shutdown_sidecar_graceful();
+
+                    if graceful {
+                        log::info!("Graceful shutdown completed successfully");
+                    } else {
+                        log::warn!("Graceful shutdown failed, process was force killed");
+                    }
+
+                    // Now exit the app
+                    app_handle.exit(0);
+                });
             }
         })
         .run(tauri::generate_context!())
@@ -155,6 +318,11 @@ async fn start_sidecar(
     SIDECAR_PID.store(pid, Ordering::SeqCst);
     log::info!("Sidecar spawned with PID: {}", pid);
 
+    // Store child handle for graceful shutdown
+    if let Ok(mut guard) = SIDECAR_CHILD.lock() {
+        *guard = Some(child);
+    }
+
     SIDECAR_STARTED.store(true, Ordering::SeqCst);
 
     // Handle sidecar output in background
@@ -172,6 +340,7 @@ async fn start_sidecar(
                 CommandEvent::Terminated(status) => {
                     log::info!("Sidecar terminated with status: {:?}", status);
                     SIDECAR_STARTED.store(false, Ordering::SeqCst);
+                    SIDECAR_PID.store(0, Ordering::SeqCst);
                     break;
                 }
                 CommandEvent::Error(err) => {
