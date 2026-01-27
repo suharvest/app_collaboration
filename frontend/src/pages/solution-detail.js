@@ -55,14 +55,16 @@ function renderSolutionIntro(solution, descriptionHtml) {
   const summary = getLocalizedField(solution, 'summary');
   const stats = solution.stats || {};
   const requiredDevices = solution.required_devices || [];
-  const deviceGroups = solution.device_groups || [];
   const presets = solution.presets || [];
   const deviceCatalog = solution.device_catalog || {};
   const partners = solution.partners || [];
   const gallery = solution.gallery || [];
 
+  // Check if any preset has device groups
+  const hasDeviceGroups = presets.some(p => (p.device_groups || []).length > 0);
+
   // Initialize device selections if device_groups exist
-  if (deviceGroups.length > 0) {
+  if (hasDeviceGroups) {
     initializeSelections(solution);
   }
 
@@ -81,52 +83,57 @@ function renderSolutionIntro(solution, descriptionHtml) {
       <!-- Hero Section -->
       <div class="solution-hero">
         ${renderHeroCarousel(solution, coverImage, gallery)}
-        <!-- Title Row with Deploy Button -->
-        <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
-          <div class="flex-1 min-w-0">
-            <h1 class="solution-title mb-2">${escapeHtml(name)}</h1>
-            <p class="solution-summary mb-0">${escapeHtml(summary)}</p>
-          </div>
-          <button class="btn-deploy-hero flex-shrink-0" id="start-deploy-btn">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-              <path d="M2 17l10 5 10-5"/>
-              <path d="M2 12l10 5 10-5"/>
-            </svg>
-            ${t('solutions.startDeploy')}
-          </button>
-        </div>
+      </div>
 
-        <!-- Stats -->
-        <div class="solution-stats">
-          ${stats.difficulty ? `
-            <div class="solution-stat">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <!-- Sticky Title Bar -->
+      <div class="solution-sticky-header" id="solution-sticky-header">
+        <div class="solution-sticky-header-inner">
+          <!-- Title Row with Deploy Button -->
+          <div class="flex flex-wrap items-start justify-between gap-4 mb-3">
+            <div class="flex-1 min-w-0">
+              <h1 class="solution-title mb-2">${escapeHtml(name)}</h1>
+              <p class="solution-summary mb-0">${escapeHtml(summary)}</p>
+            </div>
+            <button class="btn-deploy-hero flex-shrink-0" id="start-deploy-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
               </svg>
-              <span>${t('solutions.difficulty.' + stats.difficulty)}</span>
-            </div>
-          ` : ''}
-          ${stats.estimated_time ? `
-            <div class="solution-stat">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12 6 12 12 16 14"/>
-              </svg>
-              <span>${stats.estimated_time}</span>
-            </div>
-          ` : ''}
-          ${stats.deployed_count !== undefined ? `
-            <div class="solution-stat">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                <polyline points="22 4 12 14.01 9 11.01"/>
-              </svg>
-              <span>${stats.deployed_count} ${t('solutions.deployedCount')}</span>
-            </div>
-          ` : ''}
-        </div>
+              ${t('solutions.startDeploy')}
+            </button>
+          </div>
 
+          <!-- Stats -->
+          <div class="solution-stats">
+            ${stats.difficulty ? `
+              <div class="solution-stat">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                </svg>
+                <span>${t('solutions.difficulty.' + stats.difficulty)}</span>
+              </div>
+            ` : ''}
+            ${stats.estimated_time ? `
+              <div class="solution-stat">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                <span>${stats.estimated_time}</span>
+              </div>
+            ` : ''}
+            ${stats.deployed_count !== undefined ? `
+              <div class="solution-stat">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <span>${stats.deployed_count} ${t('solutions.deployedCount')}</span>
+              </div>
+            ` : ''}
+          </div>
+        </div>
       </div>
 
       <!-- Description -->
@@ -137,7 +144,7 @@ function renderSolutionIntro(solution, descriptionHtml) {
       ` : ''}
 
       <!-- Device Configuration (after description) -->
-      ${deviceGroups.length > 0 ? `
+      ${hasDeviceGroups ? `
         ${renderDeviceConfigurator(solution)}
       ` : requiredDevices.length > 0 ? `
         <div class="solution-devices-inline">
@@ -281,7 +288,10 @@ function initializeSelections(solution) {
     selectedPreset = null;
   }
 
-  for (const group of solution.device_groups || []) {
+  // Initialize selections from the selected preset's device_groups
+  const preset = presets.find(p => p.id === selectedPreset);
+  const groups = preset?.device_groups || [];
+  for (const group of groups) {
     if (group.type === 'single') {
       deviceSelections[group.id] = group.default || (group.options?.[0]?.device_ref) || null;
     } else if (group.type === 'multiple') {
@@ -293,11 +303,10 @@ function initializeSelections(solution) {
 }
 
 function renderDeviceConfigurator(solution) {
-  const groups = solution.device_groups || [];
   const presets = solution.presets || [];
 
-  // Filter groups by selected preset's selections (only show relevant devices)
-  const filteredGroups = getFilteredGroups(groups, presets);
+  // Get device groups from the selected preset
+  const filteredGroups = getFilteredGroups(presets);
 
   // Get architecture image for selected preset
   const architectureImage = getSelectedPresetArchitecture(presets, solution);
@@ -317,13 +326,18 @@ function renderDeviceConfigurator(solution) {
   `;
 }
 
-function getFilteredGroups(groups, presets) {
-  if (!selectedPreset || presets.length === 0) return groups;
+function getFilteredGroups(presets) {
+  if (!selectedPreset || presets.length === 0) return [];
   const preset = presets.find(p => p.id === selectedPreset);
-  if (!preset || !preset.selections) return groups;
-  // Only show device groups that are in the preset's selections
-  const selectionKeys = Object.keys(preset.selections);
-  return groups.filter(g => selectionKeys.includes(g.id));
+  // Return device groups directly from the preset
+  return preset?.device_groups || [];
+}
+
+function findDeviceGroupById(groupId) {
+  // Find device group in the selected preset
+  const presets = currentSolution?.presets || [];
+  const preset = presets.find(p => p.id === selectedPreset);
+  return preset?.device_groups?.find(g => g.id === groupId);
 }
 
 function getSelectedPresetArchitecture(presets, solution) {
@@ -702,7 +716,9 @@ function renderQuantityGroup(group) {
 }
 
 function renderSelectionSummary(solution) {
-  const groups = solution.device_groups || [];
+  const presets = solution.presets || [];
+  const preset = presets.find(p => p.id === selectedPreset);
+  const groups = preset?.device_groups || [];
   const catalog = solution.device_catalog || {};
 
   if (groups.length === 0) return '';
@@ -752,9 +768,16 @@ function applyPreset(presetId) {
   const preset = currentSolution?.presets?.find(p => p.id === presetId);
   if (preset) {
     selectedPreset = presetId;
-    // Apply preset selections
-    for (const [groupId, value] of Object.entries(preset.selections || {})) {
-      deviceSelections[groupId] = value;
+    // Apply device selections from preset's device_groups defaults
+    deviceSelections = {};
+    for (const group of preset.device_groups || []) {
+      if (group.type === 'single') {
+        deviceSelections[group.id] = group.default || (group.options?.[0]?.device_ref) || null;
+      } else if (group.type === 'multiple') {
+        deviceSelections[group.id] = [...(group.default_selections || [])];
+      } else if (group.type === 'quantity') {
+        deviceSelections[group.id] = group.default_count || 1;
+      }
     }
   }
 }
@@ -770,7 +793,7 @@ function updateGroupUI(groupId) {
   const groupEl = document.querySelector(`.device-group[data-group-id="${groupId}"]`);
   if (!groupEl || !currentSolution) return;
 
-  const group = currentSolution.device_groups?.find(g => g.id === groupId);
+  const group = findDeviceGroupById(groupId);
   if (!group) return;
 
   // Update option selections
@@ -880,19 +903,45 @@ function setupEventHandlers(container, solutionId) {
     });
   }
 
-  // Start deploy button
+  // Start deploy button - pass selected preset
   const deployBtn = container.querySelector('#start-deploy-btn');
   if (deployBtn) {
     deployBtn.addEventListener('click', () => {
-      router.navigate('deploy', { id: solutionId });
+      const params = { id: solutionId };
+      if (selectedPreset) {
+        params.preset = selectedPreset;
+      }
+      router.navigate('deploy', params);
     });
   }
+
+  // Sticky header shadow on scroll
+  setupStickyHeader(container);
 
   // Hero Carousel
   setupHeroCarousel(container);
 
   // Device Configurator Event Handlers
   setupDeviceConfiguratorHandlers(container);
+}
+
+function setupStickyHeader(container) {
+  const stickyHeader = container.querySelector('#solution-sticky-header');
+  if (!stickyHeader) return;
+
+  // Use scroll event to detect when header is stuck
+  const contentArea = document.getElementById('content-area');
+  if (!contentArea) return;
+
+  const checkSticky = () => {
+    const rect = stickyHeader.getBoundingClientRect();
+    const contentRect = contentArea.getBoundingClientRect();
+    // Header is stuck when its top is at or near the content area top
+    stickyHeader.classList.toggle('is-stuck', rect.top <= contentRect.top + 1);
+  };
+
+  contentArea.addEventListener('scroll', checkSticky, { passive: true });
+  checkSticky();
 }
 
 function setupDeviceConfiguratorHandlers(container) {
@@ -943,7 +992,7 @@ function setupDeviceConfiguratorHandlers(container) {
       const groupId = option.dataset.groupId;
       const deviceRef = option.dataset.deviceRef;
       const type = option.dataset.type;
-      const group = currentSolution?.device_groups?.find(g => g.id === groupId);
+      const group = findDeviceGroupById(groupId);
 
       if (!group) return;
 
@@ -976,7 +1025,7 @@ function setupDeviceConfiguratorHandlers(container) {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const groupId = btn.dataset.groupId;
-      const group = currentSolution?.device_groups?.find(g => g.id === groupId);
+      const group = findDeviceGroupById(groupId);
       if (!group) return;
 
       selectedPreset = null;
@@ -995,7 +1044,7 @@ function setupDeviceConfiguratorHandlers(container) {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const groupId = btn.dataset.groupId;
-      const group = currentSolution?.device_groups?.find(g => g.id === groupId);
+      const group = findDeviceGroupById(groupId);
       if (!group) return;
 
       selectedPreset = null;
@@ -1014,7 +1063,7 @@ function setupDeviceConfiguratorHandlers(container) {
     input.addEventListener('change', (e) => {
       e.stopPropagation();
       const groupId = input.dataset.groupId;
-      const group = currentSolution?.device_groups?.find(g => g.id === groupId);
+      const group = findDeviceGroupById(groupId);
       if (!group) return;
 
       selectedPreset = null;
@@ -1060,9 +1109,8 @@ function updateQuantityUI(container, groupId, group) {
 function rerenderChipsRow(container) {
   const chipsRow = container.querySelector('.device-chips-row');
   if (chipsRow && currentSolution) {
-    const groups = currentSolution.device_groups || [];
     const presets = currentSolution.presets || [];
-    const filteredGroups = getFilteredGroups(groups, presets);
+    const filteredGroups = getFilteredGroups(presets);
     chipsRow.innerHTML = filteredGroups.map(group => renderDeviceChipWithDropdown(group, currentSolution)).join('');
 
     // Update architecture image

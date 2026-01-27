@@ -40,7 +40,7 @@ let deviceGroupSelections = {}; // Track device selections for each device group
 let selectedPresetId = null; // Track selected preset for Level 1 sections
 
 export async function renderDeployPage(params) {
-  const { id } = params;
+  const { id, preset: initialPreset } = params;
   const container = document.getElementById('content-area');
 
   // Show loading
@@ -72,15 +72,23 @@ export async function renderDeployPage(params) {
     deviceGroupSelections = {}; // Reset device group selections
     selectedPresetId = null; // Reset preset selection
 
-    // Initialize selected preset (first preset with a section, or first preset)
+    // Initialize selected preset
+    // Priority: 1. Passed from detail page, 2. First preset with section, 3. First preset
     const presets = deploymentInfo.presets || [];
     if (presets.length > 0) {
-      const presetWithSection = presets.find(p => p.section);
-      selectedPresetId = presetWithSection ? presetWithSection.id : presets[0].id;
+      // Check if initialPreset is valid
+      const passedPreset = initialPreset && presets.find(p => p.id === initialPreset);
+      if (passedPreset) {
+        selectedPresetId = initialPreset;
+      } else {
+        const presetWithSection = presets.find(p => p.section);
+        selectedPresetId = presetWithSection ? presetWithSection.id : presets[0].id;
+      }
     }
 
-    // Initialize device group selections from defaults
-    const deviceGroups = deploymentInfo.device_groups || [];
+    // Initialize device group selections from selected preset's device groups
+    const selectedPreset = presets.find(p => p.id === selectedPresetId);
+    const deviceGroups = selectedPreset?.device_groups || [];
     deviceGroups.forEach(group => {
       if (group.type === 'single' && group.default) {
         deviceGroupSelections[group.id] = group.default;
@@ -130,7 +138,6 @@ export async function renderDeployPage(params) {
 function renderDeployContent(container) {
   const deployment = currentSolution.deployment || {};
   const devices = deployment.devices || [];
-  const deviceGroups = deployment.device_groups || [];
   const presets = deployment.presets || [];
   const name = getLocalizedField(currentSolution, 'name');
   const selectionMode = deployment.selection_mode || 'sequential';
@@ -141,8 +148,8 @@ function renderDeployContent(container) {
   }
 
   // Render device group sections (with template-based instructions)
-  // Filter by selected preset if applicable
-  const filteredDeviceGroups = getFilteredDeviceGroups(deviceGroups, presets);
+  // Get device groups from selected preset
+  const filteredDeviceGroups = getFilteredDeviceGroups(presets);
   const deviceGroupSectionsHtml = renderDeviceGroupSections(filteredDeviceGroups);
 
   // Check if presets have sections (Level 1)
@@ -196,8 +203,8 @@ function renderDeployContent(container) {
         </div>
 
         <!-- Sequential Mode: Steps -->
-        <div class="deploy-sections">
-          ${devices.map((device, index) => renderDeploySection(device, index + 1)).join('')}
+        <div class="deploy-sections" id="deploy-sections-container">
+          ${getFilteredDevices(devices).map((device, index) => renderDeploySection(device, index + 1)).join('')}
         </div>
       `}
 
@@ -286,9 +293,9 @@ async function handlePresetChange(presetId) {
 
   // Re-render device group sections filtered by new preset
   const deployment = currentSolution.deployment || {};
-  const deviceGroups = deployment.device_groups || [];
   const presets = deployment.presets || [];
-  const filteredDeviceGroups = getFilteredDeviceGroups(deviceGroups, presets);
+  const devices = deployment.devices || [];
+  const filteredDeviceGroups = getFilteredDeviceGroups(presets);
   const deviceGroupContainer = document.getElementById('deploy-device-groups-container');
   if (deviceGroupContainer) {
     deviceGroupContainer.innerHTML = renderDeviceGroupSections(filteredDeviceGroups);
@@ -300,6 +307,15 @@ async function handlePresetChange(presetId) {
         await handleDeviceGroupSelectorChange(groupId, selectedDevice);
       });
     });
+  }
+
+  // Re-render deployment steps filtered by new preset
+  const sectionsContainer = document.getElementById('deploy-sections-container');
+  if (sectionsContainer) {
+    const filteredDevices = getFilteredDevices(devices);
+    sectionsContainer.innerHTML = filteredDevices.map((device, index) => renderDeploySection(device, index + 1)).join('');
+    // Re-attach event handlers for the new sections
+    attachSectionEventHandlers(sectionsContainer);
   }
 
   try {
@@ -335,14 +351,120 @@ async function handlePresetChange(presetId) {
 }
 
 /**
- * Filter device groups by selected preset's selections keys
+ * Get device groups from selected preset
  */
-function getFilteredDeviceGroups(deviceGroups, presets) {
-  if (!selectedPresetId || presets.length === 0) return deviceGroups;
+function getFilteredDeviceGroups(presets) {
+  if (!selectedPresetId || presets.length === 0) return [];
   const preset = presets.find(p => p.id === selectedPresetId);
-  if (!preset || !preset.selections) return deviceGroups;
-  const selectionKeys = Object.keys(preset.selections);
-  return deviceGroups.filter(g => selectionKeys.includes(g.id));
+  return preset?.device_groups || [];
+}
+
+/**
+ * Filter deployment devices by selected preset's show_when condition
+ */
+function getFilteredDevices(devices) {
+  if (!selectedPresetId) return devices;
+  return devices.filter(device => {
+    // No show_when means always show
+    if (!device.show_when) return true;
+    // Check preset condition
+    if (device.show_when.preset) {
+      const presetCondition = device.show_when.preset;
+      // Can be string or array
+      if (Array.isArray(presetCondition)) {
+        return presetCondition.includes(selectedPresetId);
+      }
+      return presetCondition === selectedPresetId;
+    }
+    return true;
+  });
+}
+
+/**
+ * Attach event handlers for deployment section elements
+ */
+function attachSectionEventHandlers(container) {
+  // Section headers (expand/collapse)
+  container.querySelectorAll('[id^="section-header-"]').forEach(el => {
+    el.addEventListener('click', () => {
+      const deviceId = el.dataset.deviceId;
+      toggleSection(deviceId);
+    });
+  });
+
+  // Deploy buttons
+  container.querySelectorAll('[id^="deploy-btn-"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const deviceId = btn.dataset.deviceId;
+      const device = getDeviceById(deviceId);
+
+      if (device?.type === 'manual') {
+        markDeviceComplete(deviceId);
+      } else if (device?.type === 'preview') {
+        handlePreviewButtonClick(deviceId);
+      } else {
+        startDeployment(deviceId);
+      }
+    });
+  });
+
+  // Logs toggle
+  container.querySelectorAll('[id^="logs-toggle-"]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const deviceId = el.dataset.deviceId;
+      toggleLogs(deviceId);
+    });
+  });
+
+  // Refresh ports
+  container.querySelectorAll('[id^="refresh-ports-"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await refreshSerialPorts(btn);
+    });
+  });
+
+  // Test SSH connection
+  container.querySelectorAll('[id^="test-ssh-"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const deviceId = btn.dataset.deviceId;
+      await testSSHConnection(deviceId, btn);
+    });
+  });
+
+  // Serial port selection
+  container.querySelectorAll('[id^="serial-port-"]').forEach(select => {
+    select.addEventListener('change', () => {
+      const deviceId = select.id.replace('serial-port-', '');
+      if (select.value) {
+        deviceStates[deviceId].detected = true;
+        deviceStates[deviceId].port = select.value;
+        updateSectionUI(deviceId);
+      }
+    });
+  });
+
+  // Detailed logs toggle
+  container.querySelectorAll('[id^="detailed-logs-"]').forEach(checkbox => {
+    checkbox.addEventListener('change', (e) => {
+      e.stopPropagation();
+      showDetailedLogs = checkbox.checked;
+      refreshAllLogViewers();
+    });
+  });
+
+  // Initialize device states for filtered devices
+  const deployment = currentSolution.deployment || {};
+  const devices = deployment.devices || [];
+  const filteredDevices = getFilteredDevices(devices);
+  filteredDevices.forEach((device, index) => {
+    if (!deviceStates[device.id]) {
+      deviceStates[device.id] = createInitialDeviceState(device, index);
+    }
+  });
 }
 
 /**
@@ -407,7 +529,8 @@ async function handleDeviceGroupSelectorChange(groupId, selectedDevice) {
       currentSolution.id,
       groupId,
       selectedDevice,
-      i18n.locale
+      i18n.locale,
+      selectedPresetId
     );
 
     if (result.section && contentEl) {
