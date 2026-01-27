@@ -1,12 +1,12 @@
 version: "1.0"
 id: smart_retail_voice_ai
-name: Smart Retail Voice AI
-name_zh: 智能零售语音 AI
+name: Smart Retail Voice Collection
+name_zh: 智慧零售语音采集
 
 # ============ 介绍页内容 ============
 intro:
-  summary: Edge-based voice-to-text solution for retail environments with privacy-first architecture
-  summary_zh: 基于边缘设备的语音转文本方案，专为零售环境设计，采用隐私优先架构
+  summary: Capture and analyze in-store conversations to understand what customers are saying and what help they need
+  summary_zh: 门店顾客声音采集，听懂顾客在说什么、需要什么帮助
 
   description_file: intro/description.md
   description_file_zh: intro/description_zh.md
@@ -54,34 +54,29 @@ intro:
       description: 4-mic array with noise suppression, AEC, and beamforming
       description_zh: 4 麦克风阵列，支持噪声抑制、回声消除和波束成形
 
-  # Device Groups
-  device_groups:
-    - id: edge_device
-      name: Edge Computing Device
-      name_zh: 边缘计算设备
-      type: single
-      required: true
-      options:
-        - device_ref: rerouter_cm4
-      default: rerouter_cm4
-
-    - id: microphone
-      name: Microphone Array
-      name_zh: 麦克风阵列
-      type: single
-      required: true
-      options:
-        - device_ref: respeaker_xvf3800
-      default: respeaker_xvf3800
-
   # Presets
   presets:
     - id: default
       name: Standard Deployment
       name_zh: 标准部署
-      selections:
-        edge_device: rerouter_cm4
-        microphone: respeaker_xvf3800
+      device_groups:
+        - id: edge_device
+          name: Edge Computing Device
+          name_zh: 边缘计算设备
+          type: single
+          required: true
+          options:
+            - device_ref: rerouter_cm4
+          default: rerouter_cm4
+
+        - id: microphone
+          name: Microphone Array
+          name_zh: 麦克风阵列
+          type: single
+          required: true
+          options:
+            - device_ref: respeaker_xvf3800
+          default: respeaker_xvf3800
       links:
         wiki: https://wiki.seeedstudio.com/cn/solutions/smart-retail-voice-ai-solution-1/
       section:

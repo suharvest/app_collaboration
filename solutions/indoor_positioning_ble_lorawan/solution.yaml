@@ -1,11 +1,11 @@
 version: '1.0'
 id: indoor_positioning_ble_lorawan
-name: Indoor Positioning with BLE & LoRaWAN
-name_zh: 蓝牙 LoRaWAN 室内定位系统
+name: Campus-level BLE Beacon Positioning System
+name_zh: 园区级蓝牙信标定位系统
 intro:
-  summary: Cost-effective indoor positioning system combining BLE beacons for location
-    sensing and LoRaWAN for long-range data transmission
-  summary_zh: 经济高效的室内定位系统，结合 BLE 信标进行位置感知和 LoRaWAN 进行远距离数据传输
+  summary: Know where your assets and people are in real-time. Battery-powered tags
+    last 2 years, no wiring needed, works across large facilities.
+  summary_zh: 实时掌握人员和物品位置，定位标签电池可用2年，无需布线，覆盖整个园区
   description_file: intro/description.md
   description_file_zh: intro/description_zh.md
   cover_image: intro/gallery/cover.png
@@ -68,47 +68,6 @@ intro:
       product_url: https://www.seeedstudio.com/SenseCAP-Multi-Platform-LoRaWAN-Indoor-Gateway-SX1302-AS923-p-5473.html
       description: LoRaWAN gateway for Asia-Pacific region (AS923), 2km indoor coverage
       description_zh: 亚太地区 LoRaWAN 网关 (AS923)，室内覆盖半径 2km
-  device_groups:
-  - id: gateway
-    name: LoRaWAN Gateway
-    name_zh: LoRaWAN 网关
-    type: single
-    required: true
-    description: Select the gateway for your region
-    description_zh: 选择您所在地区的网关
-    options:
-    - device_ref: gateway_us915
-      label: Americas (US915)
-      label_zh: 美洲 (US915)
-    - device_ref: gateway_eu868
-      label: Europe (EU868)
-      label_zh: 欧洲 (EU868)
-    - device_ref: gateway_as923
-      label: Asia-Pacific (AS923)
-      label_zh: 亚太 (AS923)
-    default: gateway_us915
-  - id: beacons
-    name: BLE Beacons
-    name_zh: BLE 信标
-    type: quantity
-    required: true
-    device_ref: bc01_beacon
-    min_count: 3
-    max_count: 100
-    default_count: 6
-    description: 'Recommended: 3-5 per zone for accurate positioning'
-    description_zh: 建议：每个区域 3-5 个，以获得准确定位
-  - id: tracker
-    name: T1000 Tracker
-    name_zh: T1000 追踪器
-    type: quantity
-    required: true
-    device_ref: t1000_tracker
-    min_count: 1
-    max_count: 50
-    default_count: 1
-    description: Mobile asset tracker with BLE scanning
-    description_zh: 带 BLE 扫描的移动资产追踪器
   presets:
   - id: starter
     name: Starter Kit
@@ -117,10 +76,47 @@ intro:
     description_zh: 小型办公室（500平方米以内）
     badge: Popular
     badge_zh: 热门
-    selections:
-      gateway: gateway_us915
-      beacons: 6
-      tracker: 1
+    device_groups:
+    - id: gateway
+      name: LoRaWAN Gateway
+      name_zh: LoRaWAN 网关
+      type: single
+      required: true
+      description: Select the gateway for your region
+      description_zh: 选择您所在地区的网关
+      options:
+      - device_ref: gateway_us915
+        label: Americas (US915)
+        label_zh: 美洲 (US915)
+      - device_ref: gateway_eu868
+        label: Europe (EU868)
+        label_zh: 欧洲 (EU868)
+      - device_ref: gateway_as923
+        label: Asia-Pacific (AS923)
+        label_zh: 亚太 (AS923)
+      default: gateway_us915
+    - id: beacons
+      name: BLE Beacons
+      name_zh: BLE 信标
+      type: quantity
+      required: true
+      device_ref: bc01_beacon
+      min_count: 3
+      max_count: 100
+      default_count: 6
+      description: 'Recommended: 3-5 per zone for accurate positioning'
+      description_zh: 建议：每个区域 3-5 个，以获得准确定位
+    - id: tracker
+      name: T1000 Tracker
+      name_zh: T1000 追踪器
+      type: quantity
+      required: true
+      device_ref: t1000_tracker
+      min_count: 1
+      max_count: 50
+      default_count: 1
+      description: Mobile asset tracker with BLE scanning
+      description_zh: 带 BLE 扫描的移动资产追踪器
     links:
       wiki: https://wiki.seeedstudio.com/cn/solutions/indoor-positioning-bluetooth-lorawan-tracker/
       github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
@@ -129,10 +125,47 @@ intro:
     name_zh: 标准配置
     description: Medium facility (500-2000 sqm)
     description_zh: 中型设施（500-2000平方米）
-    selections:
-      gateway: gateway_us915
-      beacons: 15
-      tracker: 3
+    device_groups:
+    - id: gateway
+      name: LoRaWAN Gateway
+      name_zh: LoRaWAN 网关
+      type: single
+      required: true
+      description: Select the gateway for your region
+      description_zh: 选择您所在地区的网关
+      options:
+      - device_ref: gateway_us915
+        label: Americas (US915)
+        label_zh: 美洲 (US915)
+      - device_ref: gateway_eu868
+        label: Europe (EU868)
+        label_zh: 欧洲 (EU868)
+      - device_ref: gateway_as923
+        label: Asia-Pacific (AS923)
+        label_zh: 亚太 (AS923)
+      default: gateway_us915
+    - id: beacons
+      name: BLE Beacons
+      name_zh: BLE 信标
+      type: quantity
+      required: true
+      device_ref: bc01_beacon
+      min_count: 3
+      max_count: 100
+      default_count: 15
+      description: 'Recommended: 3-5 per zone for accurate positioning'
+      description_zh: 建议：每个区域 3-5 个，以获得准确定位
+    - id: tracker
+      name: T1000 Tracker
+      name_zh: T1000 追踪器
+      type: quantity
+      required: true
+      device_ref: t1000_tracker
+      min_count: 1
+      max_count: 50
+      default_count: 3
+      description: Mobile asset tracker with BLE scanning
+      description_zh: 带 BLE 扫描的移动资产追踪器
     links:
       wiki: https://wiki.seeedstudio.com/cn/solutions/indoor-positioning-bluetooth-lorawan-tracker/
       github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
@@ -141,10 +174,47 @@ intro:
     name_zh: 企业版
     description: Large facility (2000+ sqm)
     description_zh: 大型设施（2000平方米以上）
-    selections:
-      gateway: gateway_us915
-      beacons: 30
-      tracker: 10
+    device_groups:
+    - id: gateway
+      name: LoRaWAN Gateway
+      name_zh: LoRaWAN 网关
+      type: single
+      required: true
+      description: Select the gateway for your region
+      description_zh: 选择您所在地区的网关
+      options:
+      - device_ref: gateway_us915
+        label: Americas (US915)
+        label_zh: 美洲 (US915)
+      - device_ref: gateway_eu868
+        label: Europe (EU868)
+        label_zh: 欧洲 (EU868)
+      - device_ref: gateway_as923
+        label: Asia-Pacific (AS923)
+        label_zh: 亚太 (AS923)
+      default: gateway_us915
+    - id: beacons
+      name: BLE Beacons
+      name_zh: BLE 信标
+      type: quantity
+      required: true
+      device_ref: bc01_beacon
+      min_count: 3
+      max_count: 100
+      default_count: 30
+      description: 'Recommended: 3-5 per zone for accurate positioning'
+      description_zh: 建议：每个区域 3-5 个，以获得准确定位
+    - id: tracker
+      name: T1000 Tracker
+      name_zh: T1000 追踪器
+      type: quantity
+      required: true
+      device_ref: t1000_tracker
+      min_count: 1
+      max_count: 50
+      default_count: 10
+      description: Mobile asset tracker with BLE scanning
+      description_zh: 带 BLE 扫描的移动资产追踪器
     links:
       wiki: https://wiki.seeedstudio.com/cn/solutions/indoor-positioning-bluetooth-lorawan-tracker/
       github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
