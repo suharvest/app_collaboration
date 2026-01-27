@@ -5,6 +5,7 @@ Remote Docker Compose deployment via SSH
 import asyncio
 import logging
 import os
+import shlex
 import tempfile
 from pathlib import Path
 from typing import Callable, Optional, Dict, Any
@@ -159,11 +160,13 @@ class DockerRemoteDeployer(BaseDeployer):
                     self._subst_context
                 )
                 remote_dir = f"{remote_path}/{config.id}"
+                # Escape remote_dir for shell safety (handles spaces and special chars)
+                remote_dir_escaped = shlex.quote(remote_dir)
 
                 exit_code, _, stderr = await asyncio.to_thread(
                     self._exec_with_timeout,
                     client,
-                    f"mkdir -p {remote_dir}",
+                    f"mkdir -p {remote_dir_escaped}",
                     30
                 )
 
@@ -204,7 +207,7 @@ class DockerRemoteDeployer(BaseDeployer):
                 exit_code, stdout, stderr = await asyncio.to_thread(
                     self._exec_with_timeout,
                     client,
-                    f"cd {remote_dir} && docker compose pull",
+                    f"cd {remote_dir_escaped} && docker compose pull",
                     ssh_config.command_timeout
                 )
 
@@ -224,6 +227,9 @@ class DockerRemoteDeployer(BaseDeployer):
                 )
 
                 project_name = docker_config.options.get("project_name", config.id)
+                # Escape project name for shell safety
+                project_name_escaped = shlex.quote(project_name)
+
                 # Substitute template variables in environment values
                 # Quote values properly to handle spaces and special characters
                 env_items = []
@@ -231,13 +237,13 @@ class DockerRemoteDeployer(BaseDeployer):
                     substituted_value = self._substitute_variables(
                         str(v), self._subst_context
                     )
-                    # Escape single quotes in value and wrap in single quotes
-                    escaped_value = substituted_value.replace("'", "'\\''")
-                    env_items.append(f"{k}='{escaped_value}'")
+                    # Use shlex.quote for proper escaping of all special characters
+                    escaped_value = shlex.quote(substituted_value)
+                    env_items.append(f"{k}={escaped_value}")
                 env_vars = " ".join(env_items)
                 env_prefix = f"env {env_vars} " if env_vars else ""
 
-                compose_cmd = f"cd {remote_dir} && {env_prefix}docker compose -p {project_name} up -d"
+                compose_cmd = f"cd {remote_dir_escaped} && {env_prefix}docker compose -p {project_name_escaped} up -d"
 
                 if docker_config.options.get("remove_orphans"):
                     compose_cmd += " --remove-orphans"
