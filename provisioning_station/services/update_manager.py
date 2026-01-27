@@ -267,6 +267,21 @@ class UpdateManager:
                 success=False,
                 message="SSH library (paramiko) not installed",
             )
+        except paramiko.AuthenticationException:
+            return UpdateResponse(
+                success=False,
+                message=f"Authentication failed for {username}@{host}. Please check your credentials.",
+            )
+        except paramiko.SSHException as e:
+            return UpdateResponse(
+                success=False,
+                message=f"SSH connection error: {e}",
+            )
+        except OSError as e:
+            return UpdateResponse(
+                success=False,
+                message=f"Cannot connect to {host}. Network error: {e}",
+            )
         except Exception as e:
             logger.error(f"Remote Docker update failed: {e}")
             return UpdateResponse(
@@ -391,6 +406,21 @@ class UpdateManager:
             return UpdateResponse(
                 success=False,
                 message="SSH library (paramiko) not installed",
+            )
+        except paramiko.AuthenticationException:
+            return UpdateResponse(
+                success=False,
+                message=f"Authentication failed for {username}@{host}. Please check your credentials.",
+            )
+        except paramiko.SSHException as e:
+            return UpdateResponse(
+                success=False,
+                message=f"SSH connection error: {e}",
+            )
+        except OSError as e:
+            return UpdateResponse(
+                success=False,
+                message=f"Cannot connect to {host}. Network error: {e}",
             )
         except Exception as e:
             logger.error(f"Remote container action failed: {e}")
