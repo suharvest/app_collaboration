@@ -7,7 +7,7 @@ function simpleheat(canvas) {
 
     this._canvas = canvas = typeof canvas === 'string' ? document.getElementById(canvas) : canvas;
 
-    this._ctx = canvas.getContext('2d');
+    this._ctx = canvas.getContext('2d', {willReadFrequently: true});
     this._width = canvas.width;
     this._height = canvas.height;
 
@@ -77,7 +77,7 @@ simpleheat.prototype = {
     gradient: function (grad) {
         // create a 256x1 gradient that we'll use to turn a grayscale heatmap into a colored one
         var canvas = this._createCanvas(),
-            ctx = canvas.getContext('2d'),
+            ctx = canvas.getContext('2d', {willReadFrequently: true}),
             gradient = ctx.createLinearGradient(0, 0, 0, 256);
 
         canvas.width = 1;
@@ -106,7 +106,7 @@ simpleheat.prototype = {
         // draw a grayscale heatmap by putting a blurred circle at each data point
         for (var i = 0, len = this._data.length, p; i < len; i++) {
             p = this._data[i];
-            ctx.globalAlpha = Math.max(p[2] / this._max, minOpacity === undefined ? 0.05 : minOpacity);
+            ctx.globalAlpha = Math.min(Math.max(p[2] / this._max, minOpacity === undefined ? 0.05 : minOpacity), 1);
             ctx.drawImage(this._circle, p[0] - this._r, p[1] - this._r);
         }
 

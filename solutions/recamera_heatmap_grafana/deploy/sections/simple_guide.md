@@ -1,4 +1,4 @@
-Deploy heatmap application to reCamera for real-time person detection and heat visualization.
+Deploy heatmap application to reCamera for real-time person detection and heat visualization. No backend server required.
 
 ## Connection Options
 
