@@ -926,10 +926,12 @@ export function renderPreviewInputs(device) {
   if (!userInputs.length) return '';
 
   // Get previous inputs for template resolution
+  // Use filtered devices to find current device (supports preset devices)
   const deployment = currentSolution.deployment || {};
-  const devices = deployment.devices || [];
-  const currentIndex = devices.findIndex(d => d.id === device.id);
-  const previousInputs = collectPreviousInputs(devices, currentIndex);
+  const globalDevices = deployment.devices || [];
+  const filteredDevices = getFilteredDevices(globalDevices);
+  const currentIndex = filteredDevices.findIndex(d => d.id === device.id);
+  const previousInputs = collectPreviousInputs(filteredDevices, currentIndex);
 
   // Helper to render a single input field
   const renderInput = (input, extraClass = '') => {

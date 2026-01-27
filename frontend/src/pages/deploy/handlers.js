@@ -130,10 +130,11 @@ export function setupEventHandlers(container) {
     });
   });
 
-  // Initialize preview windows
+  // Initialize preview windows for filtered devices (including preset devices)
   const deployment = currentSolution.deployment || {};
-  const devices = deployment.devices || [];
-  devices.forEach(device => {
+  const globalDevices = deployment.devices || [];
+  const filteredDevices = getFilteredDevices(globalDevices);
+  filteredDevices.forEach(device => {
     if (device.type === 'preview') {
       initPreviewWindow(device.id);
     }
@@ -341,6 +342,13 @@ export function attachSectionEventHandlers(container) {
   filteredDevices.forEach((device, index) => {
     if (!deviceStates[device.id]) {
       deviceStates[device.id] = createInitialDeviceState(device, index);
+    }
+  });
+
+  // Initialize preview windows for filtered devices
+  filteredDevices.forEach(device => {
+    if (device.type === 'preview') {
+      initPreviewWindow(device.id);
     }
   });
 }

@@ -142,10 +142,22 @@ export function resolveTemplate(template, inputs) {
 
 /**
  * Find a device by ID from the current solution
+ * Searches in both preset devices (new structure) and global devices (legacy)
  */
 export function getDeviceById(deviceId) {
   const currentSolution = getCurrentSolution();
   const deployment = currentSolution?.deployment || {};
+
+  // First, try to find in selected preset's devices (new structure)
+  const presets = deployment.presets || [];
+  const selectedPresetId = getSelectedPresetId();
+  const selectedPreset = presets.find(p => p.id === selectedPresetId);
+  if (selectedPreset?.devices) {
+    const device = selectedPreset.devices.find(d => d.id === deviceId);
+    if (device) return device;
+  }
+
+  // Fallback: check global devices (legacy structure)
   const devices = deployment.devices || [];
   return devices.find(d => d.id === deviceId);
 }
