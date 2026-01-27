@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import re
+import shlex
 import sys
 from pathlib import Path
 from typing import Callable, Optional, Dict, Any
@@ -126,11 +127,13 @@ class ScriptDeployer(BaseDeployer):
                     cmd = start_cmd.linux_macos
 
                 if not cmd:
+                    platform_name = "Windows" if sys.platform == "win32" else "Linux/macOS"
                     await self._report_progress(
                         progress_callback,
                         "start",
                         0,
-                        f"No start command for platform: {sys.platform}",
+                        f"No start command configured for {platform_name}. "
+                        f"Please add 'start_command.{'windows' if sys.platform == 'win32' else 'linux_macos'}' to the solution config.",
                     )
                     return False
 
@@ -224,18 +227,28 @@ class ScriptDeployer(BaseDeployer):
         return result
 
     async def _run_command(self, cmd: str, working_dir: Path) -> bool:
-        """Run a shell command"""
+        """Run a shell command with proper platform handling"""
         try:
             if sys.platform == "win32":
-                process = await asyncio.create_subprocess_shell(
-                    cmd,
+                # On Windows, use PowerShell for better script compatibility
+                # PowerShell can handle most bash-like commands and has better Unicode support
+                powershell_cmd = [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy", "Bypass",
+                    "-Command", cmd
+                ]
+                process = await asyncio.create_subprocess_exec(
+                    *powershell_cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=str(working_dir),
                 )
             else:
-                process = await asyncio.create_subprocess_shell(
-                    cmd,
+                # On Unix, use explicit shell with proper argument handling
+                process = await asyncio.create_subprocess_exec(
+                    "/bin/sh", "-c", cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=str(working_dir),
@@ -258,19 +271,31 @@ class ScriptDeployer(BaseDeployer):
         working_dir: Path,
         env: Dict[str, str],
     ) -> Optional[asyncio.subprocess.Process]:
-        """Start a long-running process"""
+        """Start a long-running process with proper platform handling"""
         try:
             if sys.platform == "win32":
-                process = await asyncio.create_subprocess_shell(
-                    cmd,
+                # On Windows, use PowerShell for better compatibility
+                # CREATE_NEW_PROCESS_GROUP allows for proper process management
+                import subprocess
+                powershell_cmd = [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy", "Bypass",
+                    "-Command", cmd
+                ]
+                process = await asyncio.create_subprocess_exec(
+                    *powershell_cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,
                     cwd=str(working_dir),
                     env=env,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
                 )
             else:
-                process = await asyncio.create_subprocess_shell(
-                    cmd,
+                # On Unix, use explicit shell invocation
+                process = await asyncio.create_subprocess_exec(
+                    "/bin/sh", "-c", cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,
                     cwd=str(working_dir),
