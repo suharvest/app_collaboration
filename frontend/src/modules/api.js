@@ -362,6 +362,149 @@ export const solutionsApi = {
 
     return response.json();
   },
+
+  // ============================================
+  // Structured Management API
+  // ============================================
+
+  /**
+   * Get complete solution structure for management UI
+   * @param {string} id - Solution ID
+   */
+  getStructure(id) {
+    return request(`/solutions/${id}/structure`);
+  },
+
+  /**
+   * List all files in a solution
+   * @param {string} id - Solution ID
+   */
+  listFiles(id) {
+    return request(`/solutions/${id}/files`);
+  },
+
+  /**
+   * Delete a file from a solution
+   * @param {string} id - Solution ID
+   * @param {string} path - Relative file path
+   */
+  deleteFile(id, path) {
+    return request(`/solutions/${id}/files/${encodeURIComponent(path)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Create or update a text file in a solution
+   * @param {string} id - Solution ID
+   * @param {string} path - Relative file path
+   * @param {string} content - File content
+   */
+  saveTextFile(id, path, content) {
+    return request(`/solutions/${id}/files/${encodeURIComponent(path)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    });
+  },
+
+  /**
+   * Add a new preset to a solution
+   * @param {string} id - Solution ID
+   * @param {Object} data - Preset data
+   */
+  addPreset(id, data) {
+    return request(`/solutions/${id}/presets`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Update an existing preset
+   * @param {string} id - Solution ID
+   * @param {string} presetId - Preset ID
+   * @param {Object} data - Updated preset data
+   */
+  updatePreset(id, presetId, data) {
+    return request(`/solutions/${id}/presets/${encodeURIComponent(presetId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Delete a preset
+   * @param {string} id - Solution ID
+   * @param {string} presetId - Preset ID
+   */
+  deletePreset(id, presetId) {
+    return request(`/solutions/${id}/presets/${encodeURIComponent(presetId)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Add a device/step to a preset
+   * @param {string} id - Solution ID
+   * @param {string} presetId - Preset ID
+   * @param {Object} data - Device data
+   */
+  addPresetDevice(id, presetId, data) {
+    return request(`/solutions/${id}/presets/${encodeURIComponent(presetId)}/devices`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Update a device/step in a preset
+   * @param {string} id - Solution ID
+   * @param {string} presetId - Preset ID
+   * @param {string} deviceId - Device ID
+   * @param {Object} data - Updated device data
+   */
+  updatePresetDevice(id, presetId, deviceId, data) {
+    return request(`/solutions/${id}/presets/${encodeURIComponent(presetId)}/devices/${encodeURIComponent(deviceId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Delete a device/step from a preset
+   * @param {string} id - Solution ID
+   * @param {string} presetId - Preset ID
+   * @param {string} deviceId - Device ID
+   */
+  deletePresetDevice(id, presetId, deviceId) {
+    return request(`/solutions/${id}/presets/${encodeURIComponent(presetId)}/devices/${encodeURIComponent(deviceId)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Update solution links
+   * @param {string} id - Solution ID
+   * @param {Object} links - Links object (wiki, github, etc.)
+   */
+  updateLinks(id, links) {
+    return request(`/solutions/${id}/links`, {
+      method: 'PUT',
+      body: JSON.stringify(links),
+    });
+  },
+
+  /**
+   * Update solution tags
+   * @param {string} id - Solution ID
+   * @param {string[]} tags - Array of tags
+   */
+  updateTags(id, tags) {
+    return request(`/solutions/${id}/tags`, {
+      method: 'PUT',
+      body: JSON.stringify(tags),
+    });
+  },
 };
 
 // ============================================

@@ -2862,3 +2862,329 @@ button.spinning {
 .restore-logs {
   @apply border-t border-border pt-4;
 }
+
+/* ============================================
+   23. SOLUTION MANAGEMENT - TABS & STRUCTURED UI
+   ============================================ */
+
+/* Modal XL Size */
+.modal-xl {
+  max-width: 900px !important;
+  max-height: 90vh;
+}
+
+.modal-xl .modal-body {
+  max-height: calc(90vh - 200px);
+  overflow-y: auto;
+}
+
+/* Modal Tabs */
+.modal-tabs {
+  @apply flex gap-1 px-4 border-b border-border bg-gray-50;
+}
+
+.tab-btn {
+  @apply px-4 py-3 text-sm font-medium text-text-secondary bg-transparent border-none cursor-pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.15s;
+}
+
+.tab-btn:hover {
+  @apply text-text-primary;
+}
+
+.tab-btn.active {
+  @apply text-primary;
+  border-bottom-color: var(--primary);
+}
+
+/* Tab Content */
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Tags Editor */
+.tags-editor {
+  @apply bg-gray-50 rounded-lg p-3;
+}
+
+.tags-list {
+  @apply flex flex-wrap gap-2 mb-3;
+}
+
+.tag-item {
+  @apply inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-border rounded-full text-sm text-text-primary;
+}
+
+.tag-remove {
+  @apply w-4 h-4 flex items-center justify-center rounded-full text-text-muted hover:text-red-500 hover:bg-red-50 bg-transparent border-none cursor-pointer ml-1;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.tag-input-wrapper {
+  @apply flex gap-2;
+}
+
+.tag-input-wrapper input {
+  @apply flex-1 py-1.5 px-3 border border-border rounded-md text-sm bg-white;
+}
+
+.tag-input-wrapper input:focus {
+  @apply outline-none border-primary;
+}
+
+/* Presets Container */
+.presets-container {
+  @apply py-2;
+}
+
+.presets-header {
+  @apply flex items-center justify-between mb-4;
+}
+
+.presets-header h4 {
+  @apply text-base font-semibold text-text-primary m-0;
+}
+
+.presets-list {
+  @apply flex flex-col gap-4;
+}
+
+/* Preset Card (for management) */
+.preset-card {
+  @apply bg-white border border-border rounded-lg overflow-hidden;
+}
+
+.preset-card .preset-header {
+  @apply flex items-center justify-between p-4 bg-gray-50/50 border-b border-border;
+}
+
+.preset-card .preset-info {
+  @apply flex items-center gap-3;
+}
+
+.preset-card .preset-index {
+  @apply w-6 h-6 rounded-full bg-primary text-white text-xs font-medium flex items-center justify-center flex-shrink-0;
+}
+
+.preset-card .preset-name {
+  @apply font-medium text-text-primary text-sm m-0;
+}
+
+.preset-card .preset-name-zh {
+  @apply text-xs text-text-secondary;
+}
+
+.preset-card .preset-actions {
+  @apply flex items-center gap-1;
+}
+
+/* Preset Devices Section */
+.preset-devices {
+  @apply p-4;
+}
+
+.devices-header {
+  @apply flex items-center justify-between mb-3;
+}
+
+.devices-list {
+  @apply flex flex-col gap-2;
+}
+
+/* Device Row (within preset) */
+.device-row {
+  @apply flex items-center gap-3 p-3 bg-gray-50 rounded-lg;
+}
+
+.device-row .device-info {
+  @apply flex items-center gap-2 flex-1 min-w-0;
+}
+
+.device-row .device-index {
+  @apply w-5 h-5 rounded bg-gray-200 text-text-secondary text-xs font-medium flex items-center justify-center flex-shrink-0;
+}
+
+.device-row .device-details {
+  @apply flex items-center gap-2 flex-wrap min-w-0;
+}
+
+.device-row .device-name {
+  @apply font-medium text-text-primary text-sm;
+}
+
+.device-row .device-type {
+  @apply text-xs;
+}
+
+.device-row .device-files {
+  @apply flex items-center gap-2 flex-shrink-0;
+}
+
+.device-row .device-actions {
+  @apply flex items-center gap-1 flex-shrink-0;
+}
+
+/* File Badge */
+.file-badge {
+  @apply inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-text-secondary text-xs rounded;
+}
+
+/* Badge Variants */
+.badge {
+  @apply px-2 py-0.5 rounded text-xs font-medium;
+}
+
+.badge-sm {
+  @apply px-1.5 py-0.5 text-xs;
+}
+
+.badge-primary {
+  @apply bg-primary-light text-primary;
+}
+
+.badge-warning {
+  @apply bg-amber-100 text-amber-700;
+}
+
+/* Small Button Icon */
+.btn-icon-sm {
+  @apply w-6 h-6;
+}
+
+.btn-icon-sm svg {
+  @apply w-3 h-3;
+}
+
+/* Files Container */
+.files-container {
+  @apply py-2;
+}
+
+.files-header {
+  @apply flex items-center justify-between mb-4;
+}
+
+.files-header h4 {
+  @apply text-base font-semibold text-text-primary m-0;
+}
+
+.files-actions {
+  @apply flex items-center gap-2;
+}
+
+/* Files Tree */
+.files-tree {
+  @apply flex flex-col gap-3;
+}
+
+.file-group {
+  @apply border border-border rounded-lg overflow-hidden;
+}
+
+.file-group-header {
+  @apply flex items-center gap-2 px-3 py-2 bg-gray-50 text-sm font-medium text-text-secondary border-b border-border;
+}
+
+.file-group-items {
+  @apply divide-y divide-border/50;
+}
+
+.file-item {
+  @apply flex items-center justify-between px-3 py-2 hover:bg-gray-50/50;
+  transition: background-color 0.15s;
+}
+
+.file-item .file-info {
+  @apply flex items-center gap-2 min-w-0;
+}
+
+.file-item .file-name {
+  @apply text-sm text-text-primary truncate;
+}
+
+.file-item .file-size {
+  @apply text-xs flex-shrink-0;
+}
+
+.file-item .file-actions {
+  @apply flex items-center gap-1 flex-shrink-0;
+}
+
+/* Empty State Small */
+.empty-state-sm {
+  @apply flex flex-col items-center justify-center py-8 text-center;
+}
+
+.empty-state-sm p {
+  @apply text-sm text-text-muted m-0;
+}
+
+/* Form Divider */
+.form-divider {
+  @apply border-0 border-t border-border my-4;
+}
+
+/* Dialog */
+.dialog-overlay {
+  @apply fixed inset-0 bg-black/50 flex items-center justify-center z-50;
+}
+
+.dialog {
+  @apply bg-white rounded-lg shadow-xl max-w-md w-full mx-4;
+}
+
+.dialog-md {
+  max-width: 480px;
+}
+
+.dialog-lg {
+  max-width: 640px;
+}
+
+.dialog-header {
+  @apply flex items-center gap-3 p-4 border-b border-border;
+}
+
+.dialog-header svg {
+  @apply text-warning flex-shrink-0;
+}
+
+.dialog-header h3 {
+  @apply text-base font-semibold text-text-primary m-0;
+}
+
+.dialog-body {
+  @apply p-4;
+}
+
+.dialog-body p {
+  @apply text-sm text-text-secondary m-0;
+}
+
+.dialog-actions {
+  @apply flex items-center justify-end gap-2 p-4 border-t border-border bg-gray-50;
+}
+
+/* Nested Dialog Container */
+#nested-dialog-container {
+  @apply fixed inset-0;
+  z-index: 60;
+}
+
+/* Code Editor Textarea */
+.code-editor {
+  @apply font-mono text-sm bg-gray-900 text-gray-100 p-4 rounded-lg border-none;
+  min-height: 400px;
+  resize: vertical;
+}
+
+.code-editor:focus {
+  @apply outline-none ring-2 ring-primary/50;
+}
