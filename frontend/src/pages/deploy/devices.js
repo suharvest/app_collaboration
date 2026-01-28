@@ -10,6 +10,7 @@ import {
   getCurrentSolution,
   getDeviceState,
   getDeviceStates,
+  getSelectedPresetId,
 } from './state.js';
 import { getDeviceById, getSelectedTarget, getSelectedModels } from './utils.js';
 import { updateSectionUI, toggleSection } from './ui-updates.js';
@@ -197,6 +198,7 @@ export async function startDeployment(deviceId) {
   // Build params in the format expected by backend
   const params = {
     solution_id: currentSolution.id,
+    preset_id: getSelectedPresetId(),  // Include preset ID for preset-based solutions
     selected_devices: [deviceId],
     device_connections: {},
     options: {},

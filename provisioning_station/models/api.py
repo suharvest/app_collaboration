@@ -107,6 +107,7 @@ class DeviceConnectionRequest(BaseModel):
 class StartDeploymentRequest(BaseModel):
     """Request to start a deployment"""
     solution_id: str
+    preset_id: Optional[str] = None  # Preset ID for new preset-based solutions
     device_connections: Dict[str, Dict[str, Any]] = {}
     options: Dict[str, Any] = {}
     selected_devices: List[str] = []  # If empty, deploy all required

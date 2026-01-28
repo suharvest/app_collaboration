@@ -45,7 +45,7 @@ class SolutionManager:
             return
 
         try:
-            async with aiofiles.open(catalog_path, "r") as f:
+            async with aiofiles.open(catalog_path, "r", encoding="utf-8") as f:
                 content = await f.read()
                 self._global_device_catalog = yaml.safe_load(content) or {}
             logger.info(f"Loaded {len(self._global_device_catalog)} devices from global catalog")
@@ -87,7 +87,7 @@ class SolutionManager:
         """Load and validate a solution configuration"""
         try:
             solution_file = solution_path / "solution.yaml"
-            async with aiofiles.open(solution_file, "r") as f:
+            async with aiofiles.open(solution_file, "r", encoding="utf-8") as f:
                 content = await f.read()
                 data = yaml.safe_load(content)
 
@@ -121,7 +121,7 @@ class SolutionManager:
             return None
 
         try:
-            async with aiofiles.open(file_path, "r") as f:
+            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
                 content = await f.read()
 
             if convert_to_html:
@@ -154,7 +154,7 @@ class SolutionManager:
             return None
 
         try:
-            async with aiofiles.open(config_path, "r") as f:
+            async with aiofiles.open(config_path, "r", encoding="utf-8") as f:
                 content = await f.read()
                 data = yaml.safe_load(content)
 
@@ -255,20 +255,20 @@ class SolutionManager:
 
             # Write solution.yaml
             yaml_path = solution_path / "solution.yaml"
-            async with aiofiles.open(yaml_path, "w") as f:
+            async with aiofiles.open(yaml_path, "w", encoding="utf-8") as f:
                 await f.write(yaml.dump(solution_yaml, allow_unicode=True, sort_keys=False))
 
             # Create placeholder markdown files
             description_en = f"# {data['name']}\n\n{data['summary']}\n"
             description_zh = f"# {data.get('name_zh') or data['name']}\n\n{data.get('summary_zh') or data['summary']}\n"
 
-            async with aiofiles.open(solution_path / "intro" / "description.md", "w") as f:
+            async with aiofiles.open(solution_path / "intro" / "description.md", "w", encoding="utf-8") as f:
                 await f.write(description_en)
-            async with aiofiles.open(solution_path / "intro" / "description_zh.md", "w") as f:
+            async with aiofiles.open(solution_path / "intro" / "description_zh.md", "w", encoding="utf-8") as f:
                 await f.write(description_zh)
-            async with aiofiles.open(solution_path / "deploy" / "guide.md", "w") as f:
+            async with aiofiles.open(solution_path / "deploy" / "guide.md", "w", encoding="utf-8") as f:
                 await f.write(f"## Deployment Guide\n\nFollow the steps below to deploy {data['name']}.\n")
-            async with aiofiles.open(solution_path / "deploy" / "guide_zh.md", "w") as f:
+            async with aiofiles.open(solution_path / "deploy" / "guide_zh.md", "w", encoding="utf-8") as f:
                 await f.write(f"## 部署指南\n\n按照以下步骤部署 {data.get('name_zh') or data['name']}。\n")
 
             # Load and register the new solution
@@ -295,7 +295,7 @@ class SolutionManager:
         yaml_path = Path(solution.base_path) / "solution.yaml"
 
         # Read current yaml
-        async with aiofiles.open(yaml_path, "r") as f:
+        async with aiofiles.open(yaml_path, "r", encoding="utf-8") as f:
             content = await f.read()
             current_yaml = yaml.safe_load(content)
 
@@ -316,7 +316,7 @@ class SolutionManager:
             current_yaml["intro"]["stats"]["estimated_time"] = data["estimated_time"]
 
         # Write back
-        async with aiofiles.open(yaml_path, "w") as f:
+        async with aiofiles.open(yaml_path, "w", encoding="utf-8") as f:
             await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False))
 
         # Reload the solution
@@ -406,7 +406,7 @@ class SolutionManager:
         # Optionally update solution.yaml field (e.g., cover_image)
         if update_yaml_field:
             yaml_path = solution_path / "solution.yaml"
-            async with aiofiles.open(yaml_path, "r") as f:
+            async with aiofiles.open(yaml_path, "r", encoding="utf-8") as f:
                 content = await f.read()
                 current_yaml = yaml.safe_load(content)
 
@@ -417,7 +417,7 @@ class SolutionManager:
                 target = target.setdefault(field, {})
             target[fields[-1]] = relative_path
 
-            async with aiofiles.open(yaml_path, "w") as f:
+            async with aiofiles.open(yaml_path, "w", encoding="utf-8") as f:
                 await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False))
 
             # Reload solution
