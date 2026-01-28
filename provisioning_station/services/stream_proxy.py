@@ -29,7 +29,7 @@ class StreamInfo:
     stream_id: str
     rtsp_url: str
     hls_dir: Optional[Path] = None
-    process: Optional[asyncio.subprocess.Process] = None
+    process: Optional[asyncio.subprocess.Process] = None  # Can also be subprocess.Popen on Windows
     started_at: float = 0
     last_accessed: float = 0
     error: Optional[str] = None
@@ -41,6 +41,8 @@ class StreamInfo:
     _frame_event: Optional[asyncio.Event] = field(default=None, repr=False)
     _reader_task: Optional[asyncio.Task] = field(default=None, repr=False)
     _stderr_output: str = field(default='', repr=False)
+    _is_sync_process: bool = field(default=False, repr=False)  # True if using sync subprocess on Windows
+    _stop_event: Optional[object] = field(default=None, repr=False)  # threading.Event for sync mode
 
 
 class StreamProxy:
@@ -162,9 +164,11 @@ class StreamProxy:
             await self._start_mjpeg_ffmpeg(stream_info, fps, quality)
             logger.info(f"Started MJPEG stream {stream_id} from {rtsp_url}")
         except Exception as e:
+            import traceback
             stream_info.status = "error"
             stream_info.error = str(e)
-            logger.error(f"Failed to start MJPEG stream {stream_id}: {e}")
+            logger.error(f"Failed to start MJPEG stream {stream_id}: {e!r}")
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
             raise
 
         return stream_id
@@ -179,10 +183,11 @@ class StreamProxy:
 
         cmd.extend([
             "-rtsp_transport", "tcp",
-            "-fflags", "nobuffer",
+            "-fflags", "nobuffer+discardcorrupt",
             "-flags", "low_delay",
-            "-analyzeduration", "1000000",  # Reduce stream analysis to 1 second
-            "-probesize", "500000",  # Reduce probe size for faster startup
+            "-err_detect", "ignore_err",
+            "-analyzeduration", "5000000",  # 5 seconds for streams with PPS issues
+            "-probesize", "5000000",  # Larger probe size for problematic streams
             "-i", stream_info.rtsp_url,
             "-f", "image2pipe",
             "-c:v", "mjpeg",
@@ -195,24 +200,66 @@ class StreamProxy:
 
         logger.info(f"Starting FFmpeg MJPEG: {' '.join(cmd)}")
 
-        stream_info.process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        # Check event loop type for debugging
+        loop = asyncio.get_running_loop()
+        loop_name = type(loop).__name__
+        logger.info(f"Event loop type: {loop_name}")
+
+        # On Windows, SelectorEventLoop doesn't support subprocess - use sync Popen instead
+        # ProactorEventLoop supports subprocess but uvicorn uses SelectorEventLoop by default
+        is_windows = platform.system() == "win32"
+        has_selector = "Selector" in loop_name
+        use_sync = is_windows and has_selector
+        logger.info(f"Subprocess mode: is_windows={is_windows}, has_selector={has_selector}, use_sync={use_sync}")
+        if use_sync:
+            logger.info("Using threaded subprocess for Windows compatibility")
+            import subprocess
+            import threading
+
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            stream_info.process = process
+            stream_info._is_sync_process = True
+        else:
+            stream_info.process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stream_info._is_sync_process = False
 
         # Drain stderr concurrently to prevent pipe buffer deadlock.
         # On macOS the pipe buffer is only 4-16KB; if ffmpeg fills it
         # with connection/codec info, it blocks and stops producing frames.
-        asyncio.create_task(self._drain_stderr(stream_info))
+        if stream_info._is_sync_process:
+            # For sync subprocess, use threads
+            import threading
+            stream_info._stop_event = threading.Event()
+            threading.Thread(
+                target=self._drain_stderr_sync,
+                args=(stream_info,),
+                daemon=True
+            ).start()
+            # Start reading frames in a thread, but notify async via event
+            threading.Thread(
+                target=self._read_mjpeg_frames_sync,
+                args=(stream_info,),
+                daemon=True
+            ).start()
+        else:
+            asyncio.create_task(self._drain_stderr(stream_info))
+            # Start reading frames in background
+            stream_info._reader_task = asyncio.create_task(
+                self._read_mjpeg_frames(stream_info)
+            )
 
-        # Start reading frames in background
-        stream_info._reader_task = asyncio.create_task(
-            self._read_mjpeg_frames(stream_info)
-        )
-
-        # Startup timeout: kill ffmpeg if no frame within 15 seconds
-        asyncio.create_task(self._startup_timeout(stream_info, timeout=15))
+        # Startup timeout: kill ffmpeg if no frame within 30 seconds
+        # Some RTSP streams (especially with H.264 PPS issues) need time to sync
+        asyncio.create_task(self._startup_timeout(stream_info, timeout=30))
 
     async def _startup_timeout(self, stream_info: StreamInfo, timeout: int = 15):
         """Kill ffmpeg if it doesn't produce a frame within timeout seconds"""
@@ -242,6 +289,23 @@ class StreamProxy:
         except Exception:
             pass
         # Store last stderr for error reporting
+        if stderr_lines:
+            stream_info._stderr_output = "\n".join(stderr_lines[-20:])
+
+    def _drain_stderr_sync(self, stream_info: StreamInfo):
+        """Synchronous version of _drain_stderr for Windows subprocess.Popen"""
+        stderr_lines = []
+        try:
+            while not stream_info._stop_event.is_set():
+                line = stream_info.process.stderr.readline()
+                if not line:
+                    break
+                text = line.decode(errors="replace").rstrip()
+                if text:
+                    stderr_lines.append(text)
+                    logger.info(f"ffmpeg [{stream_info.stream_id}]: {text}")
+        except Exception:
+            pass
         if stderr_lines:
             stream_info._stderr_output = "\n".join(stderr_lines[-20:])
 
@@ -304,6 +368,66 @@ class StreamProxy:
         finally:
             if stream_info.status == "starting":
                 # ffmpeg exited without producing any frames
+                stderr_msg = getattr(stream_info, '_stderr_output', '')
+                stream_info.error = stderr_msg or "Stream failed to produce frames"
+                stream_info.status = "error"
+                logger.error(f"MJPEG stream {stream_info.stream_id} failed: {stream_info.error}")
+            elif stream_info.status == "running":
+                stream_info.status = "stopped"
+            logger.info(f"MJPEG reader stopped for {stream_info.stream_id}")
+
+    def _read_mjpeg_frames_sync(self, stream_info: StreamInfo):
+        """Synchronous version of _read_mjpeg_frames for Windows subprocess.Popen"""
+        buffer = b''
+        frame_start = -1
+
+        try:
+            while not stream_info._stop_event.is_set():
+                chunk = stream_info.process.stdout.read(65536)
+                if not chunk:
+                    break
+
+                buffer += chunk
+
+                # Find complete JPEG frames in buffer
+                while True:
+                    # Find SOI marker
+                    if frame_start < 0:
+                        soi_pos = buffer.find(JPEG_SOI)
+                        if soi_pos < 0:
+                            buffer = buffer[-1:] if buffer else b''
+                            break
+                        frame_start = soi_pos
+
+                    # Find EOI marker after frame_start
+                    eoi_pos = buffer.find(JPEG_EOI, frame_start + 2)
+                    if eoi_pos < 0:
+                        if frame_start > 0:
+                            buffer = buffer[frame_start:]
+                            frame_start = 0
+                        break
+
+                    # Extract complete JPEG frame
+                    frame_end = eoi_pos + 2
+                    frame = buffer[frame_start:frame_end]
+
+                    # Update latest frame (thread-safe via GIL for simple assignments)
+                    stream_info._latest_frame = frame
+                    # Note: asyncio.Event.set() is not thread-safe, but the frame is available
+
+                    if stream_info.status == "starting":
+                        stream_info.status = "running"
+                        logger.info(f"MJPEG stream {stream_info.stream_id}: first frame received ({len(frame)} bytes)")
+
+                    buffer = buffer[frame_end:]
+                    frame_start = -1
+
+        except Exception as e:
+            logger.error(f"MJPEG reader error for {stream_info.stream_id}: {e}")
+            stream_info.error = str(e)
+            stream_info.status = "error"
+        finally:
+            if stream_info.status == "starting":
                 stderr_msg = getattr(stream_info, '_stderr_output', '')
                 stream_info.error = stderr_msg or "Stream failed to produce frames"
                 stream_info.status = "error"
@@ -472,22 +596,36 @@ class StreamProxy:
 
         stream_info = self.streams[stream_id]
 
-        # Cancel reader task
-        if stream_info._reader_task and not stream_info._reader_task.done():
-            stream_info._reader_task.cancel()
-            try:
-                await stream_info._reader_task
-            except asyncio.CancelledError:
-                pass
+        if stream_info._is_sync_process:
+            # For sync subprocess (Windows), signal threads to stop
+            if stream_info._stop_event:
+                stream_info._stop_event.set()
 
-        # Terminate FFmpeg
-        if stream_info.process and stream_info.process.returncode is None:
-            stream_info.process.terminate()
-            try:
-                await asyncio.wait_for(stream_info.process.wait(), timeout=5)
-            except asyncio.TimeoutError:
-                stream_info.process.kill()
-                await stream_info.process.wait()
+            # Terminate FFmpeg (sync process)
+            if stream_info.process and stream_info.process.returncode is None:
+                stream_info.process.terminate()
+                try:
+                    stream_info.process.wait(timeout=5)
+                except Exception:
+                    stream_info.process.kill()
+                    stream_info.process.wait()
+        else:
+            # Cancel reader task (async)
+            if stream_info._reader_task and not stream_info._reader_task.done():
+                stream_info._reader_task.cancel()
+                try:
+                    await stream_info._reader_task
+                except asyncio.CancelledError:
+                    pass
+
+            # Terminate FFmpeg (async process)
+            if stream_info.process and stream_info.process.returncode is None:
+                stream_info.process.terminate()
+                try:
+                    await asyncio.wait_for(stream_info.process.wait(), timeout=5)
+                except asyncio.TimeoutError:
+                    stream_info.process.kill()
+                    await stream_info.process.wait()
 
         # Clean up HLS files
         if stream_info.hls_dir and stream_info.hls_dir.exists():

@@ -42,6 +42,7 @@ class DeviceDeployment(BaseModel):
     device_id: str
     name: str
     type: str
+    config_file: Optional[str] = None  # Store config_file path directly
     status: DeploymentStatus = DeploymentStatus.PENDING
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

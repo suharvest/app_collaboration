@@ -207,11 +207,34 @@ class PreCheckValidator:
         )
 
     def _is_port_available(self, port: int) -> bool:
-        """Check if a port is available"""
+        """Check if a port is available
+
+        On Windows, we need a more robust check:
+        1. First try to connect to see if something is listening
+        2. Then try to bind with SO_EXCLUSIVEADDRUSE to ensure exclusive access
+        """
+        # First, check if something is already listening on the port
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.settimeout(1)
+                result = s.connect_ex(("127.0.0.1", port))
+                if result == 0:
+                    # Connection succeeded - port is in use
+                    return False
+        except socket.error:
+            pass
+
+        # Then try to bind to ensure we can actually use it
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(1)
+                # On Windows, use SO_EXCLUSIVEADDRUSE to prevent binding to
+                # ports that are in TIME_WAIT or already bound with SO_REUSEADDR
+                if sys.platform == "win32":
+                    s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
                 s.bind(("127.0.0.1", port))
+                # Also try to listen to make sure the port is fully available
+                s.listen(1)
                 return True
         except socket.error:
             return False
@@ -250,64 +273,63 @@ class PreCheckValidator:
         try:
             version_str = None
 
-            # For frozen apps, check esptool module directly
-            if is_frozen():
-                try:
-                    import esptool
-                    # Get version from module
-                    version_str = getattr(esptool, '__version__', None)
-                    if not version_str:
-                        # Try getting from esptool.version module
-                        try:
-                            from esptool import __version__
-                            version_str = __version__
-                        except ImportError:
-                            pass
-                    if not version_str:
-                        # Module exists but version unknown
-                        return CheckResult(
-                            type=check.type,
-                            passed=True,
-                            message="esptool is available (bundled)",
-                        )
-                except ImportError:
+            # First, try to import esptool module directly (works for both frozen and dev)
+            try:
+                import esptool
+                version_str = getattr(esptool, '__version__', None)
+                if not version_str:
+                    try:
+                        from esptool import __version__
+                        version_str = __version__
+                    except ImportError:
+                        pass
+                if not version_str:
+                    # Module exists but version unknown
                     return CheckResult(
                         type=check.type,
-                        passed=False,
-                        message="esptool module is not bundled",
+                        passed=True,
+                        message="esptool is available",
                     )
-            else:
-                # For development, try subprocess
-                try:
-                    process = await asyncio.create_subprocess_exec(
-                        "esptool.py", "version",
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
-                    )
-                    stdout, _ = await process.communicate()
-
-                    if process.returncode != 0:
-                        # Try with python -m esptool
+            except ImportError:
+                # esptool not importable, try subprocess (for system-installed esptool)
+                if not is_frozen():
+                    try:
+                        # Try esptool.py command
                         process = await asyncio.create_subprocess_exec(
-                            "python", "-m", "esptool", "version",
+                            "esptool.py", "version",
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.PIPE,
                         )
                         stdout, _ = await process.communicate()
 
-                    if process.returncode != 0:
+                        if process.returncode != 0:
+                            # Try with python -m esptool
+                            process = await asyncio.create_subprocess_exec(
+                                sys.executable, "-m", "esptool", "version",
+                                stdout=asyncio.subprocess.PIPE,
+                                stderr=asyncio.subprocess.PIPE,
+                            )
+                            stdout, _ = await process.communicate()
+
+                        if process.returncode == 0:
+                            version_str = stdout.decode().strip()
+                        else:
+                            return CheckResult(
+                                type=check.type,
+                                passed=False,
+                                message="esptool is not installed",
+                            )
+                    except FileNotFoundError:
                         return CheckResult(
                             type=check.type,
                             passed=False,
                             message="esptool is not installed",
                         )
-
-                    version_str = stdout.decode().strip()
-                except FileNotFoundError:
+                else:
                     return CheckResult(
                         type=check.type,
                         passed=False,
-                        message="esptool is not installed",
+                        message="esptool module is not bundled",
                     )
 
             if version_str:

@@ -75,8 +75,16 @@ async def detect_devices(
 @router.get("/ports")
 async def list_serial_ports():
     """List available serial ports"""
-    ports = await device_detector.list_serial_ports()
-    return {"ports": ports}
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("Received request to list serial ports")
+    try:
+        ports = await device_detector.list_serial_ports()
+        logger.info(f"Returning {len(ports)} ports: {[p.get('device') for p in ports]}")
+        return {"ports": ports}
+    except Exception as e:
+        logger.error(f"Error listing serial ports: {e}", exc_info=True)
+        return {"ports": [], "error": str(e)}
 
 
 @router.post("/test-connection")

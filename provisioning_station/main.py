@@ -11,6 +11,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
+# Windows requires ProactorEventLoop for asyncio subprocess support
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 # Configure application logging (uvicorn only sets up its own loggers)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:\t %(name)s - %(message)s")
 
