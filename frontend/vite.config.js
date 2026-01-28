@@ -14,23 +14,24 @@ export default defineConfig({
     cors: true,
     proxy: isTauriDev ? {} : {
       // Only use proxy in non-Tauri mode (regular web development)
+      // Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues on Windows
       '/api/preview/ws': {
-        target: 'http://localhost:3260',
+        target: 'http://127.0.0.1:3260',
         changeOrigin: true,
         ws: true,
       },
       '/api': {
-        target: 'http://localhost:3260',
+        target: 'http://127.0.0.1:3260',
         changeOrigin: true,
         ws: true,
       },
       '/ws': {
-        target: 'http://localhost:3260',
+        target: 'http://127.0.0.1:3260',
         changeOrigin: true,
         ws: true,
       },
       '/solutions': {
-        target: 'http://localhost:3260',
+        target: 'http://127.0.0.1:3260',
         changeOrigin: true,
       },
     },

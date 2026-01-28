@@ -144,6 +144,7 @@ class DeploymentEngine:
                 device_id=device_id,
                 name=device_ref.name,
                 type=effective_type,  # Use effective type for deployer selection
+                config_file=config_file,  # Store config_file for _run_deployment
                 status=DeploymentStatus.PENDING,
                 connection=device_connections.get(device_id),
                 steps=[
@@ -202,24 +203,15 @@ class DeploymentEngine:
                     "device_id": device_deployment.device_id,
                 })
 
-                # Find device ref and load config
-                device_ref = next(
-                    (d for d in solution.deployment.devices if d.id == device_deployment.device_id),
-                    None,
-                )
-                if not device_ref:
-                    device_deployment.status = DeploymentStatus.FAILED
-                    device_deployment.error = "Device reference not found"
-                    continue
-
                 # Skip devices without config_file
-                if not device_ref.config_file:
+                if not device_deployment.config_file:
                     device_deployment.status = DeploymentStatus.COMPLETED
                     device_deployment.completed_at = datetime.utcnow()
                     continue
 
+                # Load device config using stored config_file path
                 config = await solution_manager.load_device_config(
-                    solution.id, device_ref.config_file
+                    solution.id, device_deployment.config_file
                 )
                 if not config:
                     device_deployment.status = DeploymentStatus.FAILED

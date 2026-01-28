@@ -79,27 +79,52 @@ class DeviceDetector:
                     best_port = None
                     for sn, port_list in by_serial.items():
                         if len(port_list) > 1:
-                            # Dual-serial device detected
-                            # Strategy: prefer higher interface number (UART is usually interface 2/3)
-                            def get_interface_priority(item):
+                            # Dual-serial device detected (e.g., CH342 on Watcher)
+                            # Windows CH342: SERIAL-A = Himax, SERIAL-B = ESP32
+                            # macOS: wchusbserial = ESP32, usbmodem = Himax
+                            def get_esp32_priority(item):
                                 port = item[0]
-                                # Windows: use interface field directly
+                                desc = (port.description or "").upper()
+                                device = port.device.lower()
+
+                                # Windows: prefer SERIAL-B for ESP32
+                                if "SERIAL-B" in desc:
+                                    return 100
+                                if "SERIAL-A" in desc:
+                                    return -100  # This is Himax, not ESP32
+
+                                # macOS: wchusbserial is for ESP32
+                                if "wchusbserial" in device:
+                                    return 100
+                                if "usbmodem" in device:
+                                    return -100  # This is Himax
+
+                                    # Linux: parse interface from location (e.g., "1-1:1.2" -> interface 2)
+                                # ttyACM0 (interface 0) = Himax, ttyACM1 (interface 2) = ESP32
+                                if port.location:
+                                    # Location format: bus-port:config.interface
+                                    try:
+                                        iface = int(port.location.split('.')[-1])
+                                        return iface  # Higher interface = ESP32
+                                    except (ValueError, IndexError):
+                                        pass
+
+                                # Fallback: use interface number directly
                                 if port.interface is not None:
                                     try:
                                         return int(port.interface)
                                     except (ValueError, TypeError):
                                         pass
-                                # macOS/Linux: extract from port name (e.g., *51 -> 1, *53 -> 3)
-                                # Port name format: /dev/cu.usbmodemXXXXXXXXXXN where N is interface
-                                device = port.device
+
+                                # Last fallback: use port name suffix
                                 if device and device[-1].isdigit():
                                     return int(device[-1])
                                 return 0
 
-                            port_list.sort(key=get_interface_priority, reverse=True)
+                            port_list.sort(key=get_esp32_priority, reverse=True)
                             logger.info(
                                 f"Dual-serial device detected (serial={sn}), "
-                                f"selecting {port_list[0][0].device} from {[p[0].device for p in port_list]}"
+                                f"selecting {port_list[0][0].device} for ESP32 from {[p[0].device for p in port_list]}"
                             )
                         best_port = port_list[0]
 
@@ -202,26 +227,43 @@ class DeviceDetector:
                             vid.lower() == detection.usb_vendor_id.lower()
                             and pid.lower() == detection.usb_product_id.lower()
                         ):
-                            # For Himax, only consider usbmodem ports (not wchusbserial)
-                            if 'usbmodem' in port.device.lower():
+                            # macOS: only consider usbmodem ports (not wchusbserial)
+                            # Windows/Linux: include all matching ports, will filter by description/location
+                            if sys.platform == "darwin":
+                                if 'usbmodem' in port.device.lower():
+                                    matched_ports.append((port, vid, pid))
+                            else:
                                 matched_ports.append((port, vid, pid))
 
                 if matched_ports:
                     # For Himax on SenseCAP Watcher:
-                    # - usbmodemXXXXX1 = Himax WE2 (preferred)
-                    # - usbmodemXXXXX3 = Another interface
-                    # Strategy: prefer port names ending with '1'
+                    # Windows CH342: SERIAL-A = Himax, SERIAL-B = ESP32
+                    # Linux: ttyACM0 (interface 0) = Himax, ttyACM1 (interface 2) = ESP32
+                    # macOS: usbmodemXXXXX1 = Himax WE2 (preferred)
 
                     def get_himax_priority(item):
                         port = item[0]
-                        device = port.device
-                        # Prefer ports ending with '1' (Himax interface)
+                        desc = (port.description or "").upper()
+                        device = port.device.lower()
+
+                        # Windows: prefer SERIAL-A for Himax
+                        if "SERIAL-A" in desc:
+                            return -100  # Lower is better (sorted first)
+                        if "SERIAL-B" in desc:
+                            return 100  # This is ESP32, not Himax
+
+                        # Linux: parse interface from location, prefer lower interface for Himax
+                        if port.location:
+                            try:
+                                iface = int(port.location.split('.')[-1])
+                                return iface  # Lower interface (0) sorted first
+                            except (ValueError, IndexError):
+                                pass
+
+                        # macOS: prefer usbmodem ending with '1'
                         if device and device[-1].isdigit():
-                            # Lower interface number is better for Himax
-                            # Port ending '1' -> priority 1 (sorted first)
-                            # Port ending '3' -> priority 3 (sorted later)
                             return int(device[-1])
-                        return 99  # Non-numeric ports sorted last
+                        return 99
 
                     matched_ports.sort(key=get_himax_priority)
                     logger.info(
@@ -520,21 +562,57 @@ class DeviceDetector:
         try:
             import serial.tools.list_ports
 
+            logger.info(f"Listing serial ports on platform: {sys.platform}")
+
+            # On Windows, list_ports.comports() should work directly
+            # On some systems, we may need to iterate manually
+            raw_ports = list(serial.tools.list_ports.comports())
+            logger.info(f"Found {len(raw_ports)} raw ports")
+
             ports = []
-            for port in serial.tools.list_ports.comports():
+            for port in raw_ports:
+                logger.debug(f"Port: {port.device}, desc: {port.description}, vid: {port.vid}, pid: {port.pid}")
                 ports.append({
                     "device": port.device,
-                    "description": port.description,
-                    "manufacturer": port.manufacturer,
+                    "description": port.description or "",
+                    "manufacturer": port.manufacturer or "",
                     "vid": f"0x{port.vid:04x}" if port.vid else None,
                     "pid": f"0x{port.pid:04x}" if port.pid else None,
                 })
+
+            # On Windows, if no ports found, try alternative method
+            if not ports and sys.platform == "win32":
+                logger.info("No ports from comports(), trying Windows registry method")
+                try:
+                    import winreg
+                    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DEVICEMAP\SERIALCOMM")
+                    i = 0
+                    while True:
+                        try:
+                            name, value, _ = winreg.EnumValue(key, i)
+                            logger.info(f"Registry port: {value}")
+                            ports.append({
+                                "device": value,
+                                "description": name,
+                                "manufacturer": "",
+                                "vid": None,
+                                "pid": None,
+                            })
+                            i += 1
+                        except OSError:
+                            break
+                    winreg.CloseKey(key)
+                except Exception as e:
+                    logger.warning(f"Windows registry method failed: {e}")
+
+            logger.info(f"Returning {len(ports)} ports")
             return ports
 
-        except ImportError:
+        except ImportError as e:
+            logger.error(f"pyserial not installed: {e}")
             return []
         except Exception as e:
-            logger.error(f"Failed to list serial ports: {e}")
+            logger.error(f"Failed to list serial ports: {e}", exc_info=True)
             return []
 
     async def test_serial_port(self, port: str) -> Dict[str, Any]:

@@ -73,6 +73,11 @@ hiddenimports = [
     'serial',
     'serial.tools',
     'serial.tools.list_ports',
+    'serial.tools.list_ports_common',
+    'serial.tools.list_ports_windows',  # Windows COM port detection
+    'serial.tools.list_ports_linux',
+    'serial.tools.list_ports_osx',
+    'serial.win32',  # Windows serial port support
     'esptool',
     'xmodem',  # Himax flashing fallback
 
