@@ -199,6 +199,21 @@ export function setupEventHandlers(container) {
 export function setupSelectedDeviceHandlers(container) {
   const deviceStates = getDeviceStates();
 
+  // Docker deploy target options (local/remote) in selected section
+  container.querySelectorAll('.deploy-selected-card .deploy-mode-option[data-target-id]').forEach(el => {
+    el.addEventListener('click', () => {
+      const deviceId = el.dataset.deviceId;
+      const targetId = el.dataset.targetId;
+      const state = getDeviceState(deviceId);
+
+      if (state && state.selectedTarget !== targetId) {
+        state.selectedTarget = targetId;
+        // Update UI: re-render target selector and content
+        updateDockerTargetUI(deviceId, container);
+      }
+    });
+  });
+
   // Deploy buttons in selected section
   container.querySelectorAll('.deploy-selected-card [id^="deploy-btn-"]').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -262,6 +277,21 @@ export function setupSelectedDeviceHandlers(container) {
 export function attachSectionEventHandlers(container) {
   const currentSolution = getCurrentSolution();
   const deviceStates = getDeviceStates();
+
+  // Docker deploy target options (local/remote)
+  container.querySelectorAll('.deploy-mode-option[data-target-id]').forEach(el => {
+    el.addEventListener('click', () => {
+      const deviceId = el.dataset.deviceId;
+      const targetId = el.dataset.targetId;
+      const state = getDeviceState(deviceId);
+
+      if (state && state.selectedTarget !== targetId) {
+        state.selectedTarget = targetId;
+        // Update UI: re-render target selector and content
+        updateDockerTargetUI(deviceId, container);
+      }
+    });
+  });
 
   // Section headers (expand/collapse)
   container.querySelectorAll('[id^="section-header-"]').forEach(el => {
