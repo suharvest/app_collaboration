@@ -869,3 +869,185 @@ async def upload_asset(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload asset: {str(e)}")
+
+
+# ============================================
+# File Management Routes
+# ============================================
+
+@router.get("/{solution_id}/files")
+async def list_files(solution_id: str):
+    """List all files in the solution directory"""
+    try:
+        return await solution_manager.list_files(solution_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/{solution_id}/files/{path:path}")
+async def delete_file(solution_id: str, path: str):
+    """Delete a file from the solution directory"""
+    try:
+        await solution_manager.delete_file(solution_id, path)
+        return {"success": True, "message": f"File '{path}' deleted"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
+
+
+@router.get("/{solution_id}/content/{path:path}")
+async def get_file_content(solution_id: str, path: str):
+    """Get raw text content of a file for editing"""
+    try:
+        content = await solution_manager.load_markdown(solution_id, path, convert_to_html=False)
+        if content is None:
+            raise HTTPException(status_code=404, detail=f"File not found: {path}")
+        return Response(content=content, media_type="text/plain; charset=utf-8")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/{solution_id}/files/{path:path}")
+async def save_text_file(
+    solution_id: str,
+    path: str,
+    data: dict
+):
+    """Create or update a text file (md, yaml)"""
+    content = data.get("content", "")
+    try:
+        saved_path = await solution_manager.save_text_file(solution_id, path, content)
+        return {"success": True, "path": saved_path}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+
+
+@router.get("/{solution_id}/structure")
+async def get_solution_structure(solution_id: str):
+    """Get the complete solution structure for management UI"""
+    try:
+        return await solution_manager.get_solution_structure(solution_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# ============================================
+# Preset Management Routes
+# ============================================
+
+@router.post("/{solution_id}/presets")
+async def add_preset(solution_id: str, data: Dict = None):
+    """Add a new preset to the solution"""
+    if data is None:
+        raise HTTPException(status_code=400, detail="Request body required")
+    try:
+        return await solution_manager.add_preset(solution_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add preset: {str(e)}")
+
+
+@router.put("/{solution_id}/presets/{preset_id}")
+async def update_preset(solution_id: str, preset_id: str, data: Dict = None):
+    """Update an existing preset"""
+    if data is None:
+        raise HTTPException(status_code=400, detail="Request body required")
+    try:
+        return await solution_manager.update_preset(solution_id, preset_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update preset: {str(e)}")
+
+
+@router.delete("/{solution_id}/presets/{preset_id}")
+async def delete_preset(solution_id: str, preset_id: str):
+    """Delete a preset from the solution"""
+    try:
+        await solution_manager.delete_preset(solution_id, preset_id)
+        return {"success": True, "message": f"Preset '{preset_id}' deleted"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete preset: {str(e)}")
+
+
+# ============================================
+# Preset Device (Deployment Step) Routes
+# ============================================
+
+@router.post("/{solution_id}/presets/{preset_id}/devices")
+async def add_preset_device(solution_id: str, preset_id: str, data: Dict = None):
+    """Add a new device (deployment step) to a preset"""
+    if data is None:
+        raise HTTPException(status_code=400, detail="Request body required")
+    try:
+        return await solution_manager.add_preset_device(solution_id, preset_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add device: {str(e)}")
+
+
+@router.put("/{solution_id}/presets/{preset_id}/devices/{device_id}")
+async def update_preset_device(
+    solution_id: str,
+    preset_id: str,
+    device_id: str,
+    data: Dict = None
+):
+    """Update a device in a preset"""
+    if data is None:
+        raise HTTPException(status_code=400, detail="Request body required")
+    try:
+        return await solution_manager.update_preset_device(solution_id, preset_id, device_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update device: {str(e)}")
+
+
+@router.delete("/{solution_id}/presets/{preset_id}/devices/{device_id}")
+async def delete_preset_device(solution_id: str, preset_id: str, device_id: str):
+    """Delete a device from a preset"""
+    try:
+        await solution_manager.delete_preset_device(solution_id, preset_id, device_id)
+        return {"success": True, "message": f"Device '{device_id}' deleted from preset '{preset_id}'"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete device: {str(e)}")
+
+
+# ============================================
+# Solution Metadata Routes
+# ============================================
+
+@router.put("/{solution_id}/links")
+async def update_solution_links(solution_id: str, data: Dict = None):
+    """Update solution external links (wiki, github)"""
+    if data is None:
+        raise HTTPException(status_code=400, detail="Request body required")
+    try:
+        return await solution_manager.update_solution_links(solution_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update links: {str(e)}")
+
+
+@router.put("/{solution_id}/tags")
+async def update_solution_tags(solution_id: str, data: Dict = None):
+    """Update solution tags"""
+    if data is None or "tags" not in data:
+        raise HTTPException(status_code=400, detail="Request body with 'tags' array required")
+    try:
+        return await solution_manager.update_solution_tags(solution_id, data["tags"])
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update tags: {str(e)}")
