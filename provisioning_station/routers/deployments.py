@@ -34,6 +34,7 @@ async def start_deployment(request: StartDeploymentRequest):
         device_connections=request.device_connections,
         selected_devices=request.selected_devices,
         options=request.options,
+        preset_id=request.preset_id,
     )
 
     return {

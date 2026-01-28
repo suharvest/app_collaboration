@@ -60,6 +60,7 @@ class DeploymentEngine:
         device_connections: Dict[str, Dict[str, Any]],
         selected_devices: List[str] = None,
         options: Dict[str, Any] = None,
+        preset_id: str = None,
     ) -> str:
         """Start a new deployment"""
         deployment_id = str(uuid4())
@@ -73,15 +74,33 @@ class DeploymentEngine:
             devices=[],
         )
 
-        # Determine which devices to deploy
-        deploy_order = solution.deployment.order
+        # Get devices list - either from preset or legacy deployment.devices
+        devices_list = []
+        deploy_order = []
+
+        if preset_id and solution.intro.presets:
+            # Find the preset by ID
+            preset = next((p for p in solution.intro.presets if p.id == preset_id), None)
+            if preset and preset.devices:
+                devices_list = preset.devices
+                deploy_order = [d.id for d in preset.devices]
+                logger.info(f"Using preset '{preset_id}' with {len(devices_list)} devices")
+            else:
+                logger.warning(f"Preset '{preset_id}' not found or has no devices, falling back to legacy")
+
+        # Fallback to legacy deployment.devices if no preset devices
+        if not devices_list:
+            devices_list = solution.deployment.devices
+            deploy_order = solution.deployment.order
+
+        # Filter by selected_devices if provided
         if selected_devices:
             deploy_order = [d for d in deploy_order if d in selected_devices]
 
         # Initialize device deployments
         for device_id in deploy_order:
             device_ref = next(
-                (d for d in solution.deployment.devices if d.id == device_id), None
+                (d for d in devices_list if d.id == device_id), None
             )
             if not device_ref:
                 continue

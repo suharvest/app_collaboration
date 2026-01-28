@@ -10,6 +10,7 @@ import { toast } from '../../modules/toast.js';
 import {
   getCurrentSolution,
   getDeviceState,
+  getSelectedPresetId,
 } from './state.js';
 import { getDeviceById } from './utils.js';
 import { updateSectionUI, updateChoiceOptionUI } from './ui-updates.js';
@@ -123,6 +124,7 @@ export async function startDeploymentWithDockerInstall(deviceId) {
   // Build params with auto_install_docker flag
   const params = {
     solution_id: currentSolution.id,
+    preset_id: getSelectedPresetId(),  // Include preset ID for preset-based solutions
     selected_devices: [deviceId],
     device_connections: {},
     options: {},
