@@ -1,19 +1,21 @@
 /**
- * YOLO26 Heatmap Overlay Renderer
+ * YOLO Heatmap Overlay Renderer (supports YOLO11 & YOLO26)
  *
  * Renders people flow heatmap and tracking visualization on canvas.
  * Depends on: simpleheat (https://github.com/mourner/simpleheat)
  *
- * Input (data): YOLO26 MQTT tracking message
+ * Input (data): YOLO MQTT tracking message
  * {
  *   timestamp: 1768969602957,
  *   frame_id: 107,
  *   inference_time_ms: 308.0,
+ *   frame_width: 1,
+ *   frame_height: 1,
  *   zone_occupancy: { total: 1, browsing: 0, engaged: 1, assistance: 0 },
  *   persons: [{
  *     track_id: 1,
  *     confidence: 0.363,
- *     bbox: { x: 0.5, y: 0.4, w: 0.2, h: 0.5 },  // normalized center coords
+ *     bbox: [0.3, 0.15, 0.2, 0.5],  // array [x, y, w, h], top-left coords, normalized
  *     speed_px_s: 0.2,
  *     speed_normalized: 0.2,
  *     state: "engaged",  // transient | dwelling | engaged | assistance
@@ -156,9 +158,22 @@ for (const person of persons) {
   const { bbox, track_id, state: personState, dwell_duration_sec = 0 } = person;
   if (!bbox) continue;
 
+  // Parse bbox: support both array [x, y, w, h] and object {x, y, w, h} formats
+  let bboxX, bboxY, bboxW, bboxH;
+  if (Array.isArray(bbox)) {
+    [bboxX, bboxY, bboxW, bboxH] = bbox;
+  } else {
+    ({ x: bboxX, y: bboxY, w: bboxW, h: bboxH } = bbox);
+  }
+
+  // Convert top-left coordinates to center coordinates for heatmap
+  // Hardware sends top-left, we need center for heat point
+  const centerX = bboxX + bboxW / 2;
+  const centerY = bboxY + bboxH / 2;
+
   // Convert normalized center coordinates to canvas pixels
-  const x = bbox.x * canvas.width;
-  const y = bbox.y * canvas.height;
+  const x = centerX * canvas.width;
+  const y = centerY * canvas.height;
 
   // Calculate heat increment based on state and dwell time
   const baseWeight = CONFIG.stateWeights[personState] || 1.0;
@@ -205,11 +220,19 @@ for (const person of persons) {
 
   const color = CONFIG.stateColors[personState] || '#FFFFFF';
 
-  // Calculate box coordinates (bbox is center-based)
-  const bx = (bbox.x - bbox.w / 2) * canvas.width;
-  const by = (bbox.y - bbox.h / 2) * canvas.height;
-  const bw = bbox.w * canvas.width;
-  const bh = bbox.h * canvas.height;
+  // Parse bbox: support both array [x, y, w, h] and object {x, y, w, h} formats
+  let bboxX, bboxY, bboxW, bboxH;
+  if (Array.isArray(bbox)) {
+    [bboxX, bboxY, bboxW, bboxH] = bbox;
+  } else {
+    ({ x: bboxX, y: bboxY, w: bboxW, h: bboxH } = bbox);
+  }
+
+  // Calculate box coordinates (bbox is top-left based from hardware)
+  const bx = bboxX * canvas.width;
+  const by = bboxY * canvas.height;
+  const bw = bboxW * canvas.width;
+  const bh = bboxH * canvas.height;
 
   // Draw bounding box with glow effect for visibility
   bufferCtx.save();
