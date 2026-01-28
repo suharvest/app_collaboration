@@ -3188,3 +3188,24 @@ button.spinning {
 .code-editor:focus {
   @apply outline-none ring-2 ring-primary/50;
 }
+
+/* Input with file status indicator */
+.input-with-status {
+  @apply relative flex items-center;
+}
+
+.input-with-status input {
+  @apply flex-1 pr-8;
+}
+
+.file-status {
+  @apply absolute right-2 w-5 h-5 flex items-center justify-center text-xs font-bold rounded-full;
+}
+
+.file-status.file-exists {
+  @apply text-green-600;
+}
+
+.file-status.file-missing {
+  @apply text-red-500;
+}
