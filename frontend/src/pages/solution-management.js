@@ -24,6 +24,45 @@ const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'];
 const DEVICE_TYPES = ['manual', 'esp32_usb', 'himax_usb', 'docker_deploy', 'script', 'preview'];
 
 /**
+ * Flatten tree structure to flat array of files
+ * @param {Array} tree - Tree structure from list_files API
+ * @returns {Array} Flat array of files with path, name, size, type
+ */
+function flattenFileTree(tree) {
+  const files = [];
+  function traverse(items) {
+    for (const item of items) {
+      if (item.type === 'directory' && item.children) {
+        traverse(item.children);
+      } else if (item.type === 'file') {
+        files.push({
+          path: item.path,
+          name: item.name,
+          size: item.size || 0,
+          type: item.extension && ['.md', '.txt', '.yaml', '.yml', '.json', '.js', '.py', '.html', '.css'].includes(item.extension) ? 'text' : 'binary'
+        });
+      }
+    }
+  }
+  traverse(tree || []);
+  return files;
+}
+
+/**
+ * Load solution structure with files list
+ * @param {string} solutionId - Solution ID
+ * @returns {Promise<Object>} Structure with files array
+ */
+async function loadSolutionStructure(solutionId) {
+  const [structure, filesResult] = await Promise.all([
+    solutionsApi.getStructure(solutionId),
+    solutionsApi.listFiles(solutionId)
+  ]);
+  structure.files = flattenFileTree(filesResult.files);
+  return structure;
+}
+
+/**
  * Render the Solution Management page
  */
 export async function renderManagementPage() {
@@ -178,10 +217,10 @@ async function openModal(solution = null) {
   activeTab = 'basic';
   const isEdit = !!solution;
 
-  // Load structure for edit mode
+  // Load structure and files for edit mode
   if (isEdit) {
     try {
-      solutionStructure = await solutionsApi.getStructure(solution.id);
+      solutionStructure = await loadSolutionStructure(solution.id);
     } catch (error) {
       console.error('Failed to load solution structure:', error);
       toast.error(t('common.error'));
@@ -857,7 +896,7 @@ async function savePreset(existingPresetId = null) {
     }
 
     // Reload structure and refresh presets tab
-    solutionStructure = await solutionsApi.getStructure(editingSolution.id);
+    solutionStructure = await loadSolutionStructure(editingSolution.id);
     document.querySelector('[data-tab-content="presets"]').innerHTML = renderPresetsTab(solutionStructure);
     setupPresetsTab();
     closePresetDialog();
@@ -872,7 +911,7 @@ async function confirmDeletePreset(presetId) {
 
   try {
     await solutionsApi.deletePreset(editingSolution.id, presetId);
-    solutionStructure = await solutionsApi.getStructure(editingSolution.id);
+    solutionStructure = await loadSolutionStructure(editingSolution.id);
     document.querySelector('[data-tab-content="presets"]').innerHTML = renderPresetsTab(solutionStructure);
     setupPresetsTab();
     toast.success(t('management.messages.presetDeleted'));
@@ -946,13 +985,29 @@ function openDeviceModal(presetId, deviceId = null) {
             <div class="form-row">
               <div class="form-group">
                 <label for="section-desc-file">${t('management.form.descFile')}</label>
-                <input type="text" id="section-desc-file" value="${section.description_file || ''}"
-                       placeholder="deploy/sections/step1.md">
+                <div class="input-with-status">
+                  <input type="text" id="section-desc-file" value="${section.description_file || ''}"
+                         placeholder="deploy/sections/step1.md">
+                  ${section.description_file ? `
+                    <span class="file-status ${section.description_file_exists ? 'file-exists' : 'file-missing'}"
+                          title="${section.description_file_exists ? t('management.files.exists') : t('management.files.missing')}">
+                      ${section.description_file_exists ? '✓' : '✗'}
+                    </span>
+                  ` : ''}
+                </div>
               </div>
               <div class="form-group">
                 <label for="section-desc-file-zh">${t('management.form.descFileZh')}</label>
-                <input type="text" id="section-desc-file-zh" value="${section.description_file_zh || ''}"
-                       placeholder="deploy/sections/step1_zh.md">
+                <div class="input-with-status">
+                  <input type="text" id="section-desc-file-zh" value="${section.description_file_zh || ''}"
+                         placeholder="deploy/sections/step1_zh.md">
+                  ${section.description_file_zh ? `
+                    <span class="file-status ${section.description_file_zh_exists ? 'file-exists' : 'file-missing'}"
+                          title="${section.description_file_zh_exists ? t('management.files.exists') : t('management.files.missing')}">
+                      ${section.description_file_zh_exists ? '✓' : '✗'}
+                    </span>
+                  ` : ''}
+                </div>
               </div>
             </div>
           </form>
@@ -1010,7 +1065,7 @@ async function saveDevice(presetId, existingDeviceId = null) {
       await solutionsApi.addPresetDevice(editingSolution.id, presetId, data);
     }
 
-    solutionStructure = await solutionsApi.getStructure(editingSolution.id);
+    solutionStructure = await loadSolutionStructure(editingSolution.id);
     document.querySelector('[data-tab-content="presets"]').innerHTML = renderPresetsTab(solutionStructure);
     setupPresetsTab();
     closeDeviceDialog();
@@ -1025,7 +1080,7 @@ async function confirmDeleteDevice(presetId, deviceId) {
 
   try {
     await solutionsApi.deletePresetDevice(editingSolution.id, presetId, deviceId);
-    solutionStructure = await solutionsApi.getStructure(editingSolution.id);
+    solutionStructure = await loadSolutionStructure(editingSolution.id);
     document.querySelector('[data-tab-content="presets"]').innerHTML = renderPresetsTab(solutionStructure);
     setupPresetsTab();
     toast.success(t('management.messages.stepDeleted'));
@@ -1058,7 +1113,7 @@ function setupFilesTab() {
       if (!confirm(t('management.confirm.deleteFile'))) return;
       try {
         await solutionsApi.deleteFile(editingSolution.id, path);
-        solutionStructure = await solutionsApi.getStructure(editingSolution.id);
+        solutionStructure = await loadSolutionStructure(editingSolution.id);
         document.querySelector('[data-tab-content="files"]').innerHTML = renderFilesTab(solutionStructure);
         setupFilesTab();
         toast.success(t('management.messages.fileDeleted'));
@@ -1144,7 +1199,7 @@ async function doFileUpload() {
 
   try {
     await solutionsApi.uploadAsset(editingSolution.id, file, path);
-    solutionStructure = await solutionsApi.getStructure(editingSolution.id);
+    solutionStructure = await loadSolutionStructure(editingSolution.id);
     document.querySelector('[data-tab-content="files"]').innerHTML = renderFilesTab(solutionStructure);
     setupFilesTab();
     closeUploadDialog();

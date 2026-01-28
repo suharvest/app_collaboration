@@ -335,6 +335,8 @@ const translations = {
         path: 'File Path',
         pathHint: 'Relative path within solution directory',
         selectFile: 'Select File',
+        exists: 'File exists',
+        missing: 'File not found',
       },
       confirm: {
         deleteTitle: 'Confirm Delete',
@@ -747,6 +749,8 @@ const translations = {
         path: '文件路径',
         pathHint: '相对于方案目录的路径',
         selectFile: '选择文件',
+        exists: '文件存在',
+        missing: '文件不存在',
       },
       confirm: {
         deleteTitle: '确认删除',
