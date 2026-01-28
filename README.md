@@ -133,7 +133,11 @@ cargo tauri dev
 
 ## 新增方案
 
-### 步骤 1: 创建目录结构
+> 📖 **详细配置指南**: [docs/solution-configuration-guide.md](docs/solution-configuration-guide.md)
+
+### 快速开始
+
+#### 1. 创建目录结构
 
 ```bash
 solutions/
@@ -144,15 +148,19 @@ solutions/
     │   ├── description_zh.md   # 中文介绍
     │   └── gallery/
     │       └── cover.png       # 封面图
-    └── deploy/
-        ├── guide.md            # 英文部署指南
-        ├── guide_zh.md         # 中文部署指南
-        └── sections/           # 部署步骤说明
-            ├── step1.md
-            └── step1_zh.md
+    ├── deploy/
+    │   ├── guide.md            # 英文部署指南
+    │   ├── guide_zh.md         # 中文部署指南
+    │   └── sections/           # 部署步骤说明
+    │       ├── step1.md
+    │       └── step1_zh.md
+    └── devices/                # 设备配置
+        └── device.yaml
 ```
 
-### 步骤 2: 编写 solution.yaml
+#### 2. 编写 solution.yaml
+
+每个 **preset（预设套餐）** 包含完整的 **devices（部署步骤）** 列表：
 
 ```yaml
 version: "1.0"
@@ -166,87 +174,106 @@ intro:
 
   description_file: intro/description.md
   description_file_zh: intro/description_zh.md
-
   cover_image: intro/gallery/cover.png
 
-  category: voice_ai  # 或 sensing, automation
-  tags:
-    - iot
-    - watcher
+  category: voice_ai  # voice_ai | sensing | automation
+  tags: [iot, watcher]
 
-  device_groups:
-    - id: main_device
-      name: Main Device
-      name_zh: 主设备
-      type: single
-      required: true
-      options:
-        - device_ref: sensecap_watcher
-      default: sensecap_watcher
+  # 设备目录
+  device_catalog:
+    sensecap_watcher:
+      name: SenseCAP Watcher
+      name_zh: SenseCAP Watcher
+      image: intro/gallery/watcher.png
+      product_url: https://www.seeedstudio.com/...
+
+  # 预设套餐（每个 preset 包含完整的部署步骤）
+  presets:
+    - id: default
+      name: Standard Deployment
+      name_zh: 标准部署
+      device_groups:
+        - id: main_device
+          name: Main Device
+          type: single
+          options:
+            - device_ref: sensecap_watcher
+          default: sensecap_watcher
+      # 该套餐的部署步骤
+      devices:
+        - id: step1
+          name: Flash Firmware
+          name_zh: 烧录固件
+          type: esp32_usb
+          required: true
+          config_file: devices/device.yaml
+          section:
+            title: Step 1
+            title_zh: 第一步
+            description_file: deploy/sections/step1.md
+            description_file_zh: deploy/sections/step1_zh.md
+        - id: step2
+          name: Configure Device
+          name_zh: 配置设备
+          type: manual
+          required: true
+          section:
+            title: Step 2
+            title_zh: 第二步
+            description_file: deploy/sections/step2.md
 
   stats:
     difficulty: beginner  # beginner | intermediate | advanced
     estimated_time: 30min
 
+# 部署配置（设备已移至 preset.devices）
 deployment:
   guide_file: deploy/guide.md
   guide_file_zh: deploy/guide_zh.md
-
-  devices:
-    - id: step1
-      name: Flash Firmware
-      name_zh: 烧录固件
-      type: esp32_usb  # esp32_usb | himax_usb | docker_local | manual
-      required: true
-      config_file: devices/device.yaml  # 设备配置
-      section:
-        title: Step 1
-        title_zh: 第一步
-        description_file: deploy/sections/step1.md
-        description_file_zh: deploy/sections/step1_zh.md
-
-  order:
-    - step1
-
+  devices: []   # 保持为空
+  order: []     # 保持为空
   post_deployment:
-    success_message: Deployment complete!
-    success_message_zh: 部署完成！
+    success_message_file: deploy/success.md
 ```
 
-### 步骤 3: 部署器类型
+#### 3. 部署器类型
 
-| 类型 | 说明 | 配置文件 |
+| 类型 | 说明 | 配置要求 |
 |------|------|----------|
-| `esp32_usb` | ESP32 USB 烧录 | 需要 `config_file` 指定固件路径 |
-| `himax_usb` | Himax WE2 烧录 | 需要 `config_file` 指定固件路径 |
-| `docker_local` | 本地 Docker 部署 | 需要 `docker_compose_file` |
-| `docker_remote` | 远程 Docker 部署 | 需要 SSH 配置 |
-| `manual` | 手动步骤 | 仅显示说明文档 |
+| `esp32_usb` | ESP32 USB 烧录 | `config_file` 指定固件配置 |
+| `himax_usb` | Himax WE2 烧录 | `config_file` 指定固件配置 |
+| `docker_deploy` | Docker 容器部署 | `config_file` 或 `targets` |
+| `manual` | 手动步骤 | 仅需 `section` |
+| `preview` | 实时预览 | `config_file` 指定视频/MQTT |
 
-### 步骤 4: 设备配置文件示例
+#### 4. 多套餐支持
 
-**ESP32 固件配置** (`devices/watcher_esp32.yaml`):
+不同 preset 可以有不同的部署步骤：
 
 ```yaml
-chip: esp32s3
-flash_mode: dio
-flash_freq: 80m
-flash_size: 16MB
+intro:
+  presets:
+    - id: cloud
+      name: Cloud Version
+      devices:
+        - id: step1
+        - id: cloud_config  # 云版本特有
 
-partitions:
-  - address: "0x0"
-    file: assets/firmware/bootloader.bin
-  - address: "0x8000"
-    file: assets/firmware/partition-table.bin
-  - address: "0x10000"
-    file: assets/firmware/application.bin
+    - id: edge
+      name: Edge Version
+      devices:
+        - id: step1
+        - id: edge_setup    # 边缘版本特有
+        - id: local_llm     # 边缘版本特有
 ```
 
-### 步骤 5: Markdown 规范
+### 相关文档
 
-- 不写 H1 标题 (页面已有标题)
-- 从 H2 (`##`) 开始
-- 支持标准 Markdown 语法和表格
+| 文档 | 说明 |
+|------|------|
+| [配置指南](docs/solution-configuration-guide.md) | solution.yaml 完整配置说明 |
+| [从 Wiki 创建](.claude/skills/add-solution-from-wiki.md) | 从 Wiki 页面生成方案 |
+| [文案规范](.claude/skills/solution-copywriting/SKILL.md) | 介绍页/部署页文案标准 |
 
 ---
 
