@@ -335,8 +335,8 @@ function renderModal(isEdit) {
  */
 function renderBasicInfoTab(solution, structure) {
   const isEdit = !!solution;
-  const tags = structure?.tags || [];
-  const links = structure?.links || {};
+  const tags = structure?.intro?.tags || [];
+  const links = structure?.intro?.links || {};
 
   return `
     <form id="solution-form">
@@ -739,12 +739,12 @@ function setupTagsEditor() {
     if (!removeBtn) return;
 
     const tag = removeBtn.dataset.tag;
-    const currentTags = solutionStructure?.tags || [];
+    const currentTags = solutionStructure?.intro?.tags || [];
     const newTags = currentTags.filter(t => t !== tag);
 
     try {
       await solutionsApi.updateTags(editingSolution.id, newTags);
-      solutionStructure.tags = newTags;
+      solutionStructure.intro.tags = newTags;
       removeBtn.closest('.tag-item').remove();
       toast.success(t('management.messages.tagRemoved'));
     } catch (error) {
@@ -760,7 +760,7 @@ function setupTagsEditor() {
     const tag = input.value.trim().toLowerCase();
     if (!tag) return;
 
-    const currentTags = solutionStructure?.tags || [];
+    const currentTags = solutionStructure?.intro?.tags || [];
     if (currentTags.includes(tag)) {
       toast.error(t('management.messages.tagExists'));
       return;
@@ -769,7 +769,7 @@ function setupTagsEditor() {
     try {
       const newTags = [...currentTags, tag];
       await solutionsApi.updateTags(editingSolution.id, newTags);
-      solutionStructure.tags = newTags;
+      solutionStructure.intro.tags = newTags;
 
       // Add to UI
       const tagsList = tagsEditor.querySelector('.tags-list');

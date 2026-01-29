@@ -26,9 +26,10 @@ import { addLogToDevice, toggleLogs, connectLogsWebSocket } from './websocket.js
 export async function detectDevices() {
   const currentSolution = getCurrentSolution();
   const deviceStates = getDeviceStates();
+  const presetId = getSelectedPresetId();
 
   try {
-    const detected = await devicesApi.detect(currentSolution.id);
+    const detected = await devicesApi.detect(currentSolution.id, presetId);
 
     detected.forEach(device => {
       if (deviceStates[device.config_id]) {
@@ -62,23 +63,17 @@ export async function refreshSerialPorts(clickedBtn = null) {
   }
 
   try {
-    console.log('[SerialPorts] Fetching ports...');
     const result = await devicesApi.getPorts();
-    console.log('[SerialPorts] API result:', result);
     const ports = result.ports || [];
-    console.log('[SerialPorts] Found ports:', ports.length, ports);
 
     // Get devices from current preset or fallback to deployment.devices
     const deployment = currentSolution.deployment || {};
     const allDevices = deployment.devices || [];
     const devices = getFilteredDevices(allDevices);
-    console.log('[SerialPorts] Devices to update:', devices.map(d => ({ id: d.id, type: d.type })));
 
     devices.forEach(device => {
-      console.log(`[SerialPorts] Checking device ${device.id}, type: ${device.type}`);
       if (device.type === 'esp32_usb' || device.type === 'himax_usb') {
         const select = document.getElementById(`serial-port-${device.id}`);
-        console.log(`[SerialPorts] Select element for ${device.id}:`, select);
         if (select) {
           const currentValue = select.value;
           const state = deviceStates[device.id] || {};
@@ -137,34 +132,32 @@ export async function refreshSerialPorts(clickedBtn = null) {
           // 2. Try VID/PID + description matching for ESP32 devices (WCH CH342/CH340 chip)
           if (!selectedPort && device.type === 'esp32_usb') {
             // CH342 dual-serial: SERIAL-B = ESP32, SERIAL-A = Himax
-            // macOS: wchusbserial = ESP32
+            // macOS: *53 (末尾3) = ESP32, *51 (末尾1) = Himax
             const ch342Ports = ports.filter(p =>
               p.vid?.toLowerCase() === '0x1a86' &&
               (p.pid?.toLowerCase() === '0x55d2' || p.pid?.toLowerCase() === '0x7523')
             );
-            // Prefer SERIAL-B (Windows) or wchusbserial (macOS)
+            // Prefer SERIAL-B (Windows) or ports ending with 3 (macOS/Linux)
             const esp32Port = ch342Ports.find(p =>
               p.description?.toUpperCase().includes('SERIAL-B') ||
-              p.device?.toLowerCase().includes('wchusbserial')
+              p.device?.endsWith('3')  // *53, *653 etc.
             ) || ch342Ports[0];
             selectedPort = esp32Port?.device;
-            console.log(`[SerialPorts] ESP32 match: ${selectedPort}`);
           }
 
           // 3. Try VID/PID + description matching for Himax devices
           if (!selectedPort && device.type === 'himax_usb') {
             // CH342 dual-serial: SERIAL-A = Himax, SERIAL-B = ESP32
-            // macOS: usbmodem = Himax
+            // macOS: *51 (末尾1) = Himax, *53 (末尾3) = ESP32
             const ch342Ports = ports.filter(p =>
               p.vid?.toLowerCase() === '0x1a86' && p.pid?.toLowerCase() === '0x55d2'
             );
-            // Prefer SERIAL-A (Windows) or usbmodem (macOS)
+            // Prefer SERIAL-A (Windows) or ports ending with 1 (macOS/Linux)
             const himaxPort = ch342Ports.find(p =>
               p.description?.toUpperCase().includes('SERIAL-A') ||
-              p.device?.toLowerCase().includes('usbmodem')
+              p.device?.endsWith('1')  // *51, *651 etc.
             ) || ch342Ports[0];
             selectedPort = himaxPort?.device;
-            console.log(`[SerialPorts] Himax match: ${selectedPort}`);
           }
 
           // 4. Fall back to single USB port (filter out Bluetooth and system ports)
@@ -172,7 +165,6 @@ export async function refreshSerialPorts(clickedBtn = null) {
             const usbPorts = ports.filter(p => p.vid && p.pid); // Only USB devices have VID/PID
             if (usbPorts.length === 1) {
               selectedPort = usbPorts[0].device;
-              console.log(`[SerialPorts] Single USB port: ${selectedPort}`);
             }
           }
 
@@ -187,7 +179,6 @@ export async function refreshSerialPorts(clickedBtn = null) {
             deviceStates[device.id].port = selectedPort;
             deviceStates[device.id].detected = true;
             updateSectionUI(device.id);
-            console.log(`[SerialPorts] Auto-selected: ${selectedPort}`);
           }
         }
       }

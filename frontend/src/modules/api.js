@@ -516,9 +516,13 @@ export const devicesApi = {
   /**
    * Detect connected devices for a solution
    * @param {string} solutionId - Solution ID
+   * @param {string} [presetId] - Optional preset ID
    */
-  detect(solutionId) {
-    return request(`/devices/detect/${solutionId}`);
+  detect(solutionId, presetId = null) {
+    const params = new URLSearchParams();
+    if (presetId) params.append('preset', presetId);
+    const query = params.toString();
+    return request(`/devices/detect/${solutionId}${query ? '?' + query : ''}`);
   },
 
   /**
