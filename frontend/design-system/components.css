@@ -1732,7 +1732,7 @@
 }
 
 .device-info-row {
-  @apply flex items-center justify-between py-2;
+  @apply flex items-start justify-between py-2;
 }
 
 .device-info-row:not(:last-child) {
@@ -1740,11 +1740,23 @@
 }
 
 .device-info-label {
-  @apply text-sm text-text-secondary;
+  @apply text-sm text-text-secondary pt-0.5;
 }
 
 .device-info-value {
-  @apply text-sm text-text-primary font-medium;
+  @apply text-sm text-text-primary font-medium text-right;
+}
+
+.device-info-value .ports-container {
+  @apply cursor-default;
+}
+
+.device-info-value .port-item {
+  @apply py-0.5 font-mono text-xs;
+}
+
+.device-info-value .port-more {
+  @apply text-text-secondary text-xs cursor-help;
 }
 
 .device-info-value.link {

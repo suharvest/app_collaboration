@@ -511,10 +511,18 @@ function renderManagedAppCard(app) {
 
   const deployedDate = app.deployed_at ? new Date(app.deployed_at).toLocaleDateString() : '-';
 
-  // Build ports display from aggregated ports
-  const portsDisplay = app.ports && app.ports.length > 0
-    ? app.ports.slice(0, 2).join(', ') + (app.ports.length > 2 ? '...' : '')
-    : '-';
+  // Build ports display - show first 2, hover for more
+  let portsDisplay = '-';
+  if (app.ports && app.ports.length > 0) {
+    const visiblePorts = app.ports.slice(0, 2);
+    const hasMore = app.ports.length > 2;
+    const allPortsTooltip = app.ports.join('\n');
+    portsDisplay = `
+      <div class="ports-container" ${hasMore ? `title="${allPortsTooltip}"` : ''}>
+        ${visiblePorts.map(p => `<div class="port-item">${p}</div>`).join('')}
+        ${hasMore ? `<div class="port-item port-more">+${app.ports.length - 2} more</div>` : ''}
+      </div>`;
+  }
 
   // Container count info
   const containerCount = app.containers ? app.containers.length : 1;
