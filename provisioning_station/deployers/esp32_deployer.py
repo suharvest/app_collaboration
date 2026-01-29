@@ -45,12 +45,17 @@ class ESP32Deployer(BaseDeployer):
         flash_config = config.firmware.flash_config
 
         try:
-            # Step 0: Wait for port to be available (may be held by Himax deployer)
+            # Step 0: Wait for port to be available (may be held by Himax deployer or other programs)
             await self._report_progress(
                 progress_callback, "detect", 0, "Waiting for port to be available..."
             )
 
-            if not await self._wait_for_port_available(port, timeout=10):
+            if not await self._wait_for_port_available(
+                port,
+                timeout=10,
+                auto_release=True,
+                progress_callback=progress_callback
+            ):
                 await self._report_progress(
                     progress_callback, "detect", 0,
                     f"Port {port} is busy. Please ensure no other program is using it."
@@ -127,6 +132,19 @@ class ESP32Deployer(BaseDeployer):
                 )
 
             # Step 3: Flash firmware
+            # Re-check port availability before flashing (may have been grabbed by another process)
+            if not await self._wait_for_port_available(
+                port,
+                timeout=5,
+                auto_release=True,
+                progress_callback=progress_callback
+            ):
+                await self._report_progress(
+                    progress_callback, "flash", 0,
+                    f"Port {port} is busy. Please ensure no other program is using it."
+                )
+                return False
+
             await self._report_progress(
                 progress_callback, "flash", 0, "Starting firmware flash..."
             )
@@ -282,11 +300,24 @@ class ESP32Deployer(BaseDeployer):
                 self._cleanup_serial_port(port)
             return {"success": False, "error": str(e)}
 
-    async def _wait_for_port_available(self, port: str, timeout: int = 10) -> bool:
-        """Wait for serial port to become available
+    async def _wait_for_port_available(
+        self,
+        port: str,
+        timeout: int = 10,
+        auto_release: bool = True,
+        progress_callback: Optional[Callable] = None
+    ) -> bool:
+        """Wait for serial port to become available, optionally auto-releasing occupied ports.
 
-        This is needed when Himax deployer has just released the ESP32 port
-        (used to hold ESP32 in reset during Himax flashing).
+        This is needed when:
+        - Himax deployer has just released the ESP32 port
+        - Another program (Arduino IDE, screen, etc.) is using the port
+
+        Args:
+            port: Serial port path
+            timeout: Seconds to wait for port availability
+            auto_release: If True, automatically terminate processes using the port
+            progress_callback: Optional callback for progress updates
         """
         import time
 
@@ -296,26 +327,73 @@ class ESP32Deployer(BaseDeployer):
             logger.warning("pyserial not available, skipping port availability check")
             return True
 
+        # Lazy import to avoid circular dependency
+        from ..services.serial_port_manager import SerialPortManager
+
         start_time = time.time()
         attempt = 0
 
         while (time.time() - start_time) < timeout:
             attempt += 1
+
+            # FIRST: Check with lsof if any process is using the port
+            # This is more reliable than pyserial for detecting exclusive locks
+            if auto_release:
+                proc_info = await SerialPortManager.get_process_using_port_async(port)
+
+                if proc_info:
+                    logger.info(
+                        f"Port {port} is used by {proc_info['name']} "
+                        f"(PID: {proc_info['pid']})"
+                    )
+                    if progress_callback:
+                        await self._report_progress(
+                            progress_callback, "detect", 0,
+                            f"Port {port} is used by {proc_info['name']} "
+                            f"(PID: {proc_info['pid']}), releasing..."
+                        )
+
+                    released = await SerialPortManager.release_port_async(port)
+                    if released:
+                        logger.info(f"Port {port} released successfully")
+                        if progress_callback:
+                            await self._report_progress(
+                                progress_callback, "detect", 0,
+                                f"Port {port} released successfully"
+                            )
+                        # Wait a moment for OS to fully release the port
+                        await asyncio.sleep(1.0)
+                    else:
+                        logger.warning(f"Failed to release port {port}")
+                        await asyncio.sleep(0.5)
+                        continue
+
+            # THEN: Try to open the port to verify it's truly available
             try:
                 ser = serial.Serial()
                 ser.port = port
                 ser.baudrate = 115200
                 ser.timeout = 0.1
+                ser.exclusive = True  # Request exclusive access
                 ser.open()
                 ser.close()
                 logger.info(f"Port {port} is available (attempt {attempt})")
                 return True
             except serial.SerialException as e:
-                if "Resource temporarily unavailable" in str(e) or "busy" in str(e).lower():
+                error_str = str(e).lower()
+                is_busy = (
+                    "resource temporarily unavailable" in error_str or
+                    "busy" in error_str or
+                    "access is denied" in error_str or  # Windows
+                    "permission denied" in error_str or
+                    "exclusively lock" in error_str
+                )
+
+                if is_busy:
                     logger.debug(f"Port {port} busy, waiting... (attempt {attempt})")
                     await asyncio.sleep(0.5)
                 else:
-                    # Other error (port doesn't exist, permission denied, etc.)
+                    # Other error (port doesn't exist, etc.)
                     logger.warning(f"Port {port} error: {e}")
                     return False
             except Exception as e:
