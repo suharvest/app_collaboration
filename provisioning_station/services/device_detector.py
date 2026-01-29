@@ -61,11 +61,12 @@ class DeviceDetector:
                             matched_ports.append((port, vid, pid))
 
                 if matched_ports:
-                    # For dual-serial USB devices (like ESP32-S3 with USB-JTAG + UART):
+                    # For dual-serial USB devices (like SenseCAP Watcher with CH342):
                     # - Multiple ports share the same serial_number but differ in interface
-                    # - Port name typically ends with: serial_number + interface_number
-                    # - Interface 1 (*51) = JTAG/debug, Interface 3 (*53) = UART (for flashing)
-                    # Strategy: prefer port names ending with '3' (UART interface)
+                    # - macOS: usbmodem*51 = Himax JTAG, usbmodem*53 = ESP32 UART
+                    # - Windows: SERIAL-A = Himax, SERIAL-B = ESP32
+                    # - Linux: ttyACM0 (interface 0) = Himax, ttyACM1 (interface 2) = ESP32
+                    # Strategy: prefer *53/SERIAL-B/higher interface for ESP32
 
                     # Group by serial number to detect dual-serial devices
                     by_serial = {}
@@ -75,60 +76,76 @@ class DeviceDetector:
                             by_serial[sn] = []
                         by_serial[sn].append((port, vid, pid))
 
+                    # Helper function to determine ESP32 priority
+                    # Positive = likely ESP32, Negative = likely Himax, 0 = unknown
+                    def get_esp32_priority(item):
+                        port = item[0]
+                        desc = (port.description or "").upper()
+                        device = port.device.lower()
+
+                        # Windows: prefer SERIAL-B for ESP32
+                        if "SERIAL-B" in desc:
+                            return 100
+                        if "SERIAL-A" in desc:
+                            return -100  # This is Himax, not ESP32
+
+                        # macOS: *53 = ESP32 UART, *51 = Himax JTAG
+                        # Both wchusbserial and usbmodem follow this pattern
+                        if device.endswith("53") or device.endswith("653"):
+                            return 100  # ESP32 UART interface
+                        if device.endswith("51") or device.endswith("651"):
+                            return -100  # This is Himax JTAG
+
+                        # Fallback: check last digit
+                        if device[-1] == "3":
+                            return 90
+                        if device[-1] == "1":
+                            return -90
+
+                        # Linux: parse interface from location (e.g., "1-1:1.2" -> interface 2)
+                        # ttyACM0 (interface 0) = Himax, ttyACM1 (interface 2) = ESP32
+                        if port.location:
+                            # Location format: bus-port:config.interface
+                            try:
+                                iface = int(port.location.split('.')[-1])
+                                return iface  # Higher interface = ESP32
+                            except (ValueError, IndexError):
+                                pass
+
+                        # Fallback: use interface number directly
+                        if port.interface is not None:
+                            try:
+                                return int(port.interface)
+                            except (ValueError, TypeError):
+                                pass
+
+                        # Last fallback: use port name suffix
+                        if device and device[-1].isdigit():
+                            return int(device[-1])
+                        return 0
+
                     # Select best port from each serial number group
+                    # IMPORTANT: Always filter by priority, even for single-port groups
                     best_port = None
+                    best_priority = -999
                     for sn, port_list in by_serial.items():
+                        for port_item in port_list:
+                            priority = get_esp32_priority(port_item)
+                            logger.debug(f"ESP32 port candidate: {port_item[0].device}, priority={priority}")
+
+                            # Only consider ports with positive priority (likely ESP32)
+                            if priority > 0 and priority > best_priority:
+                                best_priority = priority
+                                best_port = port_item
+
                         if len(port_list) > 1:
-                            # Dual-serial device detected (e.g., CH342 on Watcher)
-                            # Windows CH342: SERIAL-A = Himax, SERIAL-B = ESP32
-                            # macOS: wchusbserial = ESP32, usbmodem = Himax
-                            def get_esp32_priority(item):
-                                port = item[0]
-                                desc = (port.description or "").upper()
-                                device = port.device.lower()
-
-                                # Windows: prefer SERIAL-B for ESP32
-                                if "SERIAL-B" in desc:
-                                    return 100
-                                if "SERIAL-A" in desc:
-                                    return -100  # This is Himax, not ESP32
-
-                                # macOS: wchusbserial is for ESP32
-                                if "wchusbserial" in device:
-                                    return 100
-                                if "usbmodem" in device:
-                                    return -100  # This is Himax
-
-                                    # Linux: parse interface from location (e.g., "1-1:1.2" -> interface 2)
-                                # ttyACM0 (interface 0) = Himax, ttyACM1 (interface 2) = ESP32
-                                if port.location:
-                                    # Location format: bus-port:config.interface
-                                    try:
-                                        iface = int(port.location.split('.')[-1])
-                                        return iface  # Higher interface = ESP32
-                                    except (ValueError, IndexError):
-                                        pass
-
-                                # Fallback: use interface number directly
-                                if port.interface is not None:
-                                    try:
-                                        return int(port.interface)
-                                    except (ValueError, TypeError):
-                                        pass
-
-                                # Last fallback: use port name suffix
-                                if device and device[-1].isdigit():
-                                    return int(device[-1])
-                                return 0
-
-                            port_list.sort(key=get_esp32_priority, reverse=True)
                             logger.info(
                                 f"Dual-serial device detected (serial={sn}), "
-                                f"selecting {port_list[0][0].device} for ESP32 from {[p[0].device for p in port_list]}"
+                                f"ports: {[p[0].device for p in port_list]}"
                             )
-                        best_port = port_list[0]
 
                     if best_port:
+                        logger.info(f"Selected ESP32 port: {best_port[0].device} (priority={best_priority})")
                         port, vid, pid = best_port
                         return {
                             "status": "detected",
@@ -227,19 +244,15 @@ class DeviceDetector:
                             vid.lower() == detection.usb_vendor_id.lower()
                             and pid.lower() == detection.usb_product_id.lower()
                         ):
-                            # macOS: only consider usbmodem ports (not wchusbserial)
-                            # Windows/Linux: include all matching ports, will filter by description/location
-                            if sys.platform == "darwin":
-                                if 'usbmodem' in port.device.lower():
-                                    matched_ports.append((port, vid, pid))
-                            else:
-                                matched_ports.append((port, vid, pid))
+                            # Include all matching ports, filter by interface number later
+                            matched_ports.append((port, vid, pid))
 
                 if matched_ports:
                     # For Himax on SenseCAP Watcher:
-                    # Windows CH342: SERIAL-A = Himax, SERIAL-B = ESP32
-                    # Linux: ttyACM0 (interface 0) = Himax, ttyACM1 (interface 2) = ESP32
-                    # macOS: usbmodemXXXXX1 = Himax WE2 (preferred)
+                    # - macOS: *51/*651 (末尾1) = Himax, *53/*653 (末尾3) = ESP32
+                    # - Windows: SERIAL-A = Himax, SERIAL-B = ESP32
+                    # - Linux: ttyACM0 (interface 0) = Himax, ttyACM1 (interface 2) = ESP32
+                    # Port type (wchusbserial/usbmodem) doesn't matter, only interface number
 
                     def get_himax_priority(item):
                         port = item[0]
@@ -252,6 +265,13 @@ class DeviceDetector:
                         if "SERIAL-B" in desc:
                             return 100  # This is ESP32, not Himax
 
+                        # macOS: *51/*651 (末尾1) = Himax, *53/*653 (末尾3) = ESP32
+                        # Check last digit - '1' means Himax, '3' means ESP32
+                        if device[-1] == "1":
+                            return -100  # Himax - selected first
+                        if device[-1] == "3":
+                            return 100  # ESP32 - excluded
+
                         # Linux: parse interface from location, prefer lower interface for Himax
                         if port.location:
                             try:
@@ -260,7 +280,6 @@ class DeviceDetector:
                             except (ValueError, IndexError):
                                 pass
 
-                        # macOS: prefer usbmodem ending with '1'
                         if device and device[-1].isdigit():
                             return int(device[-1])
                         return 99

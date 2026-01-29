@@ -17,15 +17,29 @@ router = APIRouter(prefix="/api/devices", tags=["devices"])
 async def detect_devices(
     solution_id: str,
     lang: str = Query("en", pattern="^(en|zh)$"),
+    preset: str = Query(None, description="Preset ID to get devices from"),
 ):
     """Detect devices for a solution"""
     solution = solution_manager.get_solution(solution_id)
     if not solution:
         raise HTTPException(status_code=404, detail="Solution not found")
 
+    # Get devices from preset or deployment
+    devices = []
+    if preset and solution.intro and solution.intro.presets:
+        # Find the preset and get its devices
+        for p in solution.intro.presets:
+            if p.id == preset:
+                devices = p.devices or []
+                break
+
+    # Fallback to deployment.devices if no preset or preset not found
+    if not devices:
+        devices = solution.deployment.devices if solution.deployment else []
+
     # Load device configs and detect
     detected = []
-    for device_ref in solution.deployment.devices:
+    for device_ref in devices:
         # Build section info if available
         section_info = None
         if device_ref.section:
@@ -59,7 +73,7 @@ async def detect_devices(
             result = await device_detector.detect_device(config)
 
             detected.append(DetectedDevice(
-                config_id=config.id,
+                config_id=device_ref.id,  # Use device_ref.id, not config.id
                 name=config.name if lang == "en" else (config.name_zh or config.name),
                 name_zh=config.name_zh,
                 type=config.type,
@@ -119,12 +133,8 @@ async def configure_device_connection(
     if not solution:
         raise HTTPException(status_code=404, detail="Solution not found")
 
-    # Find device ref
-    device_ref = None
-    for d in solution.deployment.devices:
-        if d.id == device_id:
-            device_ref = d
-            break
+    # Find device ref from presets
+    device_ref = solution_manager.find_device_in_solution(solution, device_id)
 
     if not device_ref:
         raise HTTPException(status_code=404, detail="Device not found")
@@ -162,12 +172,8 @@ async def get_device_config(
     if not solution:
         raise HTTPException(status_code=404, detail="Solution not found")
 
-    # Find device ref
-    device_ref = None
-    for d in solution.deployment.devices:
-        if d.id == device_id:
-            device_ref = d
-            break
+    # Find device ref from presets
+    device_ref = solution_manager.find_device_in_solution(solution, device_id)
 
     if not device_ref:
         raise HTTPException(status_code=404, detail="Device not found")

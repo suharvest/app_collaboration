@@ -173,7 +173,7 @@ async def list_solutions(
             estimated_time=solution.intro.stats.estimated_time,
             deployed_count=solution.intro.stats.deployed_count,
             likes_count=solution.intro.stats.likes_count,
-            device_count=len(solution.deployment.devices),
+            device_count=solution_manager.count_devices_in_solution(solution),
             has_description=has_description,
             has_description_zh=has_description_zh,
             has_guide=has_guide,
@@ -211,9 +211,10 @@ async def get_solution(
             gallery_item["thumbnail"] = f"/api/solutions/{solution_id}/assets/{item.thumbnail}"
         gallery.append(gallery_item)
 
-    # Build devices summary
+    # Build devices summary from presets
     devices = []
-    for device in solution.deployment.devices:
+    all_preset_devices = solution_manager.get_all_devices_from_solution(solution)
+    for device in all_preset_devices:
         devices.append({
             "id": device.id,
             "name": device.name if lang == "en" else (device.name_zh or device.name),
@@ -352,9 +353,10 @@ async def get_deployment_info(
     elif solution.deployment.guide_file:
         guide = await solution_manager.load_markdown(solution_id, solution.deployment.guide_file)
 
-    # Build device sections
+    # Build device sections from presets (for backward compatibility)
     devices = []
-    for device in solution.deployment.devices:
+    all_preset_devices = solution_manager.get_all_devices_from_solution(solution)
+    for device in all_preset_devices:
         device_info = {
             "id": device.id,
             "name": device.name if lang == "en" else (device.name_zh or device.name),
@@ -813,7 +815,7 @@ async def update_solution(solution_id: str, data: SolutionUpdate):
             estimated_time=solution.intro.stats.estimated_time,
             deployed_count=solution.intro.stats.deployed_count,
             likes_count=solution.intro.stats.likes_count,
-            device_count=len(solution.deployment.devices),
+            device_count=solution_manager.count_devices_in_solution(solution),
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
