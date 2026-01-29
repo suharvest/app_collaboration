@@ -14,13 +14,13 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import Callable, Optional, Dict, Any, List
+from typing import Any, Callable, Dict, List, Optional
 
 import serial
 import serial.tools.list_ports
 
-from .base import BaseDeployer
 from ..models.device import DeviceConfig, HimaxModelConfig
+from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
 
@@ -1025,7 +1025,7 @@ class HimaxDeployer(BaseDeployer):
                         logger.error(f"Timeout waiting for reboot prompt before model {model.id}")
                         await self._report_progress(
                             progress_callback, "flash", progress_base,
-                            f"Timeout waiting for reboot prompt"
+                            "Timeout waiting for reboot prompt"
                         )
                         ser.close()
                         return False
@@ -1049,8 +1049,8 @@ class HimaxDeployer(BaseDeployer):
                     logger.info(f"Sending preamble for {model.id} at {model.flash_address}")
                     logger.info(f"Preamble bytes: {preamble[:20].hex()}...")
 
-                    import tempfile
                     import os
+                    import tempfile
                     preamble_file = os.path.join(tempfile.gettempdir(), f"_temp_model_{idx}_preamble.bin")
                     with open(preamble_file, 'wb') as f:
                         f.write(preamble)
@@ -1064,13 +1064,13 @@ class HimaxDeployer(BaseDeployer):
                         logger.error(f"Failed to send preamble for model {model.id}")
                         await self._report_progress(
                             progress_callback, "flash", progress_base,
-                            f"Failed to send preamble"
+                            "Failed to send preamble"
                         )
                         ser.close()
                         return False
 
                     # Small delay for device to process preamble
-                    logger.debug(f"Preamble sent, waiting for device response...")
+                    logger.debug("Preamble sent, waiting for device response...")
                     await asyncio.sleep(0.5)
 
                     # Debug: check if there's any data waiting
@@ -1086,7 +1086,7 @@ class HimaxDeployer(BaseDeployer):
                         logger.error(f"Timeout waiting for reboot prompt after preamble for model {model.id}")
                         await self._report_progress(
                             progress_callback, "flash", progress_base,
-                            f"Timeout after preamble"
+                            "Timeout after preamble"
                         )
                         ser.close()
                         return False
@@ -1113,7 +1113,7 @@ class HimaxDeployer(BaseDeployer):
                         logger.error(f"Failed to send model {model.id}")
                         await self._report_progress(
                             progress_callback, "flash", progress_base,
-                            f"Failed to send model file"
+                            "Failed to send model file"
                         )
                         ser.close()
                         return False

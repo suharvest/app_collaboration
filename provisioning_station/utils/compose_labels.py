@@ -8,8 +8,7 @@ import logging
 import os
 import tempfile
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 import yaml
 
@@ -127,14 +126,14 @@ def inject_labels_to_compose_file(
                 f.write(modified_content)
             return output_path
         else:
-            # Create temp file in same directory to preserve relative paths
+            # Create temp file in system temp directory
+            # Note: The caller must ensure docker compose runs with cwd set to
+            # the original compose file's directory for relative paths to work
             # On Windows, we must close the file descriptor before writing
             # because Windows locks files opened by mkstemp
-            compose_dir = Path(compose_path).parent
             temp_fd, temp_path = tempfile.mkstemp(
                 suffix=".yml",
                 prefix="compose_",
-                dir=str(compose_dir)
             )
             try:
                 # Close the file descriptor first (required for Windows)

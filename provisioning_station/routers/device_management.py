@@ -13,19 +13,19 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from ..models.kiosk import (
-    KioskStatus,
-    KioskConfigRequest,
-    KioskConfigResponse,
-    UpdateRequest,
-    UpdateResponse,
     ActiveDeployment,
     DeploymentAction,
     DeploymentActionResponse,
+    KioskConfigRequest,
+    KioskConfigResponse,
+    KioskStatus,
+    UpdateRequest,
+    UpdateResponse,
 )
-from ..services.kiosk_manager import kiosk_manager
-from ..services.update_manager import update_manager
 from ..services.deployment_history import deployment_history
+from ..services.kiosk_manager import kiosk_manager
 from ..services.solution_manager import solution_manager
+from ..services.update_manager import update_manager
 
 router = APIRouter(prefix="/api/device-management", tags=["device-management"])
 

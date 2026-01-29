@@ -6,7 +6,7 @@ Checks remote device requirements via SSH before deployment
 import asyncio
 import logging
 import re
-from typing import Dict, Any, Optional, List, Callable
+from typing import Any, Callable, Dict, Optional
 
 from pydantic import BaseModel
 

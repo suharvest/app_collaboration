@@ -7,16 +7,16 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Query
 
 from ..models.api import (
-    StartDeploymentRequest,
+    DeploymentListItem,
     DeploymentStatusResponse,
     DeviceDeploymentStatus,
-    DeploymentListItem,
+    StartDeploymentRequest,
     StepSummary,
 )
 from ..models.deployment import DeploymentStatus
-from ..services.solution_manager import solution_manager
 from ..services.deployment_engine import deployment_engine
 from ..services.deployment_history import deployment_history
+from ..services.solution_manager import solution_manager
 
 router = APIRouter(prefix="/api/deployments", tags=["deployments"])
 

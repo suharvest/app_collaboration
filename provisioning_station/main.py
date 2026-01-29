@@ -5,7 +5,6 @@ FastAPI application entry point
 import asyncio
 import atexit
 import logging
-import signal
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -21,14 +20,24 @@ logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from .config import settings
-from .routers import solutions, devices, deployments, websocket, versions, device_management, preview, docker_devices, restore
+from .routers import (
+    deployments,
+    device_management,
+    devices,
+    docker_devices,
+    preview,
+    restore,
+    solutions,
+    versions,
+    websocket,
+)
+from .services.mqtt_bridge import get_mqtt_bridge, is_mqtt_available
 from .services.solution_manager import solution_manager
 from .services.stream_proxy import get_stream_proxy
-from .services.mqtt_bridge import get_mqtt_bridge, is_mqtt_available
 
 # Global flag to track if cleanup has been performed
 _cleanup_done = False
@@ -169,6 +178,7 @@ def main():
     import argparse
     import os
     import sys
+
     import uvicorn
 
     # Check if running as frozen executable

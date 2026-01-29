@@ -2,14 +2,12 @@
 Version management service
 """
 
-import asyncio
 import logging
-import re
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 
-from ..models.version import VersionInfo, UpdateCheckResult, VersionSummary
-from .solution_manager import solution_manager
+from ..models.version import UpdateCheckResult, VersionInfo, VersionSummary
 from .deployment_history import deployment_history
+from .solution_manager import solution_manager
 
 logger = logging.getLogger(__name__)
 

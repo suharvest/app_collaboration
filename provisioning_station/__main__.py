@@ -3,8 +3,8 @@ Entry point for PyInstaller bundled executable.
 This module avoids relative import issues by using absolute imports.
 """
 
-import sys
 import os
+import sys
 
 # Ensure the package can be found
 if getattr(sys, 'frozen', False):

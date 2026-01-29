@@ -2,9 +2,9 @@
 Application configuration using pydantic-settings
 """
 
-import os
 from pathlib import Path
 from typing import Optional
+
 from pydantic_settings import BaseSettings
 
 

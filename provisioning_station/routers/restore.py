@@ -8,12 +8,11 @@ Endpoints for restoring devices to factory state:
 
 from typing import List, Optional
 
+import serial.tools.list_ports
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-import serial.tools.list_ports
-
-from ..services.restore_manager import get_restore_manager, RestoreStatus
+from ..services.restore_manager import get_restore_manager
 
 router = APIRouter(prefix="/api/restore", tags=["restore"])
 

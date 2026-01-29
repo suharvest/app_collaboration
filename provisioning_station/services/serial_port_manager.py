@@ -8,7 +8,7 @@ import logging
 import subprocess
 import sys
 import time
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 import psutil
 

@@ -6,10 +6,10 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from ..models.version import DeploymentRecord
 from ..config import settings
+from ..models.version import DeploymentRecord
 
 logger = logging.getLogger(__name__)
 

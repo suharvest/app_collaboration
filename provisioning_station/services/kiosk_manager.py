@@ -14,10 +14,10 @@ import logging
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
-from ..models.kiosk import KioskStatus, KioskConfigResponse
 from ..config import settings
+from ..models.kiosk import KioskConfigResponse, KioskStatus
 from .deployment_history import deployment_history
 
 logger = logging.getLogger(__name__)

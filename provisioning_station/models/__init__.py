@@ -2,65 +2,65 @@
 Pydantic models for Provisioning Station
 """
 
-from .solution import (
-    Solution,
-    SolutionIntro,
-    SolutionDeployment,
-    DeviceRef,
-    DeviceSection,
-    MediaItem,
-    RequiredDevice,
-    SolutionStats,
-    SolutionLinks,
-)
-from .device import (
-    DeviceConfig,
-    DetectionConfig,
-    FirmwareConfig,
-    DockerConfig,
-    DockerRemoteConfig,
-    SSHConfig,
-    PackageConfig,
-    DeploymentStep,
+from .api import (
+    DeploymentStatusResponse,
+    DetectedDevice,
+    SolutionDetail,
+    SolutionSummary,
+    StartDeploymentRequest,
 )
 from .deployment import (
     Deployment,
-    DeviceDeployment,
     DeploymentStatus,
-    StepStatus,
+    DeviceDeployment,
     LogEntry,
+    StepStatus,
 )
-from .api import (
-    SolutionSummary,
-    SolutionDetail,
-    DetectedDevice,
-    StartDeploymentRequest,
-    DeploymentStatusResponse,
-)
-from .version import (
-    VersionInfo,
-    UpdateCheckResult,
-    DeploymentRecord,
-    StepRecord,
-    SolutionVersioning,
-    VersionSummary,
+from .device import (
+    DeploymentStep,
+    DetectionConfig,
+    DeviceConfig,
+    DockerConfig,
+    DockerRemoteConfig,
+    FirmwareConfig,
+    PackageConfig,
+    SSHConfig,
 )
 from .docker_device import (
     ConnectDeviceRequest,
     ContainerInfo,
-    DeviceInfo,
     ContainersResponse,
+    DeviceInfo,
     UpgradeRequest,
 )
 from .kiosk import (
-    KioskStatus,
-    KioskConfigRequest,
-    KioskConfigResponse,
-    UpdateRequest,
-    UpdateResponse,
     ActiveDeployment,
     DeploymentAction,
     DeploymentActionResponse,
+    KioskConfigRequest,
+    KioskConfigResponse,
+    KioskStatus,
+    UpdateRequest,
+    UpdateResponse,
+)
+from .solution import (
+    DeviceRef,
+    DeviceSection,
+    MediaItem,
+    RequiredDevice,
+    Solution,
+    SolutionDeployment,
+    SolutionIntro,
+    SolutionLinks,
+    SolutionStats,
+)
+from .version import (
+    DeploymentRecord,
+    SolutionVersioning,
+    StepRecord,
+    UpdateCheckResult,
+    VersionInfo,
+    VersionSummary,
 )
 
 __all__ = [

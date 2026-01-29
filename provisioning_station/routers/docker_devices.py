@@ -6,7 +6,6 @@ from fastapi import APIRouter, HTTPException, Query
 
 from ..models.docker_device import (
     ConnectDeviceRequest,
-    ContainersResponse,
     UpgradeRequest,
 )
 from ..services.docker_device_manager import docker_device_manager
