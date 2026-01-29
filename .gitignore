@@ -42,5 +42,16 @@ pyinstaller/dist/
 .env.local
 .env.*.local
 
-# Claude Code (optional - remove if you want to track skills)
-# .claude/
+# Claude Code
+.claude/settings.local.json
+
+# Rust/Tauri
+src-tauri/target/
+src-tauri/gen/
+src-tauri/Cargo.lock
+
+# Windows
+nul
+
+# Local logging config
+provisioning_station/logging_config.yaml
