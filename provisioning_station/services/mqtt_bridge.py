@@ -16,9 +16,11 @@ logger = logging.getLogger(__name__)
 # Try to import paho-mqtt
 try:
     import paho.mqtt.client as mqtt
+
     # Check for paho-mqtt 2.0+ callback API
     try:
         from paho.mqtt.enums import CallbackAPIVersion
+
         MQTT_V2_API = True
     except ImportError:
         MQTT_V2_API = False
@@ -26,12 +28,15 @@ try:
 except ImportError:
     MQTT_AVAILABLE = False
     MQTT_V2_API = False
-    logger.warning("paho-mqtt not installed. MQTT bridge functionality will be limited.")
+    logger.warning(
+        "paho-mqtt not installed. MQTT bridge functionality will be limited."
+    )
 
 
 @dataclass
 class MqttSubscription:
     """Information about an MQTT subscription"""
+
     subscription_id: str
     broker: str
     port: int
@@ -87,8 +92,7 @@ class MqttBridge:
         """
         if not MQTT_AVAILABLE:
             raise RuntimeError(
-                "paho-mqtt is not installed. "
-                "Install it with: pip install paho-mqtt"
+                "paho-mqtt is not installed. " "Install it with: pip install paho-mqtt"
             )
 
         # Generate subscription ID
@@ -142,12 +146,15 @@ class MqttBridge:
 
         # Set up callbacks (signature differs between API versions)
         if MQTT_V2_API:
+
             def on_connect(client, userdata, flags, rc, properties=None):
                 if rc == 0 or rc.value == 0:
                     subscription.connected = True
                     subscription.error = None
                     client.subscribe(topic)
-                    logger.info(f"Connected to MQTT broker {broker}:{port}, subscribed to {topic}")
+                    logger.info(
+                        f"Connected to MQTT broker {broker}:{port}, subscribed to {topic}"
+                    )
                 else:
                     subscription.connected = False
                     subscription.error = f"Connection failed with code {rc}"
@@ -158,13 +165,17 @@ class MqttBridge:
                 if rc != 0:
                     subscription.error = f"Unexpected disconnect (code {rc})"
                     logger.warning(f"MQTT disconnected: {subscription.error}")
+
         else:
+
             def on_connect(client, userdata, flags, rc):
                 if rc == 0:
                     subscription.connected = True
                     subscription.error = None
                     client.subscribe(topic)
-                    logger.info(f"Connected to MQTT broker {broker}:{port}, subscribed to {topic}")
+                    logger.info(
+                        f"Connected to MQTT broker {broker}:{port}, subscribed to {topic}"
+                    )
                 else:
                     subscription.connected = False
                     subscription.error = f"Connection failed with code {rc}"
@@ -187,6 +198,7 @@ class MqttBridge:
                     data = {"raw": payload}
 
                 import time
+
                 message = {
                     "topic": msg.topic,
                     "payload": data,
@@ -196,10 +208,7 @@ class MqttBridge:
                 # Forward to all callbacks
                 for callback in subscription.callbacks:
                     if asyncio.iscoroutinefunction(callback):
-                        asyncio.run_coroutine_threadsafe(
-                            callback(message),
-                            self._loop
-                        )
+                        asyncio.run_coroutine_threadsafe(callback(message), self._loop)
                     else:
                         callback(message)
 
@@ -217,7 +226,9 @@ class MqttBridge:
         try:
             client.connect_async(broker, port, keepalive=60)
             client.loop_start()
-            logger.info(f"Starting MQTT subscription {subscription_id} to {broker}:{port}/{topic}")
+            logger.info(
+                f"Starting MQTT subscription {subscription_id} to {broker}:{port}/{topic}"
+            )
 
             # Wait for connection to be established (max 10 seconds)
             for _ in range(100):  # 100 * 0.1s = 10s
@@ -239,7 +250,9 @@ class MqttBridge:
             logger.error(f"Failed to connect to MQTT: {e}")
             raise RuntimeError(f"Failed to connect to MQTT broker: {e}")
 
-    async def unsubscribe(self, subscription_id: str, callback: Optional[Callable] = None) -> bool:
+    async def unsubscribe(
+        self, subscription_id: str, callback: Optional[Callable] = None
+    ) -> bool:
         """
         Unsubscribe from an MQTT topic.
 
@@ -290,10 +303,7 @@ class MqttBridge:
 
     def list_subscriptions(self) -> List[dict]:
         """List all active subscriptions"""
-        return [
-            self.get_subscription_info(sid)
-            for sid in self.subscriptions.keys()
-        ]
+        return [self.get_subscription_info(sid) for sid in self.subscriptions.keys()]
 
     async def stop_all(self):
         """Stop all MQTT subscriptions"""

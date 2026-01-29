@@ -105,7 +105,10 @@ class NodeRedDeployer(BaseDeployer):
 
             # Step 3: Connect to Node-RED and verify
             await self._report_progress(
-                progress_callback, "connect", 0, f"Connecting to Node-RED at {base_url}..."
+                progress_callback,
+                "connect",
+                0,
+                f"Connecting to Node-RED at {base_url}...",
             )
 
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -149,7 +152,11 @@ class NodeRedDeployer(BaseDeployer):
                     )
 
                     if response.status_code not in [200, 204]:
-                        error_msg = response.text[:200] if response.text else f"HTTP {response.status_code}"
+                        error_msg = (
+                            response.text[:200]
+                            if response.text
+                            else f"HTTP {response.status_code}"
+                        )
                         await self._report_progress(
                             progress_callback,
                             "deploy",
@@ -168,7 +175,10 @@ class NodeRedDeployer(BaseDeployer):
                     return False
 
                 await self._report_progress(
-                    progress_callback, "deploy", 50, "Flow deployed, setting credentials..."
+                    progress_callback,
+                    "deploy",
+                    50,
+                    "Flow deployed, setting credentials...",
                 )
 
                 # Step 5: Set credentials if provided
@@ -185,7 +195,9 @@ class NodeRedDeployer(BaseDeployer):
                                     f"Failed to set credentials for {node_id}: {creds_response.status_code}"
                                 )
                         except Exception as e:
-                            logger.warning(f"Failed to set credentials for {node_id}: {e}")
+                            logger.warning(
+                                f"Failed to set credentials for {node_id}: {e}"
+                            )
 
                 await self._report_progress(
                     progress_callback, "deploy", 100, "Flow deployed successfully"

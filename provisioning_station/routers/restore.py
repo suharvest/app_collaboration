@@ -21,14 +21,17 @@ router = APIRouter(prefix="/api/restore", tags=["restore"])
 # Request/Response Models
 # ============================================
 
+
 class RestoreStartRequest(BaseModel):
     """Request to start a restore operation"""
+
     device_type: str
     connection: dict  # port for USB, host/username/password for SSH
 
 
 class RestoreDeviceResponse(BaseModel):
     """Supported device information"""
+
     id: str
     name: str
     description: str
@@ -37,6 +40,7 @@ class RestoreDeviceResponse(BaseModel):
 
 class RestoreStatusResponse(BaseModel):
     """Restore operation status"""
+
     id: str
     device_type: str
     device_name: str
@@ -52,6 +56,7 @@ class RestoreStatusResponse(BaseModel):
 
 class PortInfo(BaseModel):
     """Serial port information"""
+
     device: str
     description: str
     hwid: str
@@ -61,6 +66,7 @@ class PortInfo(BaseModel):
 # ============================================
 # Endpoints
 # ============================================
+
 
 @router.get("/devices", response_model=List[RestoreDeviceResponse])
 async def get_supported_devices(
@@ -77,8 +83,8 @@ async def list_serial_ports():
     """List available serial ports for USB restore"""
     # Device USB identifiers
     # Watcher uses WCH chip: VID=0x1a86, PID=0x55d2
-    WATCHER_VID = 0x1a86
-    WATCHER_PID = 0x55d2
+    WATCHER_VID = 0x1A86
+    WATCHER_PID = 0x55D2
     # reCamera uses Cvitek chip: VID=0x3346, PID=0x1003
     RECAMERA_VID = 0x3346
     RECAMERA_PID = 0x1003
@@ -89,15 +95,17 @@ async def list_serial_ports():
         # Only mark as Himax if it's a Watcher's usbmodem port (WCH chip)
         if port.vid == WATCHER_VID and port.pid == WATCHER_PID:
             # Watcher has both wchusbserial (ESP32) and usbmodem (Himax) ports
-            if 'usbmodem' in port.device.lower():
+            if "usbmodem" in port.device.lower():
                 is_himax = True
 
-        ports.append(PortInfo(
-            device=port.device,
-            description=port.description or "Serial Port",
-            hwid=port.hwid or "",
-            is_himax=is_himax,
-        ))
+        ports.append(
+            PortInfo(
+                device=port.device,
+                description=port.description or "Serial Port",
+                hwid=port.hwid or "",
+                is_himax=is_himax,
+            )
+        )
 
     return ports
 
@@ -111,8 +119,7 @@ async def start_restore(request: RestoreStartRequest):
     device_config = manager.get_device_config(request.device_type)
     if not device_config:
         raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported device type: {request.device_type}"
+            status_code=400, detail=f"Unsupported device type: {request.device_type}"
         )
 
     # Validate connection parameters
@@ -142,7 +149,9 @@ async def start_restore(request: RestoreStartRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to start restore: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to start restore: {str(e)}"
+        )
 
 
 @router.get("/{operation_id}/status", response_model=RestoreStatusResponse)

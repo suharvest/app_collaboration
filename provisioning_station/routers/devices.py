@@ -45,43 +45,77 @@ async def detect_devices(
         if device_ref.section:
             section = device_ref.section
             section_info = {
-                "title": section.title if lang == "en" else (section.title_zh or section.title),
+                "title": (
+                    section.title
+                    if lang == "en"
+                    else (section.title_zh or section.title)
+                ),
             }
             if section.wiring:
                 section_info["wiring"] = {
-                    "image": f"/api/solutions/{solution_id}/assets/{section.wiring.image}" if section.wiring.image else None,
-                    "steps": section.wiring.steps_zh if lang == "zh" else section.wiring.steps,
+                    "image": (
+                        f"/api/solutions/{solution_id}/assets/{section.wiring.image}"
+                        if section.wiring.image
+                        else None
+                    ),
+                    "steps": (
+                        section.wiring.steps_zh
+                        if lang == "zh"
+                        else section.wiring.steps
+                    ),
                 }
 
         # Handle devices without config files (manual/script types)
         if not device_ref.config_file:
             # For manual or script types, no detection needed
-            detected.append(DetectedDevice(
-                config_id=device_ref.id,
-                name=device_ref.name if lang == "en" else (device_ref.name_zh or device_ref.name),
-                name_zh=device_ref.name_zh,
-                type=device_ref.type,
-                status="manual_required" if device_ref.type == "manual" else "detected",
-                connection_info=None,
-                details={"user_inputs": [ui.model_dump() for ui in device_ref.user_inputs]} if device_ref.user_inputs else None,
-                section=section_info,
-            ))
+            detected.append(
+                DetectedDevice(
+                    config_id=device_ref.id,
+                    name=(
+                        device_ref.name
+                        if lang == "en"
+                        else (device_ref.name_zh or device_ref.name)
+                    ),
+                    name_zh=device_ref.name_zh,
+                    type=device_ref.type,
+                    status=(
+                        "manual_required" if device_ref.type == "manual" else "detected"
+                    ),
+                    connection_info=None,
+                    details=(
+                        {
+                            "user_inputs": [
+                                ui.model_dump() for ui in device_ref.user_inputs
+                            ]
+                        }
+                        if device_ref.user_inputs
+                        else None
+                    ),
+                    section=section_info,
+                )
+            )
             continue
 
-        config = await solution_manager.load_device_config(solution_id, device_ref.config_file)
+        config = await solution_manager.load_device_config(
+            solution_id, device_ref.config_file
+        )
         if config:
             result = await device_detector.detect_device(config)
 
-            detected.append(DetectedDevice(
-                config_id=device_ref.id,  # Use device_ref.id, not config.id
-                name=config.name if lang == "en" else (config.name_zh or config.name),
-                name_zh=config.name_zh,
-                type=config.type,
-                status=result["status"],
-                connection_info=result.get("connection_info"),
-                details=result.get("details"),
-                section=section_info,
-            ))
+            detected.append(
+                DetectedDevice(
+                    config_id=device_ref.id,  # Use device_ref.id, not config.id
+                    name=(
+                        config.name if lang == "en" else (config.name_zh or config.name)
+                    ),
+                    name_zh=config.name_zh,
+                    type=config.type,
+                    status=result["status"],
+                    connection_info=result.get("connection_info"),
+                    details=result.get("details"),
+                    section=section_info,
+                )
+            )
 
     return detected
 
@@ -90,6 +124,7 @@ async def detect_devices(
 async def list_serial_ports():
     """List available serial ports"""
     import logging
+
     logger = logging.getLogger(__name__)
     logger.info("Received request to list serial ports")
     try:
@@ -140,7 +175,9 @@ async def configure_device_connection(
         raise HTTPException(status_code=404, detail="Device not found")
 
     # Load device config
-    config = await solution_manager.load_device_config(solution_id, device_ref.config_file)
+    config = await solution_manager.load_device_config(
+        solution_id, device_ref.config_file
+    )
     if not config:
         raise HTTPException(status_code=404, detail="Device config not found")
 
@@ -179,20 +216,28 @@ async def get_device_config(
         raise HTTPException(status_code=404, detail="Device not found")
 
     # Load device config
-    config = await solution_manager.load_device_config(solution_id, device_ref.config_file)
+    config = await solution_manager.load_device_config(
+        solution_id, device_ref.config_file
+    )
     if not config:
         raise HTTPException(status_code=404, detail="Device config not found")
 
     # Build steps info
     steps = []
     for step in config.steps:
-        steps.append({
-            "id": step.id,
-            "name": step.name if lang == "en" else (step.name_zh or step.name),
-            "description": step.description if lang == "en" else (step.description_zh or step.description),
-            "optional": step.optional,
-            "default": step.default,
-        })
+        steps.append(
+            {
+                "id": step.id,
+                "name": step.name if lang == "en" else (step.name_zh or step.name),
+                "description": (
+                    step.description
+                    if lang == "en"
+                    else (step.description_zh or step.description)
+                ),
+                "optional": step.optional,
+                "default": step.default,
+            }
+        )
 
     return {
         "id": config.id,

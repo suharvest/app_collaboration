@@ -59,7 +59,9 @@ class DeploymentHistory:
                 record_dict["deployed_at"] = record_dict["deployed_at"].isoformat()
             records.append(record_dict)
             self._save_records(records)
-            logger.info(f"Recorded deployment: {record.deployment_id} for {record.solution_id}/{record.device_id}")
+            logger.info(
+                f"Recorded deployment: {record.deployment_id} for {record.solution_id}/{record.device_id}"
+            )
         except Exception as e:
             logger.error(f"Failed to record deployment: {e}")
 
@@ -97,10 +99,7 @@ class DeploymentHistory:
                 records = [r for r in records if r.get("device_id") == device_id]
 
             # Sort by deployed_at descending
-            records.sort(
-                key=lambda r: r.get("deployed_at", ""),
-                reverse=True
-            )
+            records.sort(key=lambda r: r.get("deployed_at", ""), reverse=True)
 
             # Apply limit
             records = records[:limit]
@@ -145,7 +144,8 @@ class DeploymentHistory:
         """Get the number of times a device has been deployed"""
         records = self._load_records()
         count = sum(
-            1 for r in records
+            1
+            for r in records
             if r.get("solution_id") == solution_id
             and r.get("device_id") == device_id
             and r.get("status") == "completed"

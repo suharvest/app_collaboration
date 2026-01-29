@@ -48,7 +48,10 @@ class ConnectionManager:
 
     def has_connections(self, deployment_id: str) -> bool:
         """Check if deployment has active connections"""
-        return deployment_id in self.active_connections and len(self.active_connections[deployment_id]) > 0
+        return (
+            deployment_id in self.active_connections
+            and len(self.active_connections[deployment_id]) > 0
+        )
 
 
 manager = ConnectionManager()
@@ -66,29 +69,32 @@ async def websocket_logs(websocket: WebSocket, deployment_id: str):
         # Send initial status
         deployment = deployment_engine.get_deployment(deployment_id)
         if deployment:
-            await websocket.send_json({
-                "type": "status",
-                "deployment_id": deployment_id,
-                "status": deployment.status.value,
-            })
+            await websocket.send_json(
+                {
+                    "type": "status",
+                    "deployment_id": deployment_id,
+                    "status": deployment.status.value,
+                }
+            )
 
             # Send existing logs
             for log in deployment.logs[-50:]:  # Last 50 logs
-                await websocket.send_json({
-                    "type": "log",
-                    "timestamp": log.timestamp.isoformat(),
-                    "level": log.level,
-                    "device_id": log.device_id,
-                    "step_id": log.step_id,
-                    "message": log.message,
-                })
+                await websocket.send_json(
+                    {
+                        "type": "log",
+                        "timestamp": log.timestamp.isoformat(),
+                        "level": log.level,
+                        "device_id": log.device_id,
+                        "step_id": log.step_id,
+                        "message": log.message,
+                    }
+                )
 
         # Keep connection alive and handle client messages
         while True:
             try:
                 data = await asyncio.wait_for(
-                    websocket.receive_text(),
-                    timeout=30.0  # Ping every 30 seconds
+                    websocket.receive_text(), timeout=30.0  # Ping every 30 seconds
                 )
                 # Handle client messages if needed
                 if data == "ping":
@@ -124,20 +130,24 @@ async def websocket_all_logs(websocket: WebSocket):
                 if deployment_id:
                     await manager.connect(websocket, deployment_id)
                     subscribed.add(deployment_id)
-                    await websocket.send_json({
-                        "type": "subscribed",
-                        "deployment_id": deployment_id,
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "subscribed",
+                            "deployment_id": deployment_id,
+                        }
+                    )
 
             elif data.get("action") == "unsubscribe":
                 deployment_id = data.get("deployment_id")
                 if deployment_id and deployment_id in subscribed:
                     manager.disconnect(websocket, deployment_id)
                     subscribed.discard(deployment_id)
-                    await websocket.send_json({
-                        "type": "unsubscribed",
-                        "deployment_id": deployment_id,
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "unsubscribed",
+                            "deployment_id": deployment_id,
+                        }
+                    )
 
     except WebSocketDisconnect:
         pass

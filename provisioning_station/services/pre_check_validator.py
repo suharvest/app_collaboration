@@ -23,11 +23,12 @@ def is_frozen() -> bool:
     This must be a function, not a module-level variable, because when uvicorn
     imports the module in a worker process, sys.frozen may not be set yet.
     """
-    return getattr(sys, 'frozen', False)
+    return getattr(sys, "frozen", False)
 
 
 class CheckResult(BaseModel):
     """Result of a pre-deployment check"""
+
     type: str
     passed: bool
     message: str
@@ -69,7 +70,8 @@ class PreCheckValidator:
         """Check Docker version"""
         try:
             process = await asyncio.create_subprocess_exec(
-                "docker", "--version",
+                "docker",
+                "--version",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -94,7 +96,10 @@ class PreCheckValidator:
                             type=check.type,
                             passed=False,
                             message=f"Docker version {current_version} is below required {check.min_version}",
-                            details={"current_version": current_version, "required_version": check.min_version},
+                            details={
+                                "current_version": current_version,
+                                "required_version": check.min_version,
+                            },
                         )
 
                 return CheckResult(
@@ -137,7 +142,9 @@ class PreCheckValidator:
         """Check Docker Compose version"""
         try:
             process = await asyncio.create_subprocess_exec(
-                "docker", "compose", "version",
+                "docker",
+                "compose",
+                "version",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -162,7 +169,10 @@ class PreCheckValidator:
                             type=check.type,
                             passed=False,
                             message=f"Docker Compose version {current_version} is below required {check.min_version}",
-                            details={"current_version": current_version, "required_version": check.min_version},
+                            details={
+                                "current_version": current_version,
+                                "required_version": check.min_version,
+                            },
                         )
 
                 return CheckResult(
@@ -213,7 +223,10 @@ class PreCheckValidator:
                 type=check.type,
                 passed=False,
                 message=f"Ports {unavailable_ports} are already in use",
-                details={"unavailable_ports": unavailable_ports, "required_ports": check.ports},
+                details={
+                    "unavailable_ports": unavailable_ports,
+                    "required_ports": check.ports,
+                },
             )
 
         return CheckResult(
@@ -260,7 +273,7 @@ class PreCheckValidator:
         """Check available disk space"""
         try:
             total, used, free = shutil.disk_usage("/")
-            free_gb = free / (1024 ** 3)
+            free_gb = free / (1024**3)
 
             min_gb = check.min_gb or 0
             if free_gb < min_gb:
@@ -293,10 +306,12 @@ class PreCheckValidator:
             # First, try to import esptool module directly (works for both frozen and dev)
             try:
                 import esptool
-                version_str = getattr(esptool, '__version__', None)
+
+                version_str = getattr(esptool, "__version__", None)
                 if not version_str:
                     try:
                         from esptool import __version__
+
                         version_str = __version__
                     except ImportError:
                         pass
@@ -313,7 +328,8 @@ class PreCheckValidator:
                     try:
                         # Try esptool.py command
                         process = await asyncio.create_subprocess_exec(
-                            "esptool.py", "version",
+                            "esptool.py",
+                            "version",
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.PIPE,
                         )
@@ -322,7 +338,10 @@ class PreCheckValidator:
                         if process.returncode != 0:
                             # Try with python -m esptool
                             process = await asyncio.create_subprocess_exec(
-                                sys.executable, "-m", "esptool", "version",
+                                sys.executable,
+                                "-m",
+                                "esptool",
+                                "version",
                                 stdout=asyncio.subprocess.PIPE,
                                 stderr=asyncio.subprocess.PIPE,
                             )
@@ -355,12 +374,18 @@ class PreCheckValidator:
                     current_version = match.group(1)
 
                     if check.min_version:
-                        if self._compare_versions(current_version, check.min_version) < 0:
+                        if (
+                            self._compare_versions(current_version, check.min_version)
+                            < 0
+                        ):
                             return CheckResult(
                                 type=check.type,
                                 passed=False,
                                 message=f"esptool version {current_version} is below required {check.min_version}",
-                                details={"current_version": current_version, "required_version": check.min_version},
+                                details={
+                                    "current_version": current_version,
+                                    "required_version": check.min_version,
+                                },
                             )
 
                     return CheckResult(
@@ -396,6 +421,7 @@ class PreCheckValidator:
         """
         try:
             import serial.tools.list_ports
+
             ports = list(serial.tools.list_ports.comports())
 
             if not ports:
@@ -432,7 +458,8 @@ class PreCheckValidator:
             for python_cmd in ["python3", "python"]:
                 try:
                     process = await asyncio.create_subprocess_exec(
-                        python_cmd, "--version",
+                        python_cmd,
+                        "--version",
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE,
                     )
@@ -469,7 +496,8 @@ class PreCheckValidator:
         """Check if uv package manager is installed"""
         try:
             process = await asyncio.create_subprocess_exec(
-                "uv", "--version",
+                "uv",
+                "--version",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -510,8 +538,9 @@ class PreCheckValidator:
         """Check available memory"""
         try:
             import psutil
+
             memory = psutil.virtual_memory()
-            available_mb = memory.available / (1024 ** 2)
+            available_mb = memory.available / (1024**2)
 
             min_mb = check.min_mb or 0
             if available_mb < min_mb:
@@ -545,6 +574,7 @@ class PreCheckValidator:
 
     def _compare_versions(self, v1: str, v2: str) -> int:
         """Compare two version strings. Returns -1 if v1 < v2, 0 if equal, 1 if v1 > v2"""
+
         def normalize(v):
             return [int(x) for x in re.sub(r"[^\d.]", "", v).split(".")]
 

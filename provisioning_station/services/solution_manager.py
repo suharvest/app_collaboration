@@ -19,13 +19,15 @@ from ..models.solution import Solution
 logger = logging.getLogger(__name__)
 
 # Valid file extensions for uploads
-ALLOWED_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.svg', '.webp', '.gif'}
-ALLOWED_DOC_EXTENSIONS = {'.md'}
-ALLOWED_CONFIG_EXTENSIONS = {'.yaml', '.yml'}
-ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS | ALLOWED_DOC_EXTENSIONS | ALLOWED_CONFIG_EXTENSIONS
+ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg", ".webp", ".gif"}
+ALLOWED_DOC_EXTENSIONS = {".md"}
+ALLOWED_CONFIG_EXTENSIONS = {".yaml", ".yml"}
+ALLOWED_EXTENSIONS = (
+    ALLOWED_IMAGE_EXTENSIONS | ALLOWED_DOC_EXTENSIONS | ALLOWED_CONFIG_EXTENSIONS
+)
 
 # Solution ID validation pattern: lowercase letters, numbers, underscore, must start with letter
-SOLUTION_ID_PATTERN = re.compile(r'^[a-z][a-z0-9_]*$')
+SOLUTION_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 class SolutionManager:
@@ -34,7 +36,9 @@ class SolutionManager:
     def __init__(self):
         self.solutions_dir = settings.solutions_dir
         self.solutions: Dict[str, Solution] = {}
-        self._device_configs: Dict[str, Dict[str, DeviceConfig]] = {}  # solution_id -> device_id -> config
+        self._device_configs: Dict[str, Dict[str, DeviceConfig]] = (
+            {}
+        )  # solution_id -> device_id -> config
         self._global_device_catalog: Dict[str, dict] = {}  # Global device catalog
 
     async def load_global_device_catalog(self) -> None:
@@ -48,7 +52,9 @@ class SolutionManager:
             async with aiofiles.open(catalog_path, "r", encoding="utf-8") as f:
                 content = await f.read()
                 self._global_device_catalog = yaml.safe_load(content) or {}
-            logger.info(f"Loaded {len(self._global_device_catalog)} devices from global catalog")
+            logger.info(
+                f"Loaded {len(self._global_device_catalog)} devices from global catalog"
+            )
         except Exception as e:
             logger.error(f"Failed to load global device catalog: {e}")
 
@@ -168,7 +174,9 @@ class SolutionManager:
                         device_ids.add(device.id)
         return len(device_ids)
 
-    async def load_markdown(self, solution_id: str, relative_path: str, convert_to_html: bool = True) -> Optional[str]:
+    async def load_markdown(
+        self, solution_id: str, relative_path: str, convert_to_html: bool = True
+    ) -> Optional[str]:
         """Load markdown content from a solution's file and optionally convert to HTML"""
         solution = self.get_solution(solution_id)
         if not solution or not solution.base_path:
@@ -185,7 +193,7 @@ class SolutionManager:
 
             if convert_to_html:
                 # Convert markdown to HTML
-                md = markdown.Markdown(extensions=['extra', 'codehilite', 'toc'])
+                md = markdown.Markdown(extensions=["extra", "codehilite", "toc"])
                 return md.convert(content)
             return content
         except Exception as e:
@@ -270,7 +278,9 @@ class SolutionManager:
 
         # Validate ID format
         if not self.validate_solution_id(solution_id):
-            raise ValueError(f"Invalid solution ID format: {solution_id}. Must match pattern: {SOLUTION_ID_PATTERN.pattern}")
+            raise ValueError(
+                f"Invalid solution ID format: {solution_id}. Must match pattern: {SOLUTION_ID_PATTERN.pattern}"
+            )
 
         # Check if already exists
         if self.solution_exists(solution_id):
@@ -315,20 +325,34 @@ class SolutionManager:
             # Write solution.yaml
             yaml_path = solution_path / "solution.yaml"
             async with aiofiles.open(yaml_path, "w", encoding="utf-8") as f:
-                await f.write(yaml.dump(solution_yaml, allow_unicode=True, sort_keys=False))
+                await f.write(
+                    yaml.dump(solution_yaml, allow_unicode=True, sort_keys=False)
+                )
 
             # Create placeholder markdown files
             description_en = f"# {data['name']}\n\n{data['summary']}\n"
             description_zh = f"# {data.get('name_zh') or data['name']}\n\n{data.get('summary_zh') or data['summary']}\n"
 
-            async with aiofiles.open(solution_path / "intro" / "description.md", "w", encoding="utf-8") as f:
+            async with aiofiles.open(
+                solution_path / "intro" / "description.md", "w", encoding="utf-8"
+            ) as f:
                 await f.write(description_en)
-            async with aiofiles.open(solution_path / "intro" / "description_zh.md", "w", encoding="utf-8") as f:
+            async with aiofiles.open(
+                solution_path / "intro" / "description_zh.md", "w", encoding="utf-8"
+            ) as f:
                 await f.write(description_zh)
-            async with aiofiles.open(solution_path / "deploy" / "guide.md", "w", encoding="utf-8") as f:
-                await f.write(f"## Deployment Guide\n\nFollow the steps below to deploy {data['name']}.\n")
-            async with aiofiles.open(solution_path / "deploy" / "guide_zh.md", "w", encoding="utf-8") as f:
-                await f.write(f"## 部署指南\n\n按照以下步骤部署 {data.get('name_zh') or data['name']}。\n")
+            async with aiofiles.open(
+                solution_path / "deploy" / "guide.md", "w", encoding="utf-8"
+            ) as f:
+                await f.write(
+                    f"## Deployment Guide\n\nFollow the steps below to deploy {data['name']}.\n"
+                )
+            async with aiofiles.open(
+                solution_path / "deploy" / "guide_zh.md", "w", encoding="utf-8"
+            ) as f:
+                await f.write(
+                    f"## 部署指南\n\n按照以下步骤部署 {data.get('name_zh') or data['name']}。\n"
+                )
 
             # Load and register the new solution
             solution = await self._load_solution(solution_path)
@@ -386,7 +410,9 @@ class SolutionManager:
         else:
             raise Exception("Failed to reload updated solution")
 
-    async def delete_solution(self, solution_id: str, move_to_trash: bool = True) -> bool:
+    async def delete_solution(
+        self, solution_id: str, move_to_trash: bool = True
+    ) -> bool:
         """Delete a solution (optionally move to trash instead of permanent delete)"""
         solution = self.get_solution(solution_id)
         if not solution:
@@ -401,6 +427,7 @@ class SolutionManager:
 
             # Use timestamp to avoid conflicts
             import time
+
             trash_name = f"{solution_id}_{int(time.time())}"
             trash_path = trash_dir / trash_name
 
@@ -438,7 +465,7 @@ class SolutionManager:
         solution_id: str,
         file_content: bytes,
         relative_path: str,
-        update_yaml_field: Optional[str] = None
+        update_yaml_field: Optional[str] = None,
     ) -> str:
         """Save an uploaded file to the solution directory"""
         solution = self.get_solution(solution_id)
@@ -477,7 +504,9 @@ class SolutionManager:
             target[fields[-1]] = relative_path
 
             async with aiofiles.open(yaml_path, "w", encoding="utf-8") as f:
-                await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False))
+                await f.write(
+                    yaml.dump(current_yaml, allow_unicode=True, sort_keys=False)
+                )
 
             # Reload solution
             await self.reload_solution(solution_id)
@@ -497,7 +526,7 @@ class SolutionManager:
             items = []
             for item in sorted(path.iterdir()):
                 relative_path = item.relative_to(relative_to)
-                if item.name.startswith('.'):
+                if item.name.startswith("."):
                     continue  # Skip hidden files
 
                 entry = {
@@ -515,7 +544,7 @@ class SolutionManager:
 
         return {
             "solution_id": solution_id,
-            "files": build_tree(solution_path, solution_path)
+            "files": build_tree(solution_path, solution_path),
         }
 
     async def delete_file(self, solution_id: str, relative_path: str) -> bool:
@@ -545,10 +574,7 @@ class SolutionManager:
         return True
 
     async def save_text_file(
-        self,
-        solution_id: str,
-        relative_path: str,
-        content: str
+        self, solution_id: str, relative_path: str, content: str
     ) -> str:
         """Create or update a text file (md, yaml, etc.)"""
         solution = self.get_solution(solution_id)
@@ -611,8 +637,12 @@ class SolutionManager:
                     "title_zh": preset.section.title_zh,
                     "description_file": preset.section.description_file,
                     "description_file_zh": preset.section.description_file_zh,
-                    "description_file_exists": file_exists(preset.section.description_file),
-                    "description_file_zh_exists": file_exists(preset.section.description_file_zh),
+                    "description_file_exists": file_exists(
+                        preset.section.description_file
+                    ),
+                    "description_file_zh_exists": file_exists(
+                        preset.section.description_file_zh
+                    ),
                 }
 
             # Preset devices
@@ -635,10 +665,16 @@ class SolutionManager:
                         "title_zh": device.section.title_zh,
                         "description_file": device.section.description_file,
                         "description_file_zh": device.section.description_file_zh,
-                        "description_file_exists": file_exists(device.section.description_file),
-                        "description_file_zh_exists": file_exists(device.section.description_file_zh),
+                        "description_file_exists": file_exists(
+                            device.section.description_file
+                        ),
+                        "description_file_zh_exists": file_exists(
+                            device.section.description_file_zh
+                        ),
                         "troubleshoot_file": device.section.troubleshoot_file,
-                        "troubleshoot_file_exists": file_exists(device.section.troubleshoot_file),
+                        "troubleshoot_file_exists": file_exists(
+                            device.section.troubleshoot_file
+                        ),
                     }
 
                 # Device targets
@@ -657,8 +693,12 @@ class SolutionManager:
                             target_data["section"] = {
                                 "description_file": target.section.description_file,
                                 "description_file_zh": target.section.description_file_zh,
-                                "description_file_exists": file_exists(target.section.description_file),
-                                "description_file_zh_exists": file_exists(target.section.description_file_zh),
+                                "description_file_exists": file_exists(
+                                    target.section.description_file
+                                ),
+                                "description_file_zh_exists": file_exists(
+                                    target.section.description_file_zh
+                                ),
                             }
                         device_data["targets"][target_id] = target_data
 
@@ -680,8 +720,12 @@ class SolutionManager:
                 "description_file": solution.intro.description_file,
                 "description_file_zh": solution.intro.description_file_zh,
                 "description_file_exists": file_exists(solution.intro.description_file),
-                "description_file_zh_exists": file_exists(solution.intro.description_file_zh),
-                "links": solution.intro.links.model_dump() if solution.intro.links else {},
+                "description_file_zh_exists": file_exists(
+                    solution.intro.description_file_zh
+                ),
+                "links": (
+                    solution.intro.links.model_dump() if solution.intro.links else {}
+                ),
             },
             "deployment": {
                 "guide_file": solution.deployment.guide_file,
@@ -693,7 +737,9 @@ class SolutionManager:
             "presets": presets,
         }
 
-    async def add_preset(self, solution_id: str, preset_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def add_preset(
+        self, solution_id: str, preset_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Add a new preset to the solution"""
         solution = self.get_solution(solution_id)
         if not solution:
@@ -715,7 +761,9 @@ class SolutionManager:
         # Check for duplicate ID
         for preset in current_yaml["intro"]["presets"]:
             if preset.get("id") == preset_data.get("id"):
-                raise ValueError(f"Preset with ID '{preset_data.get('id')}' already exists")
+                raise ValueError(
+                    f"Preset with ID '{preset_data.get('id')}' already exists"
+                )
 
         # Add new preset
         new_preset = {
@@ -733,7 +781,14 @@ class SolutionManager:
 
         # Write back
         async with aiofiles.open(yaml_path, "w") as f:
-            await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False, default_flow_style=False))
+            await f.write(
+                yaml.dump(
+                    current_yaml,
+                    allow_unicode=True,
+                    sort_keys=False,
+                    default_flow_style=False,
+                )
+            )
 
         # Reload solution
         await self.reload_solution(solution_id)
@@ -741,7 +796,9 @@ class SolutionManager:
 
         return new_preset
 
-    async def update_preset(self, solution_id: str, preset_id: str, preset_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def update_preset(
+        self, solution_id: str, preset_id: str, preset_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Update an existing preset"""
         solution = self.get_solution(solution_id)
         if not solution:
@@ -758,7 +815,14 @@ class SolutionManager:
         for preset in current_yaml.get("intro", {}).get("presets", []):
             if preset.get("id") == preset_id:
                 # Update fields
-                for key in ["name", "name_zh", "description", "description_zh", "badge", "badge_zh"]:
+                for key in [
+                    "name",
+                    "name_zh",
+                    "description",
+                    "description_zh",
+                    "badge",
+                    "badge_zh",
+                ]:
                     if key in preset_data:
                         preset[key] = preset_data[key]
                 preset_found = True
@@ -768,7 +832,14 @@ class SolutionManager:
             raise ValueError(f"Preset not found: {preset_id}")
 
         async with aiofiles.open(yaml_path, "w") as f:
-            await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False, default_flow_style=False))
+            await f.write(
+                yaml.dump(
+                    current_yaml,
+                    allow_unicode=True,
+                    sort_keys=False,
+                    default_flow_style=False,
+                )
+            )
 
         await self.reload_solution(solution_id)
         logger.info(f"Updated preset '{preset_id}' in solution '{solution_id}'")
@@ -789,13 +860,22 @@ class SolutionManager:
 
         presets = current_yaml.get("intro", {}).get("presets", [])
         original_len = len(presets)
-        current_yaml["intro"]["presets"] = [p for p in presets if p.get("id") != preset_id]
+        current_yaml["intro"]["presets"] = [
+            p for p in presets if p.get("id") != preset_id
+        ]
 
         if len(current_yaml["intro"]["presets"]) == original_len:
             raise ValueError(f"Preset not found: {preset_id}")
 
         async with aiofiles.open(yaml_path, "w") as f:
-            await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False, default_flow_style=False))
+            await f.write(
+                yaml.dump(
+                    current_yaml,
+                    allow_unicode=True,
+                    sort_keys=False,
+                    default_flow_style=False,
+                )
+            )
 
         await self.reload_solution(solution_id)
         logger.info(f"Deleted preset '{preset_id}' from solution '{solution_id}'")
@@ -803,10 +883,7 @@ class SolutionManager:
         return True
 
     async def add_preset_device(
-        self,
-        solution_id: str,
-        preset_id: str,
-        device_data: Dict[str, Any]
+        self, solution_id: str, preset_id: str, device_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Add a new device (deployment step) to a preset"""
         solution = self.get_solution(solution_id)
@@ -829,7 +906,9 @@ class SolutionManager:
                 # Check for duplicate device ID
                 for device in preset["devices"]:
                     if device.get("id") == device_data.get("id"):
-                        raise ValueError(f"Device with ID '{device_data.get('id')}' already exists in preset")
+                        raise ValueError(
+                            f"Device with ID '{device_data.get('id')}' already exists in preset"
+                        )
 
                 # Build device entry
                 new_device = {
@@ -841,10 +920,15 @@ class SolutionManager:
                 }
 
                 # Add section if description files are provided
-                if device_data.get("description_file") or device_data.get("description_file_zh"):
+                if device_data.get("description_file") or device_data.get(
+                    "description_file_zh"
+                ):
                     new_device["section"] = {
                         "title": device_data.get("section_title", device_data["name"]),
-                        "title_zh": device_data.get("section_title_zh", device_data.get("name_zh", device_data["name"])),
+                        "title_zh": device_data.get(
+                            "section_title_zh",
+                            device_data.get("name_zh", device_data["name"]),
+                        ),
                         "description_file": device_data.get("description_file"),
                         "description_file_zh": device_data.get("description_file_zh"),
                     }
@@ -857,10 +941,19 @@ class SolutionManager:
             raise ValueError(f"Preset not found: {preset_id}")
 
         async with aiofiles.open(yaml_path, "w") as f:
-            await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False, default_flow_style=False))
+            await f.write(
+                yaml.dump(
+                    current_yaml,
+                    allow_unicode=True,
+                    sort_keys=False,
+                    default_flow_style=False,
+                )
+            )
 
         await self.reload_solution(solution_id)
-        logger.info(f"Added device '{device_data['id']}' to preset '{preset_id}' in solution '{solution_id}'")
+        logger.info(
+            f"Added device '{device_data['id']}' to preset '{preset_id}' in solution '{solution_id}'"
+        )
 
         return device_data
 
@@ -869,7 +962,7 @@ class SolutionManager:
         solution_id: str,
         preset_id: str,
         device_id: str,
-        device_data: Dict[str, Any]
+        device_data: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Update a device in a preset"""
         solution = self.get_solution(solution_id)
@@ -888,22 +981,44 @@ class SolutionManager:
                 for device in preset.get("devices", []):
                     if device.get("id") == device_id:
                         # Update fields
-                        for key in ["name", "name_zh", "type", "required", "config_file"]:
+                        for key in [
+                            "name",
+                            "name_zh",
+                            "type",
+                            "required",
+                            "config_file",
+                        ]:
                             if key in device_data:
                                 device[key] = device_data[key]
 
                         # Update section
-                        if any(k in device_data for k in ["description_file", "description_file_zh", "section_title", "section_title_zh"]):
+                        if any(
+                            k in device_data
+                            for k in [
+                                "description_file",
+                                "description_file_zh",
+                                "section_title",
+                                "section_title_zh",
+                            ]
+                        ):
                             if "section" not in device:
                                 device["section"] = {}
                             if "description_file" in device_data:
-                                device["section"]["description_file"] = device_data["description_file"]
+                                device["section"]["description_file"] = device_data[
+                                    "description_file"
+                                ]
                             if "description_file_zh" in device_data:
-                                device["section"]["description_file_zh"] = device_data["description_file_zh"]
+                                device["section"]["description_file_zh"] = device_data[
+                                    "description_file_zh"
+                                ]
                             if "section_title" in device_data:
-                                device["section"]["title"] = device_data["section_title"]
+                                device["section"]["title"] = device_data[
+                                    "section_title"
+                                ]
                             if "section_title_zh" in device_data:
-                                device["section"]["title_zh"] = device_data["section_title_zh"]
+                                device["section"]["title_zh"] = device_data[
+                                    "section_title_zh"
+                                ]
 
                         device_found = True
                         break
@@ -913,18 +1028,24 @@ class SolutionManager:
             raise ValueError(f"Device '{device_id}' not found in preset '{preset_id}'")
 
         async with aiofiles.open(yaml_path, "w") as f:
-            await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False, default_flow_style=False))
+            await f.write(
+                yaml.dump(
+                    current_yaml,
+                    allow_unicode=True,
+                    sort_keys=False,
+                    default_flow_style=False,
+                )
+            )
 
         await self.reload_solution(solution_id)
-        logger.info(f"Updated device '{device_id}' in preset '{preset_id}' in solution '{solution_id}'")
+        logger.info(
+            f"Updated device '{device_id}' in preset '{preset_id}' in solution '{solution_id}'"
+        )
 
         return device_data
 
     async def delete_preset_device(
-        self,
-        solution_id: str,
-        preset_id: str,
-        device_id: str
+        self, solution_id: str, preset_id: str, device_id: str
     ) -> bool:
         """Delete a device from a preset"""
         solution = self.get_solution(solution_id)
@@ -941,7 +1062,9 @@ class SolutionManager:
         for preset in current_yaml.get("intro", {}).get("presets", []):
             if preset.get("id") == preset_id:
                 original_len = len(preset.get("devices", []))
-                preset["devices"] = [d for d in preset.get("devices", []) if d.get("id") != device_id]
+                preset["devices"] = [
+                    d for d in preset.get("devices", []) if d.get("id") != device_id
+                ]
                 if len(preset["devices"]) < original_len:
                     device_found = True
                 break
@@ -950,14 +1073,25 @@ class SolutionManager:
             raise ValueError(f"Device '{device_id}' not found in preset '{preset_id}'")
 
         async with aiofiles.open(yaml_path, "w") as f:
-            await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False, default_flow_style=False))
+            await f.write(
+                yaml.dump(
+                    current_yaml,
+                    allow_unicode=True,
+                    sort_keys=False,
+                    default_flow_style=False,
+                )
+            )
 
         await self.reload_solution(solution_id)
-        logger.info(f"Deleted device '{device_id}' from preset '{preset_id}' in solution '{solution_id}'")
+        logger.info(
+            f"Deleted device '{device_id}' from preset '{preset_id}' in solution '{solution_id}'"
+        )
 
         return True
 
-    async def update_solution_links(self, solution_id: str, links: Dict[str, str]) -> Dict[str, str]:
+    async def update_solution_links(
+        self, solution_id: str, links: Dict[str, str]
+    ) -> Dict[str, str]:
         """Update solution external links (wiki, github)"""
         solution = self.get_solution(solution_id)
         if not solution:
@@ -979,12 +1113,21 @@ class SolutionManager:
                 current_yaml["intro"]["links"][key] = value
 
         async with aiofiles.open(yaml_path, "w") as f:
-            await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False, default_flow_style=False))
+            await f.write(
+                yaml.dump(
+                    current_yaml,
+                    allow_unicode=True,
+                    sort_keys=False,
+                    default_flow_style=False,
+                )
+            )
 
         await self.reload_solution(solution_id)
         return links
 
-    async def update_solution_tags(self, solution_id: str, tags: List[str]) -> List[str]:
+    async def update_solution_tags(
+        self, solution_id: str, tags: List[str]
+    ) -> List[str]:
         """Update solution tags"""
         solution = self.get_solution(solution_id)
         if not solution:
@@ -1001,7 +1144,14 @@ class SolutionManager:
         current_yaml["intro"]["tags"] = tags
 
         async with aiofiles.open(yaml_path, "w") as f:
-            await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False, default_flow_style=False))
+            await f.write(
+                yaml.dump(
+                    current_yaml,
+                    allow_unicode=True,
+                    sort_keys=False,
+                    default_flow_style=False,
+                )
+            )
 
         await self.reload_solution(solution_id)
         return tags

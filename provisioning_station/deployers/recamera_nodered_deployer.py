@@ -30,6 +30,7 @@ def _build_sudo_cmd(password: str, cmd: str) -> str:
     escaped_password = shlex.quote(password)
     return f"printf '%s\\n' {escaped_password} | sudo -S {cmd}"
 
+
 # C++ services that conflict with Node-RED (need to stop and disable)
 CPP_CONFLICT_SERVICES = [
     "yolo26-detector",
@@ -163,35 +164,49 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
         for svc_name in CPP_CONFLICT_SERVICES:
             # Stop and disable S* version
             stop_script = f'for f in /etc/init.d/S*{svc_name}*; do [ -f "$f" ] && $f stop 2>/dev/null; done'
-            stop_cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(stop_script)}") + " || true"
+            stop_cmd = (
+                _build_sudo_cmd(password, f"sh -c {shlex.quote(stop_script)}")
+                + " || true"
+            )
             await self._exec_cmd(client, stop_cmd)
 
             # Rename S* to K* to disable auto-start
-            disable_script = f'''for svc in /etc/init.d/S*{svc_name}*; do
+            disable_script = f"""for svc in /etc/init.d/S*{svc_name}*; do
     if [ -f "$svc" ]; then
         new_name=$(echo "$svc" | sed "s|/S|/K|")
         mv "$svc" "$new_name" 2>/dev/null && echo "Disabled: $svc -> $new_name"
     fi
-done'''
-            disable_cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(disable_script)}") + " || true"
+done"""
+            disable_cmd = (
+                _build_sudo_cmd(password, f"sh -c {shlex.quote(disable_script)}")
+                + " || true"
+            )
             result = await self._exec_cmd(client, disable_cmd)
             if result and "Disabled:" in result:
                 logger.info(result.strip())
 
         # Also scan for other custom S9* services and stop them
         scan_script = 'for f in /etc/init.d/S9*; do [ -f "$f" ] && basename "$f"; done'
-        scan_cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(scan_script)}") + " 2>/dev/null || true"
+        scan_cmd = (
+            _build_sudo_cmd(password, f"sh -c {shlex.quote(scan_script)}")
+            + " 2>/dev/null || true"
+        )
         result = await self._exec_cmd(client, scan_cmd)
         if result:
-            for svc in result.strip().split('\n'):
+            for svc in result.strip().split("\n"):
                 svc = svc.strip()
                 if not svc:
                     continue
                 # Skip Node-RED related services
-                if any(nr in svc.lower() for nr in ['node-red', 'sscma-node', 'sscma-supervisor']):
+                if any(
+                    nr in svc.lower()
+                    for nr in ["node-red", "sscma-node", "sscma-supervisor"]
+                ):
                     continue
                 # Stop other S9* services
-                cmd = _build_sudo_cmd(password, f"/etc/init.d/{svc} stop 2>/dev/null || true")
+                cmd = _build_sudo_cmd(
+                    password, f"/etc/init.d/{svc} stop 2>/dev/null || true"
+                )
                 await self._exec_cmd(client, cmd)
 
     async def _restore_nodered_services(
@@ -202,13 +217,16 @@ done'''
         """Restore Node-RED services that may have been disabled (K* → S*)."""
         for svc_name in NODERED_SERVICES:
             # Rename K* back to S* to enable auto-start
-            restore_script = f'''for svc in /etc/init.d/K*{svc_name}*; do
+            restore_script = f"""for svc in /etc/init.d/K*{svc_name}*; do
     if [ -f "$svc" ]; then
         new_name=$(echo "$svc" | sed "s|/K|/S|")
         mv "$svc" "$new_name" 2>/dev/null && echo "Restored: $svc -> $new_name"
     fi
-done'''
-            restore_cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(restore_script)}") + " || true"
+done"""
+            restore_cmd = (
+                _build_sudo_cmd(password, f"sh -c {shlex.quote(restore_script)}")
+                + " || true"
+            )
             result = await self._exec_cmd(client, restore_cmd)
             if result and "Restored:" in result:
                 logger.info(result.strip())

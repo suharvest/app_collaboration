@@ -12,6 +12,7 @@ from .deployment import DeploymentStatus, StepStatus
 
 class SolutionSummary(BaseModel):
     """Solution summary for listing"""
+
     id: str
     name: str
     name_zh: Optional[str] = None
@@ -34,6 +35,7 @@ class SolutionSummary(BaseModel):
 
 class DeviceSummary(BaseModel):
     """Device summary"""
+
     id: str
     name: str
     name_zh: Optional[str] = None
@@ -43,6 +45,7 @@ class DeviceSummary(BaseModel):
 
 class PartnerInfo(BaseModel):
     """Deployment partner information"""
+
     name: str
     name_zh: Optional[str] = None
     logo: Optional[str] = None
@@ -53,6 +56,7 @@ class PartnerInfo(BaseModel):
 
 class SolutionDetail(BaseModel):
     """Detailed solution information"""
+
     id: str
     name: str
     name_zh: Optional[str] = None
@@ -79,6 +83,7 @@ class SolutionDetail(BaseModel):
 
 class DetectedDevice(BaseModel):
     """Detected device information"""
+
     config_id: str
     name: str
     name_zh: Optional[str] = None
@@ -91,6 +96,7 @@ class DetectedDevice(BaseModel):
 
 class DeviceConnectionRequest(BaseModel):
     """Request to configure device connection"""
+
     ip_address: Optional[str] = None
     host: Optional[str] = None  # Alias for ip_address
     port: Optional[int] = None
@@ -113,6 +119,7 @@ class DeviceConnectionRequest(BaseModel):
 
 class StartDeploymentRequest(BaseModel):
     """Request to start a deployment"""
+
     solution_id: str
     preset_id: Optional[str] = None  # Preset ID for new preset-based solutions
     device_connections: Dict[str, Dict[str, Any]] = {}
@@ -122,6 +129,7 @@ class StartDeploymentRequest(BaseModel):
 
 class DeviceDeploymentStatus(BaseModel):
     """Device deployment status"""
+
     device_id: str
     name: str
     type: str
@@ -134,6 +142,7 @@ class DeviceDeploymentStatus(BaseModel):
 
 class DeploymentStatusResponse(BaseModel):
     """Deployment status response"""
+
     id: str
     solution_id: str
     status: DeploymentStatus
@@ -145,6 +154,7 @@ class DeploymentStatusResponse(BaseModel):
 
 class LogEntryResponse(BaseModel):
     """Log entry for WebSocket"""
+
     timestamp: str
     level: str
     device_id: Optional[str] = None
@@ -154,6 +164,7 @@ class LogEntryResponse(BaseModel):
 
 class StepSummary(BaseModel):
     """Step summary for deployment list"""
+
     id: str
     name: str
     status: str
@@ -162,6 +173,7 @@ class StepSummary(BaseModel):
 
 class DeploymentListItem(BaseModel):
     """Deployment list item"""
+
     id: str
     solution_id: str
     solution_name: str
@@ -177,8 +189,10 @@ class DeploymentListItem(BaseModel):
 # Solution Management Models
 # ============================================
 
+
 class SolutionCreate(BaseModel):
     """Request model for creating a new solution"""
+
     id: str  # Solution ID (directory name, lowercase letters, numbers, underscore)
     name: str  # English name
     name_zh: Optional[str] = None  # Chinese name
@@ -191,6 +205,7 @@ class SolutionCreate(BaseModel):
 
 class SolutionUpdate(BaseModel):
     """Request model for updating an existing solution"""
+
     name: Optional[str] = None
     name_zh: Optional[str] = None
     summary: Optional[str] = None

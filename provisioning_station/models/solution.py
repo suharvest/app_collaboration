@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 class MediaItem(BaseModel):
     """Media item (image or video) in gallery"""
+
     type: str = Field(..., pattern="^(image|video)$")
     src: str
     thumbnail: Optional[str] = None
@@ -18,6 +19,7 @@ class MediaItem(BaseModel):
 
 class RequiredDevice(BaseModel):
     """Device shown in intro page (legacy, kept for backward compatibility)"""
+
     name: str
     name_zh: Optional[str] = None
     image: Optional[str] = None
@@ -28,8 +30,10 @@ class RequiredDevice(BaseModel):
 
 # ============ Device Configuration System ============
 
+
 class DeviceCatalogItem(BaseModel):
     """Device definition in catalog (local overrides for global catalog)"""
+
     name: Optional[str] = None  # Optional when using global catalog
     name_zh: Optional[str] = None
     image: Optional[str] = None
@@ -42,6 +46,7 @@ class DeviceCatalogItem(BaseModel):
 
 class DeviceGroupOption(BaseModel):
     """Option within a device group"""
+
     device_ref: str
     label: Optional[str] = None
     label_zh: Optional[str] = None
@@ -49,6 +54,7 @@ class DeviceGroupOption(BaseModel):
 
 class DeviceGroupSection(BaseModel):
     """Section with template variables for device group deployment instructions"""
+
     title: Optional[str] = None
     title_zh: Optional[str] = None
     description_file: Optional[str] = None
@@ -59,6 +65,7 @@ class DeviceGroupSection(BaseModel):
 
 class DeviceGroup(BaseModel):
     """Device selection group"""
+
     id: str
     name: str
     name_zh: Optional[str] = None
@@ -82,12 +89,14 @@ class DeviceGroup(BaseModel):
 
 class PresetLinks(BaseModel):
     """Links specific to a preset"""
+
     wiki: Optional[str] = None
     github: Optional[str] = None
 
 
 class Preset(BaseModel):
     """Pre-defined device configuration"""
+
     id: str
     name: str
     name_zh: Optional[str] = None
@@ -104,6 +113,7 @@ class Preset(BaseModel):
 
 class SolutionStats(BaseModel):
     """Solution statistics"""
+
     deployed_count: int = 0
     likes_count: int = 0
     difficulty: str = "beginner"  # beginner | intermediate | advanced
@@ -112,6 +122,7 @@ class SolutionStats(BaseModel):
 
 class SolutionLinks(BaseModel):
     """External links for solution"""
+
     wiki: Optional[str] = None
     github: Optional[str] = None
     docs: Optional[str] = None
@@ -119,6 +130,7 @@ class SolutionLinks(BaseModel):
 
 class Partner(BaseModel):
     """Deployment partner who can provide on-site service"""
+
     name: str
     name_zh: Optional[str] = None
     logo: Optional[str] = None
@@ -130,6 +142,7 @@ class Partner(BaseModel):
 
 class SolutionIntro(BaseModel):
     """Intro page content"""
+
     summary: str
     summary_zh: Optional[str] = None
     description_file: Optional[str] = None
@@ -149,6 +162,7 @@ class SolutionIntro(BaseModel):
 
 class WiringInfo(BaseModel):
     """Wiring instructions for device"""
+
     image: Optional[str] = None
     steps: List[str] = []
     steps_zh: List[str] = []
@@ -156,6 +170,7 @@ class WiringInfo(BaseModel):
 
 class DeviceSection(BaseModel):
     """Device section in deployment page"""
+
     title: Optional[str] = None
     title_zh: Optional[str] = None
     description_file: Optional[str] = None
@@ -168,6 +183,7 @@ class DeviceSection(BaseModel):
 
 class UserInput(BaseModel):
     """User input field for deployment"""
+
     id: str
     name: str
     name_zh: Optional[str] = None
@@ -183,6 +199,7 @@ class UserInput(BaseModel):
 # Preview configuration models
 class PreviewVideoConfig(BaseModel):
     """Video source configuration for preview"""
+
     type: str = "rtsp_proxy"  # rtsp_proxy | mjpeg | hls
     rtsp_url_template: Optional[str] = None
     mjpeg_url_template: Optional[str] = None
@@ -191,6 +208,7 @@ class PreviewVideoConfig(BaseModel):
 
 class PreviewMqttConfig(BaseModel):
     """MQTT configuration for preview"""
+
     broker_template: Optional[str] = None
     port: int = 1883
     topic_template: str = "inference/results"
@@ -200,12 +218,14 @@ class PreviewMqttConfig(BaseModel):
 
 class PreviewOverlayConfig(BaseModel):
     """Overlay rendering configuration"""
+
     renderer: str = "custom"  # builtin_bbox | custom
     script_file: Optional[str] = None
 
 
 class PreviewDisplayConfig(BaseModel):
     """Display settings for preview"""
+
     aspect_ratio: str = "16:9"
     auto_start: bool = False
     show_stats: bool = True
@@ -213,6 +233,7 @@ class PreviewDisplayConfig(BaseModel):
 
 class PreviewConfig(BaseModel):
     """Complete preview configuration for a deployment step"""
+
     video: PreviewVideoConfig = Field(default_factory=PreviewVideoConfig)
     mqtt: PreviewMqttConfig = Field(default_factory=PreviewMqttConfig)
     overlay: PreviewOverlayConfig = Field(default_factory=PreviewOverlayConfig)
@@ -222,6 +243,7 @@ class PreviewConfig(BaseModel):
 
 class DeviceTarget(BaseModel):
     """A deployment target variant (e.g., local/remote, or model A/B)"""
+
     name: str
     name_zh: Optional[str] = None
     description: Optional[str] = None
@@ -233,11 +255,13 @@ class DeviceTarget(BaseModel):
 
 class DeviceShowWhen(BaseModel):
     """Conditional display rules for devices"""
+
     preset: Optional[str] = None  # Show device only when this preset is selected
 
 
 class DeviceRef(BaseModel):
     """Device reference in solution"""
+
     id: str
     name: str
     name_zh: Optional[str] = None
@@ -253,6 +277,7 @@ class DeviceRef(BaseModel):
 
 class PostDeploymentStep(BaseModel):
     """Post-deployment step"""
+
     title: str
     title_zh: Optional[str] = None
     action: str = "guide"  # open_url | guide
@@ -262,6 +287,7 @@ class PostDeploymentStep(BaseModel):
 
 class PostDeployment(BaseModel):
     """Post-deployment configuration"""
+
     success_message_file: Optional[str] = None
     success_message_file_zh: Optional[str] = None
     next_steps: List[PostDeploymentStep] = []
@@ -269,6 +295,7 @@ class PostDeployment(BaseModel):
 
 class SolutionDeployment(BaseModel):
     """Deployment page content"""
+
     guide_file: Optional[str] = None
     guide_file_zh: Optional[str] = None
     selection_mode: str = "sequential"  # sequential | single_choice
@@ -279,6 +306,7 @@ class SolutionDeployment(BaseModel):
 
 class Solution(BaseModel):
     """Complete solution configuration"""
+
     version: str = "1.0"
     id: str
     name: str
@@ -293,6 +321,7 @@ class Solution(BaseModel):
         """Get absolute path to a solution asset"""
         if self.base_path and relative_path:
             from pathlib import Path
+
             return str(Path(self.base_path) / relative_path)
         return None
 

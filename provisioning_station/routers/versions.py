@@ -42,8 +42,7 @@ async def get_device_version(solution_id: str, device_id: str):
         raise HTTPException(status_code=404, detail="Solution not found")
 
     device_version = next(
-        (d for d in versions.devices if d.device_id == device_id),
-        None
+        (d for d in versions.devices if d.device_id == device_id), None
     )
     if not device_version:
         raise HTTPException(status_code=404, detail="Device not found")
@@ -61,7 +60,9 @@ async def check_solution_updates(solution_id: str):
     """
     results = await version_manager.check_all_updates(solution_id)
     if not results:
-        raise HTTPException(status_code=404, detail="Solution not found or no devices configured")
+        raise HTTPException(
+            status_code=404, detail="Solution not found or no devices configured"
+        )
     return results
 
 

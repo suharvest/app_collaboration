@@ -23,7 +23,7 @@ def is_frozen() -> bool:
     This must be a function, not a module-level variable, because when uvicorn
     imports the module in a worker process, sys.frozen may not be set yet.
     """
-    return getattr(sys, 'frozen', False)
+    return getattr(sys, "frozen", False)
 
 
 class ESP32Deployer(BaseDeployer):
@@ -51,14 +51,13 @@ class ESP32Deployer(BaseDeployer):
             )
 
             if not await self._wait_for_port_available(
-                port,
-                timeout=10,
-                auto_release=True,
-                progress_callback=progress_callback
+                port, timeout=10, auto_release=True, progress_callback=progress_callback
             ):
                 await self._report_progress(
-                    progress_callback, "detect", 0,
-                    f"Port {port} is busy. Please ensure no other program is using it."
+                    progress_callback,
+                    "detect",
+                    0,
+                    f"Port {port} is busy. Please ensure no other program is using it.",
                 )
                 return False
 
@@ -68,12 +67,17 @@ class ESP32Deployer(BaseDeployer):
             )
 
             # Try detection with automatic reset first
-            detect_result = await self._run_esptool([
-                "--port", port,
-                "--before", "default_reset",
-                "--after", "no_reset",
-                "chip_id"
-            ])
+            detect_result = await self._run_esptool(
+                [
+                    "--port",
+                    port,
+                    "--before",
+                    "default_reset",
+                    "--after",
+                    "no_reset",
+                    "chip_id",
+                ]
+            )
 
             if not detect_result["success"]:
                 # First attempt failed, prompt user for manual boot mode
@@ -81,19 +85,24 @@ class ESP32Deployer(BaseDeployer):
                     progress_callback,
                     "detect",
                     30,
-                    "Auto-detect failed. Please enter download mode: Hold BOOT button, press RESET, then release BOOT"
+                    "Auto-detect failed. Please enter download mode: Hold BOOT button, press RESET, then release BOOT",
                 )
 
                 # Wait a moment for user to enter boot mode
                 await asyncio.sleep(3)
 
                 # Retry detection
-                detect_result = await self._run_esptool([
-                    "--port", port,
-                    "--before", "no_reset",
-                    "--after", "no_reset",
-                    "chip_id"
-                ])
+                detect_result = await self._run_esptool(
+                    [
+                        "--port",
+                        port,
+                        "--before",
+                        "no_reset",
+                        "--after",
+                        "no_reset",
+                        "chip_id",
+                    ]
+                )
 
             if not detect_result["success"]:
                 await self._report_progress(
@@ -134,14 +143,13 @@ class ESP32Deployer(BaseDeployer):
             # Step 3: Flash firmware
             # Re-check port availability before flashing (may have been grabbed by another process)
             if not await self._wait_for_port_available(
-                port,
-                timeout=5,
-                auto_release=True,
-                progress_callback=progress_callback
+                port, timeout=5, auto_release=True, progress_callback=progress_callback
             ):
                 await self._report_progress(
-                    progress_callback, "flash", 0,
-                    f"Port {port} is busy. Please ensure no other program is using it."
+                    progress_callback,
+                    "flash",
+                    0,
+                    f"Port {port} is busy. Please ensure no other program is using it.",
                 )
                 return False
 
@@ -151,18 +159,26 @@ class ESP32Deployer(BaseDeployer):
 
             # Build flash command
             flash_args = [
-                "--port", port,
-                "--chip", flash_config.chip,
-                "--baud", str(flash_config.baud_rate),
+                "--port",
+                port,
+                "--chip",
+                flash_config.chip,
+                "--baud",
+                str(flash_config.baud_rate),
                 "write_flash",
-                "--flash_mode", flash_config.flash_mode,
-                "--flash_freq", flash_config.flash_freq,
-                "--flash_size", flash_config.flash_size,
+                "--flash_mode",
+                flash_config.flash_mode,
+                "--flash_freq",
+                flash_config.flash_freq,
+                "--flash_size",
+                flash_config.flash_size,
             ]
 
             # Add partition files
             for partition in flash_config.partitions:
-                firmware_path = config.get_asset_path(f"assets/watcher_firmware/{partition.file}")
+                firmware_path = config.get_asset_path(
+                    f"assets/watcher_firmware/{partition.file}"
+                )
                 if not firmware_path or not Path(firmware_path).exists():
                     # Try relative to base path
                     firmware_path = config.get_asset_path(partition.file)
@@ -181,11 +197,13 @@ class ESP32Deployer(BaseDeployer):
             # Run flash with progress parsing
             flash_result = await self._run_esptool_with_progress(
                 flash_args,
-                lambda p, m: asyncio.create_task(
-                    self._report_progress(progress_callback, "flash", p, m)
-                )
-                if progress_callback
-                else None,
+                lambda p, m: (
+                    asyncio.create_task(
+                        self._report_progress(progress_callback, "flash", p, m)
+                    )
+                    if progress_callback
+                    else None
+                ),
             )
 
             if not flash_result["success"]:
@@ -218,7 +236,10 @@ class ESP32Deployer(BaseDeployer):
         except Exception as e:
             logger.exception(f"ESP32 deployment failed: {e}")
             await self._report_progress(
-                progress_callback, "flash", 0, f"Deployment failed: {str(e) or type(e).__name__}"
+                progress_callback,
+                "flash",
+                0,
+                f"Deployment failed: {str(e) or type(e).__name__}",
             )
             return False
 
@@ -267,7 +288,11 @@ class ESP32Deployer(BaseDeployer):
                     }
                 else:
                     # esptool outputs most errors to stdout, not stderr
-                    error_msg = stderr_val.strip() if stderr_val.strip() else self._extract_esptool_error(stdout_val)
+                    error_msg = (
+                        stderr_val.strip()
+                        if stderr_val.strip()
+                        else self._extract_esptool_error(stdout_val)
+                    )
                     if not error_msg:
                         error_msg = f"esptool exited with code {e.code}"
                     return {
@@ -293,7 +318,10 @@ class ESP32Deployer(BaseDeployer):
                     self._cleanup_serial_port(port)
 
         except ImportError as e:
-            return {"success": False, "error": f"esptool module not available: {str(e)}"}
+            return {
+                "success": False,
+                "error": f"esptool module not available: {str(e)}",
+            }
         except Exception as e:
             logger.exception("Unexpected error in esptool")
             if port:
@@ -305,7 +333,7 @@ class ESP32Deployer(BaseDeployer):
         port: str,
         timeout: int = 10,
         auto_release: bool = True,
-        progress_callback: Optional[Callable] = None
+        progress_callback: Optional[Callable] = None,
     ) -> bool:
         """Wait for serial port to become available, optionally auto-releasing occupied ports.
 
@@ -351,11 +379,11 @@ class ESP32Deployer(BaseDeployer):
             except serial.SerialException as e:
                 error_str = str(e).lower()
                 is_busy = (
-                    "resource temporarily unavailable" in error_str or
-                    "busy" in error_str or
-                    "access is denied" in error_str or  # Windows
-                    "permission denied" in error_str or
-                    "exclusively lock" in error_str
+                    "resource temporarily unavailable" in error_str
+                    or "busy" in error_str
+                    or "access is denied" in error_str  # Windows
+                    or "permission denied" in error_str
+                    or "exclusively lock" in error_str
                 )
 
                 if not is_busy:
@@ -366,7 +394,9 @@ class ESP32Deployer(BaseDeployer):
                 # Port is busy - check processes only once (slow on Windows)
                 if auto_release and not checked_processes:
                     checked_processes = True
-                    proc_info = await SerialPortManager.get_process_using_port_async(port)
+                    proc_info = await SerialPortManager.get_process_using_port_async(
+                        port
+                    )
 
                     if proc_info:
                         logger.info(
@@ -375,9 +405,11 @@ class ESP32Deployer(BaseDeployer):
                         )
                         if progress_callback:
                             await self._report_progress(
-                                progress_callback, "detect", 0,
+                                progress_callback,
+                                "detect",
+                                0,
                                 f"Port {port} is used by {proc_info['name']} "
-                                f"(PID: {proc_info['pid']}), releasing..."
+                                f"(PID: {proc_info['pid']}), releasing...",
                             )
 
                         released = await SerialPortManager.release_port_async(port)
@@ -385,8 +417,10 @@ class ESP32Deployer(BaseDeployer):
                             logger.info(f"Port {port} released successfully")
                             if progress_callback:
                                 await self._report_progress(
-                                    progress_callback, "detect", 0,
-                                    f"Port {port} released successfully"
+                                    progress_callback,
+                                    "detect",
+                                    0,
+                                    f"Port {port} released successfully",
                                 )
                             # Wait a moment for OS to fully release the port
                             await asyncio.sleep(1.0)
@@ -413,18 +447,20 @@ class ESP32Deployer(BaseDeployer):
             return "Unknown error"
 
         # Look for fatal error patterns
-        for line in output.split('\n'):
+        for line in output.split("\n"):
             line = line.strip()
-            if 'fatal error' in line.lower():
+            if "fatal error" in line.lower():
                 # Extract the error message after the colon
-                if ':' in line:
-                    return line.split(':', 1)[-1].strip()
+                if ":" in line:
+                    return line.split(":", 1)[-1].strip()
                 return line
-            if 'error' in line.lower() and ('failed' in line.lower() or 'cannot' in line.lower()):
+            if "error" in line.lower() and (
+                "failed" in line.lower() or "cannot" in line.lower()
+            ):
                 return line
 
         # Return last non-empty lines as context
-        lines = [l.strip() for l in output.strip().split('\n') if l.strip()]
+        lines = [l.strip() for l in output.strip().split("\n") if l.strip()]
         if lines:
             return lines[-1][:200]  # Last line, truncated
 
@@ -463,7 +499,7 @@ class ESP32Deployer(BaseDeployer):
             except serial.SerialException as e:
                 if attempt < max_retries - 1:
                     # Exponential backoff: 200ms, 400ms, 800ms, 1600ms, 3200ms
-                    delay = base_delay * (2 ** attempt)
+                    delay = base_delay * (2**attempt)
                     logger.debug(
                         f"Serial port {port} busy, retrying in {delay:.1f}s "
                         f"(attempt {attempt + 1}/{max_retries}): {e}"
@@ -477,18 +513,24 @@ class ESP32Deployer(BaseDeployer):
                         f"attempts: {e}"
                     )
             except Exception as e:
-                logger.debug(f"Unexpected error during serial port cleanup for {port}: {e}")
+                logger.debug(
+                    f"Unexpected error during serial port cleanup for {port}: {e}"
+                )
                 return
 
     async def _run_esptool(self, args: list) -> dict:
         """Run esptool command"""
         frozen = is_frozen()
-        logger.info(f"Running esptool, frozen={frozen}, sys.frozen={getattr(sys, 'frozen', 'NOT_SET')}")
+        logger.info(
+            f"Running esptool, frozen={frozen}, sys.frozen={getattr(sys, 'frozen', 'NOT_SET')}"
+        )
 
         # For frozen apps OR Windows, use Python API directly
         # Windows has issues with asyncio subprocess for esptool
         if frozen or sys.platform == "win32":
-            logger.info(f"Using Python API for esptool (frozen={frozen}, platform={sys.platform})")
+            logger.info(
+                f"Using Python API for esptool (frozen={frozen}, platform={sys.platform})"
+            )
             loop = asyncio.get_event_loop()
             return await loop.run_in_executor(None, self._run_esptool_internal, args)
 
@@ -520,14 +562,22 @@ class ESP32Deployer(BaseDeployer):
                 stderr_str = stderr.decode("utf-8", errors="replace")
 
                 logger.info(f"esptool returncode: {process.returncode}")
-                logger.info(f"esptool stdout: {stdout_str[:500] if stdout_str else '(empty)'}")
-                logger.info(f"esptool stderr: {stderr_str[:500] if stderr_str else '(empty)'}")
+                logger.info(
+                    f"esptool stdout: {stdout_str[:500] if stdout_str else '(empty)'}"
+                )
+                logger.info(
+                    f"esptool stderr: {stderr_str[:500] if stderr_str else '(empty)'}"
+                )
 
                 # esptool outputs most errors to stdout, not stderr
                 # Extract error message from stdout if stderr is empty
                 error_msg = None
                 if process.returncode != 0:
-                    error_msg = stderr_str if stderr_str.strip() else self._extract_esptool_error(stdout_str)
+                    error_msg = (
+                        stderr_str
+                        if stderr_str.strip()
+                        else self._extract_esptool_error(stdout_str)
+                    )
                     logger.info(f"esptool error_msg: {error_msg}")
 
                 return {
@@ -547,7 +597,9 @@ class ESP32Deployer(BaseDeployer):
                 continue
 
         # All subprocess attempts failed, fall back to Python API
-        logger.info(f"All subprocess commands failed, falling back to esptool Python API. Last error: {last_error}")
+        logger.info(
+            f"All subprocess commands failed, falling back to esptool Python API. Last error: {last_error}"
+        )
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._run_esptool_internal, args)
 
@@ -568,6 +620,7 @@ class ESP32Deployer(BaseDeployer):
 
             class LineCapture(io.StringIO):
                 """StringIO that also appends lines to a list"""
+
                 def __init__(self, lines_list):
                     super().__init__()
                     self.lines_list = lines_list
@@ -575,7 +628,7 @@ class ESP32Deployer(BaseDeployer):
                 def write(self, s):
                     super().write(s)
                     # Split by newlines and add non-empty lines
-                    for line in s.split('\n'):
+                    for line in s.split("\n"):
                         line = line.strip()
                         if line:
                             self.lines_list.append(line)
@@ -596,7 +649,11 @@ class ESP32Deployer(BaseDeployer):
                 if e.code == 0:
                     return {"success": True}
                 else:
-                    error_context = "\n".join(output_lines[-5:]) if output_lines else "Unknown error"
+                    error_context = (
+                        "\n".join(output_lines[-5:])
+                        if output_lines
+                        else "Unknown error"
+                    )
                     return {"success": False, "error": error_context}
             except FatalError as e:
                 # esptool FatalError (connection failed, etc.)
@@ -608,7 +665,10 @@ class ESP32Deployer(BaseDeployer):
                     self._cleanup_serial_port(port)
 
         except ImportError as e:
-            return {"success": False, "error": f"esptool module not available: {str(e)}"}
+            return {
+                "success": False,
+                "error": f"esptool module not available: {str(e)}",
+            }
         except Exception as e:
             logger.exception("Unexpected error in esptool with progress")
             if port:
@@ -625,7 +685,9 @@ class ESP32Deployer(BaseDeployer):
         if is_frozen() or sys.platform == "win32":
             import concurrent.futures
 
-            logger.info(f"Using Python API for esptool with progress (frozen={is_frozen()}, platform={sys.platform})")
+            logger.info(
+                f"Using Python API for esptool with progress (frozen={is_frozen()}, platform={sys.platform})"
+            )
 
             output_lines = []
             last_progress = 0
@@ -634,10 +696,7 @@ class ESP32Deployer(BaseDeployer):
             executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
             future = loop.run_in_executor(
-                executor,
-                self._run_esptool_with_progress_internal,
-                args,
-                output_lines
+                executor, self._run_esptool_with_progress_internal, args, output_lines
             )
 
             # Poll for progress while esptool runs
@@ -660,7 +719,9 @@ class ESP32Deployer(BaseDeployer):
                             if progress >= last_progress + 5 or progress == 100:
                                 progress_callback(progress, f"Flashing... {progress}%")
                                 last_progress = progress
-                    elif progress_callback and line_str and not line_str.startswith(".."):
+                    elif (
+                        progress_callback and line_str and not line_str.startswith("..")
+                    ):
                         progress_callback(last_progress, line_str)
 
             # Process any remaining lines
@@ -709,10 +770,7 @@ class ESP32Deployer(BaseDeployer):
             output_lines = []
             loop = asyncio.get_event_loop()
             return await loop.run_in_executor(
-                None,
-                self._run_esptool_with_progress_internal,
-                args,
-                output_lines
+                None, self._run_esptool_with_progress_internal, args, output_lines
             )
 
         try:
@@ -753,7 +811,9 @@ class ESP32Deployer(BaseDeployer):
 
             if process.returncode != 0:
                 # Return last few lines as error context
-                error_context = "\n".join(all_output[-5:]) if all_output else "Unknown error"
+                error_context = (
+                    "\n".join(all_output[-5:]) if all_output else "Unknown error"
+                )
                 return {"success": False, "error": error_context}
 
             return {"success": process.returncode == 0}

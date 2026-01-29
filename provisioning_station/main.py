@@ -15,7 +15,9 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 # Configure application logging (uvicorn only sets up its own loggers)
-logging.basicConfig(level=logging.INFO, format="%(levelname)s:\t %(name)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(levelname)s:\t %(name)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI
@@ -182,7 +184,7 @@ def main():
     import uvicorn
 
     # Check if running as frozen executable
-    is_frozen = getattr(sys, 'frozen', False)
+    is_frozen = getattr(sys, "frozen", False)
     print(f"Starting provisioning-station (frozen={is_frozen})")
 
     parser = argparse.ArgumentParser(
@@ -192,25 +194,25 @@ def main():
         "--port",
         type=int,
         default=settings.port,
-        help=f"Port to listen on (default: {settings.port})"
+        help=f"Port to listen on (default: {settings.port})",
     )
     parser.add_argument(
         "--host",
         type=str,
         default=settings.host,
-        help=f"Host to bind to (default: {settings.host})"
+        help=f"Host to bind to (default: {settings.host})",
     )
     parser.add_argument(
         "--solutions-dir",
         type=str,
         default=None,
-        help="Path to solutions directory (overrides default)"
+        help="Path to solutions directory (overrides default)",
     )
     parser.add_argument(
         "--reload",
         action="store_true",
         default=settings.debug,
-        help="Enable auto-reload (for development)"
+        help="Enable auto-reload (for development)",
     )
     args = parser.parse_args()
 

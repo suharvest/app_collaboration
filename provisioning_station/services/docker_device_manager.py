@@ -43,7 +43,9 @@ class DockerDeviceManager:
             if result.returncode != 0:
                 raise RuntimeError("Docker not available")
 
-            docker_version = result.stdout.strip().replace("Docker version ", "").split(",")[0]
+            docker_version = (
+                result.stdout.strip().replace("Docker version ", "").split(",")[0]
+            )
 
             # Get hostname
             hostname = socket.gethostname()
@@ -65,8 +67,11 @@ class DockerDeviceManager:
             result = await asyncio.to_thread(
                 subprocess.run,
                 [
-                    "docker", "ps", "-a", "--format",
-                    '{"id":"{{.ID}}","name":"{{.Names}}","image":"{{.Image}}","status":"{{.Status}}","ports":"{{.Ports}}","labels":"{{.Labels}}"}'
+                    "docker",
+                    "ps",
+                    "-a",
+                    "--format",
+                    '{"id":"{{.ID}}","name":"{{.Names}}","image":"{{.Image}}","status":"{{.Status}}","ports":"{{.Ports}}","labels":"{{.Labels}}"}',
                 ],
                 capture_output=True,
                 text=True,
@@ -102,7 +107,11 @@ class DockerDeviceManager:
                         status = "stopped"
 
                     ports_str = data.get("ports", "")
-                    ports = [p.strip() for p in ports_str.split(",") if p.strip()] if ports_str else []
+                    ports = (
+                        [p.strip() for p in ports_str.split(",") if p.strip()]
+                        if ports_str
+                        else []
+                    )
 
                     labels_str = data.get("labels", "")
                     labels = {}
@@ -112,15 +121,17 @@ class DockerDeviceManager:
                                 k, v = pair.split("=", 1)
                                 labels[k] = v
 
-                    containers.append(ContainerInfo(
-                        container_id=data.get("id", ""),
-                        name=data.get("name", ""),
-                        image=image_name,
-                        current_tag=tag,
-                        status=status,
-                        ports=ports,
-                        labels=labels,
-                    ))
+                    containers.append(
+                        ContainerInfo(
+                            container_id=data.get("id", ""),
+                            name=data.get("name", ""),
+                            image=image_name,
+                            current_tag=tag,
+                            status=status,
+                            ports=ports,
+                            labels=labels,
+                        )
+                    )
                 except json.JSONDecodeError:
                     continue
 
@@ -137,7 +148,9 @@ class DockerDeviceManager:
         containers = await self.list_local_containers()
         return self._group_containers_by_solution(containers)
 
-    def _group_containers_by_solution(self, containers: List[ContainerInfo]) -> List[ManagedApp]:
+    def _group_containers_by_solution(
+        self, containers: List[ContainerInfo]
+    ) -> List[ManagedApp]:
         """Group containers by solution_id into ManagedApp objects"""
         # Group containers by solution_id
         solution_groups: Dict[str, Dict[str, Any]] = {}
@@ -163,14 +176,16 @@ class DockerDeviceManager:
                 }
 
             group = solution_groups[solution_id]
-            group["containers"].append(ManagedAppContainer(
-                container_id=container.container_id,
-                container_name=container.name,
-                image=container.image,
-                tag=container.current_tag,
-                status=container.status,
-                ports=container.ports,
-            ))
+            group["containers"].append(
+                ManagedAppContainer(
+                    container_id=container.container_id,
+                    container_name=container.name,
+                    image=container.image,
+                    tag=container.current_tag,
+                    status=container.status,
+                    ports=container.ports,
+                )
+            )
             group["ports"].extend(container.ports)
             group["statuses"].append(container.status)
 
@@ -186,19 +201,23 @@ class DockerDeviceManager:
             else:
                 status = "stopped"
 
-            managed_apps.append(ManagedApp(
-                solution_id=group["solution_id"],
-                solution_name=group["solution_name"],
-                device_id=group["device_id"],
-                deployed_at=group["deployed_at"],
-                status=status,
-                containers=group["containers"],
-                ports=list(set(group["ports"])),  # Deduplicate ports
-            ))
+            managed_apps.append(
+                ManagedApp(
+                    solution_id=group["solution_id"],
+                    solution_name=group["solution_name"],
+                    device_id=group["device_id"],
+                    deployed_at=group["deployed_at"],
+                    status=status,
+                    containers=group["containers"],
+                    ports=list(set(group["ports"])),  # Deduplicate ports
+                )
+            )
 
         return managed_apps
 
-    async def local_container_action(self, container_name: str, action: str) -> Dict[str, Any]:
+    async def local_container_action(
+        self, container_name: str, action: str
+    ) -> Dict[str, Any]:
         """Perform action on a local container (start/stop/restart/remove)"""
         if action not in ("start", "stop", "restart", "remove"):
             raise ValueError(f"Invalid action: {action}")
@@ -265,7 +284,9 @@ class DockerDeviceManager:
                 result = await self.local_container_action(container_name, "remove")
                 results.append({"container": container_name, "success": True})
             except Exception as e:
-                results.append({"container": container_name, "success": False, "error": str(e)})
+                results.append(
+                    {"container": container_name, "success": False, "error": str(e)}
+                )
 
         # Remove images if requested
         images_removed = []
@@ -276,15 +297,30 @@ class DockerDeviceManager:
                     # Check if image is used by other containers
                     check_result = await asyncio.to_thread(
                         subprocess.run,
-                        ["docker", "ps", "-a", "--filter", f"ancestor={image}", "--format", "{{.Names}}"],
+                        [
+                            "docker",
+                            "ps",
+                            "-a",
+                            "--filter",
+                            f"ancestor={image}",
+                            "--format",
+                            "{{.Names}}",
+                        ],
                         capture_output=True,
                         text=True,
                         timeout=10,
                     )
-                    remaining_containers = [n for n in check_result.stdout.strip().split("\n") if n]
+                    remaining_containers = [
+                        n for n in check_result.stdout.strip().split("\n") if n
+                    ]
 
                     if remaining_containers:
-                        images_skipped.append({"image": image, "reason": f"used by: {', '.join(remaining_containers)}"})
+                        images_skipped.append(
+                            {
+                                "image": image,
+                                "reason": f"used by: {', '.join(remaining_containers)}",
+                            }
+                        )
                         continue
 
                     # Remove the image
@@ -298,7 +334,9 @@ class DockerDeviceManager:
                     if result.returncode == 0:
                         images_removed.append(image)
                     else:
-                        images_skipped.append({"image": image, "reason": result.stderr.strip()})
+                        images_skipped.append(
+                            {"image": image, "reason": result.stderr.strip()}
+                        )
                 except Exception as e:
                     images_skipped.append({"image": image, "reason": str(e)})
 
@@ -402,13 +440,17 @@ class DockerDeviceManager:
 
                 # Get OS info
                 try:
-                    os_info = self._exec_command(client, "cat /etc/os-release | head -2")
+                    os_info = self._exec_command(
+                        client, "cat /etc/os-release | head -2"
+                    )
                 except Exception:
                     os_info = ""
 
                 return DeviceInfo(
                     hostname=hostname,
-                    docker_version=docker_version.replace("Docker version ", "").split(",")[0],
+                    docker_version=docker_version.replace("Docker version ", "").split(
+                        ","
+                    )[0],
                     os_info=os_info,
                 )
             finally:
@@ -420,7 +462,9 @@ class DockerDeviceManager:
             logger.error(f"Connection failed to {connection.host}: {e}")
             raise RuntimeError(f"Connection failed: {str(e)}")
 
-    async def list_containers(self, connection: ConnectDeviceRequest) -> List[ContainerInfo]:
+    async def list_containers(
+        self, connection: ConnectDeviceRequest
+    ) -> List[ContainerInfo]:
         """List all Docker containers on the device"""
         try:
             client = self._get_ssh_client(connection)
@@ -428,7 +472,7 @@ class DockerDeviceManager:
                 # Get container list in JSON format with labels
                 output = self._exec_command(
                     client,
-                    'docker ps -a --format \'{"id":"{{.ID}}","name":"{{.Names}}","image":"{{.Image}}","status":"{{.Status}}","ports":"{{.Ports}}","labels":"{{.Labels}}"}\''
+                    'docker ps -a --format \'{"id":"{{.ID}}","name":"{{.Names}}","image":"{{.Image}}","status":"{{.Status}}","ports":"{{.Ports}}","labels":"{{.Labels}}"}\'',
                 )
 
                 containers = []
@@ -459,7 +503,11 @@ class DockerDeviceManager:
 
                         # Parse ports
                         ports_str = data.get("ports", "")
-                        ports = [p.strip() for p in ports_str.split(",") if p.strip()] if ports_str else []
+                        ports = (
+                            [p.strip() for p in ports_str.split(",") if p.strip()]
+                            if ports_str
+                            else []
+                        )
 
                         # Parse labels
                         labels_str = data.get("labels", "")
@@ -470,15 +518,17 @@ class DockerDeviceManager:
                                     k, v = pair.split("=", 1)
                                     labels[k] = v
 
-                        containers.append(ContainerInfo(
-                            container_id=data.get("id", ""),
-                            name=data.get("name", ""),
-                            image=image_name,
-                            current_tag=tag,
-                            status=status,
-                            ports=ports,
-                            labels=labels,
-                        ))
+                        containers.append(
+                            ContainerInfo(
+                                container_id=data.get("id", ""),
+                                name=data.get("name", ""),
+                                image=image_name,
+                                current_tag=tag,
+                                status=status,
+                                ports=ports,
+                                labels=labels,
+                            )
+                        )
                     except json.JSONDecodeError:
                         continue
 
@@ -492,7 +542,9 @@ class DockerDeviceManager:
             logger.error(f"Failed to list containers on {connection.host}: {e}")
             raise RuntimeError(f"Failed to list containers: {str(e)}")
 
-    async def list_managed_apps(self, connection: ConnectDeviceRequest) -> List[ManagedApp]:
+    async def list_managed_apps(
+        self, connection: ConnectDeviceRequest
+    ) -> List[ManagedApp]:
         """List only SenseCraft-managed applications on the device, grouped by solution"""
         containers = await self.list_containers(connection)
         return self._group_containers_by_solution(containers)
@@ -510,8 +562,14 @@ class DockerDeviceManager:
             client = self._get_ssh_client(connection)
             try:
                 # Pull new images
-                compose_dir = request.compose_path.rsplit("/", 1)[0] if "/" in request.compose_path else "."
-                project_flag = f"-p {request.project_name}" if request.project_name else ""
+                compose_dir = (
+                    request.compose_path.rsplit("/", 1)[0]
+                    if "/" in request.compose_path
+                    else "."
+                )
+                project_flag = (
+                    f"-p {request.project_name}" if request.project_name else ""
+                )
 
                 pull_output = self._exec_command(
                     client,
@@ -557,10 +615,14 @@ class DockerDeviceManager:
                 if action == "remove":
                     # First stop, then remove
                     try:
-                        self._exec_command(client, f"docker stop {container_name}", timeout=30)
+                        self._exec_command(
+                            client, f"docker stop {container_name}", timeout=30
+                        )
                     except Exception:
                         pass  # Container might already be stopped
-                    output = self._exec_command(client, f"docker rm {container_name}", timeout=30)
+                    output = self._exec_command(
+                        client, f"docker rm {container_name}", timeout=30
+                    )
                 else:
                     output = self._exec_command(
                         client,
@@ -606,13 +668,23 @@ class DockerDeviceManager:
                 for container_name in container_names:
                     try:
                         try:
-                            self._exec_command(client, f"docker stop {container_name}", timeout=30)
+                            self._exec_command(
+                                client, f"docker stop {container_name}", timeout=30
+                            )
                         except Exception:
                             pass
-                        self._exec_command(client, f"docker rm {container_name}", timeout=30)
+                        self._exec_command(
+                            client, f"docker rm {container_name}", timeout=30
+                        )
                         results.append({"container": container_name, "success": True})
                     except Exception as e:
-                        results.append({"container": container_name, "success": False, "error": str(e)})
+                        results.append(
+                            {
+                                "container": container_name,
+                                "success": False,
+                                "error": str(e),
+                            }
+                        )
 
                 # Remove images if requested
                 images_removed = []
@@ -626,12 +698,21 @@ class DockerDeviceManager:
                                 f"docker ps -a --filter ancestor={image} --format '{{{{.Names}}}}'",
                                 timeout=10,
                             )
-                            remaining = [n for n in check_output.strip().split("\n") if n]
+                            remaining = [
+                                n for n in check_output.strip().split("\n") if n
+                            ]
                             if remaining:
-                                images_skipped.append({"image": image, "reason": f"used by: {', '.join(remaining)}"})
+                                images_skipped.append(
+                                    {
+                                        "image": image,
+                                        "reason": f"used by: {', '.join(remaining)}",
+                                    }
+                                )
                                 continue
 
-                            self._exec_command(client, f"docker rmi {image}", timeout=60)
+                            self._exec_command(
+                                client, f"docker rmi {image}", timeout=60
+                            )
                             images_removed.append(image)
                         except Exception as e:
                             images_skipped.append({"image": image, "reason": str(e)})
@@ -654,7 +735,9 @@ class DockerDeviceManager:
         try:
             client = self._get_ssh_client(connection)
             try:
-                output = self._exec_command(client, "docker image prune -af", timeout=120)
+                output = self._exec_command(
+                    client, "docker image prune -af", timeout=120
+                )
 
                 # Parse output to get space reclaimed
                 space_reclaimed = "0B"
