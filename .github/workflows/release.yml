@@ -11,6 +11,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: write
+
 env:
   CARGO_TERM_COLOR: always
   PYTHON_VERSION: '3.11'
@@ -104,15 +107,15 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             sidecar-target: x86_64-pc-windows-msvc
-            bundles: ''
+            args: ''
           - os: macos-latest
             target: aarch64-apple-darwin
             sidecar-target: aarch64-apple-darwin
-            bundles: ''
+            args: ''
           - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
             sidecar-target: aarch64-unknown-linux-gnu
-            bundles: 'deb'
+            args: '--bundles deb'
 
     steps:
       - name: Checkout repository
@@ -138,6 +141,9 @@ jobs:
             librsvg2-dev \
             patchelf \
             xdg-utils
+          # Verify xdg-open is available
+          which xdg-open || (echo "xdg-open not found, installing desktop-file-utils" && sudo apt-get install -y desktop-file-utils)
+          ls -la /usr/bin/xdg-open || true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -178,6 +184,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          tauriScript: npx tauri
           projectPath: src-tauri
           tagName: ${{ github.ref_name }}
           releaseName: 'SenseCraft Solution ${{ github.ref_name }}'
@@ -208,7 +215,7 @@ jobs:
           releaseDraft: true
           prerelease: false
           includeDebug: false
-          args: --target ${{ matrix.target }} ${{ matrix.bundles && format('--bundles {0}', matrix.bundles) || '' }}
+          args: --target ${{ matrix.target }} ${{ matrix.args }}
 
   # ===========================================
   # Clean up artifacts after release
