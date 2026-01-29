@@ -248,11 +248,15 @@ class ESP32Deployer(BaseDeployer):
                         "error": None,
                     }
                 else:
+                    # esptool outputs most errors to stdout, not stderr
+                    error_msg = stderr_val.strip() if stderr_val.strip() else self._extract_esptool_error(stdout_val)
+                    if not error_msg:
+                        error_msg = f"esptool exited with code {e.code}"
                     return {
                         "success": False,
                         "stdout": stdout_val,
                         "stderr": stderr_val,
-                        "error": stderr_val or f"esptool exited with code {e.code}",
+                        "error": error_msg,
                     }
             except FatalError as e:
                 # esptool FatalError (connection failed, etc.)
@@ -320,6 +324,34 @@ class ESP32Deployer(BaseDeployer):
 
         logger.warning(f"Timeout waiting for port {port} to become available")
         return False
+
+    def _extract_esptool_error(self, output: str) -> str:
+        """Extract error message from esptool output.
+
+        esptool outputs errors to stdout with patterns like:
+        - "A fatal error occurred: Failed to connect to ESP32-S3: No serial data received."
+        - "Fatal error: ..."
+        """
+        if not output:
+            return "Unknown error"
+
+        # Look for fatal error patterns
+        for line in output.split('\n'):
+            line = line.strip()
+            if 'fatal error' in line.lower():
+                # Extract the error message after the colon
+                if ':' in line:
+                    return line.split(':', 1)[-1].strip()
+                return line
+            if 'error' in line.lower() and ('failed' in line.lower() or 'cannot' in line.lower()):
+                return line
+
+        # Return last non-empty lines as context
+        lines = [l.strip() for l in output.strip().split('\n') if l.strip()]
+        if lines:
+            return lines[-1][:200]  # Last line, truncated
+
+        return "Unknown error"
 
     def _cleanup_serial_port(self, port: str):
         """Force close serial port if it was left open by esptool
@@ -393,11 +425,25 @@ class ESP32Deployer(BaseDeployer):
             )
             stdout, stderr = await process.communicate()
 
+            stdout_str = stdout.decode("utf-8", errors="replace")
+            stderr_str = stderr.decode("utf-8", errors="replace")
+
+            logger.info(f"esptool returncode: {process.returncode}")
+            logger.info(f"esptool stdout: {stdout_str[:500] if stdout_str else '(empty)'}")
+            logger.info(f"esptool stderr: {stderr_str[:500] if stderr_str else '(empty)'}")
+
+            # esptool outputs most errors to stdout, not stderr
+            # Extract error message from stdout if stderr is empty
+            error_msg = None
+            if process.returncode != 0:
+                error_msg = stderr_str if stderr_str.strip() else self._extract_esptool_error(stdout_str)
+                logger.info(f"esptool error_msg: {error_msg}")
+
             return {
                 "success": process.returncode == 0,
-                "stdout": stdout.decode("utf-8", errors="replace"),
-                "stderr": stderr.decode("utf-8", errors="replace"),
-                "error": stderr.decode("utf-8", errors="replace") if process.returncode != 0 else None,
+                "stdout": stdout_str,
+                "stderr": stderr_str,
+                "error": error_msg,
             }
 
         except FileNotFoundError:
@@ -411,11 +457,19 @@ class ESP32Deployer(BaseDeployer):
                 )
                 stdout, stderr = await process.communicate()
 
+                stdout_str = stdout.decode("utf-8", errors="replace")
+                stderr_str = stderr.decode("utf-8", errors="replace")
+
+                # esptool outputs most errors to stdout, not stderr
+                error_msg = None
+                if process.returncode != 0:
+                    error_msg = stderr_str if stderr_str.strip() else self._extract_esptool_error(stdout_str)
+
                 return {
                     "success": process.returncode == 0,
-                    "stdout": stdout.decode("utf-8", errors="replace"),
-                    "stderr": stderr.decode("utf-8", errors="replace"),
-                    "error": stderr.decode("utf-8", errors="replace") if process.returncode != 0 else None,
+                    "stdout": stdout_str,
+                    "stderr": stderr_str,
+                    "error": error_msg,
                 }
             except Exception:
                 # Fall back to Python API
