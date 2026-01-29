@@ -111,7 +111,7 @@ async def test_connection(request: DeviceConnectionRequest):
     result = await device_detector.test_ssh_connection(
         host=host,
         port=request.port or 22,
-        username=request.username or "root",
+        username=request.effective_username or "root",
         password=request.password,
     )
 
