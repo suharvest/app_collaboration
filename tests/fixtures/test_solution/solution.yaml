@@ -1,0 +1,70 @@
+version: "1.0"
+id: test_solution
+name: Test Solution
+name_zh: 测试方案
+
+intro:
+  summary: A test solution for automated testing
+  summary_zh: 用于自动化测试的测试方案
+
+  description_file: intro/description.md
+  description_file_zh: intro/description_zh.md
+
+  category: testing
+  tags:
+    - test
+    - unit-test
+    - automation
+
+  device_catalog:
+    test_device:
+      name: Test Device
+      name_zh: 测试设备
+      description: A mock device for testing
+      description_zh: 用于测试的模拟设备
+
+  presets:
+    - id: default
+      name: Default Preset
+      name_zh: 默认预设
+      description: Default test preset
+      description_zh: 默认测试预设
+      device_groups:
+        - id: test_group
+          name: Test Device Group
+          name_zh: 测试设备组
+          type: single
+          required: true
+          options:
+            - device_ref: test_device
+              label: Test Device
+              label_zh: 测试设备
+          default: test_device
+      devices:
+        - id: step1
+          name: Manual Step
+          name_zh: 手动步骤
+          type: manual
+          required: true
+          section:
+            title: Step 1 - Manual Configuration
+            title_zh: 第一步 - 手动配置
+            description_file: deploy/sections/step1.md
+            description_file_zh: deploy/sections/step1_zh.md
+
+  stats:
+    difficulty: beginner
+    estimated_time: 10min
+    deployed_count: 0
+    likes_count: 0
+
+  links:
+    wiki: https://wiki.example.com/test
+    github: https://github.com/example/test
+
+deployment:
+  guide_file: deploy/guide.md
+  guide_file_zh: deploy/guide_zh.md
+  selection_mode: sequential
+  devices: []
+  order: []

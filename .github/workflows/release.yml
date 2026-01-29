@@ -13,26 +13,53 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  PYTHON_VERSION: '3.11'
 
 jobs:
+  # ===========================================
+  # Pre-release tests (gate for release)
+  # ===========================================
+  pre-release-tests:
+    name: Pre-release Tests
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --group test
+
+      - name: Run tests
+        run: uv run pytest tests/ -v
+
   # ===========================================
   # Build Python sidecar for all platforms
   # ===========================================
   build-sidecar:
     name: Build Sidecar (${{ matrix.target }})
+    needs: pre-release-tests
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            python-version: '3.11'
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             python-version: '3.11'
           - os: macos-latest
             target: aarch64-apple-darwin
+            python-version: '3.11'
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
             python-version: '3.11'
 
     steps:
@@ -72,15 +99,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            sidecar-target: x86_64-unknown-linux-gnu
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             sidecar-target: x86_64-pc-windows-msvc
           - os: macos-latest
             target: aarch64-apple-darwin
             sidecar-target: aarch64-apple-darwin
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            sidecar-target: aarch64-unknown-linux-gnu
 
     steps:
       - name: Checkout repository
@@ -131,6 +158,13 @@ jobs:
         run: npm run build
         working-directory: frontend
 
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli
+
+      - name: Generate icons from SVG
+        run: cargo tauri icon icons/icon.svg
+        working-directory: src-tauri
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -148,7 +182,7 @@ jobs:
             |----------|----------|
             | Windows (x64) | `.msi` or `.exe` installer |
             | macOS (Apple Silicon) | `.dmg` disk image |
-            | Linux (x64) | `.deb` package |
+            | Linux (ARM64) | `.deb` package |
 
             ## Installation Notes
 
@@ -159,7 +193,8 @@ jobs:
             Download the `.dmg` file, open it, and drag the app to Applications.
             If you see "App can't be opened", go to System Preferences > Security & Privacy and click "Open Anyway".
 
-            ### Linux
+            ### Linux (ARM64)
+            For Raspberry Pi, Jetson, and other ARM64 devices:
             ```bash
             sudo dpkg -i sensecraft-solution_*.deb
             ```
