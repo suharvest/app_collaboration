@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class RemoteCheckResult(BaseModel):
     """Result of a remote pre-deployment check"""
+
     check_type: str
     passed: bool
     message: str
@@ -35,10 +36,7 @@ class RemotePreCheckService:
         try:
             # Check docker version
             exit_code, stdout, stderr = await asyncio.to_thread(
-                self._exec_command,
-                ssh_client,
-                "docker --version",
-                timeout=30
+                self._exec_command, ssh_client, "docker --version", timeout=30
             )
 
             if exit_code != 0:
@@ -56,10 +54,7 @@ class RemotePreCheckService:
 
             # Check if docker daemon is running
             exit_code, stdout, stderr = await asyncio.to_thread(
-                self._exec_command,
-                ssh_client,
-                "docker info",
-                timeout=30
+                self._exec_command, ssh_client, "docker info", timeout=30
             )
 
             if exit_code != 0:
@@ -107,10 +102,7 @@ class RemotePreCheckService:
         try:
             # Check docker compose version (v2 plugin style)
             exit_code, stdout, stderr = await asyncio.to_thread(
-                self._exec_command,
-                ssh_client,
-                "docker compose version",
-                timeout=30
+                self._exec_command, ssh_client, "docker compose version", timeout=30
             )
 
             if exit_code == 0:
@@ -125,10 +117,7 @@ class RemotePreCheckService:
 
             # Try standalone docker-compose
             exit_code, stdout, stderr = await asyncio.to_thread(
-                self._exec_command,
-                ssh_client,
-                "docker-compose --version",
-                timeout=30
+                self._exec_command, ssh_client, "docker-compose --version", timeout=30
             )
 
             if exit_code == 0:
@@ -174,26 +163,34 @@ class RemotePreCheckService:
             distro_id = distro["id"]
             distro_like = distro["like"]
 
-            logger.info(f"Installing Docker on {distro['name']} ({distro_id}), init: {init_system}")
+            logger.info(
+                f"Installing Docker on {distro['name']} ({distro_id}), init: {init_system}"
+            )
 
             if progress_callback:
-                await progress_callback("install_docker", 10, f"Installing Docker on {distro['name']}...")
+                await progress_callback(
+                    "install_docker", 10, f"Installing Docker on {distro['name']}..."
+                )
 
             # Check for OpenWrt - Docker is not typically supported
             if distro_id == "openwrt":
-                logger.warning("OpenWrt detected - Docker installation may not be supported")
+                logger.warning(
+                    "OpenWrt detected - Docker installation may not be supported"
+                )
                 if progress_callback:
                     await progress_callback(
-                        "install_docker", 0,
+                        "install_docker",
+                        0,
                         "OpenWrt detected. Docker is not typically supported on OpenWrt due to resource constraints. "
-                        "Please use a device with full Linux support."
+                        "Please use a device with full Linux support.",
                     )
                 return False
 
             # Determine if Debian-based
             is_debian_based = (
-                distro_id in ("debian", "ubuntu", "raspbian", "linuxmint") or
-                "debian" in distro_like or "ubuntu" in distro_like
+                distro_id in ("debian", "ubuntu", "raspbian", "linuxmint")
+                or "debian" in distro_like
+                or "ubuntu" in distro_like
             )
 
             if is_debian_based:
@@ -259,30 +256,38 @@ class RemotePreCheckService:
                     """
 
             if progress_callback:
-                await progress_callback("install_docker", 20, "Running installation script...")
+                await progress_callback(
+                    "install_docker", 20, "Running installation script..."
+                )
 
             exit_code, stdout, stderr = await asyncio.to_thread(
                 self._exec_command,
                 ssh_client,
                 install_script,
-                timeout=600  # 10 minutes for installation
+                timeout=600,  # 10 minutes for installation
             )
 
             if exit_code != 0:
                 logger.error(f"Docker installation failed: {stderr}")
                 if progress_callback:
-                    await progress_callback("install_docker", 0, f"Installation failed: {stderr[:200]}")
+                    await progress_callback(
+                        "install_docker", 0, f"Installation failed: {stderr[:200]}"
+                    )
                 return False
 
             if progress_callback:
-                await progress_callback("install_docker", 100, "Docker installed successfully")
+                await progress_callback(
+                    "install_docker", 100, "Docker installed successfully"
+                )
 
             return True
 
         except Exception as e:
             logger.error(f"Docker installation failed: {e}")
             if progress_callback:
-                await progress_callback("install_docker", 0, f"Installation failed: {str(e)}")
+                await progress_callback(
+                    "install_docker", 0, f"Installation failed: {str(e)}"
+                )
             return False
 
     async def fix_docker_permission(
@@ -294,25 +299,30 @@ class RemotePreCheckService:
         """Fix Docker permission by adding user to docker group"""
         try:
             if progress_callback:
-                await progress_callback("fix_permission", 0, "Fixing Docker permissions...")
+                await progress_callback(
+                    "fix_permission", 0, "Fixing Docker permissions..."
+                )
 
             exit_code, stdout, stderr = await asyncio.to_thread(
                 self._exec_command,
                 ssh_client,
                 f"sudo usermod -aG docker {username}",
-                timeout=30
+                timeout=30,
             )
 
             if exit_code != 0:
                 logger.error(f"Failed to fix Docker permission: {stderr}")
                 if progress_callback:
-                    await progress_callback("fix_permission", 0, f"Failed: {stderr[:200]}")
+                    await progress_callback(
+                        "fix_permission", 0, f"Failed: {stderr[:200]}"
+                    )
                 return False
 
             if progress_callback:
                 await progress_callback(
-                    "fix_permission", 100,
-                    "Permission fixed. Note: User may need to re-login for changes to take effect."
+                    "fix_permission",
+                    100,
+                    "Permission fixed. Note: User may need to re-login for changes to take effect.",
                 )
 
             return True
@@ -340,7 +350,7 @@ class RemotePreCheckService:
                 self._exec_command,
                 ssh_client,
                 "systemctl --version 2>/dev/null | head -1",
-                timeout=10
+                timeout=10,
             )
             if exit_code == 0 and "systemd" in stdout.lower():
                 return "systemd"
@@ -350,7 +360,7 @@ class RemotePreCheckService:
                 self._exec_command,
                 ssh_client,
                 "[ -f /sbin/procd ] && echo procd",
-                timeout=10
+                timeout=10,
             )
             if exit_code == 0 and "procd" in stdout:
                 return "procd"
@@ -360,7 +370,7 @@ class RemotePreCheckService:
                 self._exec_command,
                 ssh_client,
                 "[ -d /etc/init.d ] && echo sysvinit",
-                timeout=10
+                timeout=10,
             )
             if exit_code == 0 and "sysvinit" in stdout:
                 return "sysvinit"
@@ -385,10 +395,15 @@ class RemotePreCheckService:
                 self._exec_command,
                 ssh_client,
                 "cat /etc/os-release 2>/dev/null",
-                timeout=10
+                timeout=10,
             )
 
-            distro = {"id": "unknown", "name": "Unknown Linux", "version": "", "like": ""}
+            distro = {
+                "id": "unknown",
+                "name": "Unknown Linux",
+                "version": "",
+                "like": "",
+            }
 
             if exit_code == 0 and stdout:
                 for line in stdout.strip().split("\n"):
@@ -410,7 +425,7 @@ class RemotePreCheckService:
                     self._exec_command,
                     ssh_client,
                     "[ -f /etc/openwrt_release ] && echo openwrt",
-                    timeout=10
+                    timeout=10,
                 )
                 if exit_code == 0 and "openwrt" in stdout:
                     distro["id"] = "openwrt"
@@ -436,7 +451,9 @@ class RemotePreCheckService:
             logger.info(f"Detected init system: {init_system}")
 
             if progress_callback:
-                await progress_callback("start_docker", 20, f"Starting Docker ({init_system})...")
+                await progress_callback(
+                    "start_docker", 20, f"Starting Docker ({init_system})..."
+                )
 
             if init_system == "systemd":
                 cmd = "sudo systemctl start docker && sudo systemctl enable docker"
@@ -448,16 +465,15 @@ class RemotePreCheckService:
                 cmd = "(sudo systemctl start docker 2>/dev/null || sudo /etc/init.d/docker start 2>/dev/null || sudo service docker start 2>/dev/null) && echo started"
 
             exit_code, stdout, stderr = await asyncio.to_thread(
-                self._exec_command,
-                ssh_client,
-                cmd,
-                timeout=60
+                self._exec_command, ssh_client, cmd, timeout=60
             )
 
             if exit_code != 0:
                 logger.error(f"Failed to start Docker: {stderr}")
                 if progress_callback:
-                    await progress_callback("start_docker", 0, f"Failed: {stderr[:200]}")
+                    await progress_callback(
+                        "start_docker", 0, f"Failed: {stderr[:200]}"
+                    )
                 return False
 
             if progress_callback:
@@ -482,10 +498,7 @@ class RemotePreCheckService:
         try:
             # Check uname to determine OS type
             exit_code, stdout, stderr = await asyncio.to_thread(
-                self._exec_command,
-                ssh_client,
-                "uname -s",
-                timeout=30
+                self._exec_command, ssh_client, "uname -s", timeout=30
             )
 
             if exit_code != 0:
@@ -505,7 +518,7 @@ class RemotePreCheckService:
                     self._exec_command,
                     ssh_client,
                     "cat /etc/os-release 2>/dev/null | head -5 || echo 'Unknown Linux'",
-                    timeout=30
+                    timeout=30,
                 )
 
                 return RemoteCheckResult(

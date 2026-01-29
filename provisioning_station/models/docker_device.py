@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 class ConnectDeviceRequest(BaseModel):
     """Request to connect to a remote Docker device"""
+
     host: str
     port: int = 22
     username: str = "recomputer"
@@ -17,6 +18,7 @@ class ConnectDeviceRequest(BaseModel):
 
 class ContainerInfo(BaseModel):
     """Information about a Docker container on the device"""
+
     container_id: str
     name: str
     image: str
@@ -30,6 +32,7 @@ class ContainerInfo(BaseModel):
 
 class ManagedAppContainer(BaseModel):
     """Single container within a managed application"""
+
     container_id: str
     container_name: str
     image: str
@@ -40,6 +43,7 @@ class ManagedAppContainer(BaseModel):
 
 class ManagedApp(BaseModel):
     """SenseCraft-managed application detected on device (grouped by solution)"""
+
     # SenseCraft metadata from labels
     solution_id: str
     solution_name: Optional[str] = None
@@ -55,6 +59,7 @@ class ManagedApp(BaseModel):
 
 class DeviceInfo(BaseModel):
     """Basic device information after connection"""
+
     hostname: str
     docker_version: str
     os_info: str = ""
@@ -62,12 +67,14 @@ class DeviceInfo(BaseModel):
 
 class ContainersResponse(BaseModel):
     """Response for container listing"""
+
     device: DeviceInfo
     containers: List[ContainerInfo]
 
 
 class UpgradeRequest(BaseModel):
     """Request to upgrade a container"""
+
     host: str
     port: int = 22
     username: str = "recomputer"

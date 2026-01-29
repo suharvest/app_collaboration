@@ -17,6 +17,7 @@ router = APIRouter(prefix="/api/docker-devices", tags=["docker-devices"])
 # Local Docker Endpoints
 # ============================================
 
+
 @router.get("/local/check")
 async def check_local_docker():
     """Check if Docker is available on local machine"""
@@ -60,7 +61,9 @@ async def list_local_managed_apps():
 async def local_container_action(container_name: str, action: str):
     """Perform action on a local container (start/stop/restart)"""
     try:
-        result = await docker_device_manager.local_container_action(container_name, action)
+        result = await docker_device_manager.local_container_action(
+            container_name, action
+        )
         return result
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -108,10 +111,14 @@ async def upgrade_container(request: UpgradeRequest):
 
 
 @router.post("/container-action")
-async def container_action(request: ConnectDeviceRequest, container_name: str, action: str):
+async def container_action(
+    request: ConnectDeviceRequest, container_name: str, action: str
+):
     """Perform action on a container (start/stop/restart)"""
     try:
-        result = await docker_device_manager.container_action(request, container_name, action)
+        result = await docker_device_manager.container_action(
+            request, container_name, action
+        )
         return result
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -43,6 +43,7 @@ def _build_sudo_cmd(password: str, cmd: str) -> str:
     escaped_password = shlex.quote(password)
     return f"printf '%s\\n' {escaped_password} | sudo -S {cmd}"
 
+
 # Default conflicting services on reCamera
 DEFAULT_CONFLICT_SERVICES = [
     "S03node-red",
@@ -187,10 +188,14 @@ class ReCameraCppDeployer(BaseDeployer):
                     # The deb package will create a fresh S* script
                     service_name = self._get_service_name(binary_config)
                     if service_name:
-                        await self._cleanup_orphaned_scripts(client, service_name, password)
+                        await self._cleanup_orphaned_scripts(
+                            client, service_name, password
+                        )
 
                     deb_name = Path(binary_config.deb_package.path).name
-                    install_cmd = _build_sudo_cmd(password, f"opkg install --force-reinstall /tmp/{deb_name}")
+                    install_cmd = _build_sudo_cmd(
+                        password, f"opkg install --force-reinstall /tmp/{deb_name}"
+                    )
 
                     exit_code, stdout, stderr = await self._exec_sudo(
                         client, install_cmd, password, timeout=120
@@ -232,7 +237,9 @@ class ReCameraCppDeployer(BaseDeployer):
                         progress_callback, "configure", 0, "Configuring service..."
                     )
 
-                    await self._deploy_init_script(client, config, binary_config, password)
+                    await self._deploy_init_script(
+                        client, config, binary_config, password
+                    )
 
                     await self._report_progress(
                         progress_callback, "configure", 100, "Service configured"
@@ -244,16 +251,24 @@ class ReCameraCppDeployer(BaseDeployer):
                         progress_callback, "mqtt", 0, "Configuring MQTT..."
                     )
 
-                    await self._configure_mqtt(client, binary_config.mqtt_config, password)
+                    await self._configure_mqtt(
+                        client, binary_config.mqtt_config, password
+                    )
 
                     await self._report_progress(
                         progress_callback, "mqtt", 100, "MQTT configured"
                     )
 
                 # Step 8: Disable conflict services (optional)
-                if binary_config.conflict_services and binary_config.conflict_services.disable:
+                if (
+                    binary_config.conflict_services
+                    and binary_config.conflict_services.disable
+                ):
                     await self._report_progress(
-                        progress_callback, "disable", 0, "Disabling conflicting services..."
+                        progress_callback,
+                        "disable",
+                        0,
+                        "Disabling conflicting services...",
                     )
 
                     await self._disable_services(
@@ -293,7 +308,10 @@ class ReCameraCppDeployer(BaseDeployer):
                     )
                 else:
                     await self._report_progress(
-                        progress_callback, "verify", 100, "Deployment complete (verification skipped)"
+                        progress_callback,
+                        "verify",
+                        100,
+                        "Deployment complete (verification skipped)",
                     )
 
                 return True
@@ -329,8 +347,14 @@ class ReCameraCppDeployer(BaseDeployer):
         for service in services:
             # Try both S* and K* versions
             for prefix in ["S", "K"]:
-                svc_name = service if service.startswith(prefix) else f"{prefix}{service.lstrip('SK')}"
-                cmd = _build_sudo_cmd(password, f"/etc/init.d/{svc_name} stop 2>/dev/null || true")
+                svc_name = (
+                    service
+                    if service.startswith(prefix)
+                    else f"{prefix}{service.lstrip('SK')}"
+                )
+                cmd = _build_sudo_cmd(
+                    password, f"/etc/init.d/{svc_name} stop 2>/dev/null || true"
+                )
                 await self._exec_sudo(client, cmd, password, timeout=30)
 
         # Wait for services to stop
@@ -358,10 +382,13 @@ class ReCameraCppDeployer(BaseDeployer):
 
         # Init script (only if deb doesn't include it and custom script is provided)
         deb_includes_init = (
-            binary_config.deb_package
-            and binary_config.deb_package.includes_init_script
+            binary_config.deb_package and binary_config.deb_package.includes_init_script
         )
-        if not deb_includes_init and binary_config.init_script and binary_config.init_script.path:
+        if (
+            not deb_includes_init
+            and binary_config.init_script
+            and binary_config.init_script.path
+        ):
             local_path = config.get_asset_path(binary_config.init_script.path)
             if local_path and Path(local_path).exists():
                 files.append((local_path, "/tmp/"))
@@ -385,7 +412,10 @@ class ReCameraCppDeployer(BaseDeployer):
 
             # Copy model file
             src_name = Path(model.path).name
-            cmd = _build_sudo_cmd(password, f"cp /tmp/{shlex.quote(src_name)} {shlex.quote(target_dir)}/{shlex.quote(filename)}")
+            cmd = _build_sudo_cmd(
+                password,
+                f"cp /tmp/{shlex.quote(src_name)} {shlex.quote(target_dir)}/{shlex.quote(filename)}",
+            )
             await self._exec_sudo(client, cmd, password, timeout=60)
 
     async def _deploy_init_script(
@@ -411,11 +441,16 @@ class ReCameraCppDeployer(BaseDeployer):
 
         # Deploy custom script
         src_name = Path(init_config.path).name
-        cmd = _build_sudo_cmd(password, f"cp /tmp/{shlex.quote(src_name)} {shlex.quote(script_path)}")
+        cmd = _build_sudo_cmd(
+            password, f"cp /tmp/{shlex.quote(src_name)} {shlex.quote(script_path)}"
+        )
         await self._exec_sudo(client, cmd, password, timeout=30)
 
         # Remove old scripts with same name but different priority
-        cleanup_cmd = _build_sudo_cmd(password, f"sh -c 'ls /etc/init.d/*{service_name} 2>/dev/null | grep -v {script_path} | xargs rm -f 2>/dev/null || true'")
+        cleanup_cmd = _build_sudo_cmd(
+            password,
+            f"sh -c 'ls /etc/init.d/*{service_name} 2>/dev/null | grep -v {script_path} | xargs rm -f 2>/dev/null || true'",
+        )
         await self._exec_sudo(client, cleanup_cmd, password, timeout=30)
 
         # Make executable
@@ -431,7 +466,9 @@ class ReCameraCppDeployer(BaseDeployer):
         """Configure Mosquitto for external access."""
         # Check if already configured
         check_cmd = "grep -q 'listener 1883 0.0.0.0' /etc/mosquitto/mosquitto.conf 2>/dev/null && echo 'configured'"
-        exit_code, stdout, _ = await self._exec_sudo(client, check_cmd, password, timeout=10)
+        exit_code, stdout, _ = await self._exec_sudo(
+            client, check_cmd, password, timeout=10
+        )
 
         if "configured" in stdout:
             logger.info("MQTT already configured for external access")
@@ -439,21 +476,39 @@ class ReCameraCppDeployer(BaseDeployer):
 
         # Add configuration
         config_cmds = [
-            _build_sudo_cmd(password, f"sh -c 'echo \"listener {mqtt_config.port} 0.0.0.0\" >> /etc/mosquitto/mosquitto.conf'"),
+            _build_sudo_cmd(
+                password,
+                f"sh -c 'echo \"listener {mqtt_config.port} 0.0.0.0\" >> /etc/mosquitto/mosquitto.conf'",
+            ),
         ]
 
         if mqtt_config.allow_anonymous:
             config_cmds.append(
-                _build_sudo_cmd(password, "sh -c 'echo \"allow_anonymous true\" >> /etc/mosquitto/mosquitto.conf'")
+                _build_sudo_cmd(
+                    password,
+                    "sh -c 'echo \"allow_anonymous true\" >> /etc/mosquitto/mosquitto.conf'",
+                )
             )
 
         for cmd in config_cmds:
             await self._exec_sudo(client, cmd, password, timeout=30)
 
         # Restart mosquitto (need two separate sudo commands)
-        await self._exec_sudo(client, _build_sudo_cmd(password, "killall mosquitto 2>/dev/null || true"), password, timeout=30)
+        await self._exec_sudo(
+            client,
+            _build_sudo_cmd(password, "killall mosquitto 2>/dev/null || true"),
+            password,
+            timeout=30,
+        )
         await asyncio.sleep(1)
-        await self._exec_sudo(client, _build_sudo_cmd(password, "/usr/sbin/mosquitto -c /etc/mosquitto/mosquitto.conf -d"), password, timeout=30)
+        await self._exec_sudo(
+            client,
+            _build_sudo_cmd(
+                password, "/usr/sbin/mosquitto -c /etc/mosquitto/mosquitto.conf -d"
+            ),
+            password,
+            timeout=30,
+        )
 
     async def _disable_services(
         self,
@@ -464,12 +519,12 @@ class ReCameraCppDeployer(BaseDeployer):
         """Disable services by renaming S* to K*."""
         for service in services:
             # Find and rename S* services
-            shell_script = f'''for svc in /etc/init.d/S*{service}*; do
+            shell_script = f"""for svc in /etc/init.d/S*{service}*; do
     if [ -f "$svc" ]; then
         new_name=$(echo $svc | sed "s|/S|/K|")
         mv "$svc" "$new_name" 2>/dev/null || true
     fi
-done'''
+done"""
             cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(shell_script)}")
             await self._exec_sudo(client, cmd, password, timeout=30)
 
@@ -491,7 +546,9 @@ done'''
         script_path = f"/etc/init.d/S{priority:02d}{service_name}"
 
         cmd = _build_sudo_cmd(password, f"{script_path} start")
-        exit_code, stdout, stderr = await self._exec_sudo(client, cmd, password, timeout=60)
+        exit_code, stdout, stderr = await self._exec_sudo(
+            client, cmd, password, timeout=60
+        )
 
         if exit_code != 0:
             logger.error(f"Failed to start service: {stderr}")
@@ -573,12 +630,15 @@ done'''
         may have been renamed to K* (disabled). Remove it before installing
         the new deb package which will create a fresh S* script.
         """
-        shell_script = f'''for svc in /etc/init.d/K*{service_name}*; do
+        shell_script = f"""for svc in /etc/init.d/K*{service_name}*; do
     if [ -f "$svc" ]; then
         rm -f "$svc" && echo "Removed orphaned: $svc"
     fi
-done'''
-        cleanup_cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(shell_script)}") + " 2>/dev/null || true"
+done"""
+        cleanup_cmd = (
+            _build_sudo_cmd(password, f"sh -c {shlex.quote(shell_script)}")
+            + " 2>/dev/null || true"
+        )
 
         exit_code, stdout, _ = await self._exec_sudo(
             client, cleanup_cmd, password, timeout=30

@@ -107,7 +107,7 @@ class DeviceDetector:
                         if port.location:
                             # Location format: bus-port:config.interface
                             try:
-                                iface = int(port.location.split('.')[-1])
+                                iface = int(port.location.split(".")[-1])
                                 return iface  # Higher interface = ESP32
                             except (ValueError, IndexError):
                                 pass
@@ -131,7 +131,9 @@ class DeviceDetector:
                     for sn, port_list in by_serial.items():
                         for port_item in port_list:
                             priority = get_esp32_priority(port_item)
-                            logger.debug(f"ESP32 port candidate: {port_item[0].device}, priority={priority}")
+                            logger.debug(
+                                f"ESP32 port candidate: {port_item[0].device}, priority={priority}"
+                            )
 
                             # Only consider ports with positive priority (likely ESP32)
                             if priority > 0 and priority > best_priority:
@@ -145,7 +147,9 @@ class DeviceDetector:
                             )
 
                     if best_port:
-                        logger.info(f"Selected ESP32 port: {best_port[0].device} (priority={best_priority})")
+                        logger.info(
+                            f"Selected ESP32 port: {best_port[0].device} (priority={best_priority})"
+                        )
                         port, vid, pid = best_port
                         return {
                             "status": "detected",
@@ -157,18 +161,23 @@ class DeviceDetector:
                                 "vid": vid,
                                 "pid": pid,
                                 "serial_number": port.serial_number,
-                                "all_matching_ports": [p[0].device for p in matched_ports],
+                                "all_matching_ports": [
+                                    p[0].device for p in matched_ports
+                                ],
                             },
                         }
 
             # Fallback: check common port patterns (cross-platform)
-            fallback_ports = detection.fallback_ports or self._get_platform_port_patterns()
+            fallback_ports = (
+                detection.fallback_ports or self._get_platform_port_patterns()
+            )
 
             # On Windows, glob doesn't work for COM ports - use pyserial directly
             if sys.platform == "win32":
                 for port_path in self._get_windows_com_ports():
                     try:
                         import serial
+
                         ser = serial.Serial(port_path, 115200, timeout=1)
                         ser.close()
                         return {
@@ -185,12 +194,16 @@ class DeviceDetector:
                         # Verify it's accessible
                         try:
                             import serial
+
                             ser = serial.Serial(port_path, 115200, timeout=1)
                             ser.close()
                             return {
                                 "status": "detected",
                                 "connection_info": {"port": port_path},
-                                "details": {"port": port_path, "matched_pattern": pattern},
+                                "details": {
+                                    "port": port_path,
+                                    "matched_pattern": pattern,
+                                },
                             }
                         except Exception:
                             continue
@@ -275,7 +288,7 @@ class DeviceDetector:
                         # Linux: parse interface from location, prefer lower interface for Himax
                         if port.location:
                             try:
-                                iface = int(port.location.split('.')[-1])
+                                iface = int(port.location.split(".")[-1])
                                 return iface  # Lower interface (0) sorted first
                             except (ValueError, IndexError):
                                 pass
@@ -320,6 +333,7 @@ class DeviceDetector:
                 for port_path in self._get_windows_com_ports():
                     try:
                         import serial
+
                         ser = serial.Serial(port_path, 115200, timeout=1)
                         ser.close()
                         return {
@@ -334,12 +348,16 @@ class DeviceDetector:
                     for port_path in glob_module.glob(pattern):
                         try:
                             import serial
+
                             ser = serial.Serial(port_path, 115200, timeout=1)
                             ser.close()
                             return {
                                 "status": "detected",
                                 "connection_info": {"port": port_path},
-                                "details": {"port": port_path, "matched_pattern": pattern},
+                                "details": {
+                                    "port": port_path,
+                                    "matched_pattern": pattern,
+                                },
                             }
                         except Exception:
                             continue
@@ -398,6 +416,7 @@ class DeviceDetector:
         """Get available COM ports on Windows using pyserial"""
         try:
             import serial.tools.list_ports
+
             ports = []
             for port in serial.tools.list_ports.comports():
                 if port.device.upper().startswith("COM"):
@@ -425,7 +444,9 @@ class DeviceDetector:
                     # Check docker compose
                     try:
                         result = await asyncio.create_subprocess_exec(
-                            "docker", "compose", "version",
+                            "docker",
+                            "compose",
+                            "version",
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.PIPE,
                         )
@@ -570,6 +591,7 @@ class DeviceDetector:
         """Get platform information"""
         import platform
         import sys
+
         return {
             "system": platform.system(),
             "release": platform.release(),
@@ -590,33 +612,42 @@ class DeviceDetector:
 
             ports = []
             for port in raw_ports:
-                logger.debug(f"Port: {port.device}, desc: {port.description}, vid: {port.vid}, pid: {port.pid}")
-                ports.append({
-                    "device": port.device,
-                    "description": port.description or "",
-                    "manufacturer": port.manufacturer or "",
-                    "vid": f"0x{port.vid:04x}" if port.vid else None,
-                    "pid": f"0x{port.pid:04x}" if port.pid else None,
-                })
+                logger.debug(
+                    f"Port: {port.device}, desc: {port.description}, vid: {port.vid}, pid: {port.pid}"
+                )
+                ports.append(
+                    {
+                        "device": port.device,
+                        "description": port.description or "",
+                        "manufacturer": port.manufacturer or "",
+                        "vid": f"0x{port.vid:04x}" if port.vid else None,
+                        "pid": f"0x{port.pid:04x}" if port.pid else None,
+                    }
+                )
 
             # On Windows, if no ports found, try alternative method
             if not ports and sys.platform == "win32":
                 logger.info("No ports from comports(), trying Windows registry method")
                 try:
                     import winreg
-                    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DEVICEMAP\SERIALCOMM")
+
+                    key = winreg.OpenKey(
+                        winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DEVICEMAP\SERIALCOMM"
+                    )
                     i = 0
                     while True:
                         try:
                             name, value, _ = winreg.EnumValue(key, i)
                             logger.info(f"Registry port: {value}")
-                            ports.append({
-                                "device": value,
-                                "description": name,
-                                "manufacturer": "",
-                                "vid": None,
-                                "pid": None,
-                            })
+                            ports.append(
+                                {
+                                    "device": value,
+                                    "description": name,
+                                    "manufacturer": "",
+                                    "vid": None,
+                                    "pid": None,
+                                }
+                            )
                             i += 1
                         except OSError:
                             break
@@ -691,7 +722,9 @@ class DeviceDetector:
                 stdin, stdout, stderr = client.exec_command("uname -a")
                 uname = stdout.read().decode().strip()
 
-                stdin, stdout, stderr = client.exec_command("cat /etc/os-release 2>/dev/null || echo 'Unknown'")
+                stdin, stdout, stderr = client.exec_command(
+                    "cat /etc/os-release 2>/dev/null || echo 'Unknown'"
+                )
                 os_info = stdout.read().decode().strip()
 
                 client.close()

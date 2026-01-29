@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 class VersionInfo(BaseModel):
     """Version information for a deployed device"""
+
     device_id: str
     device_type: str
     config_version: str  # Version from configuration file
@@ -21,6 +22,7 @@ class VersionInfo(BaseModel):
 
 class UpdateCheckResult(BaseModel):
     """Result of checking for available updates"""
+
     device_id: str
     current_version: Optional[str]
     target_version: str
@@ -30,6 +32,7 @@ class UpdateCheckResult(BaseModel):
 
 class StepRecord(BaseModel):
     """Persisted record of a deployment step"""
+
     id: str
     name: str
     status: str  # pending | completed | failed | skipped
@@ -40,6 +43,7 @@ class StepRecord(BaseModel):
 
 class DeploymentRecord(BaseModel):
     """Record of a deployment"""
+
     deployment_id: str
     solution_id: str
     device_id: str
@@ -55,12 +59,14 @@ class DeploymentRecord(BaseModel):
 
 class SolutionVersioning(BaseModel):
     """Solution versioning configuration"""
+
     solution_version: str = "1.0.0"
     last_updated: Optional[str] = None
 
 
 class VersionSummary(BaseModel):
     """Summary of version information for a solution"""
+
     solution_id: str
     solution_version: str
     devices: List[VersionInfo]

@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class RestoreStatus(str, Enum):
     """Restore operation status"""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -31,6 +32,7 @@ class RestoreStatus(str, Enum):
 @dataclass
 class RestoreOperation:
     """Represents a single restore operation"""
+
     id: str
     device_type: str
     device_name: str
@@ -50,7 +52,9 @@ class RestoreManager:
     """Manages device restore operations"""
 
     def __init__(self):
-        self.config_path = Path(__file__).parent.parent / "factory_firmware" / "restore_config.yaml"
+        self.config_path = (
+            Path(__file__).parent.parent / "factory_firmware" / "restore_config.yaml"
+        )
         self.firmware_dir = Path(__file__).parent.parent / "factory_firmware"
         self._config: Optional[Dict[str, Any]] = None
         self._operations: Dict[str, RestoreOperation] = {}
@@ -61,7 +65,7 @@ class RestoreManager:
         """Load and cache restore configuration"""
         if self._config is None:
             if self.config_path.exists():
-                with open(self.config_path, 'r', encoding='utf-8') as f:
+                with open(self.config_path, "r", encoding="utf-8") as f:
                     self._config = yaml.safe_load(f)
             else:
                 self._config = {"devices": {}}
@@ -73,12 +77,18 @@ class RestoreManager:
         for device_id, device_config in self.config.get("devices", {}).items():
             name_key = "name_zh" if lang == "zh" else "name"
             desc_key = "description_zh" if lang == "zh" else "description"
-            devices.append({
-                "id": device_id,
-                "name": device_config.get(name_key, device_config.get("name", device_id)),
-                "description": device_config.get(desc_key, device_config.get("description", "")),
-                "type": device_config.get("type", "unknown"),
-            })
+            devices.append(
+                {
+                    "id": device_id,
+                    "name": device_config.get(
+                        name_key, device_config.get("name", device_id)
+                    ),
+                    "description": device_config.get(
+                        desc_key, device_config.get("description", "")
+                    ),
+                    "type": device_config.get("type", "unknown"),
+                }
+            )
         return devices
 
     def get_device_config(self, device_type: str) -> Optional[Dict[str, Any]]:
@@ -91,28 +101,34 @@ class RestoreManager:
 
     def _add_log(self, operation: RestoreOperation, level: str, message: str):
         """Add log entry to operation"""
-        operation.logs.append({
-            "timestamp": datetime.now().isoformat(),
-            "level": level,
-            "message": message,
-        })
-        logger.log(getattr(logging, level.upper(), logging.INFO), f"[{operation.id}] {message}")
+        operation.logs.append(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "level": level,
+                "message": message,
+            }
+        )
+        logger.log(
+            getattr(logging, level.upper(), logging.INFO), f"[{operation.id}] {message}"
+        )
 
     async def _notify_progress(self, operation: RestoreOperation):
         """Notify progress callback if registered"""
         callback = self._callbacks.get(operation.id)
         if callback:
             try:
-                await callback({
-                    "type": "progress",
-                    "operation_id": operation.id,
-                    "status": operation.status,
-                    "progress": operation.progress,
-                    "message": operation.message,
-                    "current_step": operation.current_step,
-                    "completed_steps": operation.completed_steps,
-                    "total_steps": operation.total_steps,
-                })
+                await callback(
+                    {
+                        "type": "progress",
+                        "operation_id": operation.id,
+                        "status": operation.status,
+                        "progress": operation.progress,
+                        "message": operation.message,
+                        "current_step": operation.current_step,
+                        "completed_steps": operation.completed_steps,
+                        "total_steps": operation.total_steps,
+                    }
+                )
             except Exception as e:
                 logger.warning(f"Progress callback failed: {e}")
 
@@ -152,11 +168,17 @@ class RestoreManager:
         # Start restore in background
         restore_type = device_config.get("type", "")
         if restore_type == "watcher_dual_chip":
-            asyncio.create_task(self._restore_watcher_dual(operation, device_config, connection))
+            asyncio.create_task(
+                self._restore_watcher_dual(operation, device_config, connection)
+            )
         elif restore_type == "himax_usb":
-            asyncio.create_task(self._restore_watcher(operation, device_config, connection))
+            asyncio.create_task(
+                self._restore_watcher(operation, device_config, connection)
+            )
         elif restore_type == "ssh_restore":
-            asyncio.create_task(self._restore_recamera(operation, device_config, connection))
+            asyncio.create_task(
+                self._restore_recamera(operation, device_config, connection)
+            )
         else:
             operation.status = RestoreStatus.FAILED
             operation.error = f"Unknown restore type: {restore_type}"
@@ -206,13 +228,19 @@ class RestoreManager:
                     source_url = fw_config.get("source_url")
                     if source_url:
                         operation.current_step = "Downloading firmware"
-                        operation.message = f"Downloading {fw_config.get('name', 'firmware')}..."
+                        operation.message = (
+                            f"Downloading {fw_config.get('name', 'firmware')}..."
+                        )
                         await self._notify_progress(operation)
-                        self._add_log(operation, "info", f"Downloading firmware from {source_url}")
+                        self._add_log(
+                            operation, "info", f"Downloading firmware from {source_url}"
+                        )
 
                         success = await self._download_firmware(source_url, fw_path)
                         if not success:
-                            raise FileNotFoundError(f"Failed to download firmware: {fw_file}")
+                            raise FileNotFoundError(
+                                f"Failed to download firmware: {fw_file}"
+                            )
                     else:
                         raise FileNotFoundError(f"Firmware file not found: {fw_file}")
 
@@ -236,20 +264,36 @@ class RestoreManager:
                 operation.current_step = f"Flashing {fw_config.get('name', 'firmware')}"
                 operation.message = "Flashing firmware..."
                 await self._notify_progress(operation)
-                self._add_log(operation, "info", f"Flashing slot {fw_config.get('slot', 1)}: {fw_config.get('name')}")
+                self._add_log(
+                    operation,
+                    "info",
+                    f"Flashing slot {fw_config.get('slot', 1)}: {fw_config.get('name')}",
+                )
 
                 async def progress_handler(step: str, progress: int, message: str):
                     operation.message = message
-                    operation.progress = int((operation.completed_steps + progress / 100) / operation.total_steps * 100)
+                    operation.progress = int(
+                        (operation.completed_steps + progress / 100)
+                        / operation.total_steps
+                        * 100
+                    )
                     await self._notify_progress(operation)
 
-                success = await deployer.deploy(device_cfg, {"port": port}, progress_handler)
+                success = await deployer.deploy(
+                    device_cfg, {"port": port}, progress_handler
+                )
 
                 if not success:
-                    raise RuntimeError(f"Failed to flash {fw_config.get('name', 'firmware')}")
+                    raise RuntimeError(
+                        f"Failed to flash {fw_config.get('name', 'firmware')}"
+                    )
 
                 operation.completed_steps += 1
-                self._add_log(operation, "info", f"Successfully flashed {fw_config.get('name', 'firmware')}")
+                self._add_log(
+                    operation,
+                    "info",
+                    f"Successfully flashed {fw_config.get('name', 'firmware')}",
+                )
 
             # Complete
             operation.status = RestoreStatus.COMPLETED
@@ -310,7 +354,11 @@ class RestoreManager:
             operation.current_step = "Flashing ESP32"
             operation.message = "Preparing to flash ESP32-S3 firmware..."
             await self._notify_progress(operation)
-            self._add_log(operation, "info", f"Starting ESP32-S3 firmware flash: {esp32_config.get('name')}")
+            self._add_log(
+                operation,
+                "info",
+                f"Starting ESP32-S3 firmware flash: {esp32_config.get('name')}",
+            )
 
             # Create ESP32 deployer
             esp32_deployer = ESP32Deployer()
@@ -350,7 +398,9 @@ class RestoreManager:
                 await self._notify_progress(operation)
 
             # Flash ESP32
-            esp32_success = await esp32_deployer.deploy(esp32_device_cfg, {"port": port}, esp32_progress_handler)
+            esp32_success = await esp32_deployer.deploy(
+                esp32_device_cfg, {"port": port}, esp32_progress_handler
+            )
 
             if not esp32_success:
                 raise RuntimeError("Failed to flash ESP32-S3 firmware")
@@ -373,7 +423,11 @@ class RestoreManager:
             operation.current_step = "Flashing Himax"
             operation.message = "Preparing Himax WE2 firmware flash..."
             await self._notify_progress(operation)
-            self._add_log(operation, "info", f"Starting Himax WE2 firmware flash: {himax_config.get('name')}")
+            self._add_log(
+                operation,
+                "info",
+                f"Starting Himax WE2 firmware flash: {himax_config.get('name')}",
+            )
 
             # Create Himax deployer
             himax_deployer = HimaxDeployer()
@@ -404,7 +458,9 @@ class RestoreManager:
                 await self._notify_progress(operation)
 
             # Flash Himax (deployer will find ESP32 port and hold it in reset)
-            himax_success = await himax_deployer.deploy(himax_device_cfg, {"port": port}, himax_progress_handler)
+            himax_success = await himax_deployer.deploy(
+                himax_device_cfg, {"port": port}, himax_progress_handler
+            )
 
             if not himax_success:
                 raise RuntimeError("Failed to flash Himax WE2 firmware")
@@ -417,7 +473,9 @@ class RestoreManager:
             operation.progress = 100
             operation.message = "Restore completed successfully (ESP32 + Himax)"
             operation.completed_at = datetime.now()
-            self._add_log(operation, "info", "Watcher dual-chip restore completed successfully")
+            self._add_log(
+                operation, "info", "Watcher dual-chip restore completed successfully"
+            )
             await self._notify_progress(operation)
 
         except Exception as e:
@@ -443,9 +501,14 @@ class RestoreManager:
             import paramiko
 
             host = connection.get("host")
-            username = connection.get("username", device_config.get("default_credentials", {}).get("username", "root"))
+            username = connection.get(
+                "username",
+                device_config.get("default_credentials", {}).get("username", "root"),
+            )
             password = connection.get("password")
-            port = connection.get("port", device_config.get("default_credentials", {}).get("port", 22))
+            port = connection.get(
+                "port", device_config.get("default_credentials", {}).get("port", 22)
+            )
 
             if not host:
                 raise ValueError("Host not specified")
@@ -455,7 +518,9 @@ class RestoreManager:
             restore_ops = device_config.get("restore_operations", [])
             operation.total_steps = len(restore_ops)
 
-            self._add_log(operation, "info", f"Connecting to {host}:{port} as {username}")
+            self._add_log(
+                operation, "info", f"Connecting to {host}:{port} as {username}"
+            )
             operation.message = f"Connecting to {host}..."
             await self._notify_progress(operation)
 
@@ -480,7 +545,7 @@ class RestoreManager:
                 await self._notify_progress(operation)
 
                 stdin, stdout, stderr = ssh.exec_command("uname -s", timeout=30)
-                os_name = stdout.read().decode('utf-8', errors='ignore').strip().lower()
+                os_name = stdout.read().decode("utf-8", errors="ignore").strip().lower()
 
                 if os_name != "linux":
                     raise RuntimeError(
@@ -488,7 +553,9 @@ class RestoreManager:
                         f"Only Linux devices are supported for restore operations."
                     )
 
-                self._add_log(operation, "info", "Confirmed remote device is running Linux")
+                self._add_log(
+                    operation, "info", "Confirmed remote device is running Linux"
+                )
 
                 for i, restore_op in enumerate(restore_ops):
                     op_name = restore_op.get("name", f"Step {i + 1}")
@@ -502,29 +569,41 @@ class RestoreManager:
 
                     # Replace sudo with password-enabled sudo -S
                     # This handles commands that use 'sudo' which requires password
-                    if 'sudo ' in op_command and password:
+                    if "sudo " in op_command and password:
                         # Use printf to avoid echo issues with special characters
                         # Replace 'sudo ' with 'printf "password\n" | sudo -S '
                         escaped_password = password.replace("'", "'\"'\"'")
-                        op_command = op_command.replace('sudo ', f"printf '%s\\n' '{escaped_password}' | sudo -S ")
+                        op_command = op_command.replace(
+                            "sudo ", f"printf '%s\\n' '{escaped_password}' | sudo -S "
+                        )
 
                     # Execute command
                     try:
                         stdin, stdout, stderr = ssh.exec_command(op_command, timeout=60)
                         exit_status = stdout.channel.recv_exit_status()
 
-                        stdout_text = stdout.read().decode('utf-8', errors='ignore').strip()
-                        stderr_text = stderr.read().decode('utf-8', errors='ignore').strip()
+                        stdout_text = (
+                            stdout.read().decode("utf-8", errors="ignore").strip()
+                        )
+                        stderr_text = (
+                            stderr.read().decode("utf-8", errors="ignore").strip()
+                        )
 
                         if stdout_text:
                             self._add_log(operation, "info", f"Output: {stdout_text}")
                         if stderr_text and exit_status != 0:
-                            self._add_log(operation, "warning", f"Stderr: {stderr_text}")
+                            self._add_log(
+                                operation, "warning", f"Stderr: {stderr_text}"
+                            )
 
                         self._add_log(operation, "info", f"Completed: {op_name}")
 
                     except Exception as cmd_err:
-                        self._add_log(operation, "warning", f"Error executing {op_name}: {cmd_err}")
+                        self._add_log(
+                            operation,
+                            "warning",
+                            f"Error executing {op_name}: {cmd_err}",
+                        )
 
                     operation.completed_steps = i + 1
 
@@ -579,11 +658,13 @@ class RestoreManager:
 
             dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-            async with httpx.AsyncClient(follow_redirects=True, timeout=120.0) as client:
+            async with httpx.AsyncClient(
+                follow_redirects=True, timeout=120.0
+            ) as client:
                 response = await client.get(url)
                 response.raise_for_status()
 
-                with open(dest_path, 'wb') as f:
+                with open(dest_path, "wb") as f:
                     f.write(response.content)
 
             logger.info(f"Downloaded firmware to {dest_path}")

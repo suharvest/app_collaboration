@@ -24,11 +24,17 @@ async def load_device_group_section(
 ) -> dict:
     """Load section with template variable replacement"""
     result = {
-        "title": section.title_zh if lang == "zh" and section.title_zh else section.title,
+        "title": (
+            section.title_zh if lang == "zh" and section.title_zh else section.title
+        ),
     }
 
     # Select language-specific template file
-    template_file = section.description_file_zh if lang == "zh" and section.description_file_zh else section.description_file
+    template_file = (
+        section.description_file_zh
+        if lang == "zh" and section.description_file_zh
+        else section.description_file
+    )
     if not template_file:
         return result
 
@@ -49,7 +55,7 @@ async def load_device_group_section(
                 if content_file:
                     # Try language-specific version first
                     if lang == "zh":
-                        zh_file = content_file.replace('.md', '_zh.md')
+                        zh_file = content_file.replace(".md", "_zh.md")
                         content = await solution_manager.load_markdown(
                             solution_id, zh_file, convert_to_html=False
                         )
@@ -61,13 +67,15 @@ async def load_device_group_section(
                         content = await solution_manager.load_markdown(
                             solution_id, content_file, convert_to_html=False
                         )
-                    template_content = template_content.replace(placeholder, content or '')
+                    template_content = template_content.replace(
+                        placeholder, content or ""
+                    )
                 else:
                     # No content for this device, clear the placeholder
-                    template_content = template_content.replace(placeholder, '')
+                    template_content = template_content.replace(placeholder, "")
 
     # Convert final content to HTML
-    md = markdown.Markdown(extensions=['extra', 'codehilite', 'toc'])
+    md = markdown.Markdown(extensions=["extra", "codehilite", "toc"])
     result["description"] = md.convert(template_content)
 
     return result
@@ -86,11 +94,17 @@ async def load_preset_section(
     The key in selections that matches determines which file to use.
     """
     result = {
-        "title": section.title_zh if lang == "zh" and section.title_zh else section.title,
+        "title": (
+            section.title_zh if lang == "zh" and section.title_zh else section.title
+        ),
     }
 
     # Select language-specific template file
-    template_file = section.description_file_zh if lang == "zh" and section.description_file_zh else section.description_file
+    template_file = (
+        section.description_file_zh
+        if lang == "zh" and section.description_file_zh
+        else section.description_file
+    )
     if not template_file:
         return result
 
@@ -116,7 +130,7 @@ async def load_preset_section(
                 if content_file:
                     # Try language-specific version first
                     if lang == "zh":
-                        zh_file = content_file.replace('.md', '_zh.md')
+                        zh_file = content_file.replace(".md", "_zh.md")
                         content = await solution_manager.load_markdown(
                             solution_id, zh_file, convert_to_html=False
                         )
@@ -128,12 +142,14 @@ async def load_preset_section(
                         content = await solution_manager.load_markdown(
                             solution_id, content_file, convert_to_html=False
                         )
-                    template_content = template_content.replace(placeholder, content or '')
+                    template_content = template_content.replace(
+                        placeholder, content or ""
+                    )
                 else:
-                    template_content = template_content.replace(placeholder, '')
+                    template_content = template_content.replace(placeholder, "")
 
     # Convert final content to HTML
-    md = markdown.Markdown(extensions=['extra', 'codehilite', 'toc'])
+    md = markdown.Markdown(extensions=["extra", "codehilite", "toc"])
     result["description"] = md.convert(template_content)
 
     return result
@@ -154,10 +170,26 @@ async def list_solutions(
 
         # Check file existence for management UI
         base_path = Path(solution.base_path) if solution.base_path else None
-        has_description = base_path and (base_path / solution.intro.description_file).exists() if solution.intro.description_file else False
-        has_description_zh = base_path and (base_path / solution.intro.description_file_zh).exists() if solution.intro.description_file_zh else False
-        has_guide = base_path and (base_path / solution.deployment.guide_file).exists() if solution.deployment.guide_file else False
-        has_guide_zh = base_path and (base_path / solution.deployment.guide_file_zh).exists() if solution.deployment.guide_file_zh else False
+        has_description = (
+            base_path and (base_path / solution.intro.description_file).exists()
+            if solution.intro.description_file
+            else False
+        )
+        has_description_zh = (
+            base_path and (base_path / solution.intro.description_file_zh).exists()
+            if solution.intro.description_file_zh
+            else False
+        )
+        has_guide = (
+            base_path and (base_path / solution.deployment.guide_file).exists()
+            if solution.deployment.guide_file
+            else False
+        )
+        has_guide_zh = (
+            base_path and (base_path / solution.deployment.guide_file_zh).exists()
+            if solution.deployment.guide_file_zh
+            else False
+        )
 
         summary = SolutionSummary(
             id=solution.id,
@@ -167,7 +199,11 @@ async def list_solutions(
             summary_zh=solution.intro.summary_zh,
             category=solution.intro.category,
             tags=solution.intro.tags,
-            cover_image=f"/api/solutions/{solution.id}/assets/{solution.intro.cover_image}" if solution.intro.cover_image else None,
+            cover_image=(
+                f"/api/solutions/{solution.id}/assets/{solution.intro.cover_image}"
+                if solution.intro.cover_image
+                else None
+            ),
             difficulty=solution.intro.stats.difficulty,
             estimated_time=solution.intro.stats.estimated_time,
             deployed_count=solution.intro.stats.deployed_count,
@@ -197,9 +233,13 @@ async def get_solution(
     description = None
     description_zh = None
     if solution.intro.description_file:
-        description = await solution_manager.load_markdown(solution_id, solution.intro.description_file)
+        description = await solution_manager.load_markdown(
+            solution_id, solution.intro.description_file
+        )
     if solution.intro.description_file_zh:
-        description_zh = await solution_manager.load_markdown(solution_id, solution.intro.description_file_zh)
+        description_zh = await solution_manager.load_markdown(
+            solution_id, solution.intro.description_file_zh
+        )
 
     # Build gallery URLs
     gallery = []
@@ -207,20 +247,26 @@ async def get_solution(
         gallery_item = item.model_dump()
         gallery_item["src"] = f"/api/solutions/{solution_id}/assets/{item.src}"
         if item.thumbnail:
-            gallery_item["thumbnail"] = f"/api/solutions/{solution_id}/assets/{item.thumbnail}"
+            gallery_item["thumbnail"] = (
+                f"/api/solutions/{solution_id}/assets/{item.thumbnail}"
+            )
         gallery.append(gallery_item)
 
     # Build devices summary from presets
     devices = []
     all_preset_devices = solution_manager.get_all_devices_from_solution(solution)
     for device in all_preset_devices:
-        devices.append({
-            "id": device.id,
-            "name": device.name if lang == "en" else (device.name_zh or device.name),
-            "name_zh": device.name_zh,
-            "type": device.type,
-            "required": device.required,
-        })
+        devices.append(
+            {
+                "id": device.id,
+                "name": (
+                    device.name if lang == "en" else (device.name_zh or device.name)
+                ),
+                "name_zh": device.name_zh,
+                "type": device.type,
+                "required": device.required,
+            }
+        )
 
     # Build required devices with image URLs (legacy)
     required_devices = []
@@ -243,7 +289,11 @@ async def get_solution(
             result = dict(global_catalog[device_id])
         # Override with local device catalog
         if local_device:
-            local_data = local_device.model_dump() if hasattr(local_device, 'model_dump') else dict(local_device)
+            local_data = (
+                local_device.model_dump()
+                if hasattr(local_device, "model_dump")
+                else dict(local_device)
+            )
             for key, value in local_data.items():
                 if value is not None:
                     result[key] = value
@@ -285,7 +335,9 @@ async def get_solution(
         preset_data = preset.model_dump()
         # Resolve device groups within each preset
         if preset.device_groups:
-            preset_data["device_groups"] = [resolve_device_group(g) for g in preset.device_groups]
+            preset_data["device_groups"] = [
+                resolve_device_group(g) for g in preset.device_groups
+            ]
         presets.append(preset_data)
 
     # For backward compatibility: collect all device groups from presets for top-level device_groups field
@@ -303,7 +355,11 @@ async def get_solution(
         partner_info = {
             "name": partner.name if lang == "en" else (partner.name_zh or partner.name),
             "name_zh": partner.name_zh,
-            "logo": f"/api/solutions/{solution_id}/assets/{partner.logo}" if partner.logo else None,
+            "logo": (
+                f"/api/solutions/{solution_id}/assets/{partner.logo}"
+                if partner.logo
+                else None
+            ),
             "regions": partner.regions_en if lang == "en" else partner.regions,
             "contact": partner.contact,
             "website": partner.website,
@@ -314,13 +370,21 @@ async def get_solution(
         id=solution.id,
         name=solution.name if lang == "en" else (solution.name_zh or solution.name),
         name_zh=solution.name_zh,
-        summary=solution.intro.summary if lang == "en" else (solution.intro.summary_zh or solution.intro.summary),
+        summary=(
+            solution.intro.summary
+            if lang == "en"
+            else (solution.intro.summary_zh or solution.intro.summary)
+        ),
         summary_zh=solution.intro.summary_zh,
         description=description if lang == "en" else (description_zh or description),
         description_zh=description_zh,
         category=solution.intro.category,
         tags=solution.intro.tags,
-        cover_image=f"/api/solutions/{solution_id}/assets/{solution.intro.cover_image}" if solution.intro.cover_image else None,
+        cover_image=(
+            f"/api/solutions/{solution_id}/assets/{solution.intro.cover_image}"
+            if solution.intro.cover_image
+            else None
+        ),
         gallery=gallery,
         devices=devices,
         required_devices=required_devices,
@@ -329,7 +393,9 @@ async def get_solution(
         presets=presets,
         partners=partners,
         stats=solution.intro.stats.model_dump(),
-        links={k: v for k, v in solution.intro.links.model_dump().items() if v is not None},
+        links={
+            k: v for k, v in solution.intro.links.model_dump().items() if v is not None
+        },
         deployment_order=solution.deployment.order,
         wiki_url=solution.intro.links.wiki,
     )
@@ -348,9 +414,13 @@ async def get_deployment_info(
     # Load deployment guide
     guide = None
     if lang == "zh" and solution.deployment.guide_file_zh:
-        guide = await solution_manager.load_markdown(solution_id, solution.deployment.guide_file_zh)
+        guide = await solution_manager.load_markdown(
+            solution_id, solution.deployment.guide_file_zh
+        )
     elif solution.deployment.guide_file:
-        guide = await solution_manager.load_markdown(solution_id, solution.deployment.guide_file)
+        guide = await solution_manager.load_markdown(
+            solution_id, solution.deployment.guide_file
+        )
 
     # Build device sections from presets (for backward compatibility)
     devices = []
@@ -367,50 +437,82 @@ async def get_deployment_info(
 
         # Load device config to get SSH settings, user_inputs, preview settings, etc.
         if device.config_file:
-            config = await solution_manager.load_device_config(solution_id, device.config_file)
+            config = await solution_manager.load_device_config(
+                solution_id, device.config_file
+            )
             if config:
                 # Include SSH config for SSH-based deployments
                 if config.ssh:
                     device_info["ssh"] = config.ssh.model_dump()
                 # Include user_inputs for all device types
                 if config.user_inputs:
-                    device_info["user_inputs"] = [inp.model_dump() for inp in config.user_inputs]
+                    device_info["user_inputs"] = [
+                        inp.model_dump() for inp in config.user_inputs
+                    ]
                 # Include preview-specific settings for preview type
                 if device.type == "preview":
                     device_info["preview"] = {
-                        "user_inputs": [inp.model_dump() for inp in config.user_inputs] if config.user_inputs else [],
+                        "user_inputs": (
+                            [inp.model_dump() for inp in config.user_inputs]
+                            if config.user_inputs
+                            else []
+                        ),
                         "video": config.video.model_dump() if config.video else None,
                         "mqtt": config.mqtt.model_dump() if config.mqtt else None,
-                        "overlay": config.overlay.model_dump() if config.overlay else None,
-                        "display": config.display.model_dump() if config.display else None,
+                        "overlay": (
+                            config.overlay.model_dump() if config.overlay else None
+                        ),
+                        "display": (
+                            config.display.model_dump() if config.display else None
+                        ),
                     }
 
         if device.section:
             section = device.section
             device_info["section"] = {
-                "title": section.title if lang == "en" else (section.title_zh or section.title),
+                "title": (
+                    section.title
+                    if lang == "en"
+                    else (section.title_zh or section.title)
+                ),
                 "title_zh": section.title_zh,
             }
 
             # Load section description
-            desc_file = section.description_file_zh if lang == "zh" else section.description_file
+            desc_file = (
+                section.description_file_zh
+                if lang == "zh"
+                else section.description_file
+            )
             if desc_file:
-                device_info["section"]["description"] = await solution_manager.load_markdown(
-                    solution_id, desc_file
+                device_info["section"]["description"] = (
+                    await solution_manager.load_markdown(solution_id, desc_file)
                 )
 
             # Load troubleshoot content (shown below deploy button)
-            troubleshoot_file = section.troubleshoot_file_zh if lang == "zh" else section.troubleshoot_file
+            troubleshoot_file = (
+                section.troubleshoot_file_zh
+                if lang == "zh"
+                else section.troubleshoot_file
+            )
             if troubleshoot_file:
-                device_info["section"]["troubleshoot"] = await solution_manager.load_markdown(
-                    solution_id, troubleshoot_file
+                device_info["section"]["troubleshoot"] = (
+                    await solution_manager.load_markdown(solution_id, troubleshoot_file)
                 )
 
             # Add wiring info
             if section.wiring:
                 device_info["section"]["wiring"] = {
-                    "image": f"/api/solutions/{solution_id}/assets/{section.wiring.image}" if section.wiring.image else None,
-                    "steps": section.wiring.steps_zh if lang == "zh" else section.wiring.steps,
+                    "image": (
+                        f"/api/solutions/{solution_id}/assets/{section.wiring.image}"
+                        if section.wiring.image
+                        else None
+                    ),
+                    "steps": (
+                        section.wiring.steps_zh
+                        if lang == "zh"
+                        else section.wiring.steps
+                    ),
                 }
 
         # Process targets (alternative deployment options within a device step)
@@ -418,9 +520,15 @@ async def get_deployment_info(
             targets_data = {}
             for target_id, target in device.targets.items():
                 target_info = {
-                    "name": target.name if lang == "en" else (target.name_zh or target.name),
+                    "name": (
+                        target.name if lang == "en" else (target.name_zh or target.name)
+                    ),
                     "name_zh": target.name_zh,
-                    "description": target.description if lang == "en" else (target.description_zh or target.description),
+                    "description": (
+                        target.description
+                        if lang == "en"
+                        else (target.description_zh or target.description)
+                    ),
                     "description_zh": target.description_zh,
                     "default": target.default,
                     "config_file": target.config_file,
@@ -428,21 +536,39 @@ async def get_deployment_info(
                 # Load target section description
                 if target.section:
                     target_section = {}
-                    desc_file = target.section.description_file_zh if lang == "zh" else target.section.description_file
+                    desc_file = (
+                        target.section.description_file_zh
+                        if lang == "zh"
+                        else target.section.description_file
+                    )
                     if desc_file:
-                        target_section["description"] = await solution_manager.load_markdown(
-                            solution_id, desc_file
+                        target_section["description"] = (
+                            await solution_manager.load_markdown(solution_id, desc_file)
                         )
                     # Load troubleshoot content
-                    troubleshoot_file = target.section.troubleshoot_file_zh if lang == "zh" else target.section.troubleshoot_file
+                    troubleshoot_file = (
+                        target.section.troubleshoot_file_zh
+                        if lang == "zh"
+                        else target.section.troubleshoot_file
+                    )
                     if troubleshoot_file:
-                        target_section["troubleshoot"] = await solution_manager.load_markdown(
-                            solution_id, troubleshoot_file
+                        target_section["troubleshoot"] = (
+                            await solution_manager.load_markdown(
+                                solution_id, troubleshoot_file
+                            )
                         )
                     if target.section.wiring:
                         target_section["wiring"] = {
-                            "image": f"/api/solutions/{solution_id}/assets/{target.section.wiring.image}" if target.section.wiring.image else None,
-                            "steps": target.section.wiring.steps_zh if lang == "zh" else target.section.wiring.steps,
+                            "image": (
+                                f"/api/solutions/{solution_id}/assets/{target.section.wiring.image}"
+                                if target.section.wiring.image
+                                else None
+                            ),
+                            "steps": (
+                                target.section.wiring.steps_zh
+                                if lang == "zh"
+                                else target.section.wiring.steps
+                            ),
                         }
                     target_info["section"] = target_section
                 targets_data[target_id] = target_info
@@ -465,11 +591,15 @@ async def get_deployment_info(
 
         post_deployment["next_steps"] = []
         for step in pd.next_steps:
-            post_deployment["next_steps"].append({
-                "title": step.title if lang == "en" else (step.title_zh or step.title),
-                "action": step.action,
-                "url": step.url,
-            })
+            post_deployment["next_steps"].append(
+                {
+                    "title": (
+                        step.title if lang == "en" else (step.title_zh or step.title)
+                    ),
+                    "action": step.action,
+                    "url": step.url,
+                }
+            )
 
     # Helper function to build device group data with section content
     async def build_device_group_data(group):
@@ -480,7 +610,7 @@ async def get_deployment_info(
         if group.section:
             # Get selected device (default)
             selected_device = group.default
-            if group.type == 'multiple' and group.default_selections:
+            if group.type == "multiple" and group.default_selections:
                 selected_device = group.default_selections[0]
 
             section_data = await load_device_group_section(
@@ -508,44 +638,76 @@ async def get_deployment_info(
 
         # Load device config to get SSH settings, user_inputs, preview settings, etc.
         if device.config_file:
-            config = await solution_manager.load_device_config(solution_id, device.config_file)
+            config = await solution_manager.load_device_config(
+                solution_id, device.config_file
+            )
             if config:
                 if config.ssh:
                     device_info["ssh"] = config.ssh.model_dump()
                 if config.user_inputs:
-                    device_info["user_inputs"] = [inp.model_dump() for inp in config.user_inputs]
+                    device_info["user_inputs"] = [
+                        inp.model_dump() for inp in config.user_inputs
+                    ]
                 if device.type == "preview":
                     device_info["preview"] = {
-                        "user_inputs": [inp.model_dump() for inp in config.user_inputs] if config.user_inputs else [],
+                        "user_inputs": (
+                            [inp.model_dump() for inp in config.user_inputs]
+                            if config.user_inputs
+                            else []
+                        ),
                         "video": config.video.model_dump() if config.video else None,
                         "mqtt": config.mqtt.model_dump() if config.mqtt else None,
-                        "overlay": config.overlay.model_dump() if config.overlay else None,
-                        "display": config.display.model_dump() if config.display else None,
+                        "overlay": (
+                            config.overlay.model_dump() if config.overlay else None
+                        ),
+                        "display": (
+                            config.display.model_dump() if config.display else None
+                        ),
                     }
 
         if device.section:
             section = device.section
             device_info["section"] = {
-                "title": section.title if lang == "en" else (section.title_zh or section.title),
+                "title": (
+                    section.title
+                    if lang == "en"
+                    else (section.title_zh or section.title)
+                ),
                 "title_zh": section.title_zh,
             }
 
-            desc_file = section.description_file_zh if lang == "zh" else section.description_file
+            desc_file = (
+                section.description_file_zh
+                if lang == "zh"
+                else section.description_file
+            )
             if desc_file:
-                device_info["section"]["description"] = await solution_manager.load_markdown(
-                    solution_id, desc_file
+                device_info["section"]["description"] = (
+                    await solution_manager.load_markdown(solution_id, desc_file)
                 )
 
-            troubleshoot_file = section.troubleshoot_file_zh if lang == "zh" else section.troubleshoot_file
+            troubleshoot_file = (
+                section.troubleshoot_file_zh
+                if lang == "zh"
+                else section.troubleshoot_file
+            )
             if troubleshoot_file:
-                device_info["section"]["troubleshoot"] = await solution_manager.load_markdown(
-                    solution_id, troubleshoot_file
+                device_info["section"]["troubleshoot"] = (
+                    await solution_manager.load_markdown(solution_id, troubleshoot_file)
                 )
 
             if section.wiring:
                 device_info["section"]["wiring"] = {
-                    "image": f"/api/solutions/{solution_id}/assets/{section.wiring.image}" if section.wiring.image else None,
-                    "steps": section.wiring.steps_zh if lang == "zh" else section.wiring.steps,
+                    "image": (
+                        f"/api/solutions/{solution_id}/assets/{section.wiring.image}"
+                        if section.wiring.image
+                        else None
+                    ),
+                    "steps": (
+                        section.wiring.steps_zh
+                        if lang == "zh"
+                        else section.wiring.steps
+                    ),
                 }
 
         # Process targets
@@ -553,29 +715,53 @@ async def get_deployment_info(
             targets_data = {}
             for target_id, target in device.targets.items():
                 target_info = {
-                    "name": target.name if lang == "en" else (target.name_zh or target.name),
+                    "name": (
+                        target.name if lang == "en" else (target.name_zh or target.name)
+                    ),
                     "name_zh": target.name_zh,
-                    "description": target.description if lang == "en" else (target.description_zh or target.description),
+                    "description": (
+                        target.description
+                        if lang == "en"
+                        else (target.description_zh or target.description)
+                    ),
                     "description_zh": target.description_zh,
                     "default": target.default,
                     "config_file": target.config_file,
                 }
                 if target.section:
                     target_section = {}
-                    desc_file = target.section.description_file_zh if lang == "zh" else target.section.description_file
+                    desc_file = (
+                        target.section.description_file_zh
+                        if lang == "zh"
+                        else target.section.description_file
+                    )
                     if desc_file:
-                        target_section["description"] = await solution_manager.load_markdown(
-                            solution_id, desc_file
+                        target_section["description"] = (
+                            await solution_manager.load_markdown(solution_id, desc_file)
                         )
-                    troubleshoot_file = target.section.troubleshoot_file_zh if lang == "zh" else target.section.troubleshoot_file
+                    troubleshoot_file = (
+                        target.section.troubleshoot_file_zh
+                        if lang == "zh"
+                        else target.section.troubleshoot_file
+                    )
                     if troubleshoot_file:
-                        target_section["troubleshoot"] = await solution_manager.load_markdown(
-                            solution_id, troubleshoot_file
+                        target_section["troubleshoot"] = (
+                            await solution_manager.load_markdown(
+                                solution_id, troubleshoot_file
+                            )
                         )
                     if target.section.wiring:
                         target_section["wiring"] = {
-                            "image": f"/api/solutions/{solution_id}/assets/{target.section.wiring.image}" if target.section.wiring.image else None,
-                            "steps": target.section.wiring.steps_zh if lang == "zh" else target.section.wiring.steps,
+                            "image": (
+                                f"/api/solutions/{solution_id}/assets/{target.section.wiring.image}"
+                                if target.section.wiring.image
+                                else None
+                            ),
+                            "steps": (
+                                target.section.wiring.steps_zh
+                                if lang == "zh"
+                                else target.section.wiring.steps
+                            ),
                         }
                     target_info["section"] = target_section
                 targets_data[target_id] = target_info
@@ -592,11 +778,11 @@ async def get_deployment_info(
             # Build selections from device_groups defaults for template variable replacement
             selections = {}
             for group in preset.device_groups:
-                if group.type == 'single' and group.default:
+                if group.type == "single" and group.default:
                     selections[group.id] = group.default
-                elif group.type == 'multiple' and group.default_selections:
+                elif group.type == "multiple" and group.default_selections:
                     selections[group.id] = group.default_selections[0]
-                elif group.type == 'quantity':
+                elif group.type == "quantity":
                     selections[group.id] = group.default_count
             section_data = await load_preset_section(
                 solution_id,
@@ -609,10 +795,14 @@ async def get_deployment_info(
             preset_data["section"] = None
         # Build device groups with section content
         if preset.device_groups:
-            preset_data["device_groups"] = [await build_device_group_data(g) for g in preset.device_groups]
+            preset_data["device_groups"] = [
+                await build_device_group_data(g) for g in preset.device_groups
+            ]
         # Build preset-specific devices
         if preset.devices:
-            preset_data["devices"] = [await build_preset_device_info(d) for d in preset.devices]
+            preset_data["devices"] = [
+                await build_preset_device_info(d) for d in preset.devices
+            ]
         presets.append(preset_data)
 
     # For backward compatibility: collect all device groups from presets
@@ -730,11 +920,11 @@ async def get_preset_section(
     # Build selections from device_groups defaults
     selections = {}
     for group in preset.device_groups:
-        if group.type == 'single' and group.default:
+        if group.type == "single" and group.default:
             selections[group.id] = group.default
-        elif group.type == 'multiple' and group.default_selections:
+        elif group.type == "multiple" and group.default_selections:
             selections[group.id] = group.default_selections[0]
-        elif group.type == 'quantity':
+        elif group.type == "quantity":
             selections[group.id] = group.default_count
 
     section_data = await load_preset_section(
@@ -763,6 +953,7 @@ async def like_solution(solution_id: str):
 # Solution Management CRUD Routes
 # ============================================
 
+
 @router.post("/", response_model=SolutionSummary)
 async def create_solution(data: SolutionCreate):
     """Create a new solution"""
@@ -787,7 +978,9 @@ async def create_solution(data: SolutionCreate):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create solution: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create solution: {str(e)}"
+        )
 
 
 @router.put("/{solution_id}", response_model=SolutionSummary)
@@ -809,7 +1002,11 @@ async def update_solution(solution_id: str, data: SolutionUpdate):
             summary_zh=solution.intro.summary_zh,
             category=solution.intro.category,
             tags=solution.intro.tags,
-            cover_image=f"/api/solutions/{solution.id}/assets/{solution.intro.cover_image}" if solution.intro.cover_image else None,
+            cover_image=(
+                f"/api/solutions/{solution.id}/assets/{solution.intro.cover_image}"
+                if solution.intro.cover_image
+                else None
+            ),
             difficulty=solution.intro.stats.difficulty,
             estimated_time=solution.intro.stats.estimated_time,
             deployed_count=solution.intro.stats.deployed_count,
@@ -819,13 +1016,17 @@ async def update_solution(solution_id: str, data: SolutionUpdate):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update solution: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update solution: {str(e)}"
+        )
 
 
 @router.delete("/{solution_id}")
 async def delete_solution(
     solution_id: str,
-    permanent: bool = Query(False, description="Permanently delete instead of moving to trash")
+    permanent: bool = Query(
+        False, description="Permanently delete instead of moving to trash"
+    ),
 ):
     """Delete a solution (moves to trash by default)"""
     try:
@@ -834,7 +1035,9 @@ async def delete_solution(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete solution: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete solution: {str(e)}"
+        )
 
 
 @router.post("/{solution_id}/assets")
@@ -842,7 +1045,9 @@ async def upload_asset(
     solution_id: str,
     file: UploadFile = File(...),
     path: str = Form(..., description="Relative path within solution directory"),
-    update_field: Optional[str] = Form(None, description="Optional YAML field to update with this path")
+    update_field: Optional[str] = Form(
+        None, description="Optional YAML field to update with this path"
+    ),
 ):
     """Upload an asset file to a solution"""
     try:
@@ -855,16 +1060,13 @@ async def upload_asset(
 
         # Save the asset
         saved_path = await solution_manager.save_asset(
-            solution_id,
-            content,
-            path,
-            update_yaml_field=update_field
+            solution_id, content, path, update_yaml_field=update_field
         )
 
         return {
             "success": True,
             "path": saved_path,
-            "url": f"/api/solutions/{solution_id}/assets/{saved_path}"
+            "url": f"/api/solutions/{solution_id}/assets/{saved_path}",
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -875,6 +1077,7 @@ async def upload_asset(
 # ============================================
 # File Management Routes
 # ============================================
+
 
 @router.get("/{solution_id}/files")
 async def list_files(solution_id: str):
@@ -901,7 +1104,9 @@ async def delete_file(solution_id: str, path: str):
 async def get_file_content(solution_id: str, path: str):
     """Get raw text content of a file for editing"""
     try:
-        content = await solution_manager.load_markdown(solution_id, path, convert_to_html=False)
+        content = await solution_manager.load_markdown(
+            solution_id, path, convert_to_html=False
+        )
         if content is None:
             raise HTTPException(status_code=404, detail=f"File not found: {path}")
         return Response(content=content, media_type="text/plain; charset=utf-8")
@@ -910,11 +1115,7 @@ async def get_file_content(solution_id: str, path: str):
 
 
 @router.put("/{solution_id}/files/{path:path}")
-async def save_text_file(
-    solution_id: str,
-    path: str,
-    data: dict
-):
+async def save_text_file(solution_id: str, path: str, data: dict):
     """Create or update a text file (md, yaml)"""
     content = data.get("content", "")
     try:
@@ -939,6 +1140,7 @@ async def get_solution_structure(solution_id: str):
 # Preset Management Routes
 # ============================================
 
+
 @router.post("/{solution_id}/presets")
 async def add_preset(solution_id: str, data: Dict = None):
     """Add a new preset to the solution"""
@@ -962,7 +1164,9 @@ async def update_preset(solution_id: str, preset_id: str, data: Dict = None):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update preset: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update preset: {str(e)}"
+        )
 
 
 @router.delete("/{solution_id}/presets/{preset_id}")
@@ -974,12 +1178,15 @@ async def delete_preset(solution_id: str, preset_id: str):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete preset: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete preset: {str(e)}"
+        )
 
 
 # ============================================
 # Preset Device (Deployment Step) Routes
 # ============================================
+
 
 @router.post("/{solution_id}/presets/{preset_id}/devices")
 async def add_preset_device(solution_id: str, preset_id: str, data: Dict = None):
@@ -996,20 +1203,21 @@ async def add_preset_device(solution_id: str, preset_id: str, data: Dict = None)
 
 @router.put("/{solution_id}/presets/{preset_id}/devices/{device_id}")
 async def update_preset_device(
-    solution_id: str,
-    preset_id: str,
-    device_id: str,
-    data: Dict = None
+    solution_id: str, preset_id: str, device_id: str, data: Dict = None
 ):
     """Update a device in a preset"""
     if data is None:
         raise HTTPException(status_code=400, detail="Request body required")
     try:
-        return await solution_manager.update_preset_device(solution_id, preset_id, device_id, data)
+        return await solution_manager.update_preset_device(
+            solution_id, preset_id, device_id, data
+        )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update device: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update device: {str(e)}"
+        )
 
 
 @router.delete("/{solution_id}/presets/{preset_id}/devices/{device_id}")
@@ -1017,16 +1225,22 @@ async def delete_preset_device(solution_id: str, preset_id: str, device_id: str)
     """Delete a device from a preset"""
     try:
         await solution_manager.delete_preset_device(solution_id, preset_id, device_id)
-        return {"success": True, "message": f"Device '{device_id}' deleted from preset '{preset_id}'"}
+        return {
+            "success": True,
+            "message": f"Device '{device_id}' deleted from preset '{preset_id}'",
+        }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete device: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete device: {str(e)}"
+        )
 
 
 # ============================================
 # Solution Metadata Routes
 # ============================================
+
 
 @router.put("/{solution_id}/links")
 async def update_solution_links(solution_id: str, data: Dict = None):
@@ -1045,7 +1259,9 @@ async def update_solution_links(solution_id: str, data: Dict = None):
 async def update_solution_tags(solution_id: str, data: Dict = None):
     """Update solution tags"""
     if data is None or "tags" not in data:
-        raise HTTPException(status_code=400, detail="Request body with 'tags' array required")
+        raise HTTPException(
+            status_code=400, detail="Request body with 'tags' array required"
+        )
     try:
         return await solution_manager.update_solution_tags(solution_id, data["tags"])
     except ValueError as e:

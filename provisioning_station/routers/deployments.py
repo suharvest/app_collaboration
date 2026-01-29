@@ -61,7 +61,9 @@ async def get_deployment_status(deployment_id: str):
             elif step.status == "running":
                 completed_steps += step.progress / 100
 
-    overall_progress = int((completed_steps / total_steps * 100) if total_steps > 0 else 0)
+    overall_progress = int(
+        (completed_steps / total_steps * 100) if total_steps > 0 else 0
+    )
 
     # Build device statuses
     device_statuses = []
@@ -69,21 +71,27 @@ async def get_deployment_status(deployment_id: str):
         device_progress = 0
         if device.steps:
             device_completed = sum(
-                1 if s.status in ("completed", "skipped") else (s.progress / 100 if s.status == "running" else 0)
+                (
+                    1
+                    if s.status in ("completed", "skipped")
+                    else (s.progress / 100 if s.status == "running" else 0)
+                )
                 for s in device.steps
             )
             device_progress = int(device_completed / len(device.steps) * 100)
 
-        device_statuses.append(DeviceDeploymentStatus(
-            device_id=device.device_id,
-            name=device.name,
-            type=device.type,
-            status=device.status,
-            current_step=device.current_step,
-            steps=device.steps,
-            progress=device_progress,
-            error=device.error,
-        ))
+        device_statuses.append(
+            DeviceDeploymentStatus(
+                device_id=device.device_id,
+                name=device.name,
+                type=device.type,
+                status=device.status,
+                current_step=device.current_step,
+                steps=device.steps,
+                progress=device_progress,
+                error=device.error,
+            )
+        )
 
     return DeploymentStatusResponse(
         id=deployment.id,
@@ -139,23 +147,27 @@ async def list_deployments(
             if not device_id:
                 device_id = device.device_id
             for step in device.steps:
-                steps.append(StepSummary(
-                    id=step.id,
-                    name=step.name,
-                    status=step.status,
-                    progress=step.progress,
-                ))
-        result.append(DeploymentListItem(
-            id=deployment.id,
-            solution_id=deployment.solution_id,
-            solution_name=get_solution_name(solution, deployment.solution_id),
-            status=deployment.status,
-            started_at=deployment.started_at,
-            completed_at=deployment.completed_at,
-            device_count=len(deployment.devices),
-            device_id=device_id,
-            steps=steps,
-        ))
+                steps.append(
+                    StepSummary(
+                        id=step.id,
+                        name=step.name,
+                        status=step.status,
+                        progress=step.progress,
+                    )
+                )
+        result.append(
+            DeploymentListItem(
+                id=deployment.id,
+                solution_id=deployment.solution_id,
+                solution_name=get_solution_name(solution, deployment.solution_id),
+                status=deployment.status,
+                started_at=deployment.started_at,
+                completed_at=deployment.completed_at,
+                device_count=len(deployment.devices),
+                device_id=device_id,
+                steps=steps,
+            )
+        )
         seen_ids.add(deployment.id)
 
     # 2. Persisted history records
@@ -174,17 +186,23 @@ async def list_deployments(
             )
             for s in record.steps
         ]
-        result.append(DeploymentListItem(
-            id=record.deployment_id,
-            solution_id=record.solution_id,
-            solution_name=get_solution_name(solution, record.solution_id),
-            status=DeploymentStatus.COMPLETED if record.status == "completed" else DeploymentStatus.FAILED,
-            started_at=record.deployed_at,
-            completed_at=record.deployed_at,
-            device_count=1,
-            device_id=record.device_id,
-            steps=steps,
-        ))
+        result.append(
+            DeploymentListItem(
+                id=record.deployment_id,
+                solution_id=record.solution_id,
+                solution_name=get_solution_name(solution, record.solution_id),
+                status=(
+                    DeploymentStatus.COMPLETED
+                    if record.status == "completed"
+                    else DeploymentStatus.FAILED
+                ),
+                started_at=record.deployed_at,
+                completed_at=record.deployed_at,
+                device_count=1,
+                device_id=record.device_id,
+                steps=steps,
+            )
+        )
 
     # Sort by started_at descending
     result.sort(key=lambda d: d.started_at, reverse=True)

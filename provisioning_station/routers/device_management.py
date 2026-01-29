@@ -79,21 +79,27 @@ async def list_active_deployments(
             # Determine deployment status
             status = await _check_deployment_status(record)
 
-            active_deployments.append(ActiveDeployment(
-                deployment_id=record.deployment_id,
-                solution_id=record.solution_id,
-                solution_name=solution_name,
-                solution_name_zh=solution_name_zh,
-                device_id=record.device_id,
-                device_type=record.device_type,
-                status=status,
-                deployed_at=record.deployed_at,
-                app_url=app_url,
-                host=host,
-                kiosk_enabled=kiosk_status.enabled if kiosk_status else False,
-                kiosk_user=kiosk_status.kiosk_user if kiosk_status else None,
-                connection_info=record.metadata.get("connection_info") if record.metadata else None,
-            ))
+            active_deployments.append(
+                ActiveDeployment(
+                    deployment_id=record.deployment_id,
+                    solution_id=record.solution_id,
+                    solution_name=solution_name,
+                    solution_name_zh=solution_name_zh,
+                    device_id=record.device_id,
+                    device_type=record.device_type,
+                    status=status,
+                    deployed_at=record.deployed_at,
+                    app_url=app_url,
+                    host=host,
+                    kiosk_enabled=kiosk_status.enabled if kiosk_status else False,
+                    kiosk_user=kiosk_status.kiosk_user if kiosk_status else None,
+                    connection_info=(
+                        record.metadata.get("connection_info")
+                        if record.metadata
+                        else None
+                    ),
+                )
+            )
 
         return active_deployments
 
@@ -167,7 +173,9 @@ async def perform_deployment_action(deployment_id: str, action: DeploymentAction
             )
 
         else:
-            raise HTTPException(status_code=400, detail=f"Unknown action: {action.action}")
+            raise HTTPException(
+                status_code=400, detail=f"Unknown action: {action.action}"
+            )
 
     except HTTPException:
         raise
@@ -219,7 +227,11 @@ async def configure_kiosk(deployment_id: str, config: KioskConfigRequest):
 
 
 @router.delete("/{deployment_id}/kiosk", response_model=KioskConfigResponse)
-async def remove_kiosk(deployment_id: str, kiosk_user: str = Query(...), password: Optional[str] = Query(None)):
+async def remove_kiosk(
+    deployment_id: str,
+    kiosk_user: str = Query(...),
+    password: Optional[str] = Query(None),
+):
     """Remove Kiosk mode configuration"""
     try:
         result = await kiosk_manager.unconfigure(
@@ -280,7 +292,11 @@ async def _check_deployment_status(record) -> str:
                 container_name = f"{record.solution_id}_{record.device_id}"
 
             proc = await asyncio.create_subprocess_exec(
-                "docker", "inspect", "-f", "{{.State.Running}}", container_name,
+                "docker",
+                "inspect",
+                "-f",
+                "{{.State.Running}}",
+                container_name,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )

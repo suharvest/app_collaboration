@@ -47,8 +47,12 @@ class SSHDeployer(BaseDeployer):
 
             client = await asyncio.to_thread(
                 self._create_ssh_connection,
-                host, port, username, password, key_file,
-                config.ssh.connection_timeout
+                host,
+                port,
+                username,
+                password,
+                key_file,
+                config.ssh.connection_timeout,
             )
 
             if not client:
@@ -64,7 +68,10 @@ class SSHDeployer(BaseDeployer):
             try:
                 # Step 1.5: Check remote OS is Linux
                 await self._report_progress(
-                    progress_callback, "check_os", 0, "Checking remote operating system..."
+                    progress_callback,
+                    "check_os",
+                    0,
+                    "Checking remote operating system...",
                 )
 
                 os_check = await remote_pre_check.check_remote_os(client)
@@ -100,8 +107,7 @@ class SSHDeployer(BaseDeployer):
 
                     # Transfer file with async wrapper
                     success = await asyncio.to_thread(
-                        self._transfer_file,
-                        client, local_path, remote_path
+                        self._transfer_file, client, local_path, remote_path
                     )
 
                     if not success:
@@ -118,7 +124,10 @@ class SSHDeployer(BaseDeployer):
 
                         checksum_valid = await asyncio.to_thread(
                             self._verify_remote_checksum,
-                            client, remote_path, local_path, package_source.checksum
+                            client,
+                            remote_path,
+                            local_path,
+                            package_source.checksum,
                         )
 
                         if not checksum_valid:
@@ -147,12 +156,15 @@ class SSHDeployer(BaseDeployer):
                         self._exec_with_timeout,
                         client,
                         f"wget -O {remote_path} {url}",
-                        config.ssh.command_timeout
+                        config.ssh.command_timeout,
                     )
 
                     if exit_code != 0:
                         await self._report_progress(
-                            progress_callback, "transfer", 0, f"Download failed: {stderr[:200]}"
+                            progress_callback,
+                            "transfer",
+                            0,
+                            f"Download failed: {stderr[:200]}",
                         )
                         return False
 
@@ -184,10 +196,7 @@ class SSHDeployer(BaseDeployer):
                     )
 
                     exit_code, _, stderr = await asyncio.to_thread(
-                        self._exec_with_timeout,
-                        client,
-                        cmd,
-                        config.ssh.command_timeout
+                        self._exec_with_timeout, client, cmd, config.ssh.command_timeout
                     )
 
                     if exit_code != 0:
@@ -214,7 +223,9 @@ class SSHDeployer(BaseDeployer):
                     if local_config and Path(local_config).exists():
                         await asyncio.to_thread(
                             self._transfer_file,
-                            client, local_config, config_file.destination
+                            client,
+                            local_config,
+                            config_file.destination,
                         )
 
                         # Set permissions
@@ -222,7 +233,7 @@ class SSHDeployer(BaseDeployer):
                             self._exec_with_timeout,
                             client,
                             f"chmod {config_file.mode} {config_file.destination}",
-                            30
+                            30,
                         )
 
                 await self._report_progress(
@@ -242,7 +253,7 @@ class SSHDeployer(BaseDeployer):
                             self._exec_with_timeout,
                             client,
                             f"systemctl enable {service.name}",
-                            30
+                            30,
                         )
 
                     if service.start:
@@ -250,7 +261,7 @@ class SSHDeployer(BaseDeployer):
                             self._exec_with_timeout,
                             client,
                             f"systemctl restart {service.name}",
-                            60
+                            60,
                         )
 
                         if exit_code != 0:
@@ -268,7 +279,7 @@ class SSHDeployer(BaseDeployer):
                             self._exec_with_timeout,
                             client,
                             f"systemctl is-active {service.name}",
-                            30
+                            30,
                         )
                         status = stdout.strip()
 
@@ -287,10 +298,7 @@ class SSHDeployer(BaseDeployer):
 
                 # Cleanup
                 await asyncio.to_thread(
-                    self._exec_with_timeout,
-                    client,
-                    f"rm -f {remote_path}",
-                    30
+                    self._exec_with_timeout, client, f"rm -f {remote_path}", 30
                 )
 
                 return True
@@ -408,14 +416,14 @@ class SSHDeployer(BaseDeployer):
 
                 # Verify local matches expected
                 if local_hash != expected_hash:
-                    logger.error(f"Local file checksum mismatch: {local_hash} != {expected_hash}")
+                    logger.error(
+                        f"Local file checksum mismatch: {local_hash} != {expected_hash}"
+                    )
                     return False
 
                 # Get remote file checksum
                 exit_code, stdout, _ = self._exec_with_timeout(
-                    client,
-                    f"sha256sum {remote_path} | cut -d' ' -f1",
-                    30
+                    client, f"sha256sum {remote_path} | cut -d' ' -f1", 30
                 )
 
                 if exit_code != 0:
@@ -425,7 +433,9 @@ class SSHDeployer(BaseDeployer):
                 remote_hash = stdout.strip()
 
                 if remote_hash != expected_hash:
-                    logger.error(f"Remote checksum mismatch: {remote_hash} != {expected_hash}")
+                    logger.error(
+                        f"Remote checksum mismatch: {remote_hash} != {expected_hash}"
+                    )
                     return False
 
                 return True
@@ -441,9 +451,7 @@ class SSHDeployer(BaseDeployer):
                     return False
 
                 exit_code, stdout, _ = self._exec_with_timeout(
-                    client,
-                    f"md5sum {remote_path} | cut -d' ' -f1",
-                    30
+                    client, f"md5sum {remote_path} | cut -d' ' -f1", 30
                 )
 
                 if exit_code != 0:

@@ -75,8 +75,12 @@ class SSHBinaryDeployer(BaseDeployer):
 
             client = await asyncio.to_thread(
                 self._create_ssh_connection,
-                host, port, username, password, key_file,
-                config.ssh.connection_timeout
+                host,
+                port,
+                username,
+                password,
+                key_file,
+                config.ssh.connection_timeout,
             )
 
             if not client:
@@ -92,7 +96,10 @@ class SSHBinaryDeployer(BaseDeployer):
             try:
                 # Step 1.5: Check remote OS is Linux
                 await self._report_progress(
-                    progress_callback, "check_os", 0, "Checking remote operating system..."
+                    progress_callback,
+                    "check_os",
+                    0,
+                    "Checking remote operating system...",
                 )
 
                 os_check = await remote_pre_check.check_remote_os(client)
@@ -111,7 +118,9 @@ class SSHBinaryDeployer(BaseDeployer):
                     progress_callback, "prepare", 0, "Preparing deployment..."
                 )
 
-                if not await self._pre_deploy_hook(client, config, connection, progress_callback):
+                if not await self._pre_deploy_hook(
+                    client, config, connection, progress_callback
+                ):
                     return False
 
                 await self._report_progress(
@@ -138,12 +147,13 @@ class SSHBinaryDeployer(BaseDeployer):
                         return False
 
                     binary_name = Path(local_path).name
-                    remote_path = binary_config.install_path or f"/usr/local/bin/{binary_name}"
+                    remote_path = (
+                        binary_config.install_path or f"/usr/local/bin/{binary_name}"
+                    )
 
                     # Transfer file
                     success = await asyncio.to_thread(
-                        self._transfer_file,
-                        client, local_path, remote_path
+                        self._transfer_file, client, local_path, remote_path
                     )
 
                     if not success:
@@ -160,7 +170,10 @@ class SSHBinaryDeployer(BaseDeployer):
 
                         checksum_valid = await asyncio.to_thread(
                             self._verify_remote_checksum,
-                            client, remote_path, local_path, source.checksum
+                            client,
+                            remote_path,
+                            local_path,
+                            source.checksum,
                         )
 
                         if not checksum_valid:
@@ -179,18 +192,23 @@ class SSHBinaryDeployer(BaseDeployer):
                     )
                     url = source.url
                     binary_name = url.split("/")[-1]
-                    remote_path = binary_config.install_path or f"/usr/local/bin/{binary_name}"
+                    remote_path = (
+                        binary_config.install_path or f"/usr/local/bin/{binary_name}"
+                    )
 
                     exit_code, _, stderr = await asyncio.to_thread(
                         self._exec_with_timeout,
                         client,
                         f"wget -O {remote_path} {url}",
-                        config.ssh.command_timeout
+                        config.ssh.command_timeout,
                     )
 
                     if exit_code != 0:
                         await self._report_progress(
-                            progress_callback, "transfer", 0, f"Download failed: {stderr[:200]}"
+                            progress_callback,
+                            "transfer",
+                            0,
+                            f"Download failed: {stderr[:200]}",
                         )
                         return False
 
@@ -204,15 +222,15 @@ class SSHBinaryDeployer(BaseDeployer):
                 )
 
                 exit_code, _, stderr = await asyncio.to_thread(
-                    self._exec_with_timeout,
-                    client,
-                    f"chmod +x {remote_path}",
-                    30
+                    self._exec_with_timeout, client, f"chmod +x {remote_path}", 30
                 )
 
                 if exit_code != 0:
                     await self._report_progress(
-                        progress_callback, "configure", 0, f"Failed to set permissions: {stderr}"
+                        progress_callback,
+                        "configure",
+                        0,
+                        f"Failed to set permissions: {stderr}",
                     )
                     return False
 
@@ -221,7 +239,9 @@ class SSHBinaryDeployer(BaseDeployer):
                     progress_callback, "configure", 50, "Creating service script..."
                 )
 
-                if not await self._create_service_script(client, config, connection, remote_path, progress_callback):
+                if not await self._create_service_script(
+                    client, config, connection, remote_path, progress_callback
+                ):
                     return False
 
                 await self._report_progress(
@@ -233,7 +253,9 @@ class SSHBinaryDeployer(BaseDeployer):
                     progress_callback, "start_service", 0, "Starting service..."
                 )
 
-                if not await self._start_service(client, config, connection, progress_callback):
+                if not await self._start_service(
+                    client, config, connection, progress_callback
+                ):
                     await self._report_progress(
                         progress_callback, "start_service", 0, "Failed to start service"
                     )
@@ -250,7 +272,9 @@ class SSHBinaryDeployer(BaseDeployer):
 
                 await asyncio.sleep(2)  # Wait for service to start
 
-                if not await self._verify_service(client, config, connection, progress_callback):
+                if not await self._verify_service(
+                    client, config, connection, progress_callback
+                ):
                     await self._report_progress(
                         progress_callback, "verify", 0, "Service verification failed"
                     )
@@ -261,7 +285,9 @@ class SSHBinaryDeployer(BaseDeployer):
                 )
 
                 # Post-deploy hook
-                await self._post_deploy_hook(client, config, connection, progress_callback)
+                await self._post_deploy_hook(
+                    client, config, connection, progress_callback
+                )
 
                 return True
 
@@ -463,13 +489,13 @@ class SSHBinaryDeployer(BaseDeployer):
                 expected_hash = expected["sha256"]
 
                 if local_hash != expected_hash:
-                    logger.error(f"Local file checksum mismatch: {local_hash} != {expected_hash}")
+                    logger.error(
+                        f"Local file checksum mismatch: {local_hash} != {expected_hash}"
+                    )
                     return False
 
                 exit_code, stdout, _ = self._exec_with_timeout(
-                    client,
-                    f"sha256sum {remote_path} | cut -d' ' -f1",
-                    30
+                    client, f"sha256sum {remote_path} | cut -d' ' -f1", 30
                 )
 
                 if exit_code != 0:
@@ -479,7 +505,9 @@ class SSHBinaryDeployer(BaseDeployer):
                 remote_hash = stdout.strip()
 
                 if remote_hash != expected_hash:
-                    logger.error(f"Remote checksum mismatch: {remote_hash} != {expected_hash}")
+                    logger.error(
+                        f"Remote checksum mismatch: {remote_hash} != {expected_hash}"
+                    )
                     return False
 
                 return True
@@ -495,9 +523,7 @@ class SSHBinaryDeployer(BaseDeployer):
                     return False
 
                 exit_code, stdout, _ = self._exec_with_timeout(
-                    client,
-                    f"md5sum {remote_path} | cut -d' ' -f1",
-                    30
+                    client, f"md5sum {remote_path} | cut -d' ' -f1", 30
                 )
 
                 if exit_code != 0:

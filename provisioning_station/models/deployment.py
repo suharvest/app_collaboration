@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 class DeploymentStatus(str, Enum):
     """Deployment status enum"""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -20,6 +21,7 @@ class DeploymentStatus(str, Enum):
 
 class StepStatus(BaseModel):
     """Step execution status"""
+
     id: str
     name: str
     status: str = "pending"  # pending | running | completed | failed | skipped
@@ -31,6 +33,7 @@ class StepStatus(BaseModel):
 
 class LogEntry(BaseModel):
     """Log entry"""
+
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     level: str = "info"  # debug | info | warning | error
     device_id: Optional[str] = None
@@ -40,6 +43,7 @@ class LogEntry(BaseModel):
 
 class DeviceDeployment(BaseModel):
     """Device deployment state"""
+
     device_id: str
     name: str
     type: str
@@ -56,6 +60,7 @@ class DeviceDeployment(BaseModel):
 
 class Deployment(BaseModel):
     """Complete deployment state"""
+
     id: str
     solution_id: str
     status: DeploymentStatus = DeploymentStatus.PENDING

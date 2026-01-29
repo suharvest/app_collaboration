@@ -15,10 +15,11 @@ def _get_default_solutions_dir() -> Path:
     # 3. Relative to source (for development)
 
     import sys as _sys
+
     base_dir = Path(__file__).parent.parent
 
     # Check if running as bundled app (PyInstaller)
-    if getattr(_sys, 'frozen', False):
+    if getattr(_sys, "frozen", False):
         # Running as compiled executable
         exe_dir = Path(_sys.executable).parent
 
@@ -44,6 +45,7 @@ def _get_default_solutions_dir() -> Path:
 
         # Log warning if no candidate found in bundled mode
         import logging
+
         logging.getLogger(__name__).warning(
             f"Solutions directory not found in bundled app. "
             f"Tried: {[str(c) for c in candidates]}"

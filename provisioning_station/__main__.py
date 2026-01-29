@@ -7,7 +7,7 @@ import os
 import sys
 
 # Ensure the package can be found
-if getattr(sys, 'frozen', False):
+if getattr(sys, "frozen", False):
     # Running as compiled executable
     # Add the executable directory to path
     app_path = os.path.dirname(sys.executable)
@@ -16,9 +16,9 @@ if getattr(sys, 'frozen', False):
 
 # Parse --solutions-dir early, before importing main (which imports settings)
 # This ensures the environment variable is set before settings are initialized
-if '--solutions-dir' in sys.argv:
+if "--solutions-dir" in sys.argv:
     try:
-        idx = sys.argv.index('--solutions-dir')
+        idx = sys.argv.index("--solutions-dir")
         if idx + 1 < len(sys.argv):
             solutions_dir = sys.argv[idx + 1]
             os.environ["PS_SOLUTIONS_DIR"] = solutions_dir

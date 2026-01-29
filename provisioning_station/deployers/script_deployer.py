@@ -87,7 +87,10 @@ class ScriptDeployer(BaseDeployer):
             # Step 3: Generate config file from template
             if script_config.config_template:
                 await self._report_progress(
-                    progress_callback, "configure", 0, "Generating configuration file..."
+                    progress_callback,
+                    "configure",
+                    0,
+                    "Generating configuration file...",
                 )
 
                 template = script_config.config_template
@@ -126,7 +129,9 @@ class ScriptDeployer(BaseDeployer):
                     cmd = start_cmd.linux_macos
 
                 if not cmd:
-                    platform_name = "Windows" if sys.platform == "win32" else "Linux/macOS"
+                    platform_name = (
+                        "Windows" if sys.platform == "win32" else "Linux/macOS"
+                    )
                     await self._report_progress(
                         progress_callback,
                         "start",
@@ -159,7 +164,10 @@ class ScriptDeployer(BaseDeployer):
                 # Step 5: Health check
                 if script_config.health_check:
                     await self._report_progress(
-                        progress_callback, "health_check", 0, "Performing health check..."
+                        progress_callback,
+                        "health_check",
+                        0,
+                        "Performing health check...",
                     )
 
                     health_config = script_config.health_check
@@ -235,8 +243,10 @@ class ScriptDeployer(BaseDeployer):
                     "powershell.exe",
                     "-NoProfile",
                     "-NonInteractive",
-                    "-ExecutionPolicy", "Bypass",
-                    "-Command", cmd
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    cmd,
                 ]
                 process = await asyncio.create_subprocess_exec(
                     *powershell_cmd,
@@ -247,7 +257,9 @@ class ScriptDeployer(BaseDeployer):
             else:
                 # On Unix, use explicit shell with proper argument handling
                 process = await asyncio.create_subprocess_exec(
-                    "/bin/sh", "-c", cmd,
+                    "/bin/sh",
+                    "-c",
+                    cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=str(working_dir),
@@ -276,12 +288,15 @@ class ScriptDeployer(BaseDeployer):
                 # On Windows, use PowerShell for better compatibility
                 # CREATE_NEW_PROCESS_GROUP allows for proper process management
                 import subprocess
+
                 powershell_cmd = [
                     "powershell.exe",
                     "-NoProfile",
                     "-NonInteractive",
-                    "-ExecutionPolicy", "Bypass",
-                    "-Command", cmd
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    cmd,
                 ]
                 process = await asyncio.create_subprocess_exec(
                     *powershell_cmd,
@@ -294,7 +309,9 @@ class ScriptDeployer(BaseDeployer):
             else:
                 # On Unix, use explicit shell invocation
                 process = await asyncio.create_subprocess_exec(
-                    "/bin/sh", "-c", cmd,
+                    "/bin/sh",
+                    "-c",
+                    cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,
                     cwd=str(working_dir),

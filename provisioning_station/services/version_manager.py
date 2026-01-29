@@ -192,7 +192,9 @@ class VersionManager:
         update_type = update_type_map.get(config.type, "unknown")
 
         # Check if update is available
-        update_available = current_version != target_version if current_version else True
+        update_available = (
+            current_version != target_version if current_version else True
+        )
 
         return UpdateCheckResult(
             device_id=device_id,
@@ -233,7 +235,9 @@ class VersionManager:
 
             versions = {}
             for container in containers:
-                service_name = container.labels.get("com.docker.compose.service", "unknown")
+                service_name = container.labels.get(
+                    "com.docker.compose.service", "unknown"
+                )
 
                 # Try to get version from labels
                 version = container.labels.get("com.seeedstudio.version")

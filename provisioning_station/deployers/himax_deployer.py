@@ -33,8 +33,8 @@ class HimaxDeployer(BaseDeployer):
     """Himax WE2 firmware flashing via xmodem protocol"""
 
     # Watcher Himax WE2 USB identifiers (WCH chip)
-    DEFAULT_VID = 0x1a86
-    DEFAULT_PID = 0x55d2
+    DEFAULT_VID = 0x1A86
+    DEFAULT_PID = 0x55D2
 
     # Default port patterns
     DEFAULT_PORT_PATTERNS = [
@@ -61,7 +61,9 @@ class HimaxDeployer(BaseDeployer):
         if not port:
             port = self._auto_detect_port(config)
             if not port:
-                raise ValueError("No port specified and auto-detection failed for Himax device")
+                raise ValueError(
+                    "No port specified and auto-detection failed for Himax device"
+                )
             logger.info(f"Auto-detected Himax port: {port}")
 
         if not config.firmware:
@@ -72,7 +74,7 @@ class HimaxDeployer(BaseDeployer):
 
         # Check if this requires ESP32 reset hold (SenseCAP Watcher)
         requires_esp32_hold = False
-        if hasattr(flash_config, 'requires_esp32_reset_hold'):
+        if hasattr(flash_config, "requires_esp32_reset_hold"):
             requires_esp32_hold = flash_config.requires_esp32_reset_hold
         logger.info(f"Flash config: requires_esp32_reset_hold={requires_esp32_hold}")
 
@@ -100,14 +102,13 @@ class HimaxDeployer(BaseDeployer):
             )
 
             if not await self._wait_for_port_available(
-                port,
-                timeout=10,
-                auto_release=True,
-                progress_callback=progress_callback
+                port, timeout=10, auto_release=True, progress_callback=progress_callback
             ):
                 await self._report_progress(
-                    progress_callback, "detect", 0,
-                    f"Port {port} is busy. Please ensure no other program is using it."
+                    progress_callback,
+                    "detect",
+                    0,
+                    f"Port {port} is busy. Please ensure no other program is using it.",
                 )
                 return False
 
@@ -117,8 +118,10 @@ class HimaxDeployer(BaseDeployer):
                 esp32_port = self._find_companion_esp32_port(port)
                 if esp32_port:
                     await self._report_progress(
-                        progress_callback, "detect", 100,
-                        f"Found ESP32 port: {esp32_port}"
+                        progress_callback,
+                        "detect",
+                        100,
+                        f"Found ESP32 port: {esp32_port}",
                     )
                 else:
                     logger.warning("ESP32 port not found, flashing may be unstable")
@@ -126,11 +129,16 @@ class HimaxDeployer(BaseDeployer):
             # Step 2: Get firmware path
             firmware_path = config.get_asset_path(firmware_source.path)
             if not firmware_path:
-                firmware_path = config.get_asset_path(f"assets/watcher_firmware/{Path(firmware_source.path).name}")
+                firmware_path = config.get_asset_path(
+                    f"assets/watcher_firmware/{Path(firmware_source.path).name}"
+                )
 
             if not firmware_path or not Path(firmware_path).exists():
                 await self._report_progress(
-                    progress_callback, "flash", 0, f"Firmware file not found: {firmware_source.path}"
+                    progress_callback,
+                    "flash",
+                    0,
+                    f"Firmware file not found: {firmware_source.path}",
                 )
                 return False
 
@@ -144,15 +152,19 @@ class HimaxDeployer(BaseDeployer):
                 progress_callback, "flash", 0, "Starting firmware flash..."
             )
 
-            baudrate = flash_config.baudrate if hasattr(flash_config, 'baudrate') else 921600
+            baudrate = (
+                flash_config.baudrate if hasattr(flash_config, "baudrate") else 921600
+            )
 
             # Get user-selected models (if any)
             selected_model_ids = connection.get("selected_models", [])
-            models_config = getattr(flash_config, 'models', [])
-            models_to_flash = self._get_models_to_flash(models_config, selected_model_ids)
+            models_config = getattr(flash_config, "models", [])
+            models_to_flash = self._get_models_to_flash(
+                models_config, selected_model_ids
+            )
 
             # Get protocol type (xmodem or xmodem1k)
-            protocol = getattr(flash_config, 'protocol', 'xmodem')
+            protocol = getattr(flash_config, "protocol", "xmodem")
 
             # Use multi-model flashing if models are configured
             if models_to_flash:
@@ -164,7 +176,7 @@ class HimaxDeployer(BaseDeployer):
                     models=models_to_flash,
                     base_path=config.base_path,
                     progress_callback=progress_callback,
-                    esp32_port=esp32_port
+                    esp32_port=esp32_port,
                 )
             else:
                 success = await self._flash_with_xmodem(
@@ -210,21 +222,25 @@ class HimaxDeployer(BaseDeployer):
         2. VID/PID match + fallback patterns
         3. Fallback to any usbmodem with matching VID/PID
         """
-        detection = config.detection if hasattr(config, 'detection') else None
+        detection = config.detection if hasattr(config, "detection") else None
 
         # Get expected VID/PID
         vid = self.DEFAULT_VID
         pid = self.DEFAULT_PID
         if detection:
-            vid_str = getattr(detection, 'usb_vendor_id', None)
-            pid_str = getattr(detection, 'usb_product_id', None)
+            vid_str = getattr(detection, "usb_vendor_id", None)
+            pid_str = getattr(detection, "usb_product_id", None)
             if vid_str:
-                vid = int(vid_str, 16) if vid_str.startswith('0x') else int(vid_str)
+                vid = int(vid_str, 16) if vid_str.startswith("0x") else int(vid_str)
             if pid_str:
-                pid = int(pid_str, 16) if pid_str.startswith('0x') else int(pid_str)
+                pid = int(pid_str, 16) if pid_str.startswith("0x") else int(pid_str)
 
         patterns = self.DEFAULT_PORT_PATTERNS
-        if detection and hasattr(detection, 'fallback_ports') and detection.fallback_ports:
+        if (
+            detection
+            and hasattr(detection, "fallback_ports")
+            and detection.fallback_ports
+        ):
             patterns = detection.fallback_ports + patterns
 
         # Method 1: VID/PID match + usbmodem pattern (most reliable for Watcher)
@@ -234,7 +250,7 @@ class HimaxDeployer(BaseDeployer):
         usbmodem_candidates = []
         for port in serial.tools.list_ports.comports():
             if port.vid == vid and port.pid == pid:
-                if 'usbmodem' in port.device.lower():
+                if "usbmodem" in port.device.lower():
                     for pattern in patterns:
                         if fnmatch.fnmatch(port.device, pattern):
                             usbmodem_candidates.append(port.device)
@@ -251,7 +267,7 @@ class HimaxDeployer(BaseDeployer):
         # Method 2: VID/PID match + any pattern (excluding wchusbserial)
         for port in serial.tools.list_ports.comports():
             if port.vid == vid and port.pid == pid:
-                if 'wchusbserial' in port.device.lower():
+                if "wchusbserial" in port.device.lower():
                     continue
                 for pattern in patterns:
                     if fnmatch.fnmatch(port.device, pattern):
@@ -261,14 +277,18 @@ class HimaxDeployer(BaseDeployer):
         # Method 3: Fallback - usbmodem pattern only (without VID/PID check)
         # This is less reliable but kept for backwards compatibility
         for port in serial.tools.list_ports.comports():
-            if 'usbmodem' in port.device.lower():
+            if "usbmodem" in port.device.lower():
                 # Skip if we know this is a different device
                 if port.vid and port.vid != vid:
-                    logger.debug(f"Skipping {port.device} - different VID {port.vid:#x}")
+                    logger.debug(
+                        f"Skipping {port.device} - different VID {port.vid:#x}"
+                    )
                     continue
                 for pattern in patterns:
                     if fnmatch.fnmatch(port.device, pattern):
-                        logger.info(f"Found Himax device by usbmodem pattern: {port.device}")
+                        logger.info(
+                            f"Found Himax device by usbmodem pattern: {port.device}"
+                        )
                         return port.device
 
         return None
@@ -285,7 +305,7 @@ class HimaxDeployer(BaseDeployer):
         port: str,
         timeout: int = 10,
         auto_release: bool = True,
-        progress_callback: Optional[Callable] = None
+        progress_callback: Optional[Callable] = None,
     ) -> bool:
         """Wait for serial port to become available, optionally auto-releasing occupied ports.
 
@@ -316,9 +336,11 @@ class HimaxDeployer(BaseDeployer):
                     )
                     if progress_callback:
                         await self._report_progress(
-                            progress_callback, "detect", 0,
+                            progress_callback,
+                            "detect",
+                            0,
                             f"Port {port} is used by {proc_info['name']} "
-                            f"(PID: {proc_info['pid']}), releasing..."
+                            f"(PID: {proc_info['pid']}), releasing...",
                         )
 
                     released = await SerialPortManager.release_port_async(port)
@@ -326,8 +348,10 @@ class HimaxDeployer(BaseDeployer):
                         logger.debug(f"Port {port} released successfully")
                         if progress_callback:
                             await self._report_progress(
-                                progress_callback, "detect", 0,
-                                f"Port {port} released successfully"
+                                progress_callback,
+                                "detect",
+                                0,
+                                f"Port {port} released successfully",
                             )
                         # Wait a moment for OS to fully release the port
                         await asyncio.sleep(1.0)
@@ -350,11 +374,11 @@ class HimaxDeployer(BaseDeployer):
             except serial.SerialException as e:
                 error_str = str(e).lower()
                 is_busy = (
-                    "resource temporarily unavailable" in error_str or
-                    "busy" in error_str or
-                    "access is denied" in error_str or  # Windows
-                    "permission denied" in error_str or
-                    "exclusively lock" in error_str
+                    "resource temporarily unavailable" in error_str
+                    or "busy" in error_str
+                    or "access is denied" in error_str  # Windows
+                    or "permission denied" in error_str
+                    or "exclusively lock" in error_str
                 )
 
                 if is_busy:
@@ -402,22 +426,27 @@ class HimaxDeployer(BaseDeployer):
             if himax_port_info and himax_port_info.serial_number:
                 # Find another port with the same serial number (same USB device)
                 for port in serial.tools.list_ports.comports():
-                    if port.device != himax_port and port.serial_number == himax_port_info.serial_number:
+                    if (
+                        port.device != himax_port
+                        and port.serial_number == himax_port_info.serial_number
+                    ):
                         logger.info(f"Found ESP32 port by serial number: {port.device}")
                         return port.device
 
             # Fallback: Find port with same VID/PID but different interface
             if himax_port_info and himax_port_info.vid and himax_port_info.pid:
                 for port in serial.tools.list_ports.comports():
-                    if (port.device != himax_port and
-                        port.vid == himax_port_info.vid and
-                        port.pid == himax_port_info.pid):
+                    if (
+                        port.device != himax_port
+                        and port.vid == himax_port_info.vid
+                        and port.pid == himax_port_info.pid
+                    ):
                         logger.info(f"Found ESP32 port by VID/PID: {port.device}")
                         return port.device
 
             # Last resort on Windows: look for adjacent COM port numbers
             # WCH chips often enumerate as consecutive COM ports
-            com_match = re.search(r'COM(\d+)', himax_port.upper())
+            com_match = re.search(r"COM(\d+)", himax_port.upper())
             if com_match:
                 himax_num = int(com_match.group(1))
                 # Check COM ports within ±2 range
@@ -426,8 +455,10 @@ class HimaxDeployer(BaseDeployer):
                     for port in serial.tools.list_ports.comports():
                         if port.device.upper() == candidate:
                             # Verify it's likely from the same device (same VID or similar description)
-                            if (himax_port_info and port.vid == himax_port_info.vid):
-                                logger.info(f"Found ESP32 port by adjacent COM number: {port.device}")
+                            if himax_port_info and port.vid == himax_port_info.vid:
+                                logger.info(
+                                    f"Found ESP32 port by adjacent COM number: {port.device}"
+                                )
                                 return port.device
 
             logger.warning("Could not find ESP32 companion port on Windows")
@@ -438,22 +469,27 @@ class HimaxDeployer(BaseDeployer):
             # Method 1: Find by serial number (most reliable)
             if himax_port_info and himax_port_info.serial_number:
                 for port in serial.tools.list_ports.comports():
-                    if port.device != himax_port and port.serial_number == himax_port_info.serial_number:
+                    if (
+                        port.device != himax_port
+                        and port.serial_number == himax_port_info.serial_number
+                    ):
                         logger.info(f"Found ESP32 port by serial number: {port.device}")
                         return port.device
 
             # Method 2: Find by VID/PID
             if himax_port_info and himax_port_info.vid and himax_port_info.pid:
                 for port in serial.tools.list_ports.comports():
-                    if (port.device != himax_port and
-                        port.vid == himax_port_info.vid and
-                        port.pid == himax_port_info.pid):
+                    if (
+                        port.device != himax_port
+                        and port.vid == himax_port_info.vid
+                        and port.pid == himax_port_info.pid
+                    ):
                         logger.info(f"Found ESP32 port by VID/PID: {port.device}")
                         return port.device
 
             # Method 3: For ttyACM ports, look for adjacent numbers
             # Linux often enumerates composite USB devices as ttyACM0, ttyACM1, etc.
-            acm_match = re.search(r'/dev/ttyACM(\d+)', himax_port)
+            acm_match = re.search(r"/dev/ttyACM(\d+)", himax_port)
             if acm_match:
                 himax_num = int(acm_match.group(1))
                 for offset in [1, -1, 2, -2]:
@@ -461,14 +497,16 @@ class HimaxDeployer(BaseDeployer):
                     for port in serial.tools.list_ports.comports():
                         if port.device == candidate:
                             if himax_port_info and port.vid == himax_port_info.vid:
-                                logger.info(f"Found ESP32 port by adjacent ttyACM number: {port.device}")
+                                logger.info(
+                                    f"Found ESP32 port by adjacent ttyACM number: {port.device}"
+                                )
                                 return port.device
 
             # Method 4: For ttyUSB ports (if Himax is on ttyACM, ESP32 might be on ttyUSB)
             # WCH chips on Linux can appear as either ttyACM or ttyUSB
-            if 'ttyACM' in himax_port:
+            if "ttyACM" in himax_port:
                 for port in serial.tools.list_ports.comports():
-                    if 'ttyUSB' in port.device:
+                    if "ttyUSB" in port.device:
                         if himax_port_info and port.vid == himax_port_info.vid:
                             logger.info(f"Found ESP32 port on ttyUSB: {port.device}")
                             return port.device
@@ -477,7 +515,7 @@ class HimaxDeployer(BaseDeployer):
             return None
 
         # === macOS: Original usbmodem/wchusbserial logic ===
-        match = re.search(r'usbmodem(\w+)', himax_port)
+        match = re.search(r"usbmodem(\w+)", himax_port)
         if not match:
             return None
 
@@ -485,12 +523,14 @@ class HimaxDeployer(BaseDeployer):
         himax_base = himax_serial[:10] if len(himax_serial) > 10 else himax_serial[:-2]
         himax_suffix = himax_serial[-2:] if len(himax_serial) > 2 else himax_serial
 
-        logger.debug(f"Himax serial: {himax_serial}, base: {himax_base}, suffix: {himax_suffix}")
+        logger.debug(
+            f"Himax serial: {himax_serial}, base: {himax_base}, suffix: {himax_suffix}"
+        )
 
         # Find ESP32 port with DIFFERENT suffix (different USB interface)
         for port in serial.tools.list_ports.comports():
-            if 'wchusbserial' in port.device.lower():
-                esp_match = re.search(r'wchusbserial(\w+)', port.device)
+            if "wchusbserial" in port.device.lower():
+                esp_match = re.search(r"wchusbserial(\w+)", port.device)
                 if esp_match:
                     esp_serial = esp_match.group(1)
                     esp_suffix = esp_serial[-2:] if len(esp_serial) > 2 else esp_serial
@@ -502,7 +542,7 @@ class HimaxDeployer(BaseDeployer):
 
         # Fallback: return any wchusbserial port
         for port in serial.tools.list_ports.comports():
-            if 'wchusbserial' in port.device.lower():
+            if "wchusbserial" in port.device.lower():
                 logger.info(f"Using fallback ESP32 port: {port.device}")
                 return port.device
 
@@ -515,7 +555,7 @@ class HimaxDeployer(BaseDeployer):
             ser.port = esp32_port
             ser.baudrate = 115200
             ser.dtr = False  # EN pin - False = hold in reset
-            ser.rts = True   # GPIO0 - True = download mode
+            ser.rts = True  # GPIO0 - True = download mode
             ser.open()
             logger.info(f"Holding ESP32 in reset on {esp32_port}")
             return ser
@@ -526,7 +566,7 @@ class HimaxDeployer(BaseDeployer):
     def _release_esp32_reset(self, ser: serial.Serial):
         """Release ESP32 from reset state"""
         try:
-            ser.dtr = True   # Release EN pin
+            ser.dtr = True  # Release EN pin
             ser.rts = False  # Release GPIO0
             time.sleep(0.1)
             ser.close()
@@ -534,7 +574,9 @@ class HimaxDeployer(BaseDeployer):
         except Exception as e:
             logger.warning(f"Error releasing ESP32 reset: {e}")
 
-    def _open_serial_port(self, port: str, baudrate: int, timeout: int = 60) -> serial.Serial:
+    def _open_serial_port(
+        self, port: str, baudrate: int, timeout: int = 60
+    ) -> serial.Serial:
         """Open serial port with proper settings matching official xmodem_send.py
 
         Critical settings:
@@ -548,7 +590,7 @@ class HimaxDeployer(BaseDeployer):
         ser.bytesize = serial.EIGHTBITS
         ser.stopbits = serial.STOPBITS_ONE
         ser.xonxoff = 0  # Disable XON/XOFF flow control
-        ser.rtscts = 0   # Disable RTS/CTS flow control
+        ser.rtscts = 0  # Disable RTS/CTS flow control
         ser.parity = serial.PARITY_NONE
         ser.open()
         ser.flushInput()
@@ -557,7 +599,7 @@ class HimaxDeployer(BaseDeployer):
 
     def _send_at_command(self, ser: serial.Serial, command: str):
         """Send AT command with carriage return (matching official script)"""
-        ser.write(bytes(command + "\r", encoding='ascii'))
+        ser.write(bytes(command + "\r", encoding="ascii"))
 
     async def _flash_with_xmodem(
         self,
@@ -616,10 +658,10 @@ class HimaxDeployer(BaseDeployer):
                 response = ser.readline().strip()
                 if response:
                     logger.debug(f"Device: {response}")
-                self._send_at_command(ser, '1')
+                self._send_at_command(ser, "1")
 
                 # Match official script: look for "Send data using the xmodem protocol"
-                if b'Send data using the xmodem protocol' in response:
+                if b"Send data using the xmodem protocol" in response:
                     bootloader_ready = True
                     break
 
@@ -639,7 +681,7 @@ class HimaxDeployer(BaseDeployer):
             # sleep(1), flushInput(), send '1' again, then start xmodem
             await asyncio.sleep(1)
             ser.flushInput()
-            self._send_at_command(ser, '1')
+            self._send_at_command(ser, "1")
 
             await self._report_progress(
                 progress_callback, "flash", 40, "Starting transfer..."
@@ -680,8 +722,11 @@ class HimaxDeployer(BaseDeployer):
                 if response:
                     logger.debug(f"Device: {response}")
                 # Use shorter pattern to handle split reads
-                if b"reboot system? (y)" in response or b"end file transmission" in response:
-                    self._send_at_command(ser, 'y')
+                if (
+                    b"reboot system? (y)" in response
+                    or b"end file transmission" in response
+                ):
+                    self._send_at_command(ser, "y")
                     logger.info("Sent reboot confirmation")
                     break
 
@@ -716,24 +761,24 @@ class HimaxDeployer(BaseDeployer):
             is_himax = False
             if port.vid == cls.DEFAULT_VID and port.pid == cls.DEFAULT_PID:
                 is_himax = True
-            elif 'usbmodem' in port.device.lower():
+            elif "usbmodem" in port.device.lower():
                 is_himax = True
 
             if is_himax:
-                ports.append({
-                    "device": port.device,
-                    "description": port.description,
-                    "hwid": port.hwid,
-                    "vid": port.vid,
-                    "pid": port.pid,
-                })
+                ports.append(
+                    {
+                        "device": port.device,
+                        "description": port.description,
+                        "hwid": port.hwid,
+                        "vid": port.vid,
+                        "pid": port.pid,
+                    }
+                )
 
         return ports
 
     def _get_models_to_flash(
-        self,
-        models_config: List[HimaxModelConfig],
-        selected_ids: List[str]
+        self, models_config: List[HimaxModelConfig], selected_ids: List[str]
     ) -> List[HimaxModelConfig]:
         """Determine which models to flash based on user selection"""
         if not models_config:
@@ -746,10 +791,7 @@ class HimaxDeployer(BaseDeployer):
             return [m for m in models_config if m.required or m.default]
 
     def _generate_preamble(
-        self,
-        flash_address: str,
-        offset: str,
-        packet_size: int = 128
+        self, flash_address: str, offset: str, packet_size: int = 128
     ) -> bytes:
         """Generate preamble packet for model flashing
 
@@ -764,17 +806,15 @@ class HimaxDeployer(BaseDeployer):
         off = int(offset, 16)
 
         preamble = PREAMBLE_HEADER
-        preamble += addr.to_bytes(4, 'little')
-        preamble += off.to_bytes(4, 'little')
+        preamble += addr.to_bytes(4, "little")
+        preamble += off.to_bytes(4, "little")
         preamble += PREAMBLE_FOOTER
         preamble += bytes([0xFF] * (packet_size - 12))
 
         return preamble
 
     async def _wait_for_reboot_prompt(
-        self,
-        ser: serial.Serial,
-        timeout: int = 60
+        self, ser: serial.Serial, timeout: int = 60
     ) -> bool:
         """Wait for the reboot confirmation prompt from bootloader
 
@@ -795,33 +835,36 @@ class HimaxDeployer(BaseDeployer):
                         if response_str:
                             # Log readable text
                             try:
-                                text = response_str.decode('ascii', errors='ignore')
+                                text = response_str.decode("ascii", errors="ignore")
                                 if text:
                                     logger.debug(f"Device: {text}")
                             except:
                                 pass
 
                         # Check for prompt - use shorter patterns
-                        if b"reboot system? (y)" in response or b"end file transmission" in response:
+                        if (
+                            b"reboot system? (y)" in response
+                            or b"end file transmission" in response
+                        ):
                             return True
                     else:
                         # Empty response - log occasionally for debugging
                         if retry_count % 6 == 1:  # Every 30 seconds
-                            logger.debug(f"Waiting for device response... ({int(time.time() - start)}s elapsed)")
+                            logger.debug(
+                                f"Waiting for device response... ({int(time.time() - start)}s elapsed)"
+                            )
                 except Exception as e:
                     logger.debug(f"readline error: {e}")
 
-            logger.error(f"Timeout after {timeout}s waiting for reboot prompt (tried {retry_count} times)")
+            logger.error(
+                f"Timeout after {timeout}s waiting for reboot prompt (tried {retry_count} times)"
+            )
         finally:
             ser.timeout = old_timeout
 
         return False
 
-    async def _wait_for_bootloader(
-        self,
-        ser: serial.Serial,
-        timeout: int = 30
-    ) -> bool:
+    async def _wait_for_bootloader(self, ser: serial.Serial, timeout: int = 30) -> bool:
         """Wait for bootloader and enter xmodem download mode
 
         Matches official xmodem_send.py behavior:
@@ -843,10 +886,10 @@ class HimaxDeployer(BaseDeployer):
                 response = ser.readline().strip()
                 if response:
                     logger.debug(f"Device: {response}")
-                self._send_at_command(ser, '1')
+                self._send_at_command(ser, "1")
 
                 # Match official script: look for "Send data using the xmodem protocol"
-                if b'Send data using the xmodem protocol' in response:
+                if b"Send data using the xmodem protocol" in response:
                     return True
         finally:
             # Restore original timeout for xmodem transfer
@@ -866,7 +909,7 @@ class HimaxDeployer(BaseDeployer):
         """
         time.sleep(1)
         ser.flushInput()
-        self._send_at_command(ser, '1')
+        self._send_at_command(ser, "1")
 
     def _resolve_model_path(self, model: HimaxModelConfig, base_path: str) -> str:
         """Resolve model file path (local or download)"""
@@ -999,8 +1042,10 @@ class HimaxDeployer(BaseDeployer):
                     model_name = model.name_zh if model.name_zh else model.name
 
                     await self._report_progress(
-                        progress_callback, "flash", progress_base,
-                        f"Flashing model {idx + 1}/{total_models}: {model_name}"
+                        progress_callback,
+                        "flash",
+                        progress_base,
+                        f"Flashing model {idx + 1}/{total_models}: {model_name}",
                     )
 
                     # Resolve model path first to fail fast
@@ -1010,22 +1055,30 @@ class HimaxDeployer(BaseDeployer):
                     except FileNotFoundError as e:
                         logger.error(f"Model file not found: {e}")
                         await self._report_progress(
-                            progress_callback, "flash", progress_base,
-                            f"Model file not found: {model.path}"
+                            progress_callback,
+                            "flash",
+                            progress_base,
+                            f"Model file not found: {model.path}",
                         )
                         ser.close()
                         return False
 
                     # Wait for reboot prompt
                     await self._report_progress(
-                        progress_callback, "flash", progress_base,
-                        f"[{idx + 1}/{total_models}] Waiting for reboot prompt..."
+                        progress_callback,
+                        "flash",
+                        progress_base,
+                        f"[{idx + 1}/{total_models}] Waiting for reboot prompt...",
                     )
                     if not await self._wait_for_reboot_prompt(ser, timeout=60):
-                        logger.error(f"Timeout waiting for reboot prompt before model {model.id}")
+                        logger.error(
+                            f"Timeout waiting for reboot prompt before model {model.id}"
+                        )
                         await self._report_progress(
-                            progress_callback, "flash", progress_base,
-                            "Timeout waiting for reboot prompt"
+                            progress_callback,
+                            "flash",
+                            progress_base,
+                            "Timeout waiting for reboot prompt",
                         )
                         ser.close()
                         return False
@@ -1033,38 +1086,47 @@ class HimaxDeployer(BaseDeployer):
                     # Send 'n' to continue (not reboot) - matching official script
                     await asyncio.sleep(1)
                     ser.flushInput()
-                    self._send_at_command(ser, 'n')
+                    self._send_at_command(ser, "n")
                     logger.info(f"Continuing to flash model: {model.id}")
 
                     # Send preamble - xmodem library handles handshake
                     await self._report_progress(
-                        progress_callback, "flash", progress_base,
-                        f"[{idx + 1}/{total_models}] Sending preamble @ {model.flash_address}..."
+                        progress_callback,
+                        "flash",
+                        progress_base,
+                        f"[{idx + 1}/{total_models}] Sending preamble @ {model.flash_address}...",
                     )
 
                     # Generate preamble packet with flash address
                     preamble = self._generate_preamble(
                         model.flash_address, model.offset, packet_size
                     )
-                    logger.info(f"Sending preamble for {model.id} at {model.flash_address}")
+                    logger.info(
+                        f"Sending preamble for {model.id} at {model.flash_address}"
+                    )
                     logger.info(f"Preamble bytes: {preamble[:20].hex()}...")
 
                     import os
                     import tempfile
-                    preamble_file = os.path.join(tempfile.gettempdir(), f"_temp_model_{idx}_preamble.bin")
-                    with open(preamble_file, 'wb') as f:
+
+                    preamble_file = os.path.join(
+                        tempfile.gettempdir(), f"_temp_model_{idx}_preamble.bin"
+                    )
+                    with open(preamble_file, "wb") as f:
                         f.write(preamble)
 
                     # Run blocking xmodem in thread to allow WebSocket updates
                     def send_preamble():
-                        with open(preamble_file, 'rb') as stream:
+                        with open(preamble_file, "rb") as stream:
                             return modem.send(stream, retry=16)
 
                     if not await asyncio.to_thread(send_preamble):
                         logger.error(f"Failed to send preamble for model {model.id}")
                         await self._report_progress(
-                            progress_callback, "flash", progress_base,
-                            "Failed to send preamble"
+                            progress_callback,
+                            "flash",
+                            progress_base,
+                            "Failed to send preamble",
                         )
                         ser.close()
                         return False
@@ -1075,18 +1137,26 @@ class HimaxDeployer(BaseDeployer):
 
                     # Debug: check if there's any data waiting
                     if ser.in_waiting:
-                        logger.debug(f"Data waiting after preamble: {ser.in_waiting} bytes")
+                        logger.debug(
+                            f"Data waiting after preamble: {ser.in_waiting} bytes"
+                        )
 
                     # Wait for reboot prompt again
                     await self._report_progress(
-                        progress_callback, "flash", progress_base,
-                        f"[{idx + 1}/{total_models}] Preamble sent, waiting..."
+                        progress_callback,
+                        "flash",
+                        progress_base,
+                        f"[{idx + 1}/{total_models}] Preamble sent, waiting...",
                     )
                     if not await self._wait_for_reboot_prompt(ser, timeout=60):
-                        logger.error(f"Timeout waiting for reboot prompt after preamble for model {model.id}")
+                        logger.error(
+                            f"Timeout waiting for reboot prompt after preamble for model {model.id}"
+                        )
                         await self._report_progress(
-                            progress_callback, "flash", progress_base,
-                            "Timeout after preamble"
+                            progress_callback,
+                            "flash",
+                            progress_base,
+                            "Timeout after preamble",
                         )
                         ser.close()
                         return False
@@ -1094,12 +1164,14 @@ class HimaxDeployer(BaseDeployer):
                     # Send 'n' to continue - matching official script
                     await asyncio.sleep(1)
                     ser.flushInput()
-                    self._send_at_command(ser, 'n')
+                    self._send_at_command(ser, "n")
 
                     # Send model file - xmodem library handles handshake
                     await self._report_progress(
-                        progress_callback, "flash", progress_base,
-                        f"[{idx + 1}/{total_models}] Sending model file..."
+                        progress_callback,
+                        "flash",
+                        progress_base,
+                        f"[{idx + 1}/{total_models}] Sending model file...",
                     )
 
                     logger.info(f"Sending model file: {model_path}")
@@ -1112,8 +1184,10 @@ class HimaxDeployer(BaseDeployer):
                     if not await asyncio.to_thread(send_model):
                         logger.error(f"Failed to send model {model.id}")
                         await self._report_progress(
-                            progress_callback, "flash", progress_base,
-                            "Failed to send model file"
+                            progress_callback,
+                            "flash",
+                            progress_base,
+                            "Failed to send model file",
                         )
                         ser.close()
                         return False
@@ -1122,7 +1196,7 @@ class HimaxDeployer(BaseDeployer):
 
             # Step 6: Send 'y' to reboot after all models - matching official script
             if await self._wait_for_reboot_prompt(ser, timeout=60):
-                self._send_at_command(ser, 'y')
+                self._send_at_command(ser, "y")
                 logger.info("Sent reboot confirmation")
 
             ser.close()

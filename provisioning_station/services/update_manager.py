@@ -39,7 +39,9 @@ class UpdateManager:
         try:
             # Get deployment info
             history = await deployment_history.get_history(limit=100)
-            record = next((r for r in history if r.deployment_id == deployment_id), None)
+            record = next(
+                (r for r in history if r.deployment_id == deployment_id), None
+            )
 
             if not record:
                 return UpdateResponse(
@@ -56,7 +58,9 @@ class UpdateManager:
                     host=metadata.get("host"),
                     username=metadata.get("username", "recomputer"),
                     password=password,
-                    compose_path=metadata.get("compose_path", "/home/recomputer/missionpack_knn"),
+                    compose_path=metadata.get(
+                        "compose_path", "/home/recomputer/missionpack_knn"
+                    ),
                     project_name=metadata.get("project_name", record.solution_id),
                 )
             elif device_type == "docker_local":
@@ -95,7 +99,9 @@ class UpdateManager:
         try:
             # Get deployment info
             history = await deployment_history.get_history(limit=100)
-            record = next((r for r in history if r.deployment_id == deployment_id), None)
+            record = next(
+                (r for r in history if r.deployment_id == deployment_id), None
+            )
 
             if not record:
                 return UpdateResponse(
@@ -111,7 +117,9 @@ class UpdateManager:
                     host=metadata.get("host"),
                     username=metadata.get("username", "recomputer"),
                     password=password,
-                    compose_path=metadata.get("compose_path", "/home/recomputer/missionpack_knn"),
+                    compose_path=metadata.get(
+                        "compose_path", "/home/recomputer/missionpack_knn"
+                    ),
                     project_name=metadata.get("project_name", record.solution_id),
                     action=action,
                 )

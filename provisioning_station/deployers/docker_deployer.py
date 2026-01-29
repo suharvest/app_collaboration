@@ -86,11 +86,13 @@ class DockerDeployer(BaseDeployer):
                 compose_file,
                 ["pull"],
                 project_name,
-                progress_callback=lambda msg: asyncio.create_task(
-                    self._report_progress(progress_callback, "pull_images", 50, msg)
-                )
-                if progress_callback
-                else None,
+                progress_callback=lambda msg: (
+                    asyncio.create_task(
+                        self._report_progress(progress_callback, "pull_images", 50, msg)
+                    )
+                    if progress_callback
+                    else None
+                ),
                 working_dir=str(compose_dir),
             )
 
@@ -136,11 +138,15 @@ class DockerDeployer(BaseDeployer):
                 up_args,
                 project_name,
                 env=env,
-                progress_callback=lambda msg: asyncio.create_task(
-                    self._report_progress(progress_callback, "start_services", 50, msg)
-                )
-                if progress_callback
-                else None,
+                progress_callback=lambda msg: (
+                    asyncio.create_task(
+                        self._report_progress(
+                            progress_callback, "start_services", 50, msg
+                        )
+                    )
+                    if progress_callback
+                    else None
+                ),
                 working_dir=str(compose_dir),
             )
 
@@ -198,6 +204,7 @@ class DockerDeployer(BaseDeployer):
             if config.post_deployment.open_browser and config.post_deployment.url:
                 try:
                     import webbrowser
+
                     webbrowser.open(config.post_deployment.url)
                 except Exception as e:
                     logger.warning(f"Failed to open browser: {e}")
@@ -238,6 +245,7 @@ class DockerDeployer(BaseDeployer):
 
             # Build environment
             import os
+
             full_env = os.environ.copy()
             if env:
                 full_env.update(env)

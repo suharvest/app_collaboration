@@ -89,7 +89,9 @@ def inject_labels_to_compose(
             logger.debug(f"Injected labels into service: {service_name}")
 
         # Dump back to YAML, preserving order
-        return yaml.dump(compose_data, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        return yaml.dump(
+            compose_data, default_flow_style=False, allow_unicode=True, sort_keys=False
+        )
 
     except yaml.YAMLError as e:
         logger.error(f"Failed to parse compose file: {e}")

@@ -20,7 +20,10 @@ logger = logging.getLogger(__name__)
 
 class RemoteDockerNotInstalled(Exception):
     """Raised when Docker is not installed on remote device"""
-    def __init__(self, message: str, can_auto_fix: bool = False, fix_action: str = None):
+
+    def __init__(
+        self, message: str, can_auto_fix: bool = False, fix_action: str = None
+    ):
         super().__init__(message)
         self.can_auto_fix = can_auto_fix
         self.fix_action = fix_action
@@ -81,8 +84,12 @@ class DockerRemoteDeployer(BaseDeployer):
 
             client = await asyncio.to_thread(
                 self._create_ssh_connection,
-                host, port, username, password, key_file,
-                ssh_config.connection_timeout
+                host,
+                port,
+                username,
+                password,
+                key_file,
+                ssh_config.connection_timeout,
             )
 
             if not client:
@@ -98,7 +105,10 @@ class DockerRemoteDeployer(BaseDeployer):
             try:
                 # Step 1.5: Check remote OS is Linux
                 await self._report_progress(
-                    progress_callback, "check_os", 0, "Checking remote operating system..."
+                    progress_callback,
+                    "check_os",
+                    0,
+                    "Checking remote operating system...",
                 )
 
                 os_check = await remote_pre_check.check_remote_os(client)
@@ -116,7 +126,10 @@ class DockerRemoteDeployer(BaseDeployer):
                 auto_install_docker = connection.get("auto_install_docker", False)
 
                 await self._report_progress(
-                    progress_callback, "check_docker", 0, "Checking Docker on remote device..."
+                    progress_callback,
+                    "check_docker",
+                    0,
+                    "Checking Docker on remote device...",
                 )
 
                 docker_check = await remote_pre_check.check_docker(client)
@@ -125,7 +138,10 @@ class DockerRemoteDeployer(BaseDeployer):
                     if docker_check.can_auto_fix and auto_install_docker:
                         # User confirmed auto-install
                         await self._report_progress(
-                            progress_callback, "check_docker", 20, "Docker not found. Installing..."
+                            progress_callback,
+                            "check_docker",
+                            20,
+                            "Docker not found. Installing...",
                         )
 
                         if docker_check.fix_action == "install_docker":
@@ -134,7 +150,10 @@ class DockerRemoteDeployer(BaseDeployer):
                             )
                             if not success:
                                 await self._report_progress(
-                                    progress_callback, "check_docker", 0, "Docker installation failed"
+                                    progress_callback,
+                                    "check_docker",
+                                    0,
+                                    "Docker installation failed",
                                 )
                                 return False
                         elif docker_check.fix_action == "fix_docker_permission":
@@ -172,8 +191,7 @@ class DockerRemoteDeployer(BaseDeployer):
 
                 # Substitute template variables in remote_path
                 remote_path = self._substitute_variables(
-                    docker_config.remote_path,
-                    self._subst_context
+                    docker_config.remote_path, self._subst_context
                 )
                 remote_dir = f"{remote_path}/{config.id}"
                 # Escape remote_dir for shell safety (handles spaces and special chars)
@@ -183,12 +201,15 @@ class DockerRemoteDeployer(BaseDeployer):
                     self._exec_with_timeout,
                     client,
                     f"mkdir -p {remote_dir_escaped}",
-                    30
+                    30,
                 )
 
                 if exit_code != 0:
                     await self._report_progress(
-                        progress_callback, "prepare", 0, f"Failed to create directory: {stderr[:200]}"
+                        progress_callback,
+                        "prepare",
+                        0,
+                        f"Failed to create directory: {stderr[:200]}",
                     )
                     return False
 
@@ -224,12 +245,15 @@ class DockerRemoteDeployer(BaseDeployer):
                     self._exec_with_timeout,
                     client,
                     f"cd {remote_dir_escaped} && docker compose pull",
-                    ssh_config.command_timeout
+                    ssh_config.command_timeout,
                 )
 
                 if exit_code != 0:
                     await self._report_progress(
-                        progress_callback, "pull_images", 0, f"Pull failed: {stderr[:200]}"
+                        progress_callback,
+                        "pull_images",
+                        0,
+                        f"Pull failed: {stderr[:200]}",
                     )
                     return False
 
@@ -268,12 +292,15 @@ class DockerRemoteDeployer(BaseDeployer):
                     self._exec_with_timeout,
                     client,
                     compose_cmd,
-                    ssh_config.command_timeout
+                    ssh_config.command_timeout,
                 )
 
                 if exit_code != 0:
                     await self._report_progress(
-                        progress_callback, "start_services", 0, f"Start failed: {stderr[:200]}"
+                        progress_callback,
+                        "start_services",
+                        0,
+                        f"Start failed: {stderr[:200]}",
                     )
                     return False
 
@@ -294,18 +321,22 @@ class DockerRemoteDeployer(BaseDeployer):
                                 host,
                                 service.port,
                                 service.health_check_endpoint,
-                                timeout=30
+                                timeout=30,
                             )
                             if not healthy:
                                 if service.required:
                                     await self._report_progress(
-                                        progress_callback, "health_check", 0,
-                                        f"Service {service.name} is not healthy"
+                                        progress_callback,
+                                        "health_check",
+                                        0,
+                                        f"Service {service.name} is not healthy",
                                     )
                                     all_healthy = False
                                     break
                                 else:
-                                    logger.warning(f"Optional service {service.name} is not healthy")
+                                    logger.warning(
+                                        f"Optional service {service.name} is not healthy"
+                                    )
 
                     if not all_healthy:
                         return False
@@ -368,27 +399,36 @@ class DockerRemoteDeployer(BaseDeployer):
                 compose_dir_path = config.get_asset_path(docker_config.compose_dir)
                 if compose_dir_path and Path(compose_dir_path).exists():
                     await self._report_progress(
-                        progress_callback, "upload", 25,
-                        f"Uploading directory: {docker_config.compose_dir}"
+                        progress_callback,
+                        "upload",
+                        25,
+                        f"Uploading directory: {docker_config.compose_dir}",
                     )
 
                     # Upload contents of directory (not the directory itself)
                     # Labels will be injected to compose files during transfer
                     success = await asyncio.to_thread(
                         self._transfer_directory_contents_with_labels,
-                        client, compose_dir_path, remote_dir, labels
+                        client,
+                        compose_dir_path,
+                        remote_dir,
+                        labels,
                     )
 
                     if not success:
                         return False
                 else:
-                    logger.error(f"Compose directory not found: {docker_config.compose_dir}")
+                    logger.error(
+                        f"Compose directory not found: {docker_config.compose_dir}"
+                    )
                     return False
             else:
                 # Upload just the compose file with labels injected
                 await self._report_progress(
-                    progress_callback, "upload", 50,
-                    f"Uploading: {docker_config.compose_file}"
+                    progress_callback,
+                    "upload",
+                    50,
+                    f"Uploading: {docker_config.compose_file}",
                 )
 
                 remote_compose_path = f"{remote_dir}/docker-compose.yml"
@@ -397,12 +437,14 @@ class DockerRemoteDeployer(BaseDeployer):
                 if labels:
                     success = await asyncio.to_thread(
                         self._transfer_compose_with_labels,
-                        client, compose_path, remote_compose_path, labels
+                        client,
+                        compose_path,
+                        remote_compose_path,
+                        labels,
                     )
                 else:
                     success = await asyncio.to_thread(
-                        self._transfer_file,
-                        client, compose_path, remote_compose_path
+                        self._transfer_file, client, compose_path, remote_compose_path
                     )
 
                 if not success:
@@ -485,7 +527,9 @@ class DockerRemoteDeployer(BaseDeployer):
             logger.error(f"Directory transfer failed: {e}")
             return False
 
-    def _transfer_directory_contents(self, client, local_dir: str, remote_dir: str) -> bool:
+    def _transfer_directory_contents(
+        self, client, local_dir: str, remote_dir: str
+    ) -> bool:
         """Transfer contents of a directory (files and subdirs) directly into remote_dir"""
         try:
 
@@ -521,7 +565,9 @@ class DockerRemoteDeployer(BaseDeployer):
             # Create a file-like object for SCP
             with SCPClient(client.get_transport()) as scp:
                 # Write to temp file and upload
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.yml', delete=False) as tmp:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".yml", delete=False
+                ) as tmp:
                     tmp.write(modified_content)
                     tmp_path = tmp.name
 
@@ -545,7 +591,12 @@ class DockerRemoteDeployer(BaseDeployer):
             from scp import SCPClient
 
             local_path = Path(local_dir)
-            compose_names = {'docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml'}
+            compose_names = {
+                "docker-compose.yml",
+                "docker-compose.yaml",
+                "compose.yml",
+                "compose.yaml",
+            }
 
             with SCPClient(client.get_transport()) as scp:
                 for item in local_path.iterdir():
@@ -557,10 +608,14 @@ class DockerRemoteDeployer(BaseDeployer):
                             # Inject labels
                             with open(item, "r") as f:
                                 original_content = f.read()
-                            modified_content = inject_labels_to_compose(original_content, labels)
+                            modified_content = inject_labels_to_compose(
+                                original_content, labels
+                            )
 
                             # Write to temp file and upload
-                            with tempfile.NamedTemporaryFile(mode='w', suffix='.yml', delete=False) as tmp:
+                            with tempfile.NamedTemporaryFile(
+                                mode="w", suffix=".yml", delete=False
+                            ) as tmp:
                                 tmp.write(modified_content)
                                 tmp_path = tmp.name
 
@@ -569,7 +624,9 @@ class DockerRemoteDeployer(BaseDeployer):
                             finally:
                                 os.unlink(tmp_path)
 
-                            logger.info(f"Uploaded compose file with labels: {item.name}")
+                            logger.info(
+                                f"Uploaded compose file with labels: {item.name}"
+                            )
                         else:
                             scp.put(str(item), remote_path)
                     elif item.is_dir():
@@ -606,11 +663,7 @@ class DockerRemoteDeployer(BaseDeployer):
             return -1, "", str(e)
 
     async def _check_remote_service_health(
-        self,
-        host: str,
-        port: int,
-        endpoint: str,
-        timeout: int = 30
+        self, host: str, port: int, endpoint: str, timeout: int = 30
     ) -> bool:
         """Check remote service health via HTTP"""
         try:
@@ -657,5 +710,5 @@ class DockerRemoteDeployer(BaseDeployer):
             return str(value)
 
         # Replace {{var}} patterns
-        result = re.sub(r'\{\{(\w+)\}\}', replace_var, template)
+        result = re.sub(r"\{\{(\w+)\}\}", replace_var, template)
         return result

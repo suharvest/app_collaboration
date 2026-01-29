@@ -67,7 +67,11 @@ class KioskManager:
                 enabled=data.get("enabled", False),
                 kiosk_user=data.get("kiosk_user"),
                 app_url=data.get("app_url"),
-                configured_at=datetime.fromisoformat(data["configured_at"]) if data.get("configured_at") else None,
+                configured_at=(
+                    datetime.fromisoformat(data["configured_at"])
+                    if data.get("configured_at")
+                    else None
+                ),
             )
 
         return None
@@ -98,18 +102,20 @@ class KioskManager:
                 return KioskConfigResponse(
                     success=False,
                     message="Kiosk mode is not supported on Windows. "
-                            "This feature requires Linux with X11/Wayland desktop environment.",
+                    "This feature requires Linux with X11/Wayland desktop environment.",
                 )
             elif sys.platform == "darwin":
                 return KioskConfigResponse(
                     success=False,
                     message="Kiosk mode is not supported on macOS. "
-                            "This feature requires Linux with X11/Wayland desktop environment.",
+                    "This feature requires Linux with X11/Wayland desktop environment.",
                 )
 
             # Get deployment info
             history = await deployment_history.get_history(limit=100)
-            record = next((r for r in history if r.deployment_id == deployment_id), None)
+            record = next(
+                (r for r in history if r.deployment_id == deployment_id), None
+            )
 
             if not record:
                 return KioskConfigResponse(
@@ -203,7 +209,9 @@ class KioskManager:
         try:
             # Get deployment info
             history = await deployment_history.get_history(limit=100)
-            record = next((r for r in history if r.deployment_id == deployment_id), None)
+            record = next(
+                (r for r in history if r.deployment_id == deployment_id), None
+            )
 
             if not record:
                 return KioskConfigResponse(
@@ -234,7 +242,9 @@ class KioskManager:
                 statuses = self._load_status()
                 if deployment_id in statuses:
                     statuses[deployment_id]["enabled"] = False
-                    statuses[deployment_id]["configured_at"] = datetime.utcnow().isoformat()
+                    statuses[deployment_id][
+                        "configured_at"
+                    ] = datetime.utcnow().isoformat()
                     self._save_status(statuses)
 
                 return KioskConfigResponse(
@@ -271,7 +281,10 @@ class KioskManager:
 
             if script_path:
                 proc = await asyncio.create_subprocess_exec(
-                    "bash", script_path, kiosk_user, app_url,
+                    "bash",
+                    script_path,
+                    kiosk_user,
+                    app_url,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
@@ -302,7 +315,9 @@ class KioskManager:
 
             if script_path:
                 proc = await asyncio.create_subprocess_exec(
-                    "bash", script_path, kiosk_user,
+                    "bash",
+                    script_path,
+                    kiosk_user,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
@@ -329,7 +344,7 @@ class KioskManager:
             stdin, stdout, stderr = await asyncio.to_thread(
                 client.exec_command,
                 f"getent passwd {kiosk_user} | cut -d: -f6",
-                timeout=10
+                timeout=10,
             )
             exit_code = stdout.channel.recv_exit_status()
             if exit_code == 0:
@@ -339,9 +354,7 @@ class KioskManager:
 
             # Fallback: use eval echo ~user
             stdin, stdout, stderr = await asyncio.to_thread(
-                client.exec_command,
-                f"eval echo ~{kiosk_user}",
-                timeout=10
+                client.exec_command, f"eval echo ~{kiosk_user}", timeout=10
             )
             exit_code = stdout.channel.recv_exit_status()
             if exit_code == 0:
@@ -388,7 +401,9 @@ class KioskManager:
 
                 # Create kiosk script content (with dynamic home path)
                 kiosk_script = self._generate_kiosk_script(app_url)
-                autostart_content = self._generate_autostart_desktop_with_home(kiosk_user, home_dir)
+                autostart_content = self._generate_autostart_desktop_with_home(
+                    kiosk_user, home_dir
+                )
 
                 # Execute configuration commands
                 commands = [
@@ -496,7 +511,7 @@ class KioskManager:
 
     def _generate_kiosk_script(self, app_url: str) -> str:
         """Generate Kiosk launch script content"""
-        return f'''#!/bin/bash
+        return f"""#!/bin/bash
 # HVAC Kiosk Launcher
 
 # Wait for network and services to be ready
@@ -524,17 +539,20 @@ else
     echo "No supported browser found"
     exit 1
 fi
-'''
+"""
 
     def _generate_autostart_desktop(self, kiosk_user: str) -> str:
         """Generate autostart desktop entry content (for local use)"""
         import os
+
         home_dir = os.path.expanduser(f"~{kiosk_user}")
         return self._generate_autostart_desktop_with_home(kiosk_user, home_dir)
 
-    def _generate_autostart_desktop_with_home(self, kiosk_user: str, home_dir: str) -> str:
+    def _generate_autostart_desktop_with_home(
+        self, kiosk_user: str, home_dir: str
+    ) -> str:
         """Generate autostart desktop entry content with explicit home directory"""
-        return f'''[Desktop Entry]
+        return f"""[Desktop Entry]
 Type=Application
 Name=HVAC Kiosk
 Comment=HVAC Automation Control System Kiosk Mode
@@ -542,11 +560,12 @@ Exec={home_dir}/.local/bin/kiosk.sh
 X-GNOME-Autostart-enabled=true
 Hidden=false
 NoDisplay=false
-'''
+"""
 
     def _get_local_home_dir(self, kiosk_user: str) -> Path:
         """Get the home directory of a local user"""
         import os
+
         # Try to expand ~user
         home_dir = os.path.expanduser(f"~{kiosk_user}")
         if home_dir.startswith("~"):
@@ -559,7 +578,9 @@ NoDisplay=false
         try:
             home_dir = self._get_local_home_dir(kiosk_user)
             script_content = self._generate_kiosk_script(app_url)
-            autostart_content = self._generate_autostart_desktop_with_home(kiosk_user, str(home_dir))
+            autostart_content = self._generate_autostart_desktop_with_home(
+                kiosk_user, str(home_dir)
+            )
 
             script_dir = home_dir / ".local" / "bin"
             autostart_dir = home_dir / ".config" / "autostart"

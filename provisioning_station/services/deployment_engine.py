@@ -89,13 +89,19 @@ class DeploymentEngine:
 
         if preset_id and solution.intro.presets:
             # Find the preset by ID
-            preset = next((p for p in solution.intro.presets if p.id == preset_id), None)
+            preset = next(
+                (p for p in solution.intro.presets if p.id == preset_id), None
+            )
             if preset and preset.devices:
                 devices_list = preset.devices
                 deploy_order = [d.id for d in preset.devices]
-                logger.info(f"Using preset '{preset_id}' with {len(devices_list)} devices")
+                logger.info(
+                    f"Using preset '{preset_id}' with {len(devices_list)} devices"
+                )
             else:
-                logger.warning(f"Preset '{preset_id}' not found or has no devices, falling back to legacy")
+                logger.warning(
+                    f"Preset '{preset_id}' not found or has no devices, falling back to legacy"
+                )
 
         # Fallback to legacy deployment.devices if no preset devices
         if not devices_list:
@@ -108,21 +114,25 @@ class DeploymentEngine:
 
         # Initialize device deployments
         for device_id in deploy_order:
-            device_ref = next(
-                (d for d in devices_list if d.id == device_id), None
-            )
+            device_ref = next((d for d in devices_list if d.id == device_id), None)
             if not device_ref:
                 continue
 
             # Determine effective type and config_file
             effective_type = device_ref.type
             config_file = device_ref.config_file
-            logger.debug(f"Device {device_id}: type={device_ref.type}, config_file={config_file}")
+            logger.debug(
+                f"Device {device_id}: type={device_ref.type}, config_file={config_file}"
+            )
 
             if device_ref.type == "docker_deploy":
                 # Get selected target from options (local/remote)
-                deploy_target = options.get("deploy_target", "local") if options else "local"
-                effective_type = "docker_remote" if deploy_target == "remote" else "docker_local"
+                deploy_target = (
+                    options.get("deploy_target", "local") if options else "local"
+                )
+                effective_type = (
+                    "docker_remote" if deploy_target == "remote" else "docker_local"
+                )
                 # Use config_file from options if provided, otherwise resolve from targets
                 if options and options.get("config_file"):
                     config_file = options["config_file"]
@@ -130,11 +140,15 @@ class DeploymentEngine:
                     target = device_ref.targets[deploy_target]
                     if target.config_file:
                         config_file = target.config_file
-                logger.info(f"docker_deploy resolved: target={deploy_target}, effective_type={effective_type}, config_file={config_file}")
+                logger.info(
+                    f"docker_deploy resolved: target={deploy_target}, effective_type={effective_type}, config_file={config_file}"
+                )
             elif options and options.get("config_file"):
                 # Support config_file override for any device type with targets
                 config_file = options["config_file"]
-                logger.info(f"{device_ref.type}: using target config_file={config_file}")
+                logger.info(
+                    f"{device_ref.type}: using target config_file={config_file}"
+                )
 
             # Skip devices without config_file (e.g., manual info-only steps)
             if not config_file:
@@ -142,9 +156,7 @@ class DeploymentEngine:
                 continue
 
             # Load device config to get steps
-            config = await solution_manager.load_device_config(
-                solution.id, config_file
-            )
+            config = await solution_manager.load_device_config(solution.id, config_file)
             if not config:
                 continue
 
@@ -161,10 +173,7 @@ class DeploymentEngine:
                 config_file=config_file,  # Store config_file for _run_deployment
                 status=DeploymentStatus.PENDING,
                 connection=device_connections.get(device_id),
-                steps=[
-                    StepStatus(id=step.id, name=step.name)
-                    for step in config.steps
-                ],
+                steps=[StepStatus(id=step.id, name=step.name) for step in config.steps],
             )
             deployment.devices.append(device_deployment)
 
@@ -178,11 +187,13 @@ class DeploymentEngine:
         self._running_tasks[deployment_id] = task
 
         # Broadcast initial log (don't await in sync context, use create_task)
-        asyncio.create_task(self._broadcast_log(
-            deployment_id,
-            f"Started deployment for solution: {solution.id}",
-            level="info",
-        ))
+        asyncio.create_task(
+            self._broadcast_log(
+                deployment_id,
+                f"Started deployment for solution: {solution.id}",
+                level="info",
+            )
+        )
 
         return deployment_id
 
@@ -195,7 +206,9 @@ class DeploymentEngine:
         solution = solution_manager.get_solution(deployment.solution_id)
         if not solution:
             deployment.status = DeploymentStatus.FAILED
-            await self._broadcast_log(deployment_id, "Solution not found", level="error")
+            await self._broadcast_log(
+                deployment_id, "Solution not found", level="error"
+            )
             return
 
         try:
@@ -212,10 +225,13 @@ class DeploymentEngine:
                     level="info",
                     device_id=device_deployment.device_id,
                 )
-                await self._broadcast_update(deployment_id, {
-                    "type": "device_started",
-                    "device_id": device_deployment.device_id,
-                })
+                await self._broadcast_update(
+                    deployment_id,
+                    {
+                        "type": "device_started",
+                        "device_id": device_deployment.device_id,
+                    },
+                )
 
                 # Skip devices without config_file
                 if not device_deployment.config_file:
@@ -249,28 +265,38 @@ class DeploymentEngine:
                         level="info",
                         device_id=device_deployment.device_id,
                     )
-                    await self._broadcast_update(deployment_id, {
-                        "type": "pre_check_started",
-                        "device_id": device_deployment.device_id,
-                    })
+                    await self._broadcast_update(
+                        deployment_id,
+                        {
+                            "type": "pre_check_started",
+                            "device_id": device_deployment.device_id,
+                        },
+                    )
 
-                    check_results = await pre_check_validator.validate_all(config.pre_checks)
+                    check_results = await pre_check_validator.validate_all(
+                        config.pre_checks
+                    )
                     failed_checks = [r for r in check_results if not r.passed]
 
                     if failed_checks:
                         device_deployment.status = DeploymentStatus.FAILED
-                        device_deployment.error = f"Pre-checks failed: {[c.message for c in failed_checks]}"
+                        device_deployment.error = (
+                            f"Pre-checks failed: {[c.message for c in failed_checks]}"
+                        )
                         await self._broadcast_log(
                             deployment_id,
                             f"Pre-checks failed for {device_deployment.device_id}: {[c.message for c in failed_checks]}",
                             level="error",
                             device_id=device_deployment.device_id,
                         )
-                        await self._broadcast_update(deployment_id, {
-                            "type": "pre_check_failed",
-                            "device_id": device_deployment.device_id,
-                            "failures": [c.model_dump() for c in failed_checks],
-                        })
+                        await self._broadcast_update(
+                            deployment_id,
+                            {
+                                "type": "pre_check_failed",
+                                "device_id": device_deployment.device_id,
+                                "failures": [c.model_dump() for c in failed_checks],
+                            },
+                        )
                         deployment.status = DeploymentStatus.FAILED
                         continue
 
@@ -280,11 +306,14 @@ class DeploymentEngine:
                         level="info",
                         device_id=device_deployment.device_id,
                     )
-                    await self._broadcast_update(deployment_id, {
-                        "type": "pre_check_passed",
-                        "device_id": device_deployment.device_id,
-                        "results": [c.model_dump() for c in check_results],
-                    })
+                    await self._broadcast_update(
+                        deployment_id,
+                        {
+                            "type": "pre_check_passed",
+                            "device_id": device_deployment.device_id,
+                            "results": [c.model_dump() for c in check_results],
+                        },
+                    )
 
                 # Create progress callback
                 async def progress_callback(step_id: str, progress: int, message: str):
@@ -302,13 +331,16 @@ class DeploymentEngine:
                         device_id=device_deployment.device_id,
                         step_id=step_id,
                     )
-                    await self._broadcast_update(deployment_id, {
-                        "type": "progress",
-                        "device_id": device_deployment.device_id,
-                        "step_id": step_id,
-                        "progress": progress,
-                        "message": message,
-                    })
+                    await self._broadcast_update(
+                        deployment_id,
+                        {
+                            "type": "progress",
+                            "device_id": device_deployment.device_id,
+                            "step_id": step_id,
+                            "progress": progress,
+                            "message": message,
+                        },
+                    )
 
                 # Execute deployment
                 try:
@@ -352,7 +384,9 @@ class DeploymentEngine:
 
                 except RemoteDockerNotInstalled as e:
                     # Docker not installed - ask user for confirmation to install
-                    logger.info(f"Docker not installed on {device_deployment.device_id}: {e}")
+                    logger.info(
+                        f"Docker not installed on {device_deployment.device_id}: {e}"
+                    )
                     device_deployment.status = DeploymentStatus.FAILED
                     device_deployment.error = str(e)
                     deployment.status = DeploymentStatus.FAILED
@@ -365,16 +399,21 @@ class DeploymentEngine:
                     )
 
                     # Send special message to frontend for confirmation
-                    await self._broadcast_update(deployment_id, {
-                        "type": "docker_not_installed",
-                        "device_id": device_deployment.device_id,
-                        "message": str(e),
-                        "can_auto_fix": e.can_auto_fix,
-                        "fix_action": e.fix_action,
-                    })
+                    await self._broadcast_update(
+                        deployment_id,
+                        {
+                            "type": "docker_not_installed",
+                            "device_id": device_deployment.device_id,
+                            "message": str(e),
+                            "can_auto_fix": e.can_auto_fix,
+                            "fix_action": e.fix_action,
+                        },
+                    )
 
                 except Exception as e:
-                    logger.error(f"Deployment error for {device_deployment.device_id}: {e}")
+                    logger.error(
+                        f"Deployment error for {device_deployment.device_id}: {e}"
+                    )
                     device_deployment.status = DeploymentStatus.FAILED
                     device_deployment.error = str(e)
                     deployment.status = DeploymentStatus.FAILED
@@ -403,25 +442,42 @@ class DeploymentEngine:
                         solution_id=deployment.solution_id,
                         device_id=device_deployment.device_id,
                         device_type=device_deployment.type,
-                        deployed_version=config.version if hasattr(config, "version") else "1.0",
-                        config_version=config.version if hasattr(config, "version") else "1.0",
-                        status="completed" if device_deployment.status == DeploymentStatus.COMPLETED else "failed",
+                        deployed_version=(
+                            config.version if hasattr(config, "version") else "1.0"
+                        ),
+                        config_version=(
+                            config.version if hasattr(config, "version") else "1.0"
+                        ),
+                        status=(
+                            "completed"
+                            if device_deployment.status == DeploymentStatus.COMPLETED
+                            else "failed"
+                        ),
                         deployed_at=datetime.utcnow(),
                         metadata={
                             "device_name": device_deployment.name,
-                            "error": device_deployment.error if device_deployment.error else None,
+                            "error": (
+                                device_deployment.error
+                                if device_deployment.error
+                                else None
+                            ),
                         },
                         steps=step_records,
                     )
                     await deployment_history.record_deployment(record)
                 except Exception as history_error:
-                    logger.error(f"Failed to record deployment history: {history_error}")
+                    logger.error(
+                        f"Failed to record deployment history: {history_error}"
+                    )
 
-                await self._broadcast_update(deployment_id, {
-                    "type": "device_completed",
-                    "device_id": device_deployment.device_id,
-                    "status": device_deployment.status.value,
-                })
+                await self._broadcast_update(
+                    deployment_id,
+                    {
+                        "type": "device_completed",
+                        "device_id": device_deployment.device_id,
+                        "status": device_deployment.status.value,
+                    },
+                )
 
                 if device_deployment.status == DeploymentStatus.FAILED:
                     break
@@ -442,7 +498,9 @@ class DeploymentEngine:
         except Exception as e:
             logger.error(f"Deployment failed: {e}")
             deployment.status = DeploymentStatus.FAILED
-            await self._broadcast_log(deployment_id, f"Deployment error: {str(e)}", level="error")
+            await self._broadcast_log(
+                deployment_id, f"Deployment error: {str(e)}", level="error"
+            )
 
         finally:
             # Move to completed
@@ -453,17 +511,22 @@ class DeploymentEngine:
             if deployment_id in self._running_tasks:
                 del self._running_tasks[deployment_id]
 
-            await self._broadcast_update(deployment_id, {
-                "type": "deployment_completed",
-                "status": deployment.status.value,
-            })
+            await self._broadcast_update(
+                deployment_id,
+                {
+                    "type": "deployment_completed",
+                    "status": deployment.status.value,
+                },
+            )
 
     async def cancel_deployment(self, deployment_id: str):
         """Cancel a running deployment"""
         deployment = self.active_deployments.get(deployment_id)
         if deployment:
             deployment.status = DeploymentStatus.CANCELLED
-            await self._broadcast_log(deployment_id, "Deployment cancelled by user", level="warning")
+            await self._broadcast_log(
+                deployment_id, "Deployment cancelled by user", level="warning"
+            )
 
             # Cancel the task
             if deployment_id in self._running_tasks:
@@ -506,15 +569,20 @@ class DeploymentEngine:
         """Add log to deployment and broadcast to WebSocket clients"""
         deployment = self.active_deployments.get(deployment_id)
         if deployment:
-            deployment.add_log(message, level=level, device_id=device_id, step_id=step_id)
+            deployment.add_log(
+                message, level=level, device_id=device_id, step_id=step_id
+            )
 
-        await self._broadcast_update(deployment_id, {
-            "type": "log",
-            "level": level,
-            "message": message,
-            "device_id": device_id,
-            "step_id": step_id,
-        })
+        await self._broadcast_update(
+            deployment_id,
+            {
+                "type": "log",
+                "level": level,
+                "message": message,
+                "device_id": device_id,
+                "step_id": step_id,
+            },
+        )
 
 
 # Global instance

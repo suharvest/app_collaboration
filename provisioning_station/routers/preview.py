@@ -26,14 +26,17 @@ router = APIRouter(prefix="/api/preview", tags=["preview"])
 # Request/Response Models
 # ============================================
 
+
 class StartStreamRequest(BaseModel):
     """Request to start an RTSP stream"""
+
     rtsp_url: str
     stream_id: Optional[str] = None
 
 
 class StartStreamResponse(BaseModel):
     """Response from starting a stream"""
+
     stream_id: str
     hls_url: str
     status: str
@@ -41,6 +44,7 @@ class StartStreamResponse(BaseModel):
 
 class StartMjpegRequest(BaseModel):
     """Request to start an MJPEG stream"""
+
     rtsp_url: str
     stream_id: Optional[str] = None
     fps: int = 10
@@ -49,6 +53,7 @@ class StartMjpegRequest(BaseModel):
 
 class StartMjpegResponse(BaseModel):
     """Response from starting an MJPEG stream"""
+
     stream_id: str
     mjpeg_url: str
     status: str
@@ -56,6 +61,7 @@ class StartMjpegResponse(BaseModel):
 
 class StreamStatusResponse(BaseModel):
     """Stream status response"""
+
     stream_id: str
     status: str
     error: Optional[str] = None
@@ -63,6 +69,7 @@ class StreamStatusResponse(BaseModel):
 
 class MqttConnectRequest(BaseModel):
     """Request to connect to MQTT broker"""
+
     broker: str
     port: int = 1883
     topic: str
@@ -73,6 +80,7 @@ class MqttConnectRequest(BaseModel):
 # ============================================
 # Stream Proxy Endpoints
 # ============================================
+
 
 @router.post("/stream/start", response_model=StartStreamResponse)
 async def start_stream(request: StartStreamRequest):
@@ -104,6 +112,7 @@ async def start_stream(request: StartStreamRequest):
 # ============================================
 # MJPEG Stream Endpoints
 # ============================================
+
 
 @router.post("/mjpeg/start", response_model=StartMjpegResponse)
 async def start_mjpeg_stream(request: StartMjpegRequest):
@@ -200,6 +209,7 @@ async def get_stream_file(stream_id: str, filename: str):
     info = proxy.get_stream_info(stream_id)
     if info:
         import time
+
         info.last_accessed = time.time()
 
     file_path = proxy.get_stream_file(stream_id, filename)
@@ -221,7 +231,7 @@ async def get_stream_file(stream_id: str, filename: str):
         headers={
             "Access-Control-Allow-Origin": "*",
             "Cache-Control": "no-cache",
-        }
+        },
     )
 
 
@@ -235,6 +245,7 @@ async def list_streams():
 # ============================================
 # MQTT WebSocket Bridge
 # ============================================
+
 
 @router.websocket("/ws/mqtt")
 async def mqtt_websocket(websocket: WebSocket):
@@ -269,10 +280,12 @@ async def mqtt_websocket(websocket: WebSocket):
     await websocket.accept()
 
     if not is_mqtt_available():
-        await websocket.send_json({
-            "type": "error",
-            "message": "MQTT functionality not available. Install paho-mqtt.",
-        })
+        await websocket.send_json(
+            {
+                "type": "error",
+                "message": "MQTT functionality not available. Install paho-mqtt.",
+            }
+        )
         await websocket.close()
         return
 
@@ -282,20 +295,24 @@ async def mqtt_websocket(websocket: WebSocket):
 
     async def mqtt_callback(message):
         """Called when MQTT message is received"""
-        await message_queue.put({
-            "type": "mqtt_message",
-            **message,
-        })
+        await message_queue.put(
+            {
+                "type": "mqtt_message",
+                **message,
+            }
+        )
 
     try:
         # Wait for connection request
         data = await websocket.receive_json()
 
         if data.get("action") != "connect":
-            await websocket.send_json({
-                "type": "error",
-                "message": "Expected connect action",
-            })
+            await websocket.send_json(
+                {
+                    "type": "error",
+                    "message": "Expected connect action",
+                }
+            )
             return
 
         # Subscribe to MQTT topic
@@ -309,17 +326,21 @@ async def mqtt_websocket(websocket: WebSocket):
                 password=data.get("password"),
             )
 
-            await websocket.send_json({
-                "type": "status",
-                "connected": True,
-                "subscription_id": subscription_id,
-            })
+            await websocket.send_json(
+                {
+                    "type": "status",
+                    "connected": True,
+                    "subscription_id": subscription_id,
+                }
+            )
 
         except Exception as e:
-            await websocket.send_json({
-                "type": "error",
-                "message": f"Failed to connect to MQTT: {str(e)}",
-            })
+            await websocket.send_json(
+                {
+                    "type": "error",
+                    "message": f"Failed to connect to MQTT: {str(e)}",
+                }
+            )
             return
 
         # Forward messages to WebSocket
@@ -327,8 +348,7 @@ async def mqtt_websocket(websocket: WebSocket):
             try:
                 # Check for MQTT messages with timeout
                 message = await asyncio.wait_for(
-                    message_queue.get(),
-                    timeout=30.0  # Send ping every 30 seconds
+                    message_queue.get(), timeout=30.0  # Send ping every 30 seconds
                 )
                 await websocket.send_json(message)
 
@@ -339,11 +359,13 @@ async def mqtt_websocket(websocket: WebSocket):
                 # Check subscription status
                 info = bridge.get_subscription_info(subscription_id)
                 if info and info.get("error"):
-                    await websocket.send_json({
-                        "type": "status",
-                        "connected": False,
-                        "error": info["error"],
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "status",
+                            "connected": False,
+                            "error": info["error"],
+                        }
+                    )
 
     except WebSocketDisconnect:
         logger.info("MQTT WebSocket client disconnected")
@@ -358,6 +380,7 @@ async def mqtt_websocket(websocket: WebSocket):
 # ============================================
 # Combined Preview WebSocket
 # ============================================
+
 
 @router.websocket("/ws/preview/{preview_id}")
 async def preview_websocket(websocket: WebSocket, preview_id: str):
@@ -394,20 +417,24 @@ async def preview_websocket(websocket: WebSocket, preview_id: str):
     message_queue: asyncio.Queue = asyncio.Queue()
 
     async def mqtt_callback(message):
-        await message_queue.put({
-            "type": "mqtt_message",
-            **message,
-        })
+        await message_queue.put(
+            {
+                "type": "mqtt_message",
+                **message,
+            }
+        )
 
     try:
         # Wait for start command
         data = await websocket.receive_json()
 
         if data.get("action") != "start":
-            await websocket.send_json({
-                "type": "error",
-                "message": "Expected start action",
-            })
+            await websocket.send_json(
+                {
+                    "type": "error",
+                    "message": "Expected start action",
+                }
+            )
             return
 
         # Start stream if configured
@@ -418,17 +445,21 @@ async def preview_websocket(websocket: WebSocket, preview_id: str):
                     rtsp_url=stream_config["rtsp_url"],
                     stream_id=preview_id,
                 )
-                await websocket.send_json({
-                    "type": "stream_status",
-                    "status": "starting",
-                    "stream_id": stream_id,
-                    "hls_url": f"/api/preview/stream/{stream_id}/index.m3u8",
-                })
+                await websocket.send_json(
+                    {
+                        "type": "stream_status",
+                        "status": "starting",
+                        "stream_id": stream_id,
+                        "hls_url": f"/api/preview/stream/{stream_id}/index.m3u8",
+                    }
+                )
             except Exception as e:
-                await websocket.send_json({
-                    "type": "stream_error",
-                    "message": str(e),
-                })
+                await websocket.send_json(
+                    {
+                        "type": "stream_error",
+                        "message": str(e),
+                    }
+                )
 
         # Subscribe to MQTT if configured
         mqtt_config = data.get("mqtt")
@@ -443,21 +474,27 @@ async def preview_websocket(websocket: WebSocket, preview_id: str):
                         username=mqtt_config.get("username"),
                         password=mqtt_config.get("password"),
                     )
-                    await websocket.send_json({
-                        "type": "mqtt_status",
-                        "connected": True,
-                        "subscription_id": subscription_id,
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "mqtt_status",
+                            "connected": True,
+                            "subscription_id": subscription_id,
+                        }
+                    )
                 except Exception as e:
-                    await websocket.send_json({
-                        "type": "mqtt_error",
-                        "message": str(e),
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "mqtt_error",
+                            "message": str(e),
+                        }
+                    )
             else:
-                await websocket.send_json({
-                    "type": "mqtt_error",
-                    "message": "MQTT not available. Install paho-mqtt.",
-                })
+                await websocket.send_json(
+                    {
+                        "type": "mqtt_error",
+                        "message": "MQTT not available. Install paho-mqtt.",
+                    }
+                )
 
         # Check stream status periodically
         async def check_stream_status():
@@ -466,11 +503,13 @@ async def preview_websocket(websocket: WebSocket, preview_id: str):
                 if stream_id:
                     info = proxy.get_stream_info(stream_id)
                     if info:
-                        await message_queue.put({
-                            "type": "stream_status",
-                            "status": info.status,
-                            "error": info.error,
-                        })
+                        await message_queue.put(
+                            {
+                                "type": "stream_status",
+                                "status": info.status,
+                                "error": info.error,
+                            }
+                        )
 
         status_task = asyncio.create_task(check_stream_status())
 
@@ -478,10 +517,7 @@ async def preview_websocket(websocket: WebSocket, preview_id: str):
         try:
             while True:
                 try:
-                    message = await asyncio.wait_for(
-                        message_queue.get(),
-                        timeout=30.0
-                    )
+                    message = await asyncio.wait_for(message_queue.get(), timeout=30.0)
                     await websocket.send_json(message)
                 except asyncio.TimeoutError:
                     await websocket.send_json({"type": "ping"})
@@ -504,6 +540,7 @@ async def preview_websocket(websocket: WebSocket, preview_id: str):
 # Utility Endpoints
 # ============================================
 
+
 @router.get("/status")
 async def get_preview_status():
     """Get overall preview service status"""
@@ -514,7 +551,9 @@ async def get_preview_status():
         },
         "mqtt_bridge": {
             "available": is_mqtt_available(),
-            "active_subscriptions": len(get_mqtt_bridge().subscriptions) if is_mqtt_available() else 0,
+            "active_subscriptions": (
+                len(get_mqtt_bridge().subscriptions) if is_mqtt_available() else 0
+            ),
         },
     }
 

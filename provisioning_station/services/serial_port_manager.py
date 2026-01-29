@@ -17,16 +17,35 @@ logger = logging.getLogger(__name__)
 # Known serial port applications that can be safely terminated
 KNOWN_SERIAL_APPS = [
     # IDEs
-    "arduino", "arduino-cli", "platformio", "platformio-core",
+    "arduino",
+    "arduino-cli",
+    "platformio",
+    "platformio-core",
     # Terminal tools
-    "screen", "minicom", "picocom", "cu", "tip",
+    "screen",
+    "minicom",
+    "picocom",
+    "cu",
+    "tip",
     # Flashing tools
-    "esptool", "esptool.py", "avrdude", "openocd", "stm32flash",
+    "esptool",
+    "esptool.py",
+    "avrdude",
+    "openocd",
+    "stm32flash",
     # Serial monitors
-    "putty", "tera_term", "teraterm", "coolterm", "serial_monitor",
-    "esp_idf_monitor", "idf_monitor", "idf.py",
+    "putty",
+    "tera_term",
+    "teraterm",
+    "coolterm",
+    "serial_monitor",
+    "esp_idf_monitor",
+    "idf_monitor",
+    "idf.py",
     # Python scripts (common for serial work)
-    "python", "python3", "python.exe",
+    "python",
+    "python3",
+    "python.exe",
 ]
 
 
@@ -61,19 +80,16 @@ class SerialPortManager:
             try:
                 # lsof -t returns just the PID
                 result = subprocess.run(
-                    ["lsof", "-t", variant],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
+                    ["lsof", "-t", variant], capture_output=True, text=True, timeout=5
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     pid = int(result.stdout.strip().split()[0])
                     try:
                         proc = psutil.Process(pid)
                         return {
-                            'pid': pid,
-                            'name': proc.name(),
-                            'cmdline': ' '.join(proc.cmdline() or [])
+                            "pid": pid,
+                            "name": proc.name(),
+                            "cmdline": " ".join(proc.cmdline() or []),
                         }
                     except psutil.NoSuchProcess:
                         continue
@@ -88,16 +104,16 @@ class SerialPortManager:
         """Use psutil to detect process using serial port."""
         port_variants = SerialPortManager._get_port_variants(port)
 
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        for proc in psutil.process_iter(["pid", "name", "cmdline"]):
             try:
                 # Check open files
                 try:
                     for f in proc.open_files():
                         if any(variant in f.path for variant in port_variants):
                             return {
-                                'pid': proc.pid,
-                                'name': proc.name(),
-                                'cmdline': ' '.join(proc.cmdline() or [])
+                                "pid": proc.pid,
+                                "name": proc.name(),
+                                "cmdline": " ".join(proc.cmdline() or []),
                             }
                 except (psutil.AccessDenied, psutil.ZombieProcess):
                     pass
@@ -106,15 +122,17 @@ class SerialPortManager:
                 if sys.platform == "win32":
                     cmdline = proc.cmdline()
                     if cmdline:
-                        cmdline_str = ' '.join(cmdline).lower()
+                        cmdline_str = " ".join(cmdline).lower()
                         for variant in port_variants:
                             if variant.lower() in cmdline_str:
                                 proc_name_lower = proc.name().lower()
-                                if any(app in proc_name_lower for app in KNOWN_SERIAL_APPS):
+                                if any(
+                                    app in proc_name_lower for app in KNOWN_SERIAL_APPS
+                                ):
                                     return {
-                                        'pid': proc.pid,
-                                        'name': proc.name(),
-                                        'cmdline': cmdline_str
+                                        "pid": proc.pid,
+                                        "name": proc.name(),
+                                        "cmdline": cmdline_str,
                                     }
 
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
@@ -159,10 +177,10 @@ class SerialPortManager:
             return True
 
         try:
-            proc = psutil.Process(proc_info['pid'])
-            proc_name = proc_info['name']
-            proc_pid = proc_info['pid']
-            proc_cmdline = proc_info.get('cmdline', '')
+            proc = psutil.Process(proc_info["pid"])
+            proc_name = proc_info["name"]
+            proc_pid = proc_info["pid"]
+            proc_cmdline = proc_info.get("cmdline", "")
 
             # Log what we're terminating for debugging
             logger.info(
@@ -171,7 +189,9 @@ class SerialPortManager:
             )
             if proc_cmdline:
                 # Show abbreviated cmdline
-                cmdline_short = proc_cmdline[:100] + ('...' if len(proc_cmdline) > 100 else '')
+                cmdline_short = proc_cmdline[:100] + (
+                    "..." if len(proc_cmdline) > 100 else ""
+                )
                 logger.debug(f"Process cmdline: {cmdline_short}")
 
             # Try graceful termination first (SIGTERM on Unix)
@@ -179,7 +199,9 @@ class SerialPortManager:
 
             try:
                 proc.wait(timeout=timeout)
-                logger.info(f"Process {proc_name} (PID: {proc_pid}) terminated gracefully")
+                logger.info(
+                    f"Process {proc_name} (PID: {proc_pid}) terminated gracefully"
+                )
             except psutil.TimeoutExpired:
                 # Force kill (SIGKILL on Unix)
                 logger.warning(f"Process {proc_name} did not exit, force killing...")
@@ -188,7 +210,9 @@ class SerialPortManager:
                     proc.wait(timeout=1)
                     logger.info(f"Process {proc_name} (PID: {proc_pid}) killed")
                 except psutil.TimeoutExpired:
-                    logger.error(f"Failed to kill process {proc_name} (PID: {proc_pid})")
+                    logger.error(
+                        f"Failed to kill process {proc_name} (PID: {proc_pid})"
+                    )
                     return False
 
             # Wait a moment for OS to release the port
@@ -220,15 +244,17 @@ class SerialPortManager:
         """
         results = []
 
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        for proc in psutil.process_iter(["pid", "name", "cmdline"]):
             try:
                 proc_name_lower = proc.name().lower()
                 if any(app in proc_name_lower for app in KNOWN_SERIAL_APPS):
-                    results.append({
-                        'pid': proc.pid,
-                        'name': proc.name(),
-                        'cmdline': ' '.join(proc.cmdline() or [])
-                    })
+                    results.append(
+                        {
+                            "pid": proc.pid,
+                            "name": proc.name(),
+                            "cmdline": " ".join(proc.cmdline() or []),
+                        }
+                    )
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 continue
 
@@ -241,8 +267,11 @@ class SerialPortManager:
         Runs the blocking release_port in a thread executor.
         """
         import asyncio
+
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, SerialPortManager.release_port, port, timeout)
+        return await loop.run_in_executor(
+            None, SerialPortManager.release_port, port, timeout
+        )
 
     @staticmethod
     async def get_process_using_port_async(port: str) -> Optional[Dict[str, Any]]:
@@ -251,5 +280,8 @@ class SerialPortManager:
         Runs the blocking get_process_using_port in a thread executor.
         """
         import asyncio
+
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, SerialPortManager.get_process_using_port, port)
+        return await loop.run_in_executor(
+            None, SerialPortManager.get_process_using_port, port
+        )
