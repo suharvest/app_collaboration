@@ -115,13 +115,22 @@ class PreCheckValidator:
             return CheckResult(
                 type=check.type,
                 passed=False,
-                message="Docker is not installed",
+                message="Docker is not installed. Please install Docker Desktop.",
             )
-        except Exception as e:
+        except OSError as e:
+            # Windows may raise OSError when Docker is not installed or not in PATH
+            error_msg = str(e) or "Docker command not found"
             return CheckResult(
                 type=check.type,
                 passed=False,
-                message=f"Failed to check Docker: {str(e)}",
+                message=f"Docker is not available: {error_msg}",
+            )
+        except Exception as e:
+            error_msg = str(e) or type(e).__name__
+            return CheckResult(
+                type=check.type,
+                passed=False,
+                message=f"Failed to check Docker: {error_msg}",
             )
 
     async def _validate_docker_compose_version(self, check: PreCheck) -> CheckResult:
@@ -174,13 +183,21 @@ class PreCheckValidator:
             return CheckResult(
                 type=check.type,
                 passed=False,
-                message="Docker Compose is not installed",
+                message="Docker Compose is not installed. Please install Docker Desktop.",
             )
-        except Exception as e:
+        except OSError as e:
+            error_msg = str(e) or "Docker Compose command not found"
             return CheckResult(
                 type=check.type,
                 passed=False,
-                message=f"Failed to check Docker Compose: {str(e)}",
+                message=f"Docker Compose is not available: {error_msg}",
+            )
+        except Exception as e:
+            error_msg = str(e) or type(e).__name__
+            return CheckResult(
+                type=check.type,
+                passed=False,
+                message=f"Failed to check Docker Compose: {error_msg}",
             )
 
     async def _validate_port_available(self, check: PreCheck) -> CheckResult:
