@@ -121,13 +121,21 @@ export async function renderDevicesPage() {
     <div id="deployed-apps-section" style="display: ${deviceMode === 'embedded' ? 'none' : 'block'};">
       <div class="containers-header mb-4">
         <h3 class="text-base font-semibold text-text-primary">${t('devices.deployedApps')}</h3>
-        <button class="btn btn-sm btn-secondary" id="refresh-apps-btn">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M1 4v6h6M23 20v-6h-6"/>
-            <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
-          </svg>
-          ${t('devices.actions.refresh')}
-        </button>
+        <div class="flex gap-2">
+          <button class="btn btn-sm btn-secondary" id="prune-images-btn" title="${t('devices.actions.pruneImagesHint')}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+            </svg>
+            ${t('devices.actions.pruneImages')}
+          </button>
+          <button class="btn btn-sm btn-secondary" id="refresh-apps-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 4v6h6M23 20v-6h-6"/>
+              <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+            </svg>
+            ${t('devices.actions.refresh')}
+          </button>
+        </div>
       </div>
       <div id="devices-list">
         <div class="flex items-center justify-center py-4">
@@ -243,6 +251,36 @@ export async function renderDevicesPage() {
             <button type="submit" class="btn btn-primary">${t('devices.password.submit')}</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Remove App Confirmation Modal -->
+    <div id="remove-app-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content" style="max-width: 450px;">
+        <h3 class="modal-title">${t('devices.actions.confirmRemove')}</h3>
+        <p class="text-text-secondary mb-4">${t('devices.actions.confirmRemoveMessage')}</p>
+        <p class="text-sm text-text-muted mb-2" id="remove-app-name"></p>
+        <label class="flex items-center gap-2 mb-4 cursor-pointer">
+          <input type="checkbox" id="remove-images-checkbox" class="checkbox">
+          <span class="text-sm">${t('devices.actions.removeWithImages')}</span>
+        </label>
+        <p class="text-xs text-text-muted mb-4">${t('devices.actions.removeWithImagesHint')}</p>
+        <div class="flex gap-3 justify-end">
+          <button type="button" class="btn btn-secondary" id="remove-app-cancel">${t('common.cancel')}</button>
+          <button type="button" class="btn btn-danger" id="remove-app-confirm">${t('devices.actions.remove')}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prune Images Confirmation Modal -->
+    <div id="prune-images-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content" style="max-width: 450px;">
+        <h3 class="modal-title">${t('devices.actions.confirmPrune')}</h3>
+        <p class="text-text-secondary mb-4">${t('devices.actions.confirmPruneMessage')}</p>
+        <div class="flex gap-3 justify-end">
+          <button type="button" class="btn btn-secondary" id="prune-images-cancel">${t('common.cancel')}</button>
+          <button type="button" class="btn btn-danger" id="prune-images-confirm">${t('devices.actions.pruneImages')}</button>
+        </div>
       </div>
     </div>
   `;
@@ -367,6 +405,23 @@ function setupDockerConnectForm() {
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => loadDeployedApps());
   }
+
+  // Prune images button
+  const pruneBtn = document.getElementById('prune-images-btn');
+  if (pruneBtn) {
+    pruneBtn.addEventListener('click', () => {
+      if (!currentConnection) {
+        toast.error(t('devices.connectFirst'));
+        return;
+      }
+      const modal = document.getElementById('prune-images-modal');
+      if (modal) modal.style.display = 'flex';
+    });
+  }
+
+  // Setup modals
+  setupRemoveAppModal();
+  setupPruneImagesModal();
 
   // Restore last connection from sessionStorage
   const saved = sessionStorage.getItem('docker_connection');
@@ -577,12 +632,20 @@ function renderManagedAppCard(app) {
             ${t('devices.actions.start')}
           </button>
         `}
+        <button class="btn btn-sm btn-danger managed-app-remove"
+                data-solution-id="${app.solution_id}" data-containers="${containerNames}" data-solution-name="${app.solution_name || app.solution_id}">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+          </svg>
+          ${t('devices.actions.remove')}
+        </button>
       </div>
     </div>
   `;
 }
 
 function setupManagedAppHandlers() {
+  // Start/stop/restart action handlers
   document.querySelectorAll('.managed-app-action').forEach(btn => {
     btn.addEventListener('click', async () => {
       const containersStr = btn.dataset.containers;
@@ -618,6 +681,128 @@ function setupManagedAppHandlers() {
         btn.disabled = false;
       }
     });
+  });
+
+  // Remove app button handlers
+  document.querySelectorAll('.managed-app-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const solutionId = btn.dataset.solutionId;
+      const containersStr = btn.dataset.containers;
+      const solutionName = btn.dataset.solutionName;
+      showRemoveAppModal(solutionId, containersStr, solutionName);
+    });
+  });
+}
+
+// Store pending remove operation
+let pendingRemoveApp = null;
+
+function showRemoveAppModal(solutionId, containerNames, solutionName) {
+  const modal = document.getElementById('remove-app-modal');
+  const appNameEl = document.getElementById('remove-app-name');
+  const checkbox = document.getElementById('remove-images-checkbox');
+
+  pendingRemoveApp = { solutionId, containerNames };
+  appNameEl.textContent = solutionName;
+  checkbox.checked = false;
+  modal.style.display = 'flex';
+}
+
+function setupRemoveAppModal() {
+  const modal = document.getElementById('remove-app-modal');
+  const cancelBtn = document.getElementById('remove-app-cancel');
+  const confirmBtn = document.getElementById('remove-app-confirm');
+
+  cancelBtn?.addEventListener('click', () => {
+    modal.style.display = 'none';
+    pendingRemoveApp = null;
+  });
+
+  confirmBtn?.addEventListener('click', async () => {
+    if (!pendingRemoveApp) return;
+
+    const { solutionId, containerNames } = pendingRemoveApp;
+    const removeImages = document.getElementById('remove-images-checkbox').checked;
+    const originalText = confirmBtn.innerHTML;
+
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = `<span class="spinner spinner-sm"></span> ${t('devices.actions.removing')}`;
+
+    try {
+      let result;
+      if (currentConnection._local) {
+        result = await dockerDevicesApi.localRemoveApp(solutionId, containerNames, removeImages);
+      } else {
+        result = await dockerDevicesApi.removeApp(currentConnection, solutionId, containerNames, removeImages);
+      }
+
+      if (result.success) {
+        toast.success(t('devices.actions.removed'));
+      } else {
+        // Partial success - show warning
+        const failedContainers = result.containers?.filter(c => !c.success) || [];
+        if (failedContainers.length > 0) {
+          toast.warning(`${t('devices.actions.removed')} (${failedContainers.length} errors)`);
+        } else {
+          toast.success(t('devices.actions.removed'));
+        }
+      }
+
+      modal.style.display = 'none';
+      pendingRemoveApp = null;
+      await loadDeployedApps();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = originalText;
+    }
+  });
+
+  modal?.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.style.display = 'none';
+      pendingRemoveApp = null;
+    }
+  });
+}
+
+function setupPruneImagesModal() {
+  const modal = document.getElementById('prune-images-modal');
+  const cancelBtn = document.getElementById('prune-images-cancel');
+  const confirmBtn = document.getElementById('prune-images-confirm');
+
+  cancelBtn?.addEventListener('click', () => {
+    modal.style.display = 'none';
+  });
+
+  confirmBtn?.addEventListener('click', async () => {
+    const originalText = confirmBtn.innerHTML;
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = `<span class="spinner spinner-sm"></span> ${t('devices.actions.pruning')}`;
+
+    try {
+      let result;
+      if (currentConnection._local) {
+        result = await dockerDevicesApi.localPruneImages();
+      } else {
+        result = await dockerDevicesApi.pruneImages(currentConnection);
+      }
+
+      toast.success(`${t('devices.actions.pruned')}: ${result.space_reclaimed || ''}`);
+      modal.style.display = 'none';
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = originalText;
+    }
+  });
+
+  modal?.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.style.display = 'none';
+    }
   });
 }
 

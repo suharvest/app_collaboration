@@ -857,6 +857,70 @@ export const dockerDevicesApi = {
       timeout: 15000,
     });
   },
+
+  // ============================================
+  // App Removal & Image Pruning
+  // ============================================
+
+  /**
+   * Remove all containers for an app on local machine
+   * @param {string} solutionId - Solution ID
+   * @param {string} containerNames - Comma-separated container names
+   * @param {boolean} removeImages - Also remove associated images
+   */
+  localRemoveApp(solutionId, containerNames, removeImages = false) {
+    const params = new URLSearchParams({
+      solution_id: solutionId,
+      container_names: containerNames,
+      remove_images: removeImages.toString(),
+    });
+    return request(`/docker-devices/local/remove-app?${params}`, {
+      method: 'POST',
+      timeout: 60000,
+    });
+  },
+
+  /**
+   * Remove all unused Docker images on local machine
+   */
+  localPruneImages() {
+    return request('/docker-devices/local/prune-images', {
+      method: 'POST',
+      timeout: 120000,
+    });
+  },
+
+  /**
+   * Remove all containers for an app on remote device
+   * @param {Object} connection - Connection parameters
+   * @param {string} solutionId - Solution ID
+   * @param {string} containerNames - Comma-separated container names
+   * @param {boolean} removeImages - Also remove associated images
+   */
+  removeApp(connection, solutionId, containerNames, removeImages = false) {
+    const params = new URLSearchParams({
+      solution_id: solutionId,
+      container_names: containerNames,
+      remove_images: removeImages.toString(),
+    });
+    return request(`/docker-devices/remove-app?${params}`, {
+      method: 'POST',
+      body: JSON.stringify(connection),
+      timeout: 60000,
+    });
+  },
+
+  /**
+   * Remove all unused Docker images on remote device
+   * @param {Object} connection - Connection parameters
+   */
+  pruneImages(connection) {
+    return request('/docker-devices/prune-images', {
+      method: 'POST',
+      body: JSON.stringify(connection),
+      timeout: 120000,
+    });
+  },
 };
 
 // ============================================

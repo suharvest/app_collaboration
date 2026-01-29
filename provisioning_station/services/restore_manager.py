@@ -151,7 +151,9 @@ class RestoreManager:
 
         # Start restore in background
         restore_type = device_config.get("type", "")
-        if restore_type == "himax_usb":
+        if restore_type == "watcher_dual_chip":
+            asyncio.create_task(self._restore_watcher_dual(operation, device_config, connection))
+        elif restore_type == "himax_usb":
             asyncio.create_task(self._restore_watcher(operation, device_config, connection))
         elif restore_type == "ssh_restore":
             asyncio.create_task(self._restore_recamera(operation, device_config, connection))
@@ -227,7 +229,7 @@ class RestoreManager:
 
                 # Flash firmware
                 operation.current_step = f"Flashing {fw_config.get('name', 'firmware')}"
-                operation.message = "Please press the RESET button on the device..."
+                operation.message = "Flashing firmware..."
                 await self._notify_progress(operation)
                 self._add_log(operation, "info", f"Flashing slot {fw_config.get('slot', 1)}: {fw_config.get('name')}")
 
@@ -260,6 +262,161 @@ class RestoreManager:
             self._add_log(operation, "error", f"Restore failed: {e}")
             await self._notify_progress(operation)
             logger.exception(f"Watcher restore failed: {e}")
+
+        finally:
+            self.unregister_callback(operation.id)
+
+    async def _restore_watcher_dual(
+        self,
+        operation: RestoreOperation,
+        device_config: Dict[str, Any],
+        connection: Dict[str, Any],
+    ):
+        """Restore SenseCAP Watcher with both ESP32 and Himax firmware"""
+        try:
+            from ..deployers.esp32_deployer import ESP32Deployer
+            from ..deployers.himax_deployer import HimaxDeployer
+            from ..models.device import DeviceConfig, FirmwareConfig, FlashConfig, FirmwareSource, PartitionConfig
+
+            port = connection.get("port")
+            if not port:
+                raise ValueError("Serial port not specified")
+
+            esp32_config = device_config.get("esp32", {})
+            himax_config = device_config.get("himax", {})
+
+            # Total steps: ESP32 detect + flash + Himax detect + flash
+            operation.total_steps = 4
+            operation.completed_steps = 0
+
+            # ========== Step 1: Flash ESP32 ==========
+            esp32_file = esp32_config.get("file")
+            esp32_path = self.firmware_dir / esp32_file
+
+            if not esp32_path.exists():
+                raise FileNotFoundError(f"ESP32 firmware not found: {esp32_file}")
+
+            operation.current_step = "Flashing ESP32"
+            operation.message = "Preparing to flash ESP32-S3 firmware..."
+            await self._notify_progress(operation)
+            self._add_log(operation, "info", f"Starting ESP32-S3 firmware flash: {esp32_config.get('name')}")
+
+            # Create ESP32 deployer
+            esp32_deployer = ESP32Deployer()
+            esp32_flash_config = esp32_config.get("flash_config", {})
+
+            # Build device config for ESP32
+            esp32_device_cfg = DeviceConfig(
+                id="factory_restore_esp32",
+                name="Factory Restore ESP32",
+                type="esp32_usb",
+                firmware=FirmwareConfig(
+                    source=FirmwareSource(type="local", path=str(esp32_path)),
+                    flash_config=FlashConfig(
+                        chip=esp32_flash_config.get("chip", "esp32s3"),
+                        baud_rate=esp32_flash_config.get("baud_rate", 921600),
+                        flash_mode=esp32_flash_config.get("flash_mode", "dio"),
+                        flash_freq=esp32_flash_config.get("flash_freq", "80m"),
+                        flash_size=esp32_flash_config.get("flash_size", "16MB"),
+                        partitions=[
+                            PartitionConfig(
+                                name="firmware",
+                                offset=esp32_flash_config.get("address", "0x0"),
+                                file=str(esp32_path),
+                            )
+                        ],
+                    ),
+                ),
+                solution_dir=str(self.firmware_dir),
+            )
+
+            async def esp32_progress_handler(step: str, progress: int, message: str):
+                if step == "detect":
+                    operation.progress = int(progress * 0.125)  # 0-12.5%
+                elif step == "flash":
+                    operation.progress = int(12.5 + progress * 0.125)  # 12.5-25%
+                operation.message = message
+                await self._notify_progress(operation)
+
+            # Flash ESP32
+            esp32_success = await esp32_deployer.deploy(esp32_device_cfg, {"port": port}, esp32_progress_handler)
+
+            if not esp32_success:
+                raise RuntimeError("Failed to flash ESP32-S3 firmware")
+
+            operation.completed_steps = 2
+            self._add_log(operation, "info", "ESP32-S3 firmware flashed successfully")
+
+            # Wait for device to reset and port to become available
+            operation.message = "Waiting for device to reset..."
+            await self._notify_progress(operation)
+            await asyncio.sleep(3)
+
+            # ========== Step 2: Flash Himax ==========
+            himax_file = himax_config.get("file")
+            himax_path = self.firmware_dir / himax_file
+
+            if not himax_path.exists():
+                raise FileNotFoundError(f"Himax firmware not found: {himax_file}")
+
+            operation.current_step = "Flashing Himax"
+            operation.message = "Preparing Himax WE2 firmware flash..."
+            await self._notify_progress(operation)
+            self._add_log(operation, "info", f"Starting Himax WE2 firmware flash: {himax_config.get('name')}")
+
+            # Create Himax deployer
+            himax_deployer = HimaxDeployer()
+            himax_flash_config = himax_config.get("flash_config", {})
+
+            # Build device config for Himax with ESP32 reset hold enabled
+            # This is critical for SenseCAP Watcher - ESP32 must be held in reset
+            # during Himax flashing to prevent interference
+            himax_device_cfg = DeviceConfig(
+                id="factory_restore_himax",
+                name="Factory Restore Himax",
+                type="himax_usb",
+                firmware=FirmwareConfig(
+                    source=FirmwareSource(type="local", path=str(himax_path)),
+                    flash_config=FlashConfig(
+                        baudrate=himax_flash_config.get("baudrate", 921600),
+                        timeout=himax_flash_config.get("timeout", 60),
+                        requires_esp32_reset_hold=True,  # Hold ESP32 in reset during Himax flash
+                    ),
+                ),
+                solution_dir=str(self.firmware_dir),
+            )
+
+            async def himax_progress_handler(step: str, progress: int, message: str):
+                # Himax progress: 50-100%
+                operation.progress = int(50 + progress * 0.5)
+                operation.message = message
+                await self._notify_progress(operation)
+
+            # Flash Himax (deployer will find ESP32 port and hold it in reset)
+            himax_success = await himax_deployer.deploy(himax_device_cfg, {"port": port}, himax_progress_handler)
+
+            if not himax_success:
+                raise RuntimeError("Failed to flash Himax WE2 firmware")
+
+            operation.completed_steps = 4
+            self._add_log(operation, "info", "Himax WE2 firmware flashed successfully")
+
+            # Complete
+            operation.status = RestoreStatus.COMPLETED
+            operation.progress = 100
+            operation.message = "Restore completed successfully (ESP32 + Himax)"
+            operation.completed_at = datetime.now()
+            self._add_log(operation, "info", "Watcher dual-chip restore completed successfully")
+            await self._notify_progress(operation)
+
+        except Exception as e:
+            operation.status = RestoreStatus.FAILED
+            operation.error = str(e)
+            operation.message = f"Restore failed: {str(e)}"
+            operation.completed_at = datetime.now()
+            self._add_log(operation, "error", f"Restore failed: {e}")
+            await self._notify_progress(operation)
+            logger.exception(f"Watcher dual-chip restore failed: {e}")
 
         finally:
             self.unregister_callback(operation.id)
@@ -331,6 +488,14 @@ class RestoreManager:
                     operation.progress = int((i / operation.total_steps) * 100)
                     await self._notify_progress(operation)
                     self._add_log(operation, "info", f"Executing: {op_name}")
+
+                    # Replace sudo with password-enabled sudo -S
+                    # This handles commands that use 'sudo' which requires password
+                    if 'sudo ' in op_command and password:
+                        # Use printf to avoid echo issues with special characters
+                        # Replace 'sudo ' with 'printf "password\n" | sudo -S '
+                        escaped_password = password.replace("'", "'\"'\"'")
+                        op_command = op_command.replace('sudo ', f"printf '%s\\n' '{escaped_password}' | sudo -S ")
 
                     # Execute command
                     try:
