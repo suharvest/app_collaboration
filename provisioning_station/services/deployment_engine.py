@@ -63,6 +63,7 @@ class DeploymentEngine:
         preset_id: str = None,
     ) -> str:
         """Start a new deployment"""
+        logger.info(f"start_deployment called: solution={solution.id}, preset_id={preset_id}, selected_devices={selected_devices}, options={options}")
         deployment_id = str(uuid4())
 
         # Initialize deployment state
@@ -108,15 +109,20 @@ class DeploymentEngine:
             # Determine effective type and config_file
             effective_type = device_ref.type
             config_file = device_ref.config_file
+            logger.info(f"Device {device_id}: type={device_ref.type}, initial config_file={config_file}, options={options}")
 
-            if device_ref.type == "docker_deploy" and options:
+            if device_ref.type == "docker_deploy":
                 # Get selected target from options (local/remote)
-                deploy_target = options.get("deploy_target", "local")
+                deploy_target = options.get("deploy_target", "local") if options else "local"
                 effective_type = "docker_remote" if deploy_target == "remote" else "docker_local"
-                # Use config_file from options if provided
-                if options.get("config_file"):
+                # Use config_file from options if provided, otherwise resolve from targets
+                if options and options.get("config_file"):
                     config_file = options["config_file"]
-                logger.info(f"docker_deploy: target={deploy_target}, effective_type={effective_type}")
+                elif device_ref.targets and deploy_target in device_ref.targets:
+                    target = device_ref.targets[deploy_target]
+                    if target.config_file:
+                        config_file = target.config_file
+                logger.info(f"docker_deploy resolved: target={deploy_target}, effective_type={effective_type}, config_file={config_file}")
             elif options and options.get("config_file"):
                 # Support config_file override for any device type with targets
                 config_file = options["config_file"]
@@ -226,7 +232,9 @@ class DeploymentEngine:
                     continue
 
                 # Run pre-checks if defined
-                if config.pre_checks:
+                # Skip local pre-checks for docker_remote type - remote checks are handled by the deployer
+                # Use device_deployment.type (runtime effective type) instead of config.type (file-defined type)
+                if config.pre_checks and device_deployment.type != "docker_remote":
                     await self._broadcast_log(
                         deployment_id,
                         "Running pre-deployment checks...",
