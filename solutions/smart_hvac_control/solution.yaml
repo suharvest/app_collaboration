@@ -1,5 +1,5 @@
 version: "1.0"
-id: missionpack_knn
+id: smart_hvac_control
 name: HVAC Automation Control
 name_zh: 暖通自动化控制
 
