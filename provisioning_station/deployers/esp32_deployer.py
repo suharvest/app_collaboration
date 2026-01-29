@@ -216,9 +216,9 @@ class ESP32Deployer(BaseDeployer):
             return True
 
         except Exception as e:
-            logger.error(f"ESP32 deployment failed: {e}")
+            logger.exception(f"ESP32 deployment failed: {e}")
             await self._report_progress(
-                progress_callback, "flash", 0, f"Deployment failed: {str(e)}"
+                progress_callback, "flash", 0, f"Deployment failed: {str(e) or type(e).__name__}"
             )
             return False
 
@@ -332,43 +332,12 @@ class ESP32Deployer(BaseDeployer):
 
         start_time = time.time()
         attempt = 0
+        checked_processes = False  # Only check processes once if port is busy
 
         while (time.time() - start_time) < timeout:
             attempt += 1
 
-            # FIRST: Check with lsof if any process is using the port
-            # This is more reliable than pyserial for detecting exclusive locks
-            if auto_release:
-                proc_info = await SerialPortManager.get_process_using_port_async(port)
-
-                if proc_info:
-                    logger.info(
-                        f"Port {port} is used by {proc_info['name']} "
-                        f"(PID: {proc_info['pid']})"
-                    )
-                    if progress_callback:
-                        await self._report_progress(
-                            progress_callback, "detect", 0,
-                            f"Port {port} is used by {proc_info['name']} "
-                            f"(PID: {proc_info['pid']}), releasing..."
-                        )
-
-                    released = await SerialPortManager.release_port_async(port)
-                    if released:
-                        logger.info(f"Port {port} released successfully")
-                        if progress_callback:
-                            await self._report_progress(
-                                progress_callback, "detect", 0,
-                                f"Port {port} released successfully"
-                            )
-                        # Wait a moment for OS to fully release the port
-                        await asyncio.sleep(1.0)
-                    else:
-                        logger.warning(f"Failed to release port {port}")
-                        await asyncio.sleep(0.5)
-                        continue
-
-            # THEN: Try to open the port to verify it's truly available
+            # FIRST: Try to open the port to verify it's available (fast check)
             try:
                 ser = serial.Serial()
                 ser.port = port
@@ -389,13 +358,43 @@ class ESP32Deployer(BaseDeployer):
                     "exclusively lock" in error_str
                 )
 
-                if is_busy:
-                    logger.debug(f"Port {port} busy, waiting... (attempt {attempt})")
-                    await asyncio.sleep(0.5)
-                else:
+                if not is_busy:
                     # Other error (port doesn't exist, etc.)
                     logger.warning(f"Port {port} error: {e}")
                     return False
+
+                # Port is busy - check processes only once (slow on Windows)
+                if auto_release and not checked_processes:
+                    checked_processes = True
+                    proc_info = await SerialPortManager.get_process_using_port_async(port)
+
+                    if proc_info:
+                        logger.info(
+                            f"Port {port} is used by {proc_info['name']} "
+                            f"(PID: {proc_info['pid']})"
+                        )
+                        if progress_callback:
+                            await self._report_progress(
+                                progress_callback, "detect", 0,
+                                f"Port {port} is used by {proc_info['name']} "
+                                f"(PID: {proc_info['pid']}), releasing..."
+                            )
+
+                        released = await SerialPortManager.release_port_async(port)
+                        if released:
+                            logger.info(f"Port {port} released successfully")
+                            if progress_callback:
+                                await self._report_progress(
+                                    progress_callback, "detect", 0,
+                                    f"Port {port} released successfully"
+                                )
+                            # Wait a moment for OS to fully release the port
+                            await asyncio.sleep(1.0)
+                            continue
+
+                logger.debug(f"Port {port} busy, waiting... (attempt {attempt})")
+                await asyncio.sleep(0.5)
+
             except Exception as e:
                 logger.warning(f"Unexpected error checking port {port}: {e}")
                 return False
@@ -486,48 +485,30 @@ class ESP32Deployer(BaseDeployer):
         frozen = is_frozen()
         logger.info(f"Running esptool, frozen={frozen}, sys.frozen={getattr(sys, 'frozen', 'NOT_SET')}")
 
-        # For frozen apps, use Python API directly
-        if frozen:
-            logger.info("Using Python API for esptool (frozen mode)")
+        # For frozen apps OR Windows, use Python API directly
+        # Windows has issues with asyncio subprocess for esptool
+        if frozen or sys.platform == "win32":
+            logger.info(f"Using Python API for esptool (frozen={frozen}, platform={sys.platform})")
             loop = asyncio.get_event_loop()
             return await loop.run_in_executor(None, self._run_esptool_internal, args)
 
-        # For development, try subprocess first
+        # For development on macOS/Linux, use subprocess
         logger.info("Using subprocess for esptool (development mode)")
-        try:
-            cmd = ["esptool.py"] + args
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await process.communicate()
 
-            stdout_str = stdout.decode("utf-8", errors="replace")
-            stderr_str = stderr.decode("utf-8", errors="replace")
+        # Use sys.executable to get the current Python interpreter path
+        current_python = sys.executable
 
-            logger.info(f"esptool returncode: {process.returncode}")
-            logger.info(f"esptool stdout: {stdout_str[:500] if stdout_str else '(empty)'}")
-            logger.info(f"esptool stderr: {stderr_str[:500] if stderr_str else '(empty)'}")
+        commands_to_try = [
+            ["esptool.py"] + args,
+            [current_python, "-m", "esptool"] + args,
+            ["python", "-m", "esptool"] + args,
+            ["python3", "-m", "esptool"] + args,
+        ]
 
-            # esptool outputs most errors to stdout, not stderr
-            # Extract error message from stdout if stderr is empty
-            error_msg = None
-            if process.returncode != 0:
-                error_msg = stderr_str if stderr_str.strip() else self._extract_esptool_error(stdout_str)
-                logger.info(f"esptool error_msg: {error_msg}")
-
-            return {
-                "success": process.returncode == 0,
-                "stdout": stdout_str,
-                "stderr": stderr_str,
-                "error": error_msg,
-            }
-
-        except FileNotFoundError:
-            # Try with python -m
+        last_error = None
+        for cmd in commands_to_try:
             try:
-                cmd = ["python", "-m", "esptool"] + args
+                logger.info(f"Trying esptool command: {cmd[0]}")
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=asyncio.subprocess.PIPE,
@@ -538,10 +519,16 @@ class ESP32Deployer(BaseDeployer):
                 stdout_str = stdout.decode("utf-8", errors="replace")
                 stderr_str = stderr.decode("utf-8", errors="replace")
 
+                logger.info(f"esptool returncode: {process.returncode}")
+                logger.info(f"esptool stdout: {stdout_str[:500] if stdout_str else '(empty)'}")
+                logger.info(f"esptool stderr: {stderr_str[:500] if stderr_str else '(empty)'}")
+
                 # esptool outputs most errors to stdout, not stderr
+                # Extract error message from stdout if stderr is empty
                 error_msg = None
                 if process.returncode != 0:
                     error_msg = stderr_str if stderr_str.strip() else self._extract_esptool_error(stdout_str)
+                    logger.info(f"esptool error_msg: {error_msg}")
 
                 return {
                     "success": process.returncode == 0,
@@ -549,14 +536,20 @@ class ESP32Deployer(BaseDeployer):
                     "stderr": stderr_str,
                     "error": error_msg,
                 }
-            except Exception:
-                # Fall back to Python API
-                logger.info("Falling back to esptool Python API")
-                loop = asyncio.get_event_loop()
-                return await loop.run_in_executor(None, self._run_esptool_internal, args)
 
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+            except FileNotFoundError as e:
+                logger.debug(f"Command {cmd[0]} not found: {e}")
+                last_error = e
+                continue
+            except Exception as e:
+                logger.debug(f"Command {cmd[0]} failed: {e}")
+                last_error = e
+                continue
+
+        # All subprocess attempts failed, fall back to Python API
+        logger.info(f"All subprocess commands failed, falling back to esptool Python API. Last error: {last_error}")
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._run_esptool_internal, args)
 
     def _run_esptool_with_progress_internal(
         self, args: list, output_lines: list
@@ -627,9 +620,12 @@ class ESP32Deployer(BaseDeployer):
     ) -> dict:
         """Run esptool with real-time progress parsing"""
 
-        # For frozen apps, use Python API with polling
-        if is_frozen():
+        # For frozen apps OR Windows, use Python API with polling
+        # Windows has issues with asyncio subprocess for esptool
+        if is_frozen() or sys.platform == "win32":
             import concurrent.futures
+
+            logger.info(f"Using Python API for esptool with progress (frozen={is_frozen()}, platform={sys.platform})")
 
             output_lines = []
             last_progress = 0
@@ -682,34 +678,44 @@ class ESP32Deployer(BaseDeployer):
             executor.shutdown(wait=False)
             return await future
 
-        # For development, use subprocess with streaming
-        try:
-            cmd = ["esptool.py"] + args
+        # For development on macOS/Linux, use subprocess with streaming
+        # Use sys.executable to get the current Python interpreter path
+        current_python = sys.executable
+
+        commands_to_try = [
+            ["esptool.py"] + args,
+            [current_python, "-m", "esptool"] + args,
+            ["python", "-m", "esptool"] + args,
+            ["python3", "-m", "esptool"] + args,
+        ]
+
+        process = None
+        for cmd in commands_to_try:
             try:
+                logger.info(f"Trying esptool command (with progress): {cmd[0]}")
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,
                 )
+                break  # Success, exit loop
             except FileNotFoundError:
-                cmd = ["python", "-m", "esptool"] + args
-                try:
-                    process = await asyncio.create_subprocess_exec(
-                        *cmd,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.STDOUT,
-                    )
-                except FileNotFoundError:
-                    # Fall back to Python API
-                    logger.info("Falling back to esptool Python API for progress")
-                    output_lines = []
-                    loop = asyncio.get_event_loop()
-                    return await loop.run_in_executor(
-                        None,
-                        self._run_esptool_with_progress_internal,
-                        args,
-                        output_lines
-                    )
+                logger.debug(f"Command {cmd[0]} not found")
+                continue
+
+        if process is None:
+            # All subprocess attempts failed, fall back to Python API
+            logger.info("Falling back to esptool Python API for progress")
+            output_lines = []
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(
+                None,
+                self._run_esptool_with_progress_internal,
+                args,
+                output_lines
+            )
+
+        try:
 
             last_progress = 0
             all_output = []
