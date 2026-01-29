@@ -372,9 +372,111 @@ class HimaxDeployer(BaseDeployer):
         return False
 
     def _find_companion_esp32_port(self, himax_port: str) -> Optional[str]:
-        """Find the companion ESP32 serial port for SenseCAP Watcher."""
+        """Find the companion ESP32 serial port for SenseCAP Watcher.
+
+        On macOS: Look for wchusbserial port paired with usbmodem port
+        On Windows: Look for another COM port from the same WCH USB hub (same serial number)
+
+        The Watcher has two USB interfaces:
+        - Interface for Himax WE2 (what we flash)
+        - Interface for ESP32 (needs to be held in reset during flash)
+        """
         logger.debug(f"Looking for companion ESP32 port for Himax: {himax_port}")
 
+        # Get the Himax port info to find its serial number
+        himax_port_info = None
+        for port in serial.tools.list_ports.comports():
+            if port.device == himax_port:
+                himax_port_info = port
+                break
+
+        if himax_port_info:
+            logger.debug(
+                f"Himax port info: device={himax_port_info.device}, "
+                f"serial={himax_port_info.serial_number}, "
+                f"location={himax_port_info.location}"
+            )
+
+        # === Windows: Find companion COM port by serial number or location ===
+        if himax_port.upper().startswith("COM"):
+            if himax_port_info and himax_port_info.serial_number:
+                # Find another port with the same serial number (same USB device)
+                for port in serial.tools.list_ports.comports():
+                    if port.device != himax_port and port.serial_number == himax_port_info.serial_number:
+                        logger.info(f"Found ESP32 port by serial number: {port.device}")
+                        return port.device
+
+            # Fallback: Find port with same VID/PID but different interface
+            if himax_port_info and himax_port_info.vid and himax_port_info.pid:
+                for port in serial.tools.list_ports.comports():
+                    if (port.device != himax_port and
+                        port.vid == himax_port_info.vid and
+                        port.pid == himax_port_info.pid):
+                        logger.info(f"Found ESP32 port by VID/PID: {port.device}")
+                        return port.device
+
+            # Last resort on Windows: look for adjacent COM port numbers
+            # WCH chips often enumerate as consecutive COM ports
+            com_match = re.search(r'COM(\d+)', himax_port.upper())
+            if com_match:
+                himax_num = int(com_match.group(1))
+                # Check COM ports within ±2 range
+                for offset in [1, -1, 2, -2]:
+                    candidate = f"COM{himax_num + offset}"
+                    for port in serial.tools.list_ports.comports():
+                        if port.device.upper() == candidate:
+                            # Verify it's likely from the same device (same VID or similar description)
+                            if (himax_port_info and port.vid == himax_port_info.vid):
+                                logger.info(f"Found ESP32 port by adjacent COM number: {port.device}")
+                                return port.device
+
+            logger.warning("Could not find ESP32 companion port on Windows")
+            return None
+
+        # === Linux: Find companion port by serial number, VID/PID, or ttyUSB pattern ===
+        if himax_port.startswith("/dev/tty"):
+            # Method 1: Find by serial number (most reliable)
+            if himax_port_info and himax_port_info.serial_number:
+                for port in serial.tools.list_ports.comports():
+                    if port.device != himax_port and port.serial_number == himax_port_info.serial_number:
+                        logger.info(f"Found ESP32 port by serial number: {port.device}")
+                        return port.device
+
+            # Method 2: Find by VID/PID
+            if himax_port_info and himax_port_info.vid and himax_port_info.pid:
+                for port in serial.tools.list_ports.comports():
+                    if (port.device != himax_port and
+                        port.vid == himax_port_info.vid and
+                        port.pid == himax_port_info.pid):
+                        logger.info(f"Found ESP32 port by VID/PID: {port.device}")
+                        return port.device
+
+            # Method 3: For ttyACM ports, look for adjacent numbers
+            # Linux often enumerates composite USB devices as ttyACM0, ttyACM1, etc.
+            acm_match = re.search(r'/dev/ttyACM(\d+)', himax_port)
+            if acm_match:
+                himax_num = int(acm_match.group(1))
+                for offset in [1, -1, 2, -2]:
+                    candidate = f"/dev/ttyACM{himax_num + offset}"
+                    for port in serial.tools.list_ports.comports():
+                        if port.device == candidate:
+                            if himax_port_info and port.vid == himax_port_info.vid:
+                                logger.info(f"Found ESP32 port by adjacent ttyACM number: {port.device}")
+                                return port.device
+
+            # Method 4: For ttyUSB ports (if Himax is on ttyACM, ESP32 might be on ttyUSB)
+            # WCH chips on Linux can appear as either ttyACM or ttyUSB
+            if 'ttyACM' in himax_port:
+                for port in serial.tools.list_ports.comports():
+                    if 'ttyUSB' in port.device:
+                        if himax_port_info and port.vid == himax_port_info.vid:
+                            logger.info(f"Found ESP32 port on ttyUSB: {port.device}")
+                            return port.device
+
+            logger.warning("Could not find ESP32 companion port on Linux")
+            return None
+
+        # === macOS: Original usbmodem/wchusbserial logic ===
         match = re.search(r'usbmodem(\w+)', himax_port)
         if not match:
             return None
