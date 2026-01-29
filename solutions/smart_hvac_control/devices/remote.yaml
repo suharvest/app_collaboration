@@ -23,7 +23,7 @@ ssh:
 docker_remote:
   compose_file: assets/docker/docker-compose.yml
   compose_dir: assets/docker
-  remote_path: /home/recomputer/missionpack_knn
+  remote_path: /home/{{username}}/smart_hvac_control
 
   environment:
     TZ: Asia/Shanghai
@@ -79,10 +79,11 @@ user_inputs:
     description_zh: OPC-UA 服务器地址（使用默认值连接内置模拟器）
     required: false
 
-pre_checks:
-  - type: docker_version
-    min_version: "20.0"
-    description: Check Docker version
+# Pre-checks removed - Docker will be checked on remote device by deployer
+# pre_checks:
+#   - type: docker_version
+#     min_version: "20.0"
+#     description: Check Docker version
 
 steps:
   - id: connect
