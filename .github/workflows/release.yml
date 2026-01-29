@@ -201,7 +201,12 @@ jobs:
 
             ### macOS
             Download the `.dmg` file, open it, and drag the app to Applications.
-            If you see "App can't be opened", go to System Preferences > Security & Privacy and click "Open Anyway".
+
+            **Important:** If you see "App is damaged and can't be opened", run this command in Terminal:
+            ```bash
+            xattr -cr "/Applications/SenseCraft Solution.app"
+            ```
+            This only needs to be done once per download (new versions will need it again).
 
             ### Linux (ARM64)
             For Raspberry Pi, Jetson, and other ARM64 devices:
