@@ -199,30 +199,147 @@ class DockerDeviceManager:
         return managed_apps
 
     async def local_container_action(self, container_name: str, action: str) -> Dict[str, Any]:
-        """Perform action on a local container (start/stop/restart)"""
-        if action not in ("start", "stop", "restart"):
+        """Perform action on a local container (start/stop/restart/remove)"""
+        if action not in ("start", "stop", "restart", "remove"):
             raise ValueError(f"Invalid action: {action}")
 
         try:
-            result = await asyncio.to_thread(
-                subprocess.run,
-                ["docker", action, container_name],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
+            if action == "remove":
+                # First stop the container, then remove it
+                await asyncio.to_thread(
+                    subprocess.run,
+                    ["docker", "stop", container_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                result = await asyncio.to_thread(
+                    subprocess.run,
+                    ["docker", "rm", container_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+            else:
+                result = await asyncio.to_thread(
+                    subprocess.run,
+                    ["docker", action, container_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
 
             if result.returncode != 0:
                 raise RuntimeError(f"Action failed: {result.stderr}")
 
+            action_past = "removed" if action == "remove" else f"{action}ed"
             return {
                 "success": True,
-                "message": f"Container {container_name} {action}ed successfully",
+                "message": f"Container {container_name} {action_past} successfully",
                 "output": result.stdout,
             }
         except Exception as e:
             logger.error(f"Local container action {action} failed: {e}")
             raise RuntimeError(f"Action failed: {str(e)}")
+
+    async def local_remove_app(
+        self,
+        solution_id: str,
+        container_names: List[str],
+        remove_images: bool = False,
+    ) -> Dict[str, Any]:
+        """Remove all containers for an app, optionally removing images"""
+        results = []
+        images_to_remove = []
+
+        # Get container info before removing (to get image references)
+        if remove_images:
+            containers = await self.list_local_containers()
+            for c in containers:
+                if c.name in container_names:
+                    images_to_remove.append(f"{c.image}:{c.current_tag}")
+
+        # Remove containers
+        for container_name in container_names:
+            try:
+                result = await self.local_container_action(container_name, "remove")
+                results.append({"container": container_name, "success": True})
+            except Exception as e:
+                results.append({"container": container_name, "success": False, "error": str(e)})
+
+        # Remove images if requested
+        images_removed = []
+        images_skipped = []
+        if remove_images and images_to_remove:
+            for image in set(images_to_remove):  # deduplicate
+                try:
+                    # Check if image is used by other containers
+                    check_result = await asyncio.to_thread(
+                        subprocess.run,
+                        ["docker", "ps", "-a", "--filter", f"ancestor={image}", "--format", "{{.Names}}"],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    remaining_containers = [n for n in check_result.stdout.strip().split("\n") if n]
+
+                    if remaining_containers:
+                        images_skipped.append({"image": image, "reason": f"used by: {', '.join(remaining_containers)}"})
+                        continue
+
+                    # Remove the image
+                    result = await asyncio.to_thread(
+                        subprocess.run,
+                        ["docker", "rmi", image],
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                    )
+                    if result.returncode == 0:
+                        images_removed.append(image)
+                    else:
+                        images_skipped.append({"image": image, "reason": result.stderr.strip()})
+                except Exception as e:
+                    images_skipped.append({"image": image, "reason": str(e)})
+
+        return {
+            "success": all(r["success"] for r in results),
+            "containers": results,
+            "images_removed": images_removed,
+            "images_skipped": images_skipped,
+        }
+
+    async def local_prune_images(self) -> Dict[str, Any]:
+        """Remove all unused Docker images"""
+        try:
+            result = await asyncio.to_thread(
+                subprocess.run,
+                ["docker", "image", "prune", "-af"],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+
+            if result.returncode != 0:
+                raise RuntimeError(f"Prune failed: {result.stderr}")
+
+            # Parse output to get space reclaimed
+            output = result.stdout
+            space_reclaimed = "0B"
+            for line in output.split("\n"):
+                if "Total reclaimed space:" in line:
+                    space_reclaimed = line.split(":")[-1].strip()
+                    break
+
+            return {
+                "success": True,
+                "message": f"Pruned unused images, reclaimed {space_reclaimed}",
+                "output": output,
+                "space_reclaimed": space_reclaimed,
+            }
+        except Exception as e:
+            logger.error(f"Local image prune failed: {e}")
+            raise RuntimeError(f"Prune failed: {str(e)}")
 
     # ============================================
     # Remote Docker Management (SSH)
@@ -430,21 +547,31 @@ class DockerDeviceManager:
         container_name: str,
         action: str,
     ) -> Dict[str, Any]:
-        """Perform action on a container (start/stop/restart)"""
-        if action not in ("start", "stop", "restart"):
+        """Perform action on a container (start/stop/restart/remove)"""
+        if action not in ("start", "stop", "restart", "remove"):
             raise ValueError(f"Invalid action: {action}")
 
         try:
             client = self._get_ssh_client(connection)
             try:
-                output = self._exec_command(
-                    client,
-                    f"docker {action} {container_name}",
-                    timeout=30,
-                )
+                if action == "remove":
+                    # First stop, then remove
+                    try:
+                        self._exec_command(client, f"docker stop {container_name}", timeout=30)
+                    except Exception:
+                        pass  # Container might already be stopped
+                    output = self._exec_command(client, f"docker rm {container_name}", timeout=30)
+                else:
+                    output = self._exec_command(
+                        client,
+                        f"docker {action} {container_name}",
+                        timeout=30,
+                    )
+
+                action_past = "removed" if action == "remove" else f"{action}ed"
                 return {
                     "success": True,
-                    "message": f"Container {container_name} {action}ed successfully",
+                    "message": f"Container {container_name} {action_past} successfully",
                     "output": output,
                 }
             finally:
@@ -453,6 +580,101 @@ class DockerDeviceManager:
         except Exception as e:
             logger.error(f"Container action {action} failed: {e}")
             raise RuntimeError(f"Action failed: {str(e)}")
+
+    async def remove_app(
+        self,
+        connection: ConnectDeviceRequest,
+        solution_id: str,
+        container_names: List[str],
+        remove_images: bool = False,
+    ) -> Dict[str, Any]:
+        """Remove all containers for an app on remote device, optionally removing images"""
+        results = []
+        images_to_remove = []
+
+        try:
+            client = self._get_ssh_client(connection)
+            try:
+                # Get container info before removing (to get image references)
+                if remove_images:
+                    containers = await self.list_containers(connection)
+                    for c in containers:
+                        if c.name in container_names:
+                            images_to_remove.append(f"{c.image}:{c.current_tag}")
+
+                # Remove containers
+                for container_name in container_names:
+                    try:
+                        try:
+                            self._exec_command(client, f"docker stop {container_name}", timeout=30)
+                        except Exception:
+                            pass
+                        self._exec_command(client, f"docker rm {container_name}", timeout=30)
+                        results.append({"container": container_name, "success": True})
+                    except Exception as e:
+                        results.append({"container": container_name, "success": False, "error": str(e)})
+
+                # Remove images if requested
+                images_removed = []
+                images_skipped = []
+                if remove_images and images_to_remove:
+                    for image in set(images_to_remove):
+                        try:
+                            # Check if image is used by other containers
+                            check_output = self._exec_command(
+                                client,
+                                f"docker ps -a --filter ancestor={image} --format '{{{{.Names}}}}'",
+                                timeout=10,
+                            )
+                            remaining = [n for n in check_output.strip().split("\n") if n]
+                            if remaining:
+                                images_skipped.append({"image": image, "reason": f"used by: {', '.join(remaining)}"})
+                                continue
+
+                            self._exec_command(client, f"docker rmi {image}", timeout=60)
+                            images_removed.append(image)
+                        except Exception as e:
+                            images_skipped.append({"image": image, "reason": str(e)})
+
+                return {
+                    "success": all(r["success"] for r in results),
+                    "containers": results,
+                    "images_removed": images_removed,
+                    "images_skipped": images_skipped,
+                }
+            finally:
+                client.close()
+
+        except Exception as e:
+            logger.error(f"Remove app failed: {e}")
+            raise RuntimeError(f"Remove app failed: {str(e)}")
+
+    async def prune_images(self, connection: ConnectDeviceRequest) -> Dict[str, Any]:
+        """Remove all unused Docker images on remote device"""
+        try:
+            client = self._get_ssh_client(connection)
+            try:
+                output = self._exec_command(client, "docker image prune -af", timeout=120)
+
+                # Parse output to get space reclaimed
+                space_reclaimed = "0B"
+                for line in output.split("\n"):
+                    if "Total reclaimed space:" in line:
+                        space_reclaimed = line.split(":")[-1].strip()
+                        break
+
+                return {
+                    "success": True,
+                    "message": f"Pruned unused images, reclaimed {space_reclaimed}",
+                    "output": output,
+                    "space_reclaimed": space_reclaimed,
+                }
+            finally:
+                client.close()
+
+        except Exception as e:
+            logger.error(f"Remote image prune failed: {e}")
+            raise RuntimeError(f"Prune failed: {str(e)}")
 
 
 # Global instance

@@ -7,28 +7,34 @@ devices:
   sensecap_watcher:
     name: "SenseCAP Watcher"
     name_zh: "SenseCAP Watcher"
-    type: "himax_usb"
-    description: "Restore to factory firmware via USB"
-    description_zh: "通过 USB 烧录恢复出厂固件"
+    type: "watcher_dual_chip"
+    description: "Restore ESP32 and Himax firmware via USB"
+    description_zh: "通过 USB 烧录恢复 ESP32 和 Himax 出厂固件"
 
-    firmware:
-      # Himax firmware (slot 1)
-      - slot: 1
-        name: "Himax Firmware"
-        file: "himax/himax_firmware_20240816.img"
-        source_url: "https://github.com/Seeed-Studio/OSHW-SenseCAP-Watcher/raw/main/Firmware/Himax/himax_firmware_20240816.img"
-        address: 0x0
-        required: true
+    # ESP32-S3 firmware (flashed first)
+    esp32:
+      name: "ESP32-S3 Firmware"
+      name_zh: "ESP32-S3 固件"
+      file: "esp32/factory_firmware.bin"
+      flash_config:
+        chip: "esp32s3"
+        baud_rate: 921600
+        flash_mode: "dio"
+        flash_freq: "80m"
+        flash_size: "16MB"
+        address: "0x0"
 
-      # Factory model (slot 4, address 0x400000)
-      # Note: vela format tflite, to be provided
-      # - slot: 4
-      #   name: "Factory Model"
-      #   file: "himax/factory_model.tflite"
-      #   address: 0x400000
-      #   required: false
+    # Himax WE2 firmware (flashed after ESP32)
+    himax:
+      name: "Himax WE2 Firmware"
+      name_zh: "Himax WE2 固件"
+      file: "himax/himax_firmware_20240816.img"
+      flash_config:
+        baudrate: 921600
+        timeout: 60
 
     detection:
+      # WCH CH343 USB-Serial (shared by ESP32 and Himax)
       usb_vendor_id: "0x1a86"
       usb_product_id: "0x55d2"
       fallback_ports:
@@ -36,10 +42,6 @@ devices:
         - "/dev/tty.usbmodem*"
         - "/dev/ttyACM*"
         - "COM*"
-
-    flash_config:
-      baudrate: 921600
-      timeout: 60
 
   recamera:
     name: "reCamera"
@@ -76,17 +78,25 @@ devices:
           # - /userdata/MODEL/model.cvimodel
           sudo rm -rf /userdata/local/models/* 2>/dev/null || true
 
-      # Step 4: Restore node-red autostart
-      - name: "Restore node-red autostart"
-        name_zh: "恢复 node-red 自启动"
+      # Step 4: Restore all Node-RED related services autostart
+      - name: "Restore Node-RED services autostart"
+        name_zh: "恢复 Node-RED 相关服务自启动"
         command: |
+          # Restore node-red (K03 -> S03)
           [ -f /etc/init.d/K03node-red ] && sudo mv /etc/init.d/K03node-red /etc/init.d/S03node-red 2>/dev/null || true
+          # Restore sscma-node (K91 -> S91)
+          [ -f /etc/init.d/K91sscma-node ] && sudo mv /etc/init.d/K91sscma-node /etc/init.d/S91sscma-node 2>/dev/null || true
+          # Restore sscma-supervisor (K93 -> S93)
+          [ -f /etc/init.d/K93sscma-supervisor ] && sudo mv /etc/init.d/K93sscma-supervisor /etc/init.d/S93sscma-supervisor 2>/dev/null || true
 
-      # Step 5: Start node-red service
-      - name: "Start node-red service"
-        name_zh: "启动 node-red 服务"
+      # Step 5: Start all Node-RED related services
+      - name: "Start Node-RED services"
+        name_zh: "启动 Node-RED 相关服务"
         command: |
-          [ -f /etc/init.d/S03node-red ] && sudo /etc/init.d/S03node-red start 2>/dev/null || true
+          # Start services in order
+          for svc in /etc/init.d/S*node-red /etc/init.d/S*sscma-node /etc/init.d/S*sscma-supervisor; do
+            [ -f "$svc" ] && sudo $svc start 2>/dev/null || true
+          done
 
     factory_paths:
       # These paths contain factory models - DO NOT DELETE

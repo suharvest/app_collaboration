@@ -133,3 +133,74 @@ async def list_managed_apps(request: ConnectDeviceRequest):
         }
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ============================================
+# App Removal & Image Pruning Endpoints
+# ============================================
+
+
+@router.post("/local/remove-app")
+async def local_remove_app(
+    solution_id: str,
+    container_names: str = Query(..., description="Comma-separated container names"),
+    remove_images: bool = False,
+):
+    """Remove all containers for an app on local machine, optionally removing images"""
+    try:
+        names_list = [n.strip() for n in container_names.split(",") if n.strip()]
+        if not names_list:
+            raise ValueError("No container names provided")
+
+        result = await docker_device_manager.local_remove_app(
+            solution_id=solution_id,
+            container_names=names_list,
+            remove_images=remove_images,
+        )
+        return result
+    except (RuntimeError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/local/prune-images")
+async def local_prune_images():
+    """Remove all unused Docker images on local machine"""
+    try:
+        result = await docker_device_manager.local_prune_images()
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/remove-app")
+async def remove_app(
+    request: ConnectDeviceRequest,
+    solution_id: str = Query(...),
+    container_names: str = Query(..., description="Comma-separated container names"),
+    remove_images: bool = False,
+):
+    """Remove all containers for an app on remote device, optionally removing images"""
+    try:
+        names_list = [n.strip() for n in container_names.split(",") if n.strip()]
+        if not names_list:
+            raise ValueError("No container names provided")
+
+        result = await docker_device_manager.remove_app(
+            connection=request,
+            solution_id=solution_id,
+            container_names=names_list,
+            remove_images=remove_images,
+        )
+        return result
+    except (RuntimeError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/prune-images")
+async def prune_images(request: ConnectDeviceRequest):
+    """Remove all unused Docker images on remote device"""
+    try:
+        result = await docker_device_manager.prune_images(request)
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
