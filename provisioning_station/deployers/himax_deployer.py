@@ -136,7 +136,7 @@ class HimaxDeployer(BaseDeployer):
 
             # Step 3: Ready for flashing
             await self._report_progress(
-                progress_callback, "wait_reset", 100, "Ready for flashing"
+                progress_callback, "prepare", 100, "Ready for flashing"
             )
 
             # Step 4: Flash firmware using xmodem
@@ -310,7 +310,7 @@ class HimaxDeployer(BaseDeployer):
                 proc_info = await SerialPortManager.get_process_using_port_async(port)
 
                 if proc_info:
-                    logger.info(
+                    logger.debug(
                         f"Port {port} is used by {proc_info['name']} "
                         f"(PID: {proc_info['pid']})"
                     )
@@ -323,7 +323,7 @@ class HimaxDeployer(BaseDeployer):
 
                     released = await SerialPortManager.release_port_async(port)
                     if released:
-                        logger.info(f"Port {port} released successfully")
+                        logger.debug(f"Port {port} released successfully")
                         if progress_callback:
                             await self._report_progress(
                                 progress_callback, "detect", 0,
@@ -345,7 +345,7 @@ class HimaxDeployer(BaseDeployer):
                 ser.exclusive = True  # Request exclusive access
                 ser.open()
                 ser.close()
-                logger.info(f"Port {port} is available (attempt {attempt})")
+                logger.debug(f"Port {port} is available (attempt {attempt})")
                 return True
             except serial.SerialException as e:
                 error_str = str(e).lower()
@@ -602,7 +602,7 @@ class HimaxDeployer(BaseDeployer):
 
             # Step 2: Wait for bootloader and send "1" to select xmodem download
             await self._report_progress(
-                progress_callback, "flash", 15, "Waiting for bootloader (press RESET)..."
+                progress_callback, "flash", 15, "Waiting for bootloader..."
             )
 
             # Use short timeout for rapid polling during bootloader detection
@@ -621,7 +621,6 @@ class HimaxDeployer(BaseDeployer):
                 # Match official script: look for "Send data using the xmodem protocol"
                 if b'Send data using the xmodem protocol' in response:
                     bootloader_ready = True
-                    logger.info("Bootloader ready, xmodem mode detected")
                     break
 
             # Restore timeout for xmodem transfer
@@ -798,9 +797,9 @@ class HimaxDeployer(BaseDeployer):
                             try:
                                 text = response_str.decode('ascii', errors='ignore')
                                 if text:
-                                    logger.info(f"Device: {text}")
+                                    logger.debug(f"Device: {text}")
                             except:
-                                logger.debug(f"Device (binary): {response_str[:50]}")
+                                pass
 
                         # Check for prompt - use shorter patterns
                         if b"reboot system? (y)" in response or b"end file transmission" in response:
@@ -848,7 +847,6 @@ class HimaxDeployer(BaseDeployer):
 
                 # Match official script: look for "Send data using the xmodem protocol"
                 if b'Send data using the xmodem protocol' in response:
-                    logger.info("Bootloader ready, xmodem mode detected")
                     return True
         finally:
             # Restore original timeout for xmodem transfer
@@ -947,7 +945,7 @@ class HimaxDeployer(BaseDeployer):
 
             # Step 2: Wait for bootloader
             await self._report_progress(
-                progress_callback, "flash", 15, "Waiting for bootloader (press RESET)..."
+                progress_callback, "flash", 15, "Waiting for bootloader..."
             )
 
             if not await self._wait_for_bootloader(ser, timeout=30):

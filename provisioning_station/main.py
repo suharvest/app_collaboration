@@ -17,6 +17,7 @@ if sys.platform == "win32":
 
 # Configure application logging (uvicorn only sets up its own loggers)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:\t %(name)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,7 +41,7 @@ def _sync_cleanup():
     if _cleanup_done:
         return
 
-    print("Running synchronous cleanup (atexit)...")
+    logger.debug("Running synchronous cleanup (atexit)...")
 
     # Try to stop FFmpeg processes synchronously
     try:
@@ -50,11 +51,10 @@ def _sync_cleanup():
             if stream_info.process and stream_info.process.returncode is None:
                 try:
                     stream_info.process.kill()
-                    print(f"Killed FFmpeg process for stream {stream_id}")
-                except Exception as e:
-                    print(f"Error killing FFmpeg process: {e}")
+                except Exception:
+                    pass
     except Exception as e:
-        print(f"Sync cleanup error: {e}")
+        logger.debug(f"Sync cleanup error: {e}")
 
     _cleanup_done = True
 
@@ -65,23 +65,23 @@ async def _async_cleanup():
     if _cleanup_done:
         return
 
-    print("Running async cleanup...")
+    logger.debug("Running async cleanup...")
 
     try:
         await get_stream_proxy().stop_all()
-        print("Stream proxy stopped")
+        logger.debug("Stream proxy stopped")
     except Exception as e:
-        print(f"Stream proxy cleanup error: {e}")
+        logger.debug(f"Stream proxy cleanup error: {e}")
 
     try:
         if is_mqtt_available():
             await get_mqtt_bridge().stop_all()
-            print("MQTT bridge stopped")
+            logger.debug("MQTT bridge stopped")
     except Exception as e:
-        print(f"MQTT bridge cleanup error: {e}")
+        logger.debug(f"MQTT bridge cleanup error: {e}")
 
     _cleanup_done = True
-    print("Async cleanup completed")
+    logger.debug("Async cleanup completed")
 
 
 @asynccontextmanager
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown - this runs when uvicorn receives SIGTERM/SIGINT
-    print("Shutting down (lifespan)...")
+    logger.debug("Shutting down (lifespan)...")
 
     # Cleanup preview services
     await _async_cleanup()

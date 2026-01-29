@@ -198,21 +198,21 @@ class StreamProxy:
             "pipe:1",
         ])
 
-        logger.info(f"Starting FFmpeg MJPEG: {' '.join(cmd)}")
+        logger.debug(f"Starting FFmpeg MJPEG: {' '.join(cmd)}")
 
         # Check event loop type for debugging
         loop = asyncio.get_running_loop()
         loop_name = type(loop).__name__
-        logger.info(f"Event loop type: {loop_name}")
+        logger.debug(f"Event loop type: {loop_name}")
 
         # On Windows, SelectorEventLoop doesn't support subprocess - use sync Popen instead
         # ProactorEventLoop supports subprocess but uvicorn uses SelectorEventLoop by default
         is_windows = platform.system() == "win32"
         has_selector = "Selector" in loop_name
         use_sync = is_windows and has_selector
-        logger.info(f"Subprocess mode: is_windows={is_windows}, has_selector={has_selector}, use_sync={use_sync}")
+        logger.debug(f"Subprocess mode: is_windows={is_windows}, has_selector={has_selector}, use_sync={use_sync}")
         if use_sync:
-            logger.info("Using threaded subprocess for Windows compatibility")
+            logger.debug("Using threaded subprocess for Windows compatibility")
             import subprocess
             import threading
 
@@ -283,7 +283,6 @@ class StreamProxy:
                 text = line.decode(errors="replace").rstrip()
                 if text:
                     stderr_lines.append(text)
-                    logger.info(f"ffmpeg [{stream_info.stream_id}]: {text}")
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -303,7 +302,6 @@ class StreamProxy:
                 text = line.decode(errors="replace").rstrip()
                 if text:
                     stderr_lines.append(text)
-                    logger.info(f"ffmpeg [{stream_info.stream_id}]: {text}")
         except Exception:
             pass
         if stderr_lines:
@@ -374,7 +372,6 @@ class StreamProxy:
                 logger.error(f"MJPEG stream {stream_info.stream_id} failed: {stream_info.error}")
             elif stream_info.status == "running":
                 stream_info.status = "stopped"
-            logger.info(f"MJPEG reader stopped for {stream_info.stream_id}")
 
     def _read_mjpeg_frames_sync(self, stream_info: StreamInfo):
         """Synchronous version of _read_mjpeg_frames for Windows subprocess.Popen"""
@@ -417,7 +414,6 @@ class StreamProxy:
 
                     if stream_info.status == "starting":
                         stream_info.status = "running"
-                        logger.info(f"MJPEG stream {stream_info.stream_id}: first frame received ({len(frame)} bytes)")
 
                     buffer = buffer[frame_end:]
                     frame_start = -1
@@ -434,7 +430,6 @@ class StreamProxy:
                 logger.error(f"MJPEG stream {stream_info.stream_id} failed: {stream_info.error}")
             elif stream_info.status == "running":
                 stream_info.status = "stopped"
-            logger.info(f"MJPEG reader stopped for {stream_info.stream_id}")
 
     async def get_mjpeg_frames(self, stream_id: str) -> AsyncGenerator[bytes, None]:
         """
@@ -443,12 +438,9 @@ class StreamProxy:
         Yields frames in multipart/x-mixed-replace format.
         """
         stream_info = self.streams.get(stream_id)
-        logger.info(f"get_mjpeg_frames called for {stream_id}, stream_info exists: {stream_info is not None}")
         if not stream_info or stream_info.mode != "mjpeg":
-            logger.warning(f"get_mjpeg_frames: invalid stream {stream_id}")
             return
 
-        logger.info(f"get_mjpeg_frames: status={stream_info.status}, latest_frame={stream_info._latest_frame is not None}")
         stream_info.last_accessed = time.time()
         last_frame = None
         frame_count = 0
@@ -461,7 +453,6 @@ class StreamProxy:
                     timeout=5.0
                 )
             except asyncio.TimeoutError:
-                logger.debug(f"get_mjpeg_frames: timeout waiting for frame, status={stream_info.status}")
                 # Keep waiting during "starting" (ffmpeg connecting) and "running" phases
                 # Only break if status changed to "error" or "stopped"
                 if stream_info.status not in ("starting", "running"):
@@ -473,8 +464,6 @@ class StreamProxy:
                 last_frame = frame
                 frame_count += 1
                 stream_info.last_accessed = time.time()
-                if frame_count <= 3:
-                    logger.info(f"get_mjpeg_frames: yielding frame {frame_count}, size={len(frame)}")
                 # Yield as multipart chunk
                 yield (
                     b"--frame\r\n"
@@ -482,8 +471,6 @@ class StreamProxy:
                     b"Content-Length: " + str(len(frame)).encode() + b"\r\n"
                     b"\r\n" + frame + b"\r\n"
                 )
-
-        logger.info(f"get_mjpeg_frames: loop exited, status={stream_info.status}, frames yielded={frame_count}")
 
     async def _wait_for_frame(self, stream_info: StreamInfo, last_frame):
         """Wait until a new frame is available"""

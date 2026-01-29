@@ -279,7 +279,6 @@ export class PreviewWindow {
       // Dev mode: connect directly to backend at port 3260
       fullUrl = `http://${window.location.hostname}:3260${url}`;
     }
-    console.log('[MJPEG] Starting stream:', fullUrl);
 
     // For Tauri/Safari, use native img.src with MJPEG URL directly
     // This works better than fetch+ReadableStream which has WebKit issues
@@ -289,7 +288,6 @@ export class PreviewWindow {
     if (useNativeImg) {
       // Native MJPEG: set img.src directly
       // Browsers handle multipart/x-mixed-replace automatically
-      console.log('[MJPEG] Using native img.src approach');
       this.img.src = fullUrl;
       // First frame will trigger img.onload event which is already handled
       return;
@@ -297,10 +295,8 @@ export class PreviewWindow {
 
     // For dev mode with Vite proxy: use fetch + manual frame parsing
     // because Vite proxy doesn't handle multipart/x-mixed-replace well
-    console.log('[MJPEG] Using fetch+parser approach (dev mode)');
     fetch(fullUrl, { signal: this._abortController.signal, mode: 'cors' })
       .then(response => {
-        console.log('[MJPEG] Response:', response.status, response.headers.get('content-type'));
         if (!response.ok) {
           throw new Error(`Stream request failed: ${response.status}`);
         }
@@ -326,7 +322,6 @@ export class PreviewWindow {
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          console.log('[MJPEG] Stream ended');
           break;
         }
 
@@ -335,10 +330,6 @@ export class PreviewWindow {
         newBuffer.set(buffer);
         newBuffer.set(value, buffer.length);
         buffer = newBuffer;
-
-        if (frameCount === 0) {
-          console.log('[MJPEG] First chunk received:', value.length, 'bytes, buffer now:', buffer.length);
-        }
 
         // Find complete JPEG frames (SOI: 0xFF 0xD8, EOI: 0xFF 0xD9)
         while (true) {
@@ -351,11 +342,7 @@ export class PreviewWindow {
           // Extract complete JPEG frame
           const frameEnd = eoiIdx + 2;
           const frame = buffer.slice(soiIdx, frameEnd);
-
           frameCount++;
-          if (frameCount <= 3) {
-            console.log(`[MJPEG] Frame ${frameCount}: ${frame.length} bytes, SOI@${soiIdx}, EOI@${eoiIdx}`);
-          }
 
           // Display frame as blob URL
           const blob = new Blob([frame], { type: 'image/jpeg' });
@@ -683,9 +670,7 @@ export class PreviewWindow {
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
-      container.requestFullscreen().catch(e => {
-        console.warn('Fullscreen not supported:', e);
-      });
+      container.requestFullscreen().catch(() => {});
     }
   }
 
