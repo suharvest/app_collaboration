@@ -8,12 +8,12 @@ import os
 import shlex
 import tempfile
 from pathlib import Path
-from typing import Callable, Optional, Dict, Any
+from typing import Any, Callable, Dict, Optional
 
-from .base import BaseDeployer
 from ..models.device import DeviceConfig, SSHConfig
 from ..services.remote_pre_check import remote_pre_check
 from ..utils.compose_labels import create_labels, inject_labels_to_compose
+from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +71,8 @@ class DockerRemoteDeployer(BaseDeployer):
                     )
 
         try:
-            import paramiko
-            from scp import SCPClient
+            import paramiko  # noqa: F401
+            from scp import SCPClient  # noqa: F401
 
             # Step 1: SSH Connect
             await self._report_progress(
@@ -347,7 +347,6 @@ class DockerRemoteDeployer(BaseDeployer):
         temp_files = []  # Track temp files for cleanup
 
         try:
-            from scp import SCPClient
 
             # Get compose file path
             compose_path = config.get_asset_path(docker_config.compose_file)
@@ -489,8 +488,8 @@ class DockerRemoteDeployer(BaseDeployer):
     def _transfer_directory_contents(self, client, local_dir: str, remote_dir: str) -> bool:
         """Transfer contents of a directory (files and subdirs) directly into remote_dir"""
         try:
+
             from scp import SCPClient
-            import os
 
             local_path = Path(local_dir)
             with SCPClient(client.get_transport()) as scp:
@@ -510,8 +509,8 @@ class DockerRemoteDeployer(BaseDeployer):
     ) -> bool:
         """Transfer compose file with labels injected"""
         try:
+
             from scp import SCPClient
-            import io
 
             # Read and inject labels
             with open(local_path, "r") as f:

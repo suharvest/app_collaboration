@@ -2,13 +2,13 @@
 Device detection API routes
 """
 
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, HTTPException, Query
 
 from ..models.api import DetectedDevice, DeviceConnectionRequest
-from ..services.solution_manager import solution_manager
 from ..services.device_detector import device_detector
+from ..services.solution_manager import solution_manager
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
 

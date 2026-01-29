@@ -3,16 +3,16 @@ ESP32 firmware flashing deployer using esptool
 """
 
 import asyncio
+import io
 import logging
 import re
 import sys
-import io
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
-from typing import Callable, Optional, Dict, Any
-from contextlib import redirect_stdout, redirect_stderr
+from typing import Any, Callable, Dict, Optional
 
-from .base import BaseDeployer
 from ..models.device import DeviceConfig
+from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
 

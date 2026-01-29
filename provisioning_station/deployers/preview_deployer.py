@@ -6,10 +6,10 @@ The deployer just validates the configuration and marks the step as ready.
 """
 
 import logging
-from typing import Callable, Optional, Dict, Any
+from typing import Any, Callable, Dict, Optional
 
-from .base import BaseDeployer
 from ..models.device import DeviceConfig
+from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
 

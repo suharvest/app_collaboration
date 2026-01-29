@@ -9,11 +9,11 @@ Handles restoring devices to factory state:
 import asyncio
 import logging
 import uuid
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
 import yaml
 
@@ -173,7 +173,12 @@ class RestoreManager:
         """Restore SenseCAP Watcher via USB firmware flashing"""
         try:
             from ..deployers.himax_deployer import HimaxDeployer
-            from ..models.device import DeviceConfig, FirmwareConfig, FlashConfig, FirmwareSource
+            from ..models.device import (
+                DeviceConfig,
+                FirmwareConfig,
+                FirmwareSource,
+                FlashConfig,
+            )
 
             port = connection.get("port")
             if not port:
@@ -276,7 +281,13 @@ class RestoreManager:
         try:
             from ..deployers.esp32_deployer import ESP32Deployer
             from ..deployers.himax_deployer import HimaxDeployer
-            from ..models.device import DeviceConfig, FirmwareConfig, FlashConfig, FirmwareSource, PartitionConfig
+            from ..models.device import (
+                DeviceConfig,
+                FirmwareConfig,
+                FirmwareSource,
+                FlashConfig,
+                PartitionConfig,
+            )
 
             port = connection.get("port")
             if not port:
@@ -534,7 +545,7 @@ class RestoreManager:
         except paramiko.AuthenticationException as e:
             operation.status = RestoreStatus.FAILED
             operation.error = f"Authentication failed: {str(e)}"
-            operation.message = f"SSH authentication failed"
+            operation.message = "SSH authentication failed"
             operation.completed_at = datetime.now()
             self._add_log(operation, "error", f"SSH authentication error: {e}")
             await self._notify_progress(operation)

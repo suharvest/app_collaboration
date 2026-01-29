@@ -6,13 +6,12 @@ import asyncio
 import logging
 import os
 import re
-import shlex
 import sys
 from pathlib import Path
-from typing import Callable, Optional, Dict, Any
+from typing import Any, Callable, Dict, Optional
 
-from .base import BaseDeployer
 from ..models.device import DeviceConfig
+from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
 

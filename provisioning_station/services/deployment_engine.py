@@ -5,25 +5,33 @@ Deployment orchestration engine
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from ..models.solution import Solution
-from ..models.deployment import Deployment, DeviceDeployment, DeploymentStatus, StepStatus
 from ..deployers.base import BaseDeployer
+from ..deployers.docker_deployer import DockerDeployer
+from ..deployers.docker_remote_deployer import (
+    DockerRemoteDeployer,
+    RemoteDockerNotInstalled,
+)
 from ..deployers.esp32_deployer import ESP32Deployer
 from ..deployers.himax_deployer import HimaxDeployer
-from ..deployers.docker_deployer import DockerDeployer
-from ..deployers.docker_remote_deployer import DockerRemoteDeployer, RemoteDockerNotInstalled
-from ..deployers.ssh_deployer import SSHDeployer
-from ..deployers.script_deployer import ScriptDeployer
 from ..deployers.manual_deployer import ManualDeployer
-from ..deployers.recamera_nodered_deployer import ReCameraNodeRedDeployer
 from ..deployers.recamera_cpp_deployer import ReCameraCppDeployer
-from .solution_manager import solution_manager
-from .pre_check_validator import pre_check_validator
-from .deployment_history import deployment_history
+from ..deployers.recamera_nodered_deployer import ReCameraNodeRedDeployer
+from ..deployers.script_deployer import ScriptDeployer
+from ..deployers.ssh_deployer import SSHDeployer
+from ..models.deployment import (
+    Deployment,
+    DeploymentStatus,
+    DeviceDeployment,
+    StepStatus,
+)
+from ..models.solution import Solution
 from ..models.version import DeploymentRecord, StepRecord
+from .deployment_history import deployment_history
+from .pre_check_validator import pre_check_validator
+from .solution_manager import solution_manager
 
 logger = logging.getLogger(__name__)
 

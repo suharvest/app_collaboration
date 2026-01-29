@@ -12,10 +12,10 @@ When switching from C++ to Node-RED:
 import asyncio
 import logging
 import shlex
-from typing import Callable, Optional, Dict, Any, List
+from typing import Any, Callable, Dict, List, Optional
 
-from .nodered_deployer import NodeRedDeployer
 from ..models.device import DeviceConfig
+from .nodered_deployer import NodeRedDeployer
 
 logger = logging.getLogger(__name__)
 

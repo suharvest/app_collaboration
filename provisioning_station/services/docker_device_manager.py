@@ -7,17 +7,17 @@ import json
 import logging
 import socket
 import subprocess
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List
 
 from ..models.docker_device import (
     ConnectDeviceRequest,
     ContainerInfo,
     DeviceInfo,
-    UpgradeRequest,
     ManagedApp,
     ManagedAppContainer,
+    UpgradeRequest,
 )
-from ..utils.compose_labels import LABELS, parse_container_labels
+from ..utils.compose_labels import parse_container_labels
 
 logger = logging.getLogger(__name__)
 

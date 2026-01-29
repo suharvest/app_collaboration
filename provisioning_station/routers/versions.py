@@ -7,13 +7,13 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 
 from ..models.version import (
-    VersionSummary,
-    VersionInfo,
-    UpdateCheckResult,
     DeploymentRecord,
+    UpdateCheckResult,
+    VersionInfo,
+    VersionSummary,
 )
-from ..services.version_manager import version_manager
 from ..services.deployment_history import deployment_history
+from ..services.version_manager import version_manager
 
 router = APIRouter(prefix="/api/solutions", tags=["versions"])
 

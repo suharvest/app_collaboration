@@ -8,16 +8,15 @@ Handles:
 """
 
 import asyncio
-import json
 import logging
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-from ..services.stream_proxy import get_stream_proxy
 from ..services.mqtt_bridge import get_mqtt_bridge, is_mqtt_available
+from ..services.stream_proxy import get_stream_proxy
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/preview", tags=["preview"])

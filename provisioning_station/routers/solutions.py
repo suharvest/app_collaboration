@@ -2,17 +2,16 @@
 Solution management API routes
 """
 
-from typing import List, Optional, Dict
 from pathlib import Path
+from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
-from fastapi.responses import FileResponse, Response
 import markdown
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse, Response
 
-from ..models.api import SolutionSummary, SolutionDetail, SolutionCreate, SolutionUpdate
+from ..models.api import SolutionCreate, SolutionDetail, SolutionSummary, SolutionUpdate
 from ..models.solution import DeviceGroupSection
 from ..services.solution_manager import solution_manager
-from ..config import settings
 
 router = APIRouter(prefix="/api/solutions", tags=["solutions"])
 

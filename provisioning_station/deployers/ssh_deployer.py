@@ -6,11 +6,11 @@ import asyncio
 import hashlib
 import logging
 from pathlib import Path
-from typing import Callable, Optional, Dict, Any
+from typing import Any, Callable, Dict, Optional
 
-from .base import BaseDeployer
 from ..models.device import DeviceConfig
 from ..services.remote_pre_check import remote_pre_check
+from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +37,8 @@ class SSHDeployer(BaseDeployer):
             raise ValueError("No host specified for SSH deployment")
 
         try:
-            import paramiko
-            from scp import SCPClient
+            import paramiko  # noqa: F401
+            from scp import SCPClient  # noqa: F401
 
             # Step 1: Connect (wrapped in thread for async safety)
             await self._report_progress(
@@ -437,7 +437,7 @@ class SSHDeployer(BaseDeployer):
                 expected_hash = expected["md5"]
 
                 if local_hash != expected_hash:
-                    logger.error(f"Local file MD5 mismatch")
+                    logger.error("Local file MD5 mismatch")
                     return False
 
                 exit_code, stdout, _ = self._exec_with_timeout(

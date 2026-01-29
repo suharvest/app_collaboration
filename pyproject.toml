@@ -62,8 +62,16 @@ target-version = ["py311"]
 
 [tool.ruff]
 line-length = 88
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "W"]
-ignore = ["E501"]
+ignore = [
+    "E501",   # line too long
+    "E402",   # module level import not at top (intentional in main.py for logging setup)
+    "E722",   # bare except (common in cleanup code)
+    "E741",   # ambiguous variable name
+    "F841",   # unused variable (often intentional placeholders)
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

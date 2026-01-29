@@ -6,7 +6,7 @@ import asyncio
 import glob as glob_module
 import logging
 import sys
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from ..models.device import DeviceConfig
 
@@ -568,8 +568,8 @@ class DeviceDetector:
 
     async def _get_platform_info(self) -> Dict[str, str]:
         """Get platform information"""
-        import sys
         import platform
+        import sys
         return {
             "system": platform.system(),
             "release": platform.release(),

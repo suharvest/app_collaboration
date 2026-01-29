@@ -10,11 +10,11 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Callable, Optional, Dict, Any
+from typing import Any, Callable, Dict, Optional
 
-from .base import BaseDeployer
 from ..models.device import DeviceConfig
 from ..utils.compose_labels import create_labels, inject_labels_to_compose_file
+from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ class DockerDeployer(BaseDeployer):
                 )
                 temp_compose_file = inject_labels_to_compose_file(compose_file, labels)
                 compose_file = temp_compose_file
-                logger.info(f"Injected SenseCraft labels into compose file")
+                logger.info("Injected SenseCraft labels into compose file")
 
             # Step 1: Pull images
             await self._report_progress(
@@ -91,6 +91,7 @@ class DockerDeployer(BaseDeployer):
                 )
                 if progress_callback
                 else None,
+                working_dir=str(compose_dir),
             )
 
             if not pull_result["success"]:
@@ -140,6 +141,7 @@ class DockerDeployer(BaseDeployer):
                 )
                 if progress_callback
                 else None,
+                working_dir=str(compose_dir),
             )
 
             if not up_result["success"]:
@@ -225,6 +227,7 @@ class DockerDeployer(BaseDeployer):
         project_name: str = None,
         env: Dict[str, str] = None,
         progress_callback: Optional[Callable] = None,
+        working_dir: str = None,
     ) -> dict:
         """Run docker compose command"""
         try:
@@ -239,12 +242,15 @@ class DockerDeployer(BaseDeployer):
             if env:
                 full_env.update(env)
 
+            # Use provided working_dir or fall back to compose file's directory
+            cwd = working_dir or str(Path(compose_file).parent)
+
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 env=full_env,
-                cwd=str(Path(compose_file).parent),
+                cwd=cwd,
             )
 
             output_lines = []

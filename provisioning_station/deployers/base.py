@@ -3,7 +3,7 @@ Base deployer abstract class
 """
 
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, Dict, Any
+from typing import Any, Callable, Dict, Optional
 
 from ..models.device import DeviceConfig
 
