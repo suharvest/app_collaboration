@@ -100,8 +100,14 @@ class DeviceConnectionRequest(BaseModel):
 
     @property
     def effective_host(self) -> Optional[str]:
-        """Get the host, preferring 'host' over 'ip_address'"""
-        return self.host or self.ip_address
+        """Get the host, preferring 'host' over 'ip_address', with whitespace trimmed"""
+        host = self.host or self.ip_address
+        return host.strip() if host else None
+
+    @property
+    def effective_username(self) -> Optional[str]:
+        """Get username with whitespace trimmed"""
+        return self.username.strip() if self.username else None
 
 
 class StartDeploymentRequest(BaseModel):
