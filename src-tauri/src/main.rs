@@ -117,6 +117,7 @@ fn force_kill_process(pid: u32) -> bool {
 }
 
 /// Get child process PIDs (cross-platform)
+#[allow(unused_variables)]
 fn get_child_pids(parent_pid: u32) -> Vec<u32> {
     #[cfg(unix)]
     {
