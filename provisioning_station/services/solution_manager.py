@@ -109,6 +109,65 @@ class SolutionManager:
         """Get all loaded solutions"""
         return list(self.solutions.values())
 
+    def find_device_in_solution(
+        self, solution: Solution, device_id: str, preset_id: str = None
+    ):
+        """Find a device by ID from presets.
+
+        Args:
+            solution: The solution object
+            device_id: The device ID to find
+            preset_id: Optional preset ID to search within
+
+        Returns:
+            The device reference if found, None otherwise
+        """
+        if solution.intro and solution.intro.presets:
+            for preset in solution.intro.presets:
+                if preset_id and preset.id != preset_id:
+                    continue
+                if preset.devices:
+                    for device in preset.devices:
+                        if device.id == device_id:
+                            return device
+        return None
+
+    def get_all_devices_from_solution(self, solution: Solution, preset_id: str = None):
+        """Get all devices from a solution's presets.
+
+        Args:
+            solution: The solution object
+            preset_id: Optional preset ID to filter by
+
+        Returns:
+            List of device references from presets
+        """
+        devices = []
+        if solution.intro and solution.intro.presets:
+            for preset in solution.intro.presets:
+                if preset_id and preset.id != preset_id:
+                    continue
+                if preset.devices:
+                    devices.extend(preset.devices)
+        return devices
+
+    def count_devices_in_solution(self, solution: Solution) -> int:
+        """Count unique devices in a solution (from presets).
+
+        Args:
+            solution: The solution object
+
+        Returns:
+            Number of unique device IDs
+        """
+        device_ids = set()
+        if solution.intro and solution.intro.presets:
+            for preset in solution.intro.presets:
+                if preset.devices:
+                    for device in preset.devices:
+                        device_ids.add(device.id)
+        return len(device_ids)
+
     async def load_markdown(self, solution_id: str, relative_path: str, convert_to_html: bool = True) -> Optional[str]:
         """Load markdown content from a solution's file and optionally convert to HTML"""
         solution = self.get_solution(solution_id)

@@ -45,6 +45,18 @@ class ESP32Deployer(BaseDeployer):
         flash_config = config.firmware.flash_config
 
         try:
+            # Step 0: Wait for port to be available (may be held by Himax deployer)
+            await self._report_progress(
+                progress_callback, "detect", 0, "Waiting for port to be available..."
+            )
+
+            if not await self._wait_for_port_available(port, timeout=10):
+                await self._report_progress(
+                    progress_callback, "detect", 0,
+                    f"Port {port} is busy. Please ensure no other program is using it."
+                )
+                return False
+
             # Step 1: Detect chip with retry logic
             await self._report_progress(
                 progress_callback, "detect", 0, "Detecting ESP32 chip..."
@@ -265,6 +277,49 @@ class ESP32Deployer(BaseDeployer):
             if port:
                 self._cleanup_serial_port(port)
             return {"success": False, "error": str(e)}
+
+    async def _wait_for_port_available(self, port: str, timeout: int = 10) -> bool:
+        """Wait for serial port to become available
+
+        This is needed when Himax deployer has just released the ESP32 port
+        (used to hold ESP32 in reset during Himax flashing).
+        """
+        import time
+
+        try:
+            import serial
+        except ImportError:
+            logger.warning("pyserial not available, skipping port availability check")
+            return True
+
+        start_time = time.time()
+        attempt = 0
+
+        while (time.time() - start_time) < timeout:
+            attempt += 1
+            try:
+                ser = serial.Serial()
+                ser.port = port
+                ser.baudrate = 115200
+                ser.timeout = 0.1
+                ser.open()
+                ser.close()
+                logger.info(f"Port {port} is available (attempt {attempt})")
+                return True
+            except serial.SerialException as e:
+                if "Resource temporarily unavailable" in str(e) or "busy" in str(e).lower():
+                    logger.debug(f"Port {port} busy, waiting... (attempt {attempt})")
+                    await asyncio.sleep(0.5)
+                else:
+                    # Other error (port doesn't exist, permission denied, etc.)
+                    logger.warning(f"Port {port} error: {e}")
+                    return False
+            except Exception as e:
+                logger.warning(f"Unexpected error checking port {port}: {e}")
+                return False
+
+        logger.warning(f"Timeout waiting for port {port} to become available")
+        return False
 
     def _cleanup_serial_port(self, port: str):
         """Force close serial port if it was left open by esptool
