@@ -11,9 +11,6 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: write
-
 env:
   CARGO_TERM_COLOR: always
   PYTHON_VERSION: '3.11'
@@ -107,15 +104,15 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             sidecar-target: x86_64-pc-windows-msvc
-            args: ''
+            bundles: ''
           - os: macos-latest
             target: aarch64-apple-darwin
             sidecar-target: aarch64-apple-darwin
-            args: ''
+            bundles: ''
           - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
             sidecar-target: aarch64-unknown-linux-gnu
-            args: '--bundles deb'
+            bundles: 'deb'
 
     steps:
       - name: Checkout repository
@@ -134,16 +131,17 @@ jobs:
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          # Disable slow/unnecessary repos to speed up apt-get update
+          sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
+          sudo rm -f /etc/apt/sources.list.d/azure-cli.list
+          sudo rm -f /etc/apt/sources.list.d/ondrej-ubuntu-php-*.list
+          sudo apt-get update -o Acquire::Languages=none -o Acquire::AllowInsecureRepositories=true
+          sudo apt-get install -y --no-install-recommends \
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
             patchelf \
             xdg-utils
-          # Verify xdg-open is available
-          which xdg-open || (echo "xdg-open not found, installing desktop-file-utils" && sudo apt-get install -y desktop-file-utils)
-          ls -la /usr/bin/xdg-open || true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -184,7 +182,6 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tauriScript: npx tauri
           projectPath: src-tauri
           tagName: ${{ github.ref_name }}
           releaseName: 'SenseCraft Solution ${{ github.ref_name }}'
@@ -215,7 +212,7 @@ jobs:
           releaseDraft: true
           prerelease: false
           includeDebug: false
-          args: --target ${{ matrix.target }} ${{ matrix.args }}
+          args: --target ${{ matrix.target }} ${{ matrix.bundles && format('--bundles {0}', matrix.bundles) || '' }}
 
   # ===========================================
   # Clean up artifacts after release
