@@ -259,8 +259,6 @@ class DockerDeployer(BaseDeployer):
                 if progress_callback and line_str:
                     progress_callback(line_str)
 
-                logger.debug(f"docker-compose: {line_str}")
-
             await process.wait()
 
             return {

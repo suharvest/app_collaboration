@@ -63,7 +63,7 @@ class DeploymentEngine:
         preset_id: str = None,
     ) -> str:
         """Start a new deployment"""
-        logger.info(f"start_deployment called: solution={solution.id}, preset_id={preset_id}, selected_devices={selected_devices}, options={options}")
+        logger.info(f"Starting deployment: solution={solution.id}, preset={preset_id}")
         deployment_id = str(uuid4())
 
         # Initialize deployment state
@@ -109,7 +109,7 @@ class DeploymentEngine:
             # Determine effective type and config_file
             effective_type = device_ref.type
             config_file = device_ref.config_file
-            logger.info(f"Device {device_id}: type={device_ref.type}, initial config_file={config_file}, options={options}")
+            logger.debug(f"Device {device_id}: type={device_ref.type}, config_file={config_file}")
 
             if device_ref.type == "docker_deploy":
                 # Get selected target from options (local/remote)

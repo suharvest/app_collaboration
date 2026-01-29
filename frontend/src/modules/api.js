@@ -33,7 +33,6 @@ async function initBackendPort() {
       if (port > 0) {
         backendPort = port;
         window.__BACKEND_PORT__ = port;
-        console.log('Got backend port via invoke:', port);
         return;
       }
     }
@@ -104,7 +103,6 @@ let backendReady = !isTauri; // Non-Tauri is always ready
 if (isTauri) {
   backendReadyPromise = initBackendPort().then(() => {
     API_BASE = getApiBaseUrl();
-    console.log('Backend port initialized:', backendPort, 'API_BASE:', API_BASE);
     backendReady = true;
   });
 }
@@ -123,7 +121,6 @@ export async function waitForBackendReady() {
     try {
       const response = await fetch(healthUrl, { method: 'GET' });
       if (response.ok) {
-        console.log('Backend health check passed');
         return true;
       }
     } catch (e) {
@@ -1018,7 +1015,6 @@ export class LogsWebSocket {
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
-      console.log('WebSocket connected');
       this.reconnectAttempts = 0;
       this.emit('open', { connected: true });
     };
@@ -1081,14 +1077,12 @@ export class LogsWebSocket {
     };
 
     this.ws.onclose = (event) => {
-      console.log('WebSocket closed:', event.code, event.reason);
       this.emit('close', event);
 
       // Attempt to reconnect if not a normal close
       if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
         this.reconnectAttempts++;
         const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
-        console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
         setTimeout(() => this.connect(), delay);
       }
     };
