@@ -165,10 +165,10 @@ jobs:
         working-directory: frontend
 
       - name: Install Tauri CLI
-        run: cargo install tauri-cli
+        run: npm install -g @tauri-apps/cli
 
       - name: Generate icons from SVG
-        run: cargo tauri icon icons/icon.svg
+        run: npx tauri icon icons/icon.svg
         working-directory: src-tauri
 
       - name: Build Tauri app
