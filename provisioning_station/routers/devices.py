@@ -8,9 +8,39 @@ from fastapi import APIRouter, HTTPException, Query
 
 from ..models.api import DetectedDevice, DeviceConnectionRequest
 from ..services.device_detector import device_detector
+from ..services.mdns_scanner import mdns_scanner
 from ..services.solution_manager import solution_manager
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
+
+
+@router.get("/catalog")
+async def get_device_catalog():
+    """Get device catalog list for dropdown selectors.
+
+    Returns all devices from devices/catalog.yaml for use in
+    the required_devices selector on the management UI.
+    """
+    return {"devices": solution_manager.get_device_catalog_list()}
+
+
+@router.get("/scan-mdns")
+async def scan_mdns_devices(
+    timeout: float = Query(3.0, ge=1.0, le=10.0, description="Scan timeout in seconds"),
+    filter_known: bool = Query(True, description="Only return known IoT devices"),
+):
+    """Scan the local network for SSH-enabled devices using mDNS.
+
+    Returns devices that advertise SSH services (_ssh._tcp.local).
+    By default, filters to known IoT device patterns (Raspberry Pi, Jetson, etc.).
+
+    Returns:
+        List of devices with hostname, IP address, and port
+    """
+    devices = await mdns_scanner.scan_ssh_devices(
+        timeout=timeout, filter_known=filter_known
+    )
+    return {"devices": devices}
 
 
 @router.get("/detect/{solution_id}", response_model=List[DetectedDevice])

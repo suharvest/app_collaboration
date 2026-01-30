@@ -498,7 +498,8 @@
   }
 
   .solution-hero {
-    @apply mb-4;
+    @apply mb-4 relative;
+    z-index: 41;
   }
 
   /* Sticky Header for Title + Deploy Button */
@@ -575,12 +576,14 @@
   }
 
   .hero-carousel-dots {
-    @apply absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5;
+    @apply absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 px-3 py-1.5 rounded-full;
     z-index: 2;
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(4px);
   }
 
   .hero-carousel-dot {
-    @apply w-2 h-2 rounded-full bg-white/60 border-0 cursor-pointer p-0;
+    @apply w-2 h-2 rounded-full bg-white/50 border-0 cursor-pointer p-0;
     transition: background 0.2s, transform 0.2s;
   }
 
@@ -589,7 +592,7 @@
   }
 
   .hero-carousel-dot:hover:not(.active) {
-    @apply bg-white/90;
+    @apply bg-white/80;
   }
 
   /* Carousel Modal (full-screen image viewer with navigation) */
@@ -1617,6 +1620,61 @@
 
   .deploy-selected-card .deploy-logs {
     @apply border-t-0 pt-0 mt-0;
+  }
+
+  /* Post-Deployment Success Section */
+  .post-deployment-section {
+    @apply mt-8 p-6 bg-green-50 border border-green-200 rounded-lg;
+  }
+
+  .post-deployment-header {
+    @apply flex items-center gap-3 mb-4;
+  }
+
+  .post-deployment-icon {
+    @apply text-green-600;
+  }
+
+  .post-deployment-title {
+    @apply text-xl font-semibold text-green-800 m-0;
+  }
+
+  .post-deployment-content {
+    @apply mb-6 text-text-primary;
+  }
+
+  .post-deployment-content h1,
+  .post-deployment-content h2,
+  .post-deployment-content h3 {
+    @apply text-green-800;
+  }
+
+  .post-deployment-content a {
+    @apply text-primary hover:underline;
+  }
+
+  .post-deployment-next-steps {
+    @apply border-t border-green-200 pt-4;
+  }
+
+  .post-deployment-next-steps-title {
+    @apply text-sm font-medium text-green-700 mb-3;
+  }
+
+  .post-deployment-actions {
+    @apply flex flex-wrap gap-3;
+  }
+
+  .post-deployment-action-btn {
+    @apply inline-flex flex-col items-start px-4 py-3 bg-white border border-green-300 rounded-lg hover:bg-green-50 hover:border-green-400 transition-colors no-underline;
+  }
+
+  .post-deployment-action-title {
+    @apply text-sm font-medium text-text-primary;
+  }
+
+  .post-deployment-action-desc {
+    @apply text-xs text-text-secondary mt-1;
   }
 
   /* ============================================
@@ -2975,6 +3033,88 @@ button.spinning {
   @apply py-2;
 }
 
+/* Guide Validation Section */
+.guide-validation-section {
+  @apply mb-4;
+}
+
+.validation-loading {
+  @apply flex items-center gap-2 py-3 px-4 bg-gray-50 rounded-lg text-text-muted text-sm;
+}
+
+.validation-box {
+  @apply rounded-lg overflow-hidden;
+}
+
+.validation-box .validation-header {
+  @apply flex items-center gap-2 py-3 px-4 text-sm font-medium;
+}
+
+.validation-box .validation-header svg {
+  @apply w-4 h-4 flex-shrink-0;
+}
+
+.validation-box .validation-detail {
+  @apply px-4 pb-3;
+}
+
+/* Success state */
+.validation-box.validation-success {
+  @apply bg-green-50 border border-green-200;
+}
+
+.validation-box.validation-success .validation-header {
+  @apply text-green-700;
+}
+
+.validation-box.validation-success .validation-detail {
+  @apply text-green-600;
+}
+
+/* Warning state */
+.validation-box.validation-warning {
+  @apply bg-amber-50 border border-amber-200;
+}
+
+.validation-box.validation-warning .validation-header {
+  @apply text-amber-700;
+}
+
+.validation-box.validation-warning .validation-detail {
+  @apply text-amber-600;
+}
+
+/* Error state */
+.validation-box.validation-error,
+.validation-box.validation-errors {
+  @apply bg-red-50 border border-red-200;
+}
+
+.validation-box.validation-error .validation-header,
+.validation-box.validation-errors .validation-header {
+  @apply text-red-700 border-b border-red-200;
+}
+
+.validation-error-list {
+  @apply py-2 px-4;
+}
+
+.validation-error-item {
+  @apply py-2 text-sm text-red-600;
+}
+
+.validation-error-item + .validation-error-item {
+  @apply border-t border-red-100;
+}
+
+.validation-error-item strong {
+  @apply font-medium text-red-700;
+}
+
+.spinner-sm {
+  @apply w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin;
+}
+
 .presets-header {
   @apply flex items-center justify-between mb-4;
 }
@@ -3241,4 +3381,268 @@ button.spinning {
 
 .file-status.file-missing {
   @apply text-red-500;
+}
+
+/* ============================================
+   CONTENT FILES TAB
+   ============================================ */
+
+.content-files-container {
+  @apply py-2;
+}
+
+.content-files-header {
+  @apply mb-6;
+}
+
+.content-files-header h4 {
+  @apply text-base font-semibold text-text-primary m-0 mb-1;
+}
+
+.content-files-sections {
+  @apply flex flex-col gap-6;
+}
+
+.content-files-group {
+  @apply border border-border rounded-lg overflow-hidden;
+}
+
+.content-files-group .group-title {
+  @apply px-4 py-3 m-0 bg-gray-50 text-sm font-semibold text-text-secondary border-b border-border;
+}
+
+.content-files-list {
+  @apply divide-y divide-border/50;
+}
+
+.content-file-item {
+  @apply flex items-center gap-4 px-4 py-3 hover:bg-gray-50/50;
+  transition: background-color 0.15s;
+}
+
+.content-file-item .file-info {
+  @apply flex items-center gap-2 min-w-0 flex-1;
+}
+
+.content-file-item .file-name {
+  @apply font-medium text-text-primary text-sm;
+}
+
+.content-file-item .file-label {
+  @apply text-xs;
+}
+
+.content-file-item .file-status {
+  @apply flex-shrink-0;
+  position: static;
+}
+
+.content-file-item .file-actions {
+  @apply flex items-center gap-2 flex-shrink-0;
+}
+
+.status-badge {
+  @apply px-2 py-0.5 rounded text-xs font-medium;
+}
+
+.status-badge.status-exists {
+  @apply bg-green-100 text-green-700;
+}
+
+.status-badge.status-missing {
+  @apply bg-red-100 text-red-600;
+}
+
+.content-validation {
+  @apply mt-6;
+}
+
+/* ============================================
+   REQUIRED DEVICES SELECTOR
+   ============================================ */
+
+.required-devices-editor {
+  @apply space-y-4;
+}
+
+.required-devices-list {
+  @apply flex flex-col gap-2;
+}
+
+.required-device-item {
+  @apply flex items-center justify-between gap-3 px-3 py-2 bg-gray-50 rounded-lg border border-border;
+}
+
+.required-device-item .device-info {
+  @apply flex items-center gap-3 min-w-0;
+}
+
+.required-device-item .device-name {
+  @apply font-medium text-text-primary text-sm;
+}
+
+.required-device-item .device-id {
+  @apply text-xs;
+}
+
+.add-device-wrapper {
+  @apply flex items-center gap-2;
+}
+
+.add-device-wrapper .device-select {
+  @apply flex-1;
+}
+
+/* ============================================
+   PREVIEW TAB
+   ============================================ */
+
+.preview-container {
+  @apply py-2;
+}
+
+.preview-header {
+  @apply flex items-center justify-between mb-6 flex-wrap gap-2;
+}
+
+.preview-header h4 {
+  @apply text-base font-semibold text-text-primary m-0;
+}
+
+.preview-content {
+  @apply min-h-[200px];
+}
+
+.preview-presets {
+  @apply flex flex-col gap-4;
+}
+
+.preview-preset {
+  @apply border border-border rounded-lg overflow-hidden;
+}
+
+.preview-preset .preset-header {
+  @apply flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-border;
+}
+
+.preview-preset .preset-name {
+  @apply font-semibold text-text-primary text-sm;
+}
+
+.preview-preset .preset-id {
+  @apply text-xs;
+}
+
+.preview-preset .preset-description {
+  @apply px-4 py-2 bg-gray-50/50 border-b border-border m-0;
+}
+
+.preview-preset .preset-steps {
+  @apply divide-y divide-border/50;
+}
+
+.preview-step {
+  @apply flex items-start gap-3 px-4 py-3;
+}
+
+.preview-step .step-index {
+  @apply w-5 h-5 rounded bg-primary text-white text-xs font-medium flex items-center justify-center flex-shrink-0 mt-0.5;
+}
+
+.preview-step .step-info {
+  @apply flex items-center gap-2 flex-wrap flex-1 min-w-0;
+}
+
+.preview-step .step-name {
+  @apply font-medium text-text-primary text-sm;
+}
+
+.preview-step .step-type {
+  @apply bg-gray-100 text-text-secondary;
+}
+
+.preview-step .step-targets {
+  @apply flex flex-wrap gap-1 mt-1 w-full;
+}
+
+.target-badge {
+  @apply px-2 py-0.5 text-xs rounded bg-blue-50 text-blue-700;
+}
+
+.target-badge.target-default {
+  @apply bg-green-50 text-green-700 font-medium;
+}
+
+.preview-section {
+  @apply mt-6 p-4 border border-border rounded-lg;
+}
+
+.preview-section h5 {
+  @apply text-sm font-semibold text-text-primary m-0 mb-3;
+}
+
+.post-deployment-message {
+  @apply text-sm text-text-secondary mb-3;
+}
+
+.post-deployment-message p {
+  @apply mt-1 italic;
+}
+
+.post-deployment-steps ul {
+  @apply list-disc list-inside text-sm text-text-secondary mt-1 space-y-1;
+}
+
+/* ============================================
+   mDNS Device Discovery
+   ============================================ */
+
+.input-with-scan {
+  @apply flex gap-2;
+}
+
+.input-with-scan input {
+  @apply flex-1;
+}
+
+.btn-scan {
+  @apply flex items-center gap-1.5 whitespace-nowrap px-3;
+}
+
+.mdns-devices-dropdown {
+  @apply absolute z-50 mt-1 w-full bg-sidebar border border-border rounded-lg shadow-lg overflow-hidden;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.form-group {
+  position: relative;
+}
+
+.mdns-header {
+  @apply px-3 py-2 text-xs font-medium text-text-secondary uppercase tracking-wide bg-hover border-b border-border;
+}
+
+.mdns-device {
+  @apply flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors;
+}
+
+.mdns-device:hover {
+  @apply bg-hover;
+}
+
+.mdns-device-icon {
+  @apply text-text-secondary flex-shrink-0;
+}
+
+.mdns-device-name {
+  @apply flex-1 font-medium text-text-primary text-sm;
+}
+
+.mdns-device-ip {
+  @apply text-xs text-text-muted font-mono;
+}
+
+.mdns-empty {
+  @apply flex items-center justify-center gap-2 px-3 py-4 text-sm text-text-secondary;
 }
