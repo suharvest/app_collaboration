@@ -61,9 +61,20 @@ export function getFilteredDevices(devices) {
   const presets = currentSolution?.deployment?.presets || [];
   const selectedPreset = presets.find(p => p.id === selectedPresetId);
 
-  // If preset has its own devices list, use it directly
+  // If preset has its own devices list, filter global devices by preset device IDs
   if (selectedPreset?.devices && selectedPreset.devices.length > 0) {
-    return selectedPreset.devices;
+    const presetDeviceIds = selectedPreset.devices;
+    // Check if devices list contains IDs (strings) or device objects
+    if (typeof presetDeviceIds[0] === 'string') {
+      // New format: preset.devices is array of device IDs
+      // Filter and sort global devices by preset device order
+      const deviceMap = new Map(devices.map(d => [d.id, d]));
+      return presetDeviceIds
+        .map(id => deviceMap.get(id))
+        .filter(d => d !== undefined);
+    }
+    // Legacy format: preset.devices is array of device objects
+    return presetDeviceIds;
   }
 
   // Fallback: use global devices with show_when filtering (for backward compatibility)
@@ -85,14 +96,52 @@ export function getFilteredDevices(devices) {
 }
 
 /**
+ * Check if all required devices have completed deployment
+ */
+export function areAllRequiredDevicesCompleted(devices) {
+  const deviceStates = getDeviceStates();
+  const filteredDevices = getFilteredDevices(devices);
+
+  // Get required devices
+  const requiredDevices = filteredDevices.filter(d => d.required !== false);
+
+  // Check if all required devices are completed
+  return requiredDevices.every(device => {
+    const state = deviceStates[device.id];
+    return state && state.deploymentStatus === 'completed';
+  });
+}
+
+/**
  * Get the currently selected target for a docker_deploy device
  */
 export function getSelectedTarget(device) {
   const deviceStates = getDeviceStates();
   const state = deviceStates[device.id] || {};
   const targets = device.targets || {};
-  const selectedId = state.selectedTarget || 'local';
-  return { id: selectedId, ...targets[selectedId] };
+  const targetEntries = Object.entries(targets);
+
+  if (targetEntries.length === 0) return null;
+
+  // If state has a selected target and it exists, use it
+  if (state.selectedTarget && targets[state.selectedTarget]) {
+    return { id: state.selectedTarget, ...targets[state.selectedTarget] };
+  }
+
+  // Find default target (default=true)
+  const defaultEntry = targetEntries.find(([_, t]) => t.default === true);
+  if (defaultEntry) {
+    return { id: defaultEntry[0], ...defaultEntry[1] };
+  }
+
+  // Fallback: try 'local' for backward compatibility, then first target
+  if (targets['local']) {
+    return { id: 'local', ...targets['local'] };
+  }
+
+  // Use first target
+  const [firstId, firstTarget] = targetEntries[0];
+  return { id: firstId, ...firstTarget };
 }
 
 /**

@@ -25,8 +25,8 @@ allowed-tools: Read, Write, Edit, Glob, Grep
 
 **Step 1**: 读取方案文件
 - `solutions/$0/solution.yaml`
-- `solutions/$0/intro/description_zh.md`
-- `solutions/$0/deploy/sections/*.md`
+- `solutions/$0/description.md` + `solutions/$0/description_zh.md`
+- `solutions/$0/guide.md` + `solutions/$0/guide_zh.md`
 
 **如果指定了修改方向 (`$1`)**: 优先按用户指定方向修改，跳过无关检查项。
 
@@ -38,9 +38,10 @@ allowed-tools: Read, Write, Edit, Glob, Grep
 - [ ] 专业术语已替换？
 
 **Step 3**: 部署页检查（对照下方「三、部署页文案标准」）
-- [ ] description 只包含准备工作？
-- [ ] troubleshoot 包含故障排查？
-- [ ] 无"完成后"内容错位？
+- [ ] 每个步骤有 `### 接线` 子节？
+- [ ] 每个步骤有 `### 故障排除` 子节？
+- [ ] 中英文步骤 ID 一致？
+- [ ] 成功页内容完整？
 
 **Step 4**: 输出改进报告
 - 按 P0/P1/P2 分类问题
@@ -63,8 +64,14 @@ allowed-tools: Read, Write, Edit, Glob, Grep
 帮助非技术用户在 30 秒内理解：**这个方案解决什么问题？对我有什么好处？**
 
 ### 文件位置
-- 英文：`solutions/[id]/intro/description.md`
-- 中文：`solutions/[id]/intro/description_zh.md`
+
+使用**分离格式**（每种语言独立文件）：
+
+```
+solutions/[id]/
+├── description.md      # 英文介绍页
+└── description_zh.md   # 中文介绍页
+```
 
 ### 结构模板（必须包含以下 4 个部分）
 
@@ -149,103 +156,280 @@ allowed-tools: Read, Write, Edit, Glob, Grep
 
 ### 文件结构
 
+使用**分离格式**（每种语言独立文件）：
+
 ```
-deploy/
-├── guide_zh.md          # 部署总览（必须）
-├── guide.md             # 英文版
-└── sections/
-    ├── step1_zh.md      # 步骤 1 详情
-    ├── step1.md         # 英文版
-    └── troubleshoot_zh.md  # 常见问题（可选）
+solutions/[id]/
+├── solution.yaml       # 方案配置（介绍页元数据 + preset 定义）
+├── description.md      # 英文介绍页
+├── description_zh.md   # 中文介绍页
+├── guide.md            # 英文部署页（含所有步骤 + 成功页）
+├── guide_zh.md         # 中文部署页（含所有步骤 + 成功页）
+├── gallery/            # 图片资源
+│   ├── cover.png
+│   └── ...
+└── devices/            # 设备配置文件
+    ├── docker.yaml
+    └── ...
 ```
 
-### guide_zh.md 模板
+> **重要**：部署步骤的所有内容（标题、描述、接线、故障排除）都在 `guide.md` / `guide_zh.md` 中定义，不再使用 `deploy/sections/` 目录。
+
+### guide.md 模板（英文）
 
 ```markdown
-## 开始之前
+## Preset: Cloud Solution {#cloud_mode}
 
-### 你需要准备
+## Step 1: Deploy Backend {#backend type=docker_deploy required=true config=devices/docker.yaml}
 
-| 类别 | 准备内容 | 说明 |
-|------|---------|------|
-| 硬件 | SenseCAP Watcher | 主控设备 |
-| 硬件 | USB-C 数据线 | 用于连接电脑 |
-| 软件 | Chrome 浏览器 | 用于烧录固件 |
-| 账号 | SenseCraft 账号 | [点此注册](链接) |
+Deploy the backend services.
 
-### 部署流程预览
+### Target: Local Deployment {#backend_local config=devices/docker.yaml default=true}
 
+![Wiring](gallery/architecture.png)
+
+1. Ensure Docker is installed and running
+2. Click Deploy button to start services
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Port 8080 busy | Stop other services using this port |
+| Docker not found | Install Docker Desktop |
+
+### Target: Remote Deployment {#backend_remote config=devices/docker_remote.yaml}
+
+![Wiring](gallery/architecture.png)
+
+1. Connect target device to network
+2. Enter IP address and SSH credentials
+3. Click Deploy to install on remote device
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| SSH connection failed | Check IP address and credentials |
+| Timeout | Ensure target device is online |
+
+---
+
+## Step 2: Configure Platform {#platform type=manual required=true}
+
+### Wiring
+
+![Platform Setup](gallery/platform.png)
+
+1. Open web interface at http://localhost:8080
+2. Register admin account
+3. Configure API settings
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Page not loading | Wait 30 seconds for services to start |
+| Registration failed | Check network connection |
+
+---
+
+## Preset: Edge Computing {#edge_mode}
+
+## Step 1: Deploy Backend {#backend type=docker_deploy required=true config=devices/docker.yaml}
+
+... (steps for this preset)
+
+---
+
+# Deployment Complete
+
+Congratulations! All components deployed successfully.
+
+## Initial Setup
+
+1. Open http://localhost:8080
+2. Register admin account
+
+## Quick Verification
+
+- Test voice commands
+- Verify web interface
+
+## Next Steps
+
+- [View Documentation](https://wiki.seeedstudio.com/...)
+- [Report Issues](https://github.com/...)
 ```
-[硬件连接] → [固件烧录] → [服务部署] → [测试验收]
-   5分钟        10分钟        5分钟        5分钟
-```
 
-## 部署完成后
-
-[简要说明如何验证部署成功，以及日常使用入口]
-```
-
-### 步骤页布局说明
-
-**重要**：页面分为三个区域，内容需要放在正确的位置。
-
-```
-┌─────────────────────────────────────────┐
-│  description 区域（部署按钮上方）          │  ← 只写准备工作
-│  - 连接说明                              │
-│  - 注意事项                              │
-├─────────────────────────────────────────┤
-│  [ 🚀 开始部署 ]  ← 部署按钮              │  ← 系统自动渲染
-├─────────────────────────────────────────┤
-│  troubleshoot 区域（部署按钮下方）         │  ← 故障排查内容
-│  - 遇到问题？                            │
-│  - 常见问题表格                          │
-└─────────────────────────────────────────┘
-```
-
-### solution.yaml section 配置
-
-> **注意**：从 v1.1 开始，部署步骤定义在 `intro.presets[].devices` 中。
-
-```yaml
-intro:
-  presets:
-    - id: preset_id
-      devices:
-        - id: flash_firmware
-          name: Flash Firmware
-          name_zh: 烧录固件
-          type: esp32_usb
-          required: true
-          config_file: devices/esp32.yaml
-          section:
-            title: 烧录固件
-            title_zh: 烧录固件
-            # 部署按钮上方的内容（准备工作）
-            description_file: deploy/sections/flash.md
-            description_file_zh: deploy/sections/flash_zh.md
-            # 部署按钮下方的内容（故障排查）
-            troubleshoot_file: deploy/sections/flash_troubleshoot.md
-            troubleshoot_file_zh: deploy/sections/flash_troubleshoot_zh.md
-```
-
-### description 文件内容（部署按钮上方）
-
-只写**点击部署前**需要知道的信息：
+### guide_zh.md 模板（中文）
 
 ```markdown
-### 连接设备
+## 套餐: 云方案 {#cloud_mode}
 
-1. 用 USB-C 线连接 Watcher 到电脑
-2. 在上方选择串口（选 wchusbserial 开头的）
+## 步骤 1: 部署后端 {#backend type=docker_deploy required=true config=devices/docker.yaml}
+
+部署后端服务。
+
+### 部署目标: 本机部署 {#backend_local config=devices/docker.yaml default=true}
+
+![接线图](gallery/architecture.png)
+
+1. 确保 Docker 已安装并运行
+2. 点击部署按钮启动服务
+
+### 故障排除
+
+| 问题 | 解决方法 |
+|------|----------|
+| 端口 8080 被占用 | 停止占用该端口的其他服务 |
+| 找不到 Docker | 安装 Docker Desktop |
+
+### 部署目标: 远程部署 {#backend_remote config=devices/docker_remote.yaml}
+
+![接线图](gallery/architecture.png)
+
+1. 将目标设备连接到网络
+2. 输入 IP 地址和 SSH 凭据
+3. 点击部署安装到远程设备
+
+### 故障排除
+
+| 问题 | 解决方法 |
+|------|----------|
+| SSH 连接失败 | 检查 IP 地址和凭据 |
+| 连接超时 | 确保目标设备在线 |
+
+---
+
+## 步骤 2: 配置平台 {#platform type=manual required=true}
+
+### 接线
+
+![平台设置](gallery/platform.png)
+
+1. 访问 http://localhost:8080
+2. 注册管理员账号
+3. 配置 API 设置
+
+### 故障排除
+
+| 问题 | 解决方法 |
+|------|----------|
+| 页面无法加载 | 等待 30 秒让服务启动 |
+| 注册失败 | 检查网络连接 |
+
+---
+
+## 套餐: 边缘计算 {#edge_mode}
+
+## 步骤 1: 部署后端 {#backend type=docker_deploy required=true config=devices/docker.yaml}
+
+... (此套餐的步骤)
+
+---
+
+# 部署完成
+
+恭喜！所有组件已部署成功。
+
+## 初始设置
+
+1. 访问 http://localhost:8080
+2. 注册管理员账号
+
+## 快速验证
+
+- 测试语音命令
+- 验证 Web 界面
+
+## 后续步骤
+
+- [查看文档](https://wiki.seeedstudio.com/...)
+- [报告问题](https://github.com/...)
 ```
 
-### troubleshoot 文件内容（部署按钮下方）
+### 格式规范
 
-写**部署过程中或失败后**的排查指南：
+#### Preset 头格式
+
+```
+## Preset: Name {#preset_id}
+## 套餐: 名称 {#preset_id}
+```
+
+- `#preset_id` - Preset ID（必需，小写+下划线）
+- 必须与 solution.yaml 中 `intro.presets[].id` 一致
+
+#### 步骤头格式
+
+```
+## Step N: Title {#step_id type=xxx required=true config=devices/xxx.yaml}
+## 步骤 N: 标题 {#step_id type=xxx required=true config=devices/xxx.yaml}
+```
+
+参数说明：
+- `#step_id` - 步骤 ID（必需，小写+下划线）
+- `type` - 部署类型（必需）
+- `required` - 是否必需（默认 true）
+- `config` - 设备配置文件路径（可选）
+
+**有效类型**：
+| 类型 | 说明 |
+|------|------|
+| `manual` | 手动步骤（仅显示说明） |
+| `docker_deploy` | Docker 部署（支持 local/remote targets） |
+| `docker_local` | 本机 Docker 部署 |
+| `docker_remote` | 远程 Docker 部署 |
+| `esp32_usb` | ESP32 USB 烧录 |
+| `himax_usb` | Himax 芯片烧录 |
+| `script` | 脚本执行 |
+| `preview` | 预览功能 |
+| `recamera_cpp` | reCamera C++ 应用 |
+| `recamera_nodered` | reCamera Node-RED |
+| `ssh_deb` | SSH + Debian 包部署 |
+
+#### Target 头格式（用于 docker_deploy 类型）
+
+```
+### Target: Name {#target_id config=devices/xxx.yaml default=true}
+### 部署目标: 名称 {#target_id config=devices/xxx.yaml default=true}
+```
+
+参数说明：
+- `#target_id` - Target ID（必需，小写+下划线）
+- `config` - 设备配置文件路径（可选）
+- `default` - 是否为默认选项（可选，true/false）
+
+#### 子节识别规则
+
+| 英文标题 | 中文标题 | 用途 | 渲染位置 |
+|---------|---------|------|---------|
+| `### Wiring` | `### 接线` | 接线说明 | 部署按钮上方（图片+步骤） |
+| `### Troubleshooting` | `### 故障排除` | 故障排查 | 部署按钮下方（表格格式） |
+| `### Target: ...` | `### 部署目标: ...` | 部署目标选项 | Target 选择器 |
+| 其他 H3 | - | 作为描述的一部分 | 步骤主体内容 |
+
+#### 接线子节格式
 
 ```markdown
-### 遇到问题？
+### 接线
+
+![接线图](gallery/wiring.png)
+
+1. 用 USB-C 线连接设备到电脑
+2. 选择串口
+3. 点击部署按钮
+```
+
+解析器自动提取：
+- `wiring.image` - 从 `![](path)` 提取图片路径
+- `wiring.steps` - 从有序列表提取步骤
+
+#### 故障排除子节格式
+
+```markdown
+### 故障排除
 
 | 问题 | 解决方法 |
 |------|----------|
@@ -253,46 +437,148 @@ intro:
 | 烧录失败 | 重新插拔设备再试 |
 ```
 
-### 错误示范
+**必须使用表格格式**，包含「问题」和「解决方法」两列。
 
-**不要**把故障排查放在 description 文件中：
+#### 成功页格式
+
+使用 `# Deployment Complete` / `# 部署完成` 标记成功页开始：
 
 ```markdown
-### 连接设备
-1. 用 USB-C 线连接 Watcher
+# 部署完成
 
-### 遇到问题？        ← ❌ 错误！应该放在 troubleshoot 文件
-| 问题 | 解决方法 |
+恭喜！所有组件已部署成功。
+
+## 初始设置
+
+1. 访问 http://localhost:8080
+2. 注册管理员账号
+
+## 快速验证
+
+- 测试语音命令
+- 验证 Web 界面
 ```
 
-### "完成后"内容放在哪里？
+### 页面布局
 
-**solution.yaml 的 post_deployment**：
-```yaml
-post_deployment:
-  success_message_zh: |
-    部署完成！设备会自动重启，屏幕显示小智表情即为成功。
+```
+┌─────────────────────────────────────────┐
+│  [Preset 选择器: 云方案 | 边缘计算]       │  ← 多个 preset 时显示
+├─────────────────────────────────────────┤
+│  步骤 1: 部署后端                        │  ← 步骤卡片
+│  ├─ [Target 选择: 本机 | 远程]           │  ← docker_deploy 时显示
+│  ├─ 接线图 + 步骤列表                    │  ← ### 接线 子节
+│  ├─ [ 🚀 开始部署 ]                     │  ← 系统自动渲染
+│  └─ 故障排除表格                        │  ← ### 故障排除 子节
+├─────────────────────────────────────────┤
+│  步骤 2: 配置平台                        │
+│  └─ ...                                 │
+└─────────────────────────────────────────┘
 ```
 
-### 步骤顺序原则
+### 中英文结构一致性要求
 
-**正确顺序**：
-1. 物理连接（插线、摆放设备）
-2. 固件/软件准备（烧录、安装）
-3. 配置设置（账号、参数）
-4. 启动服务（一键部署）
-5. 测试验收（功能验证）
-6. 问题排查（可选）
+**必须保证中英文文件的结构完全一致**：
 
-**常见错误**：
-- 先讲部署命令，再讲插线方法
-- 把问题排查放在步骤中间
-- 多个步骤混在一起讲
-- 把"完成后"的提示放在部署按钮上方
+1. **Preset ID 一致**：`{#cloud_mode}` 在两个文件中必须相同
+2. **步骤 ID 一致**：`{#backend}` 在两个文件中必须相同
+3. **Target ID 一致**：`{#backend_local}` 在两个文件中必须相同
+4. **步骤数量一致**：每个 preset 下的步骤数量必须相同
+5. **type/required/config 一致**：元数据参数必须相同
+
+解析器会校验结构一致性，不一致时会报告错误。
 
 ---
 
-## 四、质量检查清单
+## 四、solution.yaml 配置（简化版）
+
+> **重要变化**：从 v2.0 开始，部署步骤的所有内容从 `guide.md` / `guide_zh.md` 自动解析，YAML 中只需定义介绍页元数据和 preset 基本信息。
+
+```yaml
+version: "1.0"
+id: solution_id
+name: Solution Name
+name_zh: 方案名称
+
+intro:
+  summary: One-line description
+  summary_zh: 一句话描述
+  description_file: description.md      # 英文介绍页（根目录）
+  cover_image: gallery/cover.png
+  category: voice_ai
+  tags: [voice, ai, watcher]
+
+  gallery:
+    - type: image
+      src: gallery/demo.png
+      caption: Demo screenshot
+      caption_zh: 演示截图
+
+  # 设备目录（用于介绍页展示购买链接）
+  device_catalog:
+    sensecap_watcher:
+      name: SenseCAP Watcher
+      name_zh: SenseCAP Watcher
+      image: gallery/watcher.png
+      product_url: https://www.seeedstudio.com/sensecap-watcher
+      description: AI voice assistant
+      description_zh: AI 语音助手
+
+  # Preset 定义（用于介绍页展示方案选项）
+  presets:
+    - id: cloud_mode                    # 必须与 guide.md 中的 {#cloud_mode} 一致
+      name: Cloud Solution
+      name_zh: 云方案
+      badge: Recommended
+      badge_zh: 推荐
+      description: Quick setup with cloud services
+      description_zh: 使用云服务快速部署
+      device_groups:                    # 用于介绍页展示所需设备
+        - id: watcher
+          name: Voice Assistant
+          name_zh: 语音助手
+          type: single
+          required: true
+          options:
+            - device_ref: sensecap_watcher
+          default: sensecap_watcher
+      # ⚠️ 不需要 devices[] - 步骤从 guide.md 解析
+      # ⚠️ 不需要 section - 内容从 guide.md 解析
+
+  stats:
+    difficulty: beginner    # beginner | intermediate | advanced
+    estimated_time: 30min
+
+  links:
+    wiki: https://wiki.seeedstudio.com/...
+    github: https://github.com/...
+
+deployment:
+  guide_file: guide.md                  # 英文部署页（根目录）
+  selection_mode: sequential
+  # ⚠️ 不需要 devices[] - 从 guide.md 解析
+  # ⚠️ 不需要 order[] - 从 guide.md 解析
+  # ⚠️ 不需要 post_deployment.success_message_file - 从 guide.md 末尾解析
+```
+
+### YAML 与 guide.md 职责划分
+
+| 数据 | YAML | guide.md | 说明 |
+|------|------|----------|------|
+| **介绍页** ||||
+| Preset ID/名称/描述 | ✅ | ❌ | 用于介绍页展示 |
+| 所需设备 (device_groups) | ✅ | ❌ | 购买链接展示 |
+| 封面/图库/标签 | ✅ | ❌ | 介绍页元数据 |
+| **部署页（100% 从 guide.md）** ||||
+| Preset 结构 | ❌ | ✅ | 从 `## Preset: ... {#id}` 解析 |
+| 步骤 ID/type/config | ❌ | ✅ | 从 `## Step ... {#id type=X}` 解析 |
+| 步骤内容/接线/故障排除 | ❌ | ✅ | Markdown 内容 |
+| Target 选项 | ❌ | ✅ | 从 `### Target: ... {#id}` 解析 |
+| 成功消息 | ❌ | ✅ | `# Deployment Complete` 区域 |
+
+---
+
+## 五、质量检查清单
 
 ### 介绍页检查
 
@@ -304,63 +590,25 @@ post_deployment:
 
 ### 部署页检查
 
-- [ ] **准备清单完整**：用户知道需要准备什么
-- [ ] **步骤可执行**：每一步都是明确的动作，不是概念描述
+- [ ] **Preset ID 一致**：YAML 中的 preset ID 与 guide.md 一致
+- [ ] **中英文结构一致**：guide.md 和 guide_zh.md 的 preset/step/target ID 完全一致
+- [ ] **接线说明完整**：每个需要硬件连接的步骤都有 `### 接线` 子节
+- [ ] **故障排除完整**：每个步骤都有 `### 故障排除` 子节（表格格式）
+- [ ] **成功页完整**：有 `# 部署完成` 区域，包含验证步骤
 - [ ] **顺序合理**：先物理后软件，先准备后操作
-- [ ] **成功可验证**：每步都有检查方法
-- [ ] **问题可解决**：常见问题都有对应方案
-- [ ] **无"完成后"错位**：section 中不包含部署后的提示
+
+### 常见错误
+
+| 错误 | 表现 | 修复方法 |
+|------|------|----------|
+| Preset ID 不一致 | 部署页无法加载 | 确保 YAML 和 guide.md 中的 ID 一致 |
+| 缺少故障排除 | 用户遇到问题无指引 | 添加 `### 故障排除` + 表格 |
+| 中英文 ID 不匹配 | 解析错误 | 检查两个文件的 `{#xxx}` 一致 |
+| Target 无默认值 | 页面显示异常 | 添加 `default=true` 到一个 target |
 
 ---
 
-## 五、最佳范例
-
-### 介绍页范例：xiaozhi_face_recognition
-
-**优点**：
-1. 痛点陈述有吸引力："看不见人脸，不知道是谁"
-2. 解决方案用比喻："给小智装上'眼睛'"
-3. 使用示例是自然语言对话
-4. 限制条件坦诚透明
-
-### 部署页范例：recamera_retail_heatmap
-
-**优点**：
-1. 故障排除表格完整
-2. 步骤有检查清单
-3. 技术规格用表格呈现
-4. section 内容不包含"完成后"提示
-
----
-
-## 六、使用方法
-
-### 创建新方案文案
-
-1. 复制目录结构：
-   ```bash
-   cp -r solutions/recamera_retail_heatmap solutions/your_solution_id
-   ```
-
-2. 按本规范编写 `solution.yaml`
-
-3. 按模板编写介绍页和部署页
-
-4. 使用检查清单自检
-
-### 优化现有方案文案
-
-1. 读取现有文案
-2. 对照检查清单找出问题
-3. 按规范修改
-4. 重点检查：
-   - 术语是否通俗化
-   - section 是否有"完成后"错位
-   - 是否有具体场景和示例
-
----
-
-## 七、常见文案问题及修复
+## 六、常见文案问题及修复
 
 ### 高优先级问题（P0）
 
@@ -368,15 +616,15 @@ post_deployment:
 |---------|------|---------|
 | 术语堆砌 | 首段出现 3+ 专业术语 | 用「术语通俗化对照表」替换 |
 | 价值模糊 | 无法 30 秒说清"干什么用" | 重写「这个方案能帮你做什么」段落 |
-| 步骤缺失 | 用户卡在某步不知道下一步 | 补充 wiring.steps 或 description |
+| 结构不一致 | 中英文步骤 ID 不匹配 | 对齐两个文件的 `{#xxx}` |
 
 ### 中优先级问题（P1）
 
 | 问题类型 | 表现 | 修复方法 |
 |---------|------|---------|
-| 缺接线图 | 硬件连接方式不清晰 | 添加 wiring.image |
-| 完成后错位 | section 中包含"部署成功后"内容 | 移到 post_deployment |
-| 缺故障排查 | 部署失败后无指引 | 添加 troubleshoot_file |
+| 缺接线图 | 硬件连接方式不清晰 | 在 `### 接线` 子节添加图片和步骤 |
+| 缺故障排查 | 部署失败后无指引 | 添加 `### 故障排除` 子节（表格格式） |
+| 无默认 Target | 部署页显示异常 | 添加 `default=true` 到一个 target |
 
 ### 低优先级问题（P2）
 
@@ -385,234 +633,98 @@ post_deployment:
 | 场景抽象 | 只说功能，不说具体怎么用 | 添加对话示例或操作流程 |
 | 限制不透明 | 不告知能力边界 | 补充「使用须知」段落 |
 
-### 优秀方案参考
+---
 
-- `recamera_heatmap_grafana` - 结构完整，targets 配置规范
-- `smart_space_assistant` - preset 分离清晰，wiring 说明详细
+## 七、最佳范例
+
+### 介绍页范例
+
+**优点**：
+1. 痛点陈述有吸引力："看不见人脸，不知道是谁"
+2. 解决方案用比喻："给小智装上'眼睛'"
+3. 使用示例是自然语言对话
+4. 限制条件坦诚透明
+
+### 部署页范例：smart_warehouse
+
+**优点**：
+1. 多 preset 支持（云方案/私有云/边缘计算）
+2. docker_deploy 类型有 local/remote targets
+3. 每个步骤有接线说明
+4. 成功页有验证步骤
+
+查看参考：
+- `solutions/smart_warehouse/guide.md`
+- `solutions/smart_warehouse/guide_zh.md`
 
 ---
 
-## 八、配置结构说明
+## 八、使用方法
 
-### 1. device_catalog（设备目录）
+### 创建新方案
 
-在 `intro.device_catalog` 中定义方案使用的所有设备，供 presets 引用：
+1. 创建目录结构：
+   ```bash
+   mkdir -p solutions/your_solution_id/{gallery,devices}
+   ```
 
-```yaml
-intro:
-  device_catalog:
-    sensecap_watcher:
-      name: SenseCAP Watcher
-      name_zh: SenseCAP Watcher
-      image: intro/gallery/watcher.svg
-      product_url: https://www.seeedstudio.com/sensecap-watcher
-      description: AI-powered voice assistant
-      description_zh: AI 语音助手
+2. 创建必需文件：
+   ```
+   solutions/your_solution_id/
+   ├── solution.yaml       # 方案配置
+   ├── description.md      # 英文介绍页
+   ├── description_zh.md   # 中文介绍页
+   ├── guide.md            # 英文部署页
+   ├── guide_zh.md         # 中文部署页
+   ├── gallery/            # 图片资源
+   └── devices/            # 设备配置文件
+   ```
 
-    recomputer_r1100:
-      name: reComputer R1100
-      name_zh: reComputer R1100
-      image: intro/gallery/recomputer.svg
-      product_url: https://www.seeedstudio.com/recomputer-r1100
-      description: Edge gateway for services
-      description_zh: 边缘网关
-```
+3. 按本规范编写内容
 
-### 2. presets（部署套餐）
+4. 使用检查清单自检
 
-每个 preset 是一个完整的部署方案，包含设备选择和部署步骤：
+### 优化现有方案
 
-```yaml
-intro:
-  presets:
-    - id: cloud_mode
-      name: Cloud Mode
-      name_zh: 云端模式
-      badge: Recommended           # 角标（可选）
-      badge_zh: 推荐
-      description: Use cloud services
-      description_zh: 使用云服务
-      architecture_image: intro/gallery/arch.svg  # 架构图（可选）
-      links:                       # 相关链接
-        wiki: https://wiki.seeedstudio.com/...
-        github: https://github.com/...
+1. 读取现有文案
+2. 对照检查清单找出问题
+3. 按规范修改
+4. 重点检查：
+   - 术语是否通俗化
+   - 中英文结构是否一致
+   - 是否有具体场景和示例
+   - 每个步骤是否有 `### 故障排除` 子节
 
-      # 设备组选择（用户在页面上选择设备）
-      device_groups:
-        - id: voice_assistant
-          name: Voice Assistant
-          name_zh: 语音助手
-          type: single             # single | multiple
-          required: true
-          options:
-            - device_ref: sensecap_watcher  # 引用 device_catalog
-          default: sensecap_watcher
+---
 
-      # preset 级别的部署指南
-      section:
-        title: Cloud Deployment Guide
-        title_zh: 云端部署指南
-        description_file: deploy/sections/cloud_guide.md
-        description_file_zh: deploy/sections/cloud_guide_zh.md
+## 九、解析器行为说明
 
-      # 部署步骤列表
-      devices:
-        - id: step1
-          name: Step Name
-          name_zh: 步骤名称
-          type: docker_deploy      # 见下方类型说明
-          required: true
-          config_file: devices/config.yaml
-          section:
-            title: Step Title
-            title_zh: 步骤标题
-          targets: ...             # 见下方 targets 说明
-```
+### 自动解析内容
 
-**设备类型 (type)**：
-- `manual` - 手动步骤（仅显示说明）
-- `docker_deploy` - Docker 容器部署
-- `esp32_usb` - ESP32 USB 烧录
-- `himax_usb` - Himax 芯片烧录
-- `recamera_cpp` - reCamera C++ 应用部署
-- `recamera_nodered` - reCamera Node-RED 部署
-- `script` - 脚本执行
-- `preview` - 预览功能
+解析器从 `guide.md` / `guide_zh.md` 自动提取：
 
-### 3. targets（部署目标）
+1. **Preset**：从 `## Preset: Name {#id}` / `## 套餐: 名称 {#id}` 提取
+2. **Step**：从 `## Step N: Title {#id type=xxx ...}` / `## 步骤 N: 标题 {#id ...}` 提取
+3. **Target**：从 `### Target: Name {#id ...}` / `### 部署目标: 名称 {#id ...}` 提取
+4. **Wiring**：从 `### Wiring` / `### 接线` 子节提取图片和步骤列表
+5. **Troubleshoot**：从 `### Troubleshooting` / `### 故障排除` 子节提取
+6. **Success**：从 `# Deployment Complete` / `# 部署完成` 之后的内容提取
 
-支持同一步骤部署到不同目标（本机/远程）：
+### 结构校验
 
-```yaml
-devices:
-  - id: backend
-    name: Deploy Backend
-    name_zh: 部署后端
-    type: docker_deploy
-    section:
-      title: Deploy Backend Services
-      title_zh: 部署后端服务
-    targets:
-      local:
-        name: Local Deployment
-        name_zh: 本机部署
-        description: Deploy on this computer
-        description_zh: 部署到当前电脑
-        default: true              # 默认选项
-        config_file: devices/backend_local.yaml
-        section:
-          description_file: deploy/sections/backend_local.md
-          description_file_zh: deploy/sections/backend_local_zh.md
-          troubleshoot_file: deploy/sections/backend_troubleshoot.md
-          troubleshoot_file_zh: deploy/sections/backend_troubleshoot_zh.md
-          wiring: ...              # 见下方 wiring 说明
+解析器校验中英文文件结构一致性：
 
-      remote:
-        name: Remote Deployment
-        name_zh: 远程部署
-        description: Deploy via SSH
-        description_zh: 通过 SSH 部署
-        config_file: devices/backend_remote.yaml
-        section:
-          description_file: deploy/sections/backend_remote.md
-          description_file_zh: deploy/sections/backend_remote_zh.md
-```
+- Preset 数量和 ID 一致
+- 每个 Preset 下的步骤数量和 ID 一致
+- 每个步骤的 type/required/config 一致
+- 每个步骤下的 Target 数量和 ID 一致
 
-### 4. wiring（接线说明）
+### 错误处理
 
-在 section 中添加可视化接线指引：
-
-```yaml
-section:
-  description_file: deploy/sections/step.md
-  description_file_zh: deploy/sections/step_zh.md
-  wiring:
-    image: intro/gallery/wiring.svg   # 接线示意图
-    steps:
-      - Connect device to computer via USB-C
-      - Select the serial port
-      - Click Deploy button
-    steps_zh:
-      - 用 USB-C 线连接设备到电脑
-      - 选择串口
-      - 点击部署按钮
-```
-
-### 5. post_deployment（部署完成后）
-
-定义部署成功后的提示和后续步骤：
-
-```yaml
-deployment:
-  post_deployment:
-    success_message_file: deploy/success.md
-    success_message_file_zh: deploy/success_zh.md
-    next_steps:
-      - title: Access Web Interface
-        title_zh: 访问 Web 界面
-        action: open_url
-        url: "http://localhost:8080"
-      - title: View Documentation
-        title_zh: 查看文档
-        description: Learn more about the features
-        description_zh: 了解更多功能
-        action: open_url
-        url: "https://wiki.seeedstudio.com/..."
-```
-
-### 6. 完整配置骨架
-
-```yaml
-version: "1.0"
-id: solution_id
-name: Solution Name
-name_zh: 方案名称
-
-intro:
-  summary: One-line description
-  summary_zh: 一句话描述
-  description_file: intro/description.md
-  description_file_zh: intro/description_zh.md
-  cover_image: intro/gallery/cover.svg
-  gallery: [...]
-  category: voice_ai
-  tags: [...]
-
-  device_catalog:
-    device_id: { ... }
-
-  presets:
-    - id: preset_id
-      name: ...
-      device_groups: [...]
-      section: { ... }
-      devices: [...]
-
-  stats:
-    difficulty: beginner | intermediate | advanced
-    estimated_time: 30min
-    deployed_count: 0
-    likes_count: 0
-
-  links:
-    wiki: https://...
-    github: https://...
-
-  partners: [...]    # 可选
-
-deployment:
-  guide_file: deploy/guide.md
-  guide_file_zh: deploy/guide_zh.md
-  selection_mode: sequential
-  devices: []        # 保持为空
-  order: []          # 保持为空
-  post_deployment:
-    success_message_file: deploy/success.md
-    success_message_file_zh: deploy/success_zh.md
-    next_steps: [...]
-```
-
-### 参考文档
-
-- 完整配置指南：`docs/solution-configuration-guide.md`
-- 从 Wiki 创建方案：`.claude/skills/add-solution-from-wiki.md`
+| 错误类型 | 说明 | 解决方法 |
+|---------|------|----------|
+| `PRESET_ID_MISMATCH` | 中英文 Preset ID 不一致 | 对齐两个文件的 `{#xxx}` |
+| `STEP_ID_MISMATCH` | 中英文步骤 ID 不一致 | 对齐两个文件的 `{#xxx}` |
+| `STEP_TYPE_MISMATCH` | 中英文步骤 type 不一致 | 对齐两个文件的 `type=xxx` |
+| `INVALID_STEP_TYPE` | 无效的步骤类型 | 使用有效类型（见上方列表） |
+| `DUPLICATE_STEP_ID` | 步骤 ID 重复 | 使用唯一的步骤 ID |

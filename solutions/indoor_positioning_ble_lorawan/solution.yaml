@@ -6,20 +6,19 @@ intro:
   summary: Know where your assets and people are in real-time. Battery-powered tags
     last 2 years, no wiring needed, works across large facilities.
   summary_zh: 实时掌握人员和物品位置，定位标签电池可用2年，无需布线，覆盖整个园区
-  description_file: intro/description.md
-  description_file_zh: intro/description_zh.md
-  cover_image: intro/gallery/cover.png
+  description_file: description.md
+  cover_image: gallery/cover.png
   gallery:
   - type: image
-    src: intro/gallery/architecture.png
+    src: gallery/architecture.png
     caption: System Architecture
     caption_zh: 系统架构
   - type: image
-    src: intro/gallery/app-preview.png
+    src: gallery/app-preview.png
     caption: Application Dashboard
     caption_zh: 应用仪表板
   - type: image
-    src: intro/gallery/map-view.png
+    src: gallery/map-view.png
     caption: Map Visualization
     caption_zh: 地图可视化
   category: smart_building
@@ -568,15 +567,13 @@ intro:
     github: https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5
     demo: https://indoorpositioning-demo.seeed.cc/
     purchase: https://www.seeedstudio.com/Indoor-Outdoor-Integrated-Positioning.html
+  description_file_zh: description_zh.md
 deployment:
-  guide_file: deploy/guide.md
-  guide_file_zh: deploy/guide_zh.md
+  guide_file: guide.md
   selection_mode: sequential
   devices: []
   order: []
   post_deployment:
-    success_message_file: deploy/success.md
-    success_message_file_zh: deploy/success_zh.md
     next_steps:
     - title: Access Indoor Positioning Dashboard
       title_zh: 访问室内定位仪表板
@@ -586,3 +583,4 @@ deployment:
       title_zh: 配置地图和信标
       description: Upload floor maps and add beacon locations
       description_zh: 上传楼层地图并添加信标位置
+  guide_file_zh: guide_zh.md

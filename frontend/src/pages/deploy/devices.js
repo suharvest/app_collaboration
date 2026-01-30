@@ -258,8 +258,11 @@ export async function startDeployment(deviceId) {
   if (device.targets) {
     selectedTarget = getSelectedTarget(device);
     if (device.type === 'docker_deploy') {
-      // Map target id to deployment type
-      effectiveType = selectedTarget?.id === 'remote' ? 'docker_remote' : 'docker_local';
+      // Map target id to deployment type (supports 'remote', 'xxx_remote' formats)
+      const isRemote = selectedTarget?.id === 'remote' ||
+                       selectedTarget?.id?.endsWith('_remote') ||
+                       selectedTarget?.id?.includes('remote');
+      effectiveType = isRemote ? 'docker_remote' : 'docker_local';
     }
   }
 
