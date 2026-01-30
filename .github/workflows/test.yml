@@ -10,13 +10,14 @@ on:
 
 env:
   PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
 
 jobs:
   # ===========================================
-  # Run pytest tests with coverage
+  # Run pytest backend tests with coverage
   # ===========================================
-  test:
-    name: Tests
+  backend-test:
+    name: Backend Tests
     runs-on: ubuntu-22.04
 
     steps:
@@ -40,7 +41,9 @@ jobs:
             --cov=provisioning_station \
             --cov-report=term-missing \
             --cov-report=xml \
-            -v
+            -v \
+            --ignore=tests/integration/test_deployment_api_contract.py \
+            --ignore=tests/integration/test_port_configuration.py
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
@@ -50,6 +53,84 @@ jobs:
           fail_ci_if_error: false
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # ===========================================
+  # Run frontend tests with Vitest
+  # ===========================================
+  frontend-test:
+    name: Frontend Tests
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Run tests
+        run: npm test
+        working-directory: frontend
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        working-directory: frontend
+        continue-on-error: true
+
+  # ===========================================
+  # Run API contract tests (requires backend)
+  # ===========================================
+  contract-test:
+    name: API Contract Tests
+    runs-on: ubuntu-22.04
+    needs: backend-test  # Only run after backend tests pass
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --group test
+
+      - name: Start backend server
+        run: |
+          uv run python -m provisioning_station &
+          sleep 5
+        env:
+          PS_DEBUG: "false"
+
+      - name: Wait for backend to be ready
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost:3260/api/health > /dev/null; then
+              echo "Backend is ready"
+              break
+            fi
+            echo "Waiting for backend... ($i/30)"
+            sleep 1
+          done
+
+      - name: Run contract tests
+        run: |
+          uv run pytest tests/integration/test_deployment_api_contract.py \
+            tests/integration/test_port_configuration.py \
+            -v
 
   # ===========================================
   # Lint Python code

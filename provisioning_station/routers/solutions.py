@@ -405,13 +405,25 @@ async def get_solution(
 async def get_deployment_info(
     solution_id: str,
     lang: str = Query("en", pattern="^(en|zh)$"),
+    use_guide: bool = Query(True, description="Load from guide.md (new) vs YAML (legacy)"),
 ):
-    """Get deployment page information"""
+    """Get deployment page information.
+
+    By default, loads deployment data from guide.md (simplified structure).
+    Set use_guide=false to use the legacy YAML-based loading.
+    """
     solution = solution_manager.get_solution(solution_id)
     if not solution:
         raise HTTPException(status_code=404, detail="Solution not found")
 
-    # Load deployment guide
+    # New: Load deployment data from guide.md
+    if use_guide:
+        result = await solution_manager.get_deployment_from_guide(solution_id, lang)
+        if result:
+            return result
+        # Fall back to YAML-based loading if guide parsing fails
+
+    # Legacy: Load deployment guide as HTML
     guide = None
     if lang == "zh" and solution.deployment.guide_file_zh:
         guide = await solution_manager.load_markdown(
@@ -937,6 +949,134 @@ async def get_preset_section(
     return {"section": section_data}
 
 
+@router.get("/{solution_id}/parse-guide")
+async def parse_guide(
+    solution_id: str,
+    path: str = Query(..., description="Path to the guide.md file"),
+    lang: str = Query("en", pattern="^(en|zh)$"),
+):
+    """Parse a bilingual deployment guide and return structured steps.
+
+    This endpoint parses the new bilingual markdown format and returns
+    the deployment steps, presets, and success content.
+    """
+    solution = solution_manager.get_solution(solution_id)
+    if not solution:
+        raise HTTPException(status_code=404, detail="Solution not found")
+
+    result = await solution_manager.parse_deployment_guide(solution_id, path)
+    if not result:
+        raise HTTPException(
+            status_code=404, detail=f"Guide file not found: {path}"
+        )
+
+    # Convert to API response format
+    response = {
+        "solution_id": solution_id,
+        "guide_path": path,
+        "has_errors": result.has_errors,
+        "errors": [
+            {
+                "type": str(e.error_type.value),
+                "message": e.message,
+                "line_number": e.line_number,
+                "suggestion": e.suggestion,
+            }
+            for e in result.errors
+        ],
+        "warnings": [
+            {
+                "message": w.message,
+                "line_number": w.line_number,
+            }
+            for w in result.warnings
+        ],
+        "overview": result.overview_en if lang == "en" else (result.overview_zh or result.overview_en),
+        "presets": [],
+        "steps": [],
+        "success": None,
+    }
+
+    # Format steps
+    def format_step(step):
+        return {
+            "id": step.id,
+            "title": step.title_en if lang == "en" else (step.title_zh or step.title_en),
+            "title_en": step.title_en,
+            "title_zh": step.title_zh,
+            "type": step.type,
+            "required": step.required,
+            "config_file": step.config_file,
+            "section": {
+                "title": step.section.title if lang == "en" else (step.section.title_zh or step.section.title),
+                "description": step.section.description if lang == "en" else (step.section.description_zh or step.section.description),
+                "troubleshoot": step.section.troubleshoot if lang == "en" else (step.section.troubleshoot_zh or step.section.troubleshoot),
+                "wiring": (
+                    {
+                        "image": f"/api/solutions/{solution_id}/assets/{step.section.wiring.image}" if step.section.wiring.image else None,
+                        "steps": step.section.wiring.steps if lang == "en" else (step.section.wiring.steps_zh or step.section.wiring.steps),
+                    }
+                    if step.section.wiring
+                    else None
+                ),
+            },
+        }
+
+    # Format presets
+    for preset in result.presets:
+        preset_data = {
+            "id": preset.id,
+            "name": preset.name if lang == "en" else (preset.name_zh or preset.name),
+            "name_en": preset.name,
+            "name_zh": preset.name_zh,
+            "description": preset.description if lang == "en" else (preset.description_zh or preset.description),
+            "steps": [format_step(s) for s in preset.steps],
+        }
+        response["presets"].append(preset_data)
+
+    # Format standalone steps
+    response["steps"] = [format_step(s) for s in result.steps]
+
+    # Format success content
+    if result.success:
+        response["success"] = {
+            "content": result.success.content_en if lang == "en" else (result.success.content_zh or result.success.content_en),
+        }
+
+    return response
+
+
+@router.get("/{solution_id}/bilingual-content")
+async def get_bilingual_content(
+    solution_id: str,
+    path: str = Query(..., description="Path to the bilingual markdown file"),
+    lang: str = Query("en", pattern="^(en|zh)$"),
+):
+    """Get content from a bilingual markdown file for the specified language.
+
+    This endpoint loads a bilingual markdown file and returns the content
+    for the requested language.
+    """
+    solution = solution_manager.get_solution(solution_id)
+    if not solution:
+        raise HTTPException(status_code=404, detail="Solution not found")
+
+    content = await solution_manager.load_bilingual_markdown(
+        solution_id, path, lang=lang, convert_to_html=True
+    )
+    if not content:
+        raise HTTPException(
+            status_code=404, detail=f"Bilingual file not found: {path}"
+        )
+
+    return {
+        "solution_id": solution_id,
+        "path": path,
+        "lang": lang,
+        "content": content,
+    }
+
+
 @router.post("/{solution_id}/like")
 async def like_solution(solution_id: str):
     """Increment likes count for a solution"""
@@ -947,6 +1087,62 @@ async def like_solution(solution_id: str):
     # In a real app, this would persist to a database
     solution.intro.stats.likes_count += 1
     return {"likes_count": solution.intro.stats.likes_count}
+
+
+@router.get("/{solution_id}/validate-guides")
+async def validate_guides(solution_id: str):
+    """Validate structure consistency between guide.md and guide_zh.md.
+
+    Returns validation result with errors if EN and ZH guides have
+    mismatched preset IDs, step IDs, or step parameters.
+    """
+    solution = solution_manager.get_solution(solution_id)
+    if not solution:
+        raise HTTPException(status_code=404, detail="Solution not found")
+
+    result = await solution_manager.validate_guide_pair(solution_id)
+    if result is None:
+        raise HTTPException(status_code=500, detail="Failed to validate guides")
+
+    return {
+        "solution_id": solution_id,
+        "valid": result.valid,
+        "errors": [
+            {
+                "type": str(e.error_type.value),
+                "message": e.message,
+                "line_number": e.line_number,
+                "suggestion": e.suggestion,
+            }
+            for e in result.errors
+        ],
+        "warnings": [
+            {
+                "message": w.message,
+                "line_number": getattr(w, 'line_number', None),
+            }
+            for w in result.warnings
+        ],
+        "en_presets": result.en_presets,
+        "zh_presets": result.zh_presets,
+    }
+
+
+@router.get("/{solution_id}/guide-structure")
+async def get_guide_structure(solution_id: str):
+    """Get parsed structure from guide files for management UI.
+
+    Returns file status, validation result, and parsed preset/step structure.
+    """
+    solution = solution_manager.get_solution(solution_id)
+    if not solution:
+        raise HTTPException(status_code=404, detail="Solution not found")
+
+    result = await solution_manager.get_guide_structure(solution_id)
+    if result is None:
+        raise HTTPException(status_code=500, detail="Failed to get guide structure")
+
+    return result
 
 
 # ============================================
@@ -1268,3 +1464,88 @@ async def update_solution_tags(solution_id: str, data: Dict = None):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update tags: {str(e)}")
+
+
+# ============================================
+# Content File Management (Simplified API)
+# ============================================
+
+
+@router.post("/{solution_id}/content/{filename}")
+async def upload_content_file(
+    solution_id: str,
+    filename: str,
+    data: Dict = None,
+):
+    """Upload a core content file (guide.md, description.md, etc.).
+
+    This is the simplified API for the management UI. It accepts:
+    - guide.md / guide_zh.md: Deployment guide files
+    - description.md / description_zh.md: Introduction page files
+
+    When a guide file is uploaded, presets are automatically synced to YAML.
+    """
+    if data is None or "content" not in data:
+        raise HTTPException(
+            status_code=400, detail="Request body with 'content' required"
+        )
+
+    try:
+        saved_path = await solution_manager.save_content_file(
+            solution_id, filename, data["content"]
+        )
+        return {"success": True, "path": saved_path}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to save content file: {str(e)}"
+        )
+
+
+@router.get("/{solution_id}/preview-structure")
+async def get_preview_structure(solution_id: str):
+    """Get structure preview parsed from guide.md for management UI.
+
+    Returns the complete structure including:
+    - presets with their steps
+    - post-deployment content
+    - validation status (EN/ZH consistency)
+    - content file status
+    """
+    solution = solution_manager.get_solution(solution_id)
+    if not solution:
+        raise HTTPException(status_code=404, detail="Solution not found")
+
+    result = await solution_manager.get_structure_preview(solution_id)
+    if result is None:
+        raise HTTPException(status_code=500, detail="Failed to get structure preview")
+
+    return result
+
+
+@router.put("/{solution_id}/required-devices")
+async def update_required_devices(solution_id: str, data: Dict = None):
+    """Update required devices from catalog IDs.
+
+    Args:
+        data: {"device_ids": ["sensecap_watcher", "recamera", ...]}
+
+    Returns:
+        {"devices": [...]} - List of updated devices
+    """
+    if data is None or "device_ids" not in data:
+        raise HTTPException(
+            status_code=400, detail="Request body with 'device_ids' array required"
+        )
+    try:
+        devices = await solution_manager.update_required_devices(
+            solution_id, data["device_ids"]
+        )
+        return {"devices": devices}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update required devices: {str(e)}"
+        )
