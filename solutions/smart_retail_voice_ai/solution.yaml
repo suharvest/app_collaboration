@@ -29,6 +29,21 @@ intro:
   - edge-ai
   - rerouter
   - respeaker
+  device_catalog:
+    rerouter_cm4:
+      name: reRouter CM4
+      name_zh: reRouter CM4
+      image: gallery/rerouter.png
+      product_url: https://www.seeedstudio.com/reRouter-CM4
+      description: Edge computing device with 4GB RAM, 32GB eMMC
+      description_zh: 边缘计算设备，4GB 内存，32GB eMMC 存储
+    respeaker_xvf3800:
+      name: reSpeaker XVF3800
+      name_zh: reSpeaker XVF3800 麦克风阵列
+      image: gallery/respeaker.jpg
+      product_url: https://www.seeedstudio.com/ReSpeaker-XVF3800
+      description: 4-mic array with noise suppression, AEC, and beamforming
+      description_zh: 4 麦克风阵列，支持噪声抑制、回声消除和波束成形
   stats:
     deployed_count: 0
     likes_count: 0
@@ -41,6 +56,25 @@ intro:
   - id: default
     name: Standard Deployment
     name_zh: 标准部署
+    device_groups:
+    - id: edge_device
+      name: Edge Computing Device
+      name_zh: 边缘计算设备
+      type: single
+      required: true
+      options:
+      - device_ref: rerouter_cm4
+      default: rerouter_cm4
+    - id: microphone
+      name: Microphone Array
+      name_zh: 麦克风阵列
+      type: single
+      required: true
+      options:
+      - device_ref: respeaker_xvf3800
+      default: respeaker_xvf3800
+    links:
+      wiki: https://wiki.seeedstudio.com/cn/solutions/smart-retail-voice-ai-solution-1/
 deployment:
   guide_file: guide.md
   guide_file_zh: guide_zh.md

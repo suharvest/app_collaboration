@@ -3,8 +3,7 @@ id: recamera_heatmap_grafana
 name: Smart Retail People Flow Heatmap
 name_zh: 智慧零售人流热力图
 intro:
-  summary: See which shelves attract customers, which aisles get ignored - make data-driven decisions on product placement
-    and promotion locations
+  summary: See which shelves attract customers, which aisles get ignored - make data-driven decisions on product placement and promotion locations
   summary_zh: 看清哪个货架前人多、哪条过道没人走，用数据优化商品陈列和促销位置
   description_file: description.md
   description_file_zh: description_zh.md
@@ -28,6 +27,19 @@ intro:
   - privacy
   - analytics
   - retail
+  device_catalog:
+    recamera:
+      name: reCamera
+      name_zh: reCamera
+      image: gallery/recamera.svg
+      product_url: https://www.seeedstudio.com/reCamera-2002w-8GB-p-6250.html
+      description: AI camera that detects people and automatically protects privacy
+      description_zh: AI 摄像头，自动识别人员位置并打码保护隐私
+    computer:
+      name: Computer (Windows/Linux)
+      name_zh: 电脑 (Windows/Linux)
+      description: For running the data statistics dashboard
+      description_zh: 用于运行数据统计面板
   stats:
     deployed_count: 0
     likes_count: 0
@@ -42,11 +54,43 @@ intro:
     badge_zh: 快速上手
     description: Just reCamera - real-time heatmap preview without backend
     description_zh: 仅需 reCamera，实时热力图预览，无需后端服务
+    device_groups:
+    - id: camera
+      name: AI Camera
+      name_zh: AI 摄像头
+      type: single
+      required: true
+      options:
+      - device_ref: recamera
+      default: recamera
+    links:
+      wiki: https://wiki.seeedstudio.com/
+      github: https://github.com/Seeed-Studio/sscma-example-sg200x
   - id: grafana
     name: Grafana Dashboard
     name_zh: Grafana 仪表板
     description: Full analytics with InfluxDB storage and Grafana visualization
     description_zh: 完整分析方案，包含 InfluxDB 存储和 Grafana 可视化
+    device_groups:
+    - id: camera
+      name: AI Camera
+      name_zh: AI 摄像头
+      type: single
+      required: true
+      options:
+      - device_ref: recamera
+      default: recamera
+    - id: server
+      name: Backend Server
+      name_zh: 后端服务器
+      type: single
+      required: true
+      options:
+      - device_ref: computer
+      default: computer
+    links:
+      wiki: https://wiki.seeedstudio.com/cn/integration_of_real-time_heat_map_with_grafana_data_dashboard/
+      github: https://github.com/xr686/reCamera-with-Heatmap
 deployment:
   guide_file: guide.md
   guide_file_zh: guide_zh.md

@@ -28,6 +28,28 @@ intro:
   - watcher
   - integration
   - warehouse
+  device_catalog:
+    sensecap_watcher:
+      name: SenseCAP Watcher
+      name_zh: SenseCAP Watcher
+      image: gallery/watcher.png
+      product_url: https://www.seeedstudio.com/sensecap-watcher
+      description: AI voice assistant, required for all deployment modes
+      description_zh: AI 语音助手，必选
+    recomputer_r1100:
+      name: reComputer R1100
+      name_zh: reComputer R1100
+      image: gallery/r1100.png
+      product_url: https://www.seeedstudio.com/recomputer-r1100
+      description: Edge gateway with built-in warehouse management system
+      description_zh: 边缘网关，内置智慧仓管系统
+    nvidia_agx_orin:
+      name: NVIDIA AGX Orin
+      name_zh: NVIDIA AGX Orin
+      image: gallery/agx-orin.png
+      product_url: https://www.seeedstudio.com/agx-orin
+      description: Edge AI computer for local LLM/TTS processing, required for edge computing mode
+      description_zh: 边缘 AI 计算机，用于本地 LLM/TTS 处理，边缘方案选配
   stats:
     deployed_count: 0
     likes_count: 0
@@ -44,16 +66,79 @@ intro:
     badge_zh: 推荐
     description: Connect to SenseCraft cloud, quick setup and low cost
     description_zh: 需要外网 · 连接 SenseCraft 云服务 · 快速部署、低成本起步
+    architecture_image: gallery/architecture-cloud.png
+    device_groups:
+    - id: watcher
+      name: Voice Assistant
+      name_zh: 语音助手
+      type: single
+      required: true
+      options:
+      - device_ref: sensecap_watcher
+      default: sensecap_watcher
+    - id: edge_gateway
+      name: Edge Gateway
+      name_zh: 边缘网关
+      type: single
+      required: true
+      options:
+      - device_ref: recomputer_r1100
+      default: recomputer_r1100
   - id: private_cloud
     name: Private Cloud
     name_zh: 私有云方案
     description: Self-hosted warehouse system, use external cloud API for LLM/TTS
     description_zh: 需要外网 · 仓管系统本地部署 · 调用外部云 API (LLM/TTS) · 数据隐私要求高
+    architecture_image: gallery/architecture-private.png
+    device_groups:
+    - id: watcher
+      name: Voice Assistant
+      name_zh: 语音助手
+      type: single
+      required: true
+      options:
+      - device_ref: sensecap_watcher
+      default: sensecap_watcher
+    - id: edge_gateway
+      name: Edge Gateway
+      name_zh: 边缘网关
+      type: single
+      required: true
+      options:
+      - device_ref: recomputer_r1100
+      default: recomputer_r1100
   - id: edge_computing
     name: Edge Computing
     name_zh: 边缘计算方案
     description: Pure LAN deployment, all processing on local edge devices
     description_zh: 纯局域网 · 数据不出厂区 · 离线/弱网环境适用
+    disabled: true
+    architecture_image: gallery/architecture-edge.png
+    device_groups:
+    - id: watcher
+      name: Voice Assistant
+      name_zh: 语音助手
+      type: single
+      required: true
+      options:
+      - device_ref: sensecap_watcher
+      default: sensecap_watcher
+    - id: edge_gateway
+      name: Edge Gateway
+      name_zh: 边缘网关
+      type: single
+      required: true
+      options:
+      - device_ref: recomputer_r1100
+      default: recomputer_r1100
+    - id: ai_compute
+      name: AI Compute
+      name_zh: AI 算力
+      type: single
+      required: true
+      options:
+      - device_ref: nvidia_agx_orin
+      default: nvidia_agx_orin
   partners:
   - name: 深圳矽递科技
     name_zh: 深圳矽递科技
