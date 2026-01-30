@@ -1,14 +1,51 @@
+---
+name: optimize-solution
+description: 优化 IoT 解决方案文案。检查并改进 solutions/ 目录下的介绍页和部署页文案，确保非技术用户能理解。使用场景：优化文案、检查术语、修复文案问题。
+argument-hint: "<solution_id> [修改方向]"
+allowed-tools: Read, Write, Edit, Glob, Grep
+---
+
 # Solution Copywriting Skill
 
----
-name: solution-copywriting
-description: 解决方案文案编写规范 - 帮助创建或优化 IoT 解决方案的介绍页和部署页文案
-allowed-tools:
-  - Read
-  - Write
-  - Edit
-  - Glob
-  - Grep
+## 调用方式
+
+```
+/optimize-solution smart_warehouse                    # 全面检查
+/optimize-solution smart_warehouse 介绍页术语太专业    # 指定修改方向
+/optimize-solution smart_warehouse 部署步骤不清晰
+/optimize-solution smart_warehouse 添加故障排查表格
+```
+
+## 参数说明
+
+- `$0` = solution_id（必填）
+- `$1...` = 修改方向（可选，自然语言描述）
+
+## 执行流程
+
+**Step 1**: 读取方案文件
+- `solutions/$0/solution.yaml`
+- `solutions/$0/intro/description_zh.md`
+- `solutions/$0/deploy/sections/*.md`
+
+**如果指定了修改方向 (`$1`)**: 优先按用户指定方向修改，跳过无关检查项。
+
+**Step 2**: 介绍页检查（对照下方「一、介绍页文案标准」）
+- [ ] 有「这个方案能帮你做什么」段落？
+- [ ] 有「核心价值」表格？
+- [ ] 有「适用场景」示例？
+- [ ] 有「使用须知」限制说明？
+- [ ] 专业术语已替换？
+
+**Step 3**: 部署页检查（对照下方「三、部署页文案标准」）
+- [ ] description 只包含准备工作？
+- [ ] troubleshoot 包含故障排查？
+- [ ] 无"完成后"内容错位？
+
+**Step 4**: 输出改进报告
+- 按 P0/P1/P2 分类问题
+- 提供修改建议或直接修改
+
 ---
 
 ## 概述
@@ -323,57 +360,259 @@ post_deployment:
 
 ---
 
-## 七、方案改进优先级参考
+## 七、常见文案问题及修复
 
-| 优先级 | 方案 | 主要问题 |
-|-------|------|---------|
-| P0 | missionpack_knn | 文案抽象，术语多 |
-| P0 | smart_warehouse | 步骤复杂，缺架构说明 |
-| P1 | recamera_heatmap_grafana | 术语多，缺应用示例 |
-| P1 | smart_retail_voice_ai | 缺接线图 |
-| P1 | smart_space_assistant | section 有"完成后"错位 |
-| P2 | indoor_positioning_ble_lorawan | 定位模式解释不直观 |
-| ✓ | recamera_heatmap_grafana | 结构良好，作为参考 |
+### 高优先级问题（P0）
+
+| 问题类型 | 表现 | 修复方法 |
+|---------|------|---------|
+| 术语堆砌 | 首段出现 3+ 专业术语 | 用「术语通俗化对照表」替换 |
+| 价值模糊 | 无法 30 秒说清"干什么用" | 重写「这个方案能帮你做什么」段落 |
+| 步骤缺失 | 用户卡在某步不知道下一步 | 补充 wiring.steps 或 description |
+
+### 中优先级问题（P1）
+
+| 问题类型 | 表现 | 修复方法 |
+|---------|------|---------|
+| 缺接线图 | 硬件连接方式不清晰 | 添加 wiring.image |
+| 完成后错位 | section 中包含"部署成功后"内容 | 移到 post_deployment |
+| 缺故障排查 | 部署失败后无指引 | 添加 troubleshoot_file |
+
+### 低优先级问题（P2）
+
+| 问题类型 | 表现 | 修复方法 |
+|---------|------|---------|
+| 场景抽象 | 只说功能，不说具体怎么用 | 添加对话示例或操作流程 |
+| 限制不透明 | 不告知能力边界 | 补充「使用须知」段落 |
+
+### 优秀方案参考
+
+- `recamera_heatmap_grafana` - 结构完整，targets 配置规范
+- `smart_space_assistant` - preset 分离清晰，wiring 说明详细
 
 ---
 
 ## 八、配置结构说明
 
-### 新架构：preset.devices
+### 1. device_catalog（设备目录）
 
-从 v1.1 开始，部署步骤定义在 `intro.presets[].devices` 中，不再使用 `deployment.devices`。
+在 `intro.device_catalog` 中定义方案使用的所有设备，供 presets 引用：
+
+```yaml
+intro:
+  device_catalog:
+    sensecap_watcher:
+      name: SenseCAP Watcher
+      name_zh: SenseCAP Watcher
+      image: intro/gallery/watcher.svg
+      product_url: https://www.seeedstudio.com/sensecap-watcher
+      description: AI-powered voice assistant
+      description_zh: AI 语音助手
+
+    recomputer_r1100:
+      name: reComputer R1100
+      name_zh: reComputer R1100
+      image: intro/gallery/recomputer.svg
+      product_url: https://www.seeedstudio.com/recomputer-r1100
+      description: Edge gateway for services
+      description_zh: 边缘网关
+```
+
+### 2. presets（部署套餐）
+
+每个 preset 是一个完整的部署方案，包含设备选择和部署步骤：
 
 ```yaml
 intro:
   presets:
-    - id: preset_a
-      name: Preset A
+    - id: cloud_mode
+      name: Cloud Mode
+      name_zh: 云端模式
+      badge: Recommended           # 角标（可选）
+      badge_zh: 推荐
+      description: Use cloud services
+      description_zh: 使用云服务
+      architecture_image: intro/gallery/arch.svg  # 架构图（可选）
+      links:                       # 相关链接
+        wiki: https://wiki.seeedstudio.com/...
+        github: https://github.com/...
+
+      # 设备组选择（用户在页面上选择设备）
+      device_groups:
+        - id: voice_assistant
+          name: Voice Assistant
+          name_zh: 语音助手
+          type: single             # single | multiple
+          required: true
+          options:
+            - device_ref: sensecap_watcher  # 引用 device_catalog
+          default: sensecap_watcher
+
+      # preset 级别的部署指南
+      section:
+        title: Cloud Deployment Guide
+        title_zh: 云端部署指南
+        description_file: deploy/sections/cloud_guide.md
+        description_file_zh: deploy/sections/cloud_guide_zh.md
+
+      # 部署步骤列表
       devices:
         - id: step1
-          name: Step 1
-          type: manual
+          name: Step Name
+          name_zh: 步骤名称
+          type: docker_deploy      # 见下方类型说明
+          required: true
+          config_file: devices/config.yaml
           section:
-            description_file: deploy/sections/step1.md
-            troubleshoot_file: deploy/sections/step1_troubleshoot.md
-        - id: step2
-          name: Step 2
-          type: docker_deploy
-          section:
-            description_file: deploy/sections/step2.md
-
-deployment:
-  devices: []   # 保持为空
-  order: []     # 保持为空
+            title: Step Title
+            title_zh: 步骤标题
+          targets: ...             # 见下方 targets 说明
 ```
 
-### 优势
+**设备类型 (type)**：
+- `manual` - 手动步骤（仅显示说明）
+- `docker_deploy` - Docker 容器部署
+- `esp32_usb` - ESP32 USB 烧录
+- `himax_usb` - Himax 芯片烧录
+- `recamera_cpp` - reCamera C++ 应用部署
+- `recamera_nodered` - reCamera Node-RED 部署
+- `script` - 脚本执行
+- `preview` - 预览功能
 
-1. **更清晰**：一眼看出每个套餐包含哪些部署步骤
-2. **更灵活**：不同套餐可以有完全不同的步骤顺序
-3. **无歧义**：不需要理解复杂的 show_when 条件逻辑
+### 3. targets（部署目标）
+
+支持同一步骤部署到不同目标（本机/远程）：
+
+```yaml
+devices:
+  - id: backend
+    name: Deploy Backend
+    name_zh: 部署后端
+    type: docker_deploy
+    section:
+      title: Deploy Backend Services
+      title_zh: 部署后端服务
+    targets:
+      local:
+        name: Local Deployment
+        name_zh: 本机部署
+        description: Deploy on this computer
+        description_zh: 部署到当前电脑
+        default: true              # 默认选项
+        config_file: devices/backend_local.yaml
+        section:
+          description_file: deploy/sections/backend_local.md
+          description_file_zh: deploy/sections/backend_local_zh.md
+          troubleshoot_file: deploy/sections/backend_troubleshoot.md
+          troubleshoot_file_zh: deploy/sections/backend_troubleshoot_zh.md
+          wiring: ...              # 见下方 wiring 说明
+
+      remote:
+        name: Remote Deployment
+        name_zh: 远程部署
+        description: Deploy via SSH
+        description_zh: 通过 SSH 部署
+        config_file: devices/backend_remote.yaml
+        section:
+          description_file: deploy/sections/backend_remote.md
+          description_file_zh: deploy/sections/backend_remote_zh.md
+```
+
+### 4. wiring（接线说明）
+
+在 section 中添加可视化接线指引：
+
+```yaml
+section:
+  description_file: deploy/sections/step.md
+  description_file_zh: deploy/sections/step_zh.md
+  wiring:
+    image: intro/gallery/wiring.svg   # 接线示意图
+    steps:
+      - Connect device to computer via USB-C
+      - Select the serial port
+      - Click Deploy button
+    steps_zh:
+      - 用 USB-C 线连接设备到电脑
+      - 选择串口
+      - 点击部署按钮
+```
+
+### 5. post_deployment（部署完成后）
+
+定义部署成功后的提示和后续步骤：
+
+```yaml
+deployment:
+  post_deployment:
+    success_message_file: deploy/success.md
+    success_message_file_zh: deploy/success_zh.md
+    next_steps:
+      - title: Access Web Interface
+        title_zh: 访问 Web 界面
+        action: open_url
+        url: "http://localhost:8080"
+      - title: View Documentation
+        title_zh: 查看文档
+        description: Learn more about the features
+        description_zh: 了解更多功能
+        action: open_url
+        url: "https://wiki.seeedstudio.com/..."
+```
+
+### 6. 完整配置骨架
+
+```yaml
+version: "1.0"
+id: solution_id
+name: Solution Name
+name_zh: 方案名称
+
+intro:
+  summary: One-line description
+  summary_zh: 一句话描述
+  description_file: intro/description.md
+  description_file_zh: intro/description_zh.md
+  cover_image: intro/gallery/cover.svg
+  gallery: [...]
+  category: voice_ai
+  tags: [...]
+
+  device_catalog:
+    device_id: { ... }
+
+  presets:
+    - id: preset_id
+      name: ...
+      device_groups: [...]
+      section: { ... }
+      devices: [...]
+
+  stats:
+    difficulty: beginner | intermediate | advanced
+    estimated_time: 30min
+    deployed_count: 0
+    likes_count: 0
+
+  links:
+    wiki: https://...
+    github: https://...
+
+  partners: [...]    # 可选
+
+deployment:
+  guide_file: deploy/guide.md
+  guide_file_zh: deploy/guide_zh.md
+  selection_mode: sequential
+  devices: []        # 保持为空
+  order: []          # 保持为空
+  post_deployment:
+    success_message_file: deploy/success.md
+    success_message_file_zh: deploy/success_zh.md
+    next_steps: [...]
+```
 
 ### 参考文档
 
 - 完整配置指南：`docs/solution-configuration-guide.md`
 - 从 Wiki 创建方案：`.claude/skills/add-solution-from-wiki.md`
-- 修改现有方案：`.claude/skills/modify-solution.md`

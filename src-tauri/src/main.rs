@@ -186,6 +186,93 @@ fn force_kill_by_name() {
     }
 }
 
+/// Cleanup any leftover provisioning-station processes from previous runs (cross-platform)
+/// Returns the number of processes killed
+fn cleanup_leftover_processes() -> u32 {
+    let mut killed_count = 0;
+
+    #[cfg(unix)]
+    {
+        use std::process::Command;
+
+        // Find all provisioning-station processes (exclude grep itself)
+        let output = Command::new("pgrep")
+            .args(["-f", "provisioning-station"])
+            .output();
+
+        if let Ok(output) = output {
+            let pids_str = String::from_utf8_lossy(&output.stdout);
+            for line in pids_str.lines() {
+                if let Ok(pid) = line.trim().parse::<u32>() {
+                    println!("Found leftover provisioning-station process: PID {}", pid);
+
+                    // Try graceful termination first
+                    let _ = Command::new("kill")
+                        .args(["-15", &pid.to_string()])
+                        .output();
+
+                    // Wait briefly
+                    std::thread::sleep(Duration::from_millis(500));
+
+                    // Check if still running, force kill if needed
+                    if is_process_running(pid) {
+                        println!("  Force killing PID {}...", pid);
+                        force_kill_process(pid);
+                    } else {
+                        println!("  Terminated gracefully");
+                    }
+                    killed_count += 1;
+                }
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+
+        // Use wmic to find provisioning-station processes
+        let output = Command::new("wmic")
+            .args([
+                "process",
+                "where",
+                "name like '%provisioning-station%'",
+                "get",
+                "processid",
+            ])
+            .output();
+
+        if let Ok(output) = output {
+            let pids_str = String::from_utf8_lossy(&output.stdout);
+            for line in pids_str.lines().skip(1) {
+                // Skip header
+                if let Ok(pid) = line.trim().parse::<u32>() {
+                    println!("Found leftover provisioning-station process: PID {}", pid);
+
+                    // On Windows, just force terminate
+                    let _ = Command::new("taskkill")
+                        .args(["/F", "/PID", &pid.to_string(), "/T"])
+                        .output();
+
+                    killed_count += 1;
+                    println!("  Terminated");
+                }
+            }
+        }
+    }
+
+    if killed_count > 0 {
+        println!(
+            "Cleaned up {} leftover provisioning-station process(es)",
+            killed_count
+        );
+        // Give the system time to release resources
+        std::thread::sleep(Duration::from_millis(500));
+    }
+
+    killed_count
+}
+
 /// Gracefully shutdown the sidecar with timeout
 /// Returns true if process exited gracefully, false if force killed
 fn shutdown_sidecar_graceful() -> bool {
@@ -398,6 +485,12 @@ async fn start_sidecar(
     if SIDECAR_STARTED.load(Ordering::SeqCst) {
         log::info!("Sidecar already started");
         return Ok(());
+    }
+
+    // Clean up any leftover processes from previous runs
+    let cleaned = cleanup_leftover_processes();
+    if cleaned > 0 {
+        log::info!("Cleaned up {} leftover process(es)", cleaned);
     }
 
     log::info!("Starting provisioning-station sidecar on port {}", port);

@@ -919,18 +919,26 @@ class SolutionManager:
                     "required": device_data.get("required", True),
                 }
 
-                # Add section if description files are provided
-                if device_data.get("description_file") or device_data.get(
+                # Add section if provided (supports both nested and flat formats)
+                section_data = device_data.get("section", {})
+                desc_file = section_data.get(
+                    "description_file"
+                ) or device_data.get("description_file")
+                desc_file_zh = section_data.get(
                     "description_file_zh"
-                ):
+                ) or device_data.get("description_file_zh")
+
+                if desc_file or desc_file_zh or section_data:
                     new_device["section"] = {
-                        "title": device_data.get("section_title", device_data["name"]),
-                        "title_zh": device_data.get(
+                        "title": section_data.get("title")
+                        or device_data.get("section_title", device_data["name"]),
+                        "title_zh": section_data.get("title_zh")
+                        or device_data.get(
                             "section_title_zh",
                             device_data.get("name_zh", device_data["name"]),
                         ),
-                        "description_file": device_data.get("description_file"),
-                        "description_file_zh": device_data.get("description_file_zh"),
+                        "description_file": desc_file,
+                        "description_file_zh": desc_file_zh,
                     }
 
                 preset["devices"].append(new_device)
@@ -991,8 +999,9 @@ class SolutionManager:
                             if key in device_data:
                                 device[key] = device_data[key]
 
-                        # Update section
-                        if any(
+                        # Update section (supports both nested and flat formats)
+                        section_data = device_data.get("section", {})
+                        has_section_update = section_data or any(
                             k in device_data
                             for k in [
                                 "description_file",
@@ -1000,22 +1009,39 @@ class SolutionManager:
                                 "section_title",
                                 "section_title_zh",
                             ]
-                        ):
+                        )
+
+                        if has_section_update:
                             if "section" not in device:
                                 device["section"] = {}
-                            if "description_file" in device_data:
+
+                            # Handle nested section object
+                            if section_data.get("description_file"):
+                                device["section"]["description_file"] = section_data[
+                                    "description_file"
+                                ]
+                            elif "description_file" in device_data:
                                 device["section"]["description_file"] = device_data[
                                     "description_file"
                                 ]
-                            if "description_file_zh" in device_data:
+
+                            if section_data.get("description_file_zh"):
+                                device["section"]["description_file_zh"] = section_data[
+                                    "description_file_zh"
+                                ]
+                            elif "description_file_zh" in device_data:
                                 device["section"]["description_file_zh"] = device_data[
                                     "description_file_zh"
                                 ]
-                            if "section_title" in device_data:
-                                device["section"]["title"] = device_data[
-                                    "section_title"
-                                ]
-                            if "section_title_zh" in device_data:
+
+                            if section_data.get("title"):
+                                device["section"]["title"] = section_data["title"]
+                            elif "section_title" in device_data:
+                                device["section"]["title"] = device_data["section_title"]
+
+                            if section_data.get("title_zh"):
+                                device["section"]["title_zh"] = section_data["title_zh"]
+                            elif "section_title_zh" in device_data:
                                 device["section"]["title_zh"] = device_data[
                                     "section_title_zh"
                                 ]
