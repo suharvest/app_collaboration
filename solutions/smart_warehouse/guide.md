@@ -2,14 +2,14 @@
 
 ## Step 1: Warehouse System {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
 
-### Target: Local Deployment {#warehouse_local config=devices/recomputer.yaml default=true}
+### Target: Local Deployment {#warehouse_local config=devices/recomputer.yaml}
 
 ![Wiring](intro/gallery/api-endpoint.png)
 
 1. Ensure Docker is installed and running
 2. Click Deploy button to start services
 
-### Target: Remote Deployment {#warehouse_remote config=devices/warehouse_remote.yaml}
+### Target: Remote Deployment (R1100) {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
 
 ![Wiring](intro/gallery/api-endpoint.png)
 
@@ -68,14 +68,14 @@
 
 ## Step 1: Warehouse System {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
 
-### Target: Local Deployment {#warehouse_local config=devices/recomputer.yaml default=true}
+### Target: Local Deployment {#warehouse_local config=devices/recomputer.yaml}
 
 ![Wiring](intro/gallery/api-endpoint.png)
 
 1. Ensure Docker is installed and running
 2. Click Deploy button to start services
 
-### Target: Remote Deployment {#warehouse_remote config=devices/warehouse_remote.yaml}
+### Target: Remote Deployment (R1100) {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
 
 ![Wiring](intro/gallery/api-endpoint.png)
 
@@ -134,14 +134,14 @@
 
 ## Step 1: Warehouse System {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
 
-### Target: Local Deployment {#warehouse_local config=devices/recomputer.yaml default=true}
+### Target: Local Deployment {#warehouse_local config=devices/recomputer.yaml}
 
 ![Wiring](intro/gallery/api-endpoint.png)
 
 1. Ensure Docker is installed and running
 2. Click Deploy button to start services
 
-### Target: Remote Deployment {#warehouse_remote config=devices/warehouse_remote.yaml}
+### Target: Remote Deployment (R1100) {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
 
 ![Wiring](intro/gallery/api-endpoint.png)
 

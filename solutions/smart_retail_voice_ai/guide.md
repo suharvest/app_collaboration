@@ -9,15 +9,6 @@ This solution deploys a complete edge-based voice AI system for retail environme
 
 ## Preset: Standard Deployment {#default}
 
-This solution deploys a complete edge-based voice AI system for retail environments.
-
-## Prerequisites
-
-- reRouter CM4 with at least 4GB RAM and 32GB storage
-- reSpeaker XVF3800 4-mic array
-- USB-C cable for reSpeaker configuration
-- Network cable for reRouter connection
-
 ## Step 1: Flash OpenWrt Firmware {#firmware type=manual required=true config=devices/firmware.yaml}
 
 ### Flash Firmware
@@ -26,14 +17,6 @@ This solution deploys a complete edge-based voice AI system for retail environme
 2. Flash to reRouter using Raspberry Pi Imager
 3. Connect WAN to router, LAN to computer
 4. Visit `http://192.168.49.1`, login with root (empty password)
-
-### Wiring
-
-1. Download the firmware for your region
-2. Flash firmware to reRouter using the flashing tool
-3. Connect WAN port to internet, LAN port to computer
-
-### Troubleshooting
 
 ### Troubleshooting
 
@@ -60,14 +43,6 @@ This solution deploys a complete edge-based voice AI system for retail environme
    ```
 4. Disconnect from computer, connect reSpeaker to **reRouter USB port**
 
-### Wiring
-
-1. Connect reSpeaker to your computer via USB
-2. Clone the configuration repository
-3. Run the configuration commands
-
-### Troubleshooting
-
 ### Troubleshooting
 
 | Issue | Solution |
@@ -83,28 +58,22 @@ This solution deploys a complete edge-based voice AI system for retail environme
 
 ### Target: Local Deployment {#voice_services_local config=devices/voice_local.yaml}
 
-# Local Deployment
+## Local Deployment
 
 Deploy voice services on your local computer.
 
-## Requirements
+### Requirements
 
 - Docker Desktop installed and running
 - reSpeaker XVF3800 connected via USB
 - At least 2GB free disk space
 - Port 8090 available
 
-## After Deployment
+### After Deployment
 
 1. Run `docker ps` to verify containers are running
 2. Open `http://localhost:8090` to access edge client
 3. Start real-time voice transcription testing
-
-1. Connect reSpeaker to computer USB port
-2. Ensure Docker is installed and running
-3. Click Deploy button to start services
-
-#### Troubleshooting
 
 ### Troubleshooting
 
@@ -117,11 +86,11 @@ Deploy voice services on your local computer.
 
 ### Target: Remote Deployment {#voice_services_remote config=devices/rerouter.yaml default=true}
 
-# Remote Deployment
+## Remote Deployment
 
 Deploy voice services to a remote device (reRouter, Raspberry Pi, etc.).
 
-## Before You Begin
+### Before You Begin
 
 1. **Connect target device to the network**
    - Ensure the device is on the same network as your computer
@@ -131,7 +100,7 @@ Deploy voice services to a remote device (reRouter, Raspberry Pi, etc.).
    - SSH username (usually `root` for OpenWrt)
    - SSH password (empty by default on OpenWrt)
 
-## Connection Settings
+### Connection Settings
 
 Enter the following information:
 
@@ -140,19 +109,13 @@ Enter the following information:
 | Device IP | Target device IP address | 192.168.49.1 |
 | SSH Password | Login password (optional) | your-password |
 
-## After Deployment
+### After Deployment
 
 1. SSH and run `docker ps` to verify three containers are running
 2. Visit `http://192.168.49.1:8090` to open edge client
 3. Start real-time voice transcription testing
 
 ![Wiring](intro/gallery/wan_lan.png)
-
-1. Connect reSpeaker to reRouter USB port
-2. Enter SSH credentials
-3. Deploy Docker containers
-
-#### Troubleshooting
 
 ### Troubleshooting
 

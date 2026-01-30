@@ -50,8 +50,6 @@ After deployment, use MQTT topic `recamera/yolo11/detections` in the preview ste
 
 ### Target: YOLO26 (~3 FPS) {#deploy_detector_yolo26 config=devices/recamera_yolo26.yaml}
 
-### Troubleshooting
-
 The service will automatically start on device boot. You can verify it's working by checking the preview in the next step.
 
 ### Troubleshooting
@@ -104,11 +102,6 @@ Deploy the database and dashboard services on your computer.
 
 ![Wiring](intro/gallery/architecture.svg)
 
-1. Ensure Docker is installed and running
-2. Click Deploy button to start services
-
-#### Troubleshooting
-
 ### Troubleshooting
 
 | Issue | Possible Cause | Solution |
@@ -157,10 +150,6 @@ Access Grafana: `http://<device-ip>:3000`
 
 ![Wiring](intro/gallery/architecture.svg)
 
-1. Connect target device to network
-2. Enter IP address and SSH credentials
-3. Click Deploy to install on remote device
-
 ---
 
 ## Step 2: Configure reCamera {#recamera type=recamera_nodered required=true config=devices/recamera.yaml}
@@ -177,8 +166,6 @@ Set up reCamera to send detected traffic data to the database.
    - URL: `http://<your-computer-ip>:8086`
    - Paste the API token from the previous step
 4. Click Deploy to activate the flow
-
-### Troubleshooting
 
 ### Troubleshooting
 
@@ -210,8 +197,6 @@ Connect the database to Grafana and import the pre-built chart templates.
 4. Import chart templates:
    - Go to **Dashboards** > **Import**
    - Upload the dashboard JSON file provided with this solution
-
-### Troubleshooting
 
 ### Troubleshooting
 
@@ -248,8 +233,6 @@ Calibrate the camera view to match your floor plan, so traffic data displays cor
 4. **Start the Service**
    - Run `python -m http.server 8080`
    - Open `http://localhost:8080` in your browser to view the result
-
-### Troubleshooting
 
 ### Troubleshooting
 
