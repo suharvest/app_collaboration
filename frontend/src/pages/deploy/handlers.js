@@ -541,10 +541,10 @@ export async function handleDeviceGroupSelectorChange(groupId, selectedDevice) {
 
 /**
  * Update docker target UI when user switches between local/remote
- * Wrapper that passes the testSSHConnection handler
+ * Wrapper that passes the testSSHConnection and scanMdnsDevices handlers
  */
 export function updateDockerTargetUI(deviceId, container) {
-  baseUpdateDockerTargetUI(deviceId, container, testSSHConnection);
+  baseUpdateDockerTargetUI(deviceId, container, testSSHConnection, scanMdnsDevices);
 }
 
 /**
