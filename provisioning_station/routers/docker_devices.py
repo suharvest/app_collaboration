@@ -151,8 +151,9 @@ async def local_remove_app(
     solution_id: str,
     container_names: str = Query(..., description="Comma-separated container names"),
     remove_images: bool = False,
+    remove_volumes: bool = False,
 ):
-    """Remove all containers for an app on local machine, optionally removing images"""
+    """Remove all containers for an app on local machine, optionally removing images and volumes"""
     try:
         names_list = [n.strip() for n in container_names.split(",") if n.strip()]
         if not names_list:
@@ -162,6 +163,7 @@ async def local_remove_app(
             solution_id=solution_id,
             container_names=names_list,
             remove_images=remove_images,
+            remove_volumes=remove_volumes,
         )
         return result
     except (RuntimeError, ValueError) as e:
@@ -184,8 +186,9 @@ async def remove_app(
     solution_id: str = Query(...),
     container_names: str = Query(..., description="Comma-separated container names"),
     remove_images: bool = False,
+    remove_volumes: bool = False,
 ):
-    """Remove all containers for an app on remote device, optionally removing images"""
+    """Remove all containers for an app on remote device, optionally removing images and volumes"""
     try:
         names_list = [n.strip() for n in container_names.split(",") if n.strip()]
         if not names_list:
@@ -196,6 +199,7 @@ async def remove_app(
             solution_id=solution_id,
             container_names=names_list,
             remove_images=remove_images,
+            remove_volumes=remove_volumes,
         )
         return result
     except (RuntimeError, ValueError) as e:

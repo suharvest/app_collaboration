@@ -270,11 +270,16 @@ export async function renderDevicesPage() {
         <h3 class="modal-title">${t('devices.actions.confirmRemove')}</h3>
         <p class="text-text-secondary mb-4">${t('devices.actions.confirmRemoveMessage')}</p>
         <p class="text-sm text-text-muted mb-2" id="remove-app-name"></p>
-        <label class="flex items-center gap-2 mb-4 cursor-pointer">
+        <label class="flex items-center gap-2 mb-2 cursor-pointer">
           <input type="checkbox" id="remove-images-checkbox" class="checkbox">
           <span class="text-sm">${t('devices.actions.removeWithImages')}</span>
         </label>
-        <p class="text-xs text-text-muted mb-4">${t('devices.actions.removeWithImagesHint')}</p>
+        <p class="text-xs text-text-muted mb-3">${t('devices.actions.removeWithImagesHint')}</p>
+        <label class="flex items-center gap-2 mb-2 cursor-pointer">
+          <input type="checkbox" id="remove-volumes-checkbox" class="checkbox">
+          <span class="text-sm">${t('devices.actions.removeWithVolumes')}</span>
+        </label>
+        <p class="text-xs text-text-muted mb-4">${t('devices.actions.removeWithVolumesHint')}</p>
         <div class="flex gap-3 justify-end">
           <button type="button" class="btn btn-secondary" id="remove-app-cancel">${t('common.cancel')}</button>
           <button type="button" class="btn btn-danger" id="remove-app-confirm">${t('devices.actions.remove')}</button>
@@ -809,11 +814,13 @@ let pendingRemoveApp = null;
 function showRemoveAppModal(solutionId, containerNames, solutionName) {
   const modal = document.getElementById('remove-app-modal');
   const appNameEl = document.getElementById('remove-app-name');
-  const checkbox = document.getElementById('remove-images-checkbox');
+  const imagesCheckbox = document.getElementById('remove-images-checkbox');
+  const volumesCheckbox = document.getElementById('remove-volumes-checkbox');
 
   pendingRemoveApp = { solutionId, containerNames };
   appNameEl.textContent = solutionName;
-  checkbox.checked = false;
+  imagesCheckbox.checked = false;
+  volumesCheckbox.checked = false;
   modal.style.display = 'flex';
 }
 
@@ -832,6 +839,7 @@ function setupRemoveAppModal() {
 
     const { solutionId, containerNames } = pendingRemoveApp;
     const removeImages = document.getElementById('remove-images-checkbox').checked;
+    const removeVolumes = document.getElementById('remove-volumes-checkbox').checked;
     const originalText = confirmBtn.innerHTML;
 
     confirmBtn.disabled = true;
@@ -840,9 +848,9 @@ function setupRemoveAppModal() {
     try {
       let result;
       if (currentConnection._local) {
-        result = await dockerDevicesApi.localRemoveApp(solutionId, containerNames, removeImages);
+        result = await dockerDevicesApi.localRemoveApp(solutionId, containerNames, removeImages, removeVolumes);
       } else {
-        result = await dockerDevicesApi.removeApp(currentConnection, solutionId, containerNames, removeImages);
+        result = await dockerDevicesApi.removeApp(currentConnection, solutionId, containerNames, removeImages, removeVolumes);
       }
 
       if (result.success) {

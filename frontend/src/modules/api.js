@@ -944,11 +944,12 @@ export const dockerDevicesApi = {
    * @param {string} containerNames - Comma-separated container names
    * @param {boolean} removeImages - Also remove associated images
    */
-  localRemoveApp(solutionId, containerNames, removeImages = false) {
+  localRemoveApp(solutionId, containerNames, removeImages = false, removeVolumes = false) {
     const params = new URLSearchParams({
       solution_id: solutionId,
       container_names: containerNames,
       remove_images: removeImages.toString(),
+      remove_volumes: removeVolumes.toString(),
     });
     return request(`/docker-devices/local/remove-app?${params}`, {
       method: 'POST',
@@ -973,11 +974,12 @@ export const dockerDevicesApi = {
    * @param {string} containerNames - Comma-separated container names
    * @param {boolean} removeImages - Also remove associated images
    */
-  removeApp(connection, solutionId, containerNames, removeImages = false) {
+  removeApp(connection, solutionId, containerNames, removeImages = false, removeVolumes = false) {
     const params = new URLSearchParams({
       solution_id: solutionId,
       container_names: containerNames,
       remove_images: removeImages.toString(),
+      remove_volumes: removeVolumes.toString(),
     });
     return request(`/docker-devices/remove-app?${params}`, {
       method: 'POST',

@@ -266,8 +266,9 @@ class DockerDeviceManager:
         solution_id: str,
         container_names: List[str],
         remove_images: bool = False,
+        remove_volumes: bool = False,
     ) -> Dict[str, Any]:
-        """Remove all containers for an app, optionally removing images"""
+        """Remove all containers for an app, optionally removing images and volumes"""
         results = []
         images_to_remove = []
 
@@ -340,11 +341,54 @@ class DockerDeviceManager:
                 except Exception as e:
                     images_skipped.append({"image": image, "reason": str(e)})
 
+        # Remove volumes if requested
+        volumes_removed = []
+        volumes_skipped = []
+        if remove_volumes:
+            # Find volumes associated with the solution
+            # Convention: volumes are named like {solution_id}_{volume_name}
+            try:
+                result = await asyncio.to_thread(
+                    subprocess.run,
+                    ["docker", "volume", "ls", "--format", "{{.Name}}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                all_volumes = [v for v in result.stdout.strip().split("\n") if v]
+                # Filter volumes that match the solution_id pattern
+                solution_volumes = [
+                    v for v in all_volumes
+                    if v.startswith(f"{solution_id}_") or v.startswith(solution_id.replace("-", "_") + "_")
+                ]
+
+                for volume in solution_volumes:
+                    try:
+                        vol_result = await asyncio.to_thread(
+                            subprocess.run,
+                            ["docker", "volume", "rm", volume],
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                        )
+                        if vol_result.returncode == 0:
+                            volumes_removed.append(volume)
+                        else:
+                            volumes_skipped.append(
+                                {"volume": volume, "reason": vol_result.stderr.strip()}
+                            )
+                    except Exception as e:
+                        volumes_skipped.append({"volume": volume, "reason": str(e)})
+            except Exception as e:
+                logger.warning(f"Failed to list volumes: {e}")
+
         return {
             "success": all(r["success"] for r in results),
             "containers": results,
             "images_removed": images_removed,
             "images_skipped": images_skipped,
+            "volumes_removed": volumes_removed,
+            "volumes_skipped": volumes_skipped,
         }
 
     async def local_prune_images(self) -> Dict[str, Any]:
@@ -649,8 +693,9 @@ class DockerDeviceManager:
         solution_id: str,
         container_names: List[str],
         remove_images: bool = False,
+        remove_volumes: bool = False,
     ) -> Dict[str, Any]:
-        """Remove all containers for an app on remote device, optionally removing images"""
+        """Remove all containers for an app on remote device, optionally removing images and volumes"""
         results = []
         images_to_remove = []
 
@@ -717,11 +762,39 @@ class DockerDeviceManager:
                         except Exception as e:
                             images_skipped.append({"image": image, "reason": str(e)})
 
+                # Remove volumes if requested
+                volumes_removed = []
+                volumes_skipped = []
+                if remove_volumes:
+                    try:
+                        # List all volumes and filter by solution_id pattern
+                        output = self._exec_command(
+                            client, "docker volume ls --format '{{.Name}}'", timeout=10
+                        )
+                        all_volumes = [v for v in output.strip().split("\n") if v]
+                        solution_volumes = [
+                            v for v in all_volumes
+                            if v.startswith(f"{solution_id}_") or v.startswith(solution_id.replace("-", "_") + "_")
+                        ]
+
+                        for volume in solution_volumes:
+                            try:
+                                self._exec_command(
+                                    client, f"docker volume rm {volume}", timeout=30
+                                )
+                                volumes_removed.append(volume)
+                            except Exception as e:
+                                volumes_skipped.append({"volume": volume, "reason": str(e)})
+                    except Exception as e:
+                        logger.warning(f"Failed to list volumes: {e}")
+
                 return {
                     "success": all(r["success"] for r in results),
                     "containers": results,
                     "images_removed": images_removed,
                     "images_skipped": images_skipped,
+                    "volumes_removed": volumes_removed,
+                    "volumes_skipped": volumes_skipped,
                 }
             finally:
                 client.close()
