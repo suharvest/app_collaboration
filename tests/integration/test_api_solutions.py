@@ -333,3 +333,190 @@ class TestLangParameter:
         with TestClient(app, raise_server_exceptions=False) as client:
             response = client.get("/api/solutions/?lang=invalid")
             assert response.status_code == 422  # Validation error
+
+
+class TestContentFileEndpoints:
+    """Tests for content file upload endpoints"""
+
+    def test_upload_content_file(self, mock_solution):
+        """Test uploading a content file"""
+        from provisioning_station.services.solution_manager import solution_manager
+
+        async def mock_save(solution_id, filename, content):
+            return f"/path/to/{filename}"
+
+        with patch.object(solution_manager, 'save_content_file', new_callable=AsyncMock, side_effect=mock_save):
+            from provisioning_station.main import app
+            with TestClient(app, raise_server_exceptions=False) as client:
+                response = client.post(
+                    "/api/solutions/test_solution/content/guide.md",
+                    json={"content": "# Guide\n\nContent here."}
+                )
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["success"] is True
+                assert "path" in data
+
+    def test_upload_content_file_invalid_filename(self):
+        """Test uploading with invalid filename"""
+        from provisioning_station.services.solution_manager import solution_manager
+
+        async def mock_save(solution_id, filename, content):
+            raise ValueError("Filename must be one of: guide.md, guide_zh.md, description.md, description_zh.md")
+
+        with patch.object(solution_manager, 'save_content_file', new_callable=AsyncMock, side_effect=mock_save):
+            from provisioning_station.main import app
+            with TestClient(app, raise_server_exceptions=False) as client:
+                response = client.post(
+                    "/api/solutions/test_solution/content/invalid.txt",
+                    json={"content": "content"}
+                )
+
+                assert response.status_code == 400
+
+    def test_upload_content_file_solution_not_found(self):
+        """Test uploading to nonexistent solution"""
+        from provisioning_station.services.solution_manager import solution_manager
+
+        async def mock_save(solution_id, filename, content):
+            raise ValueError("Solution not found")
+
+        with patch.object(solution_manager, 'save_content_file', new_callable=AsyncMock, side_effect=mock_save):
+            from provisioning_station.main import app
+            with TestClient(app, raise_server_exceptions=False) as client:
+                response = client.post(
+                    "/api/solutions/nonexistent/content/guide.md",
+                    json={"content": "content"}
+                )
+
+                assert response.status_code == 400
+
+
+class TestPreviewStructureEndpoint:
+    """Tests for structure preview endpoint"""
+
+    def test_get_preview_structure(self, mock_solution):
+        """Test getting structure preview"""
+        from provisioning_station.services.solution_manager import solution_manager
+
+        mock_preview = {
+            "presets": [
+                {
+                    "id": "cloud",
+                    "name": "Cloud Solution",
+                    "name_zh": "云方案",
+                    "steps": [
+                        {"id": "deploy", "name": "Deploy", "type": "docker_deploy", "required": True}
+                    ]
+                }
+            ],
+            "post_deployment": {
+                "success_message": "Congratulations!",
+                "next_steps": []
+            },
+            "validation": {"valid": True}
+        }
+
+        with patch.object(solution_manager, 'get_solution', return_value=mock_solution):
+            with patch.object(solution_manager, 'get_structure_preview', new_callable=AsyncMock, return_value=mock_preview):
+                from provisioning_station.main import app
+                with TestClient(app, raise_server_exceptions=False) as client:
+                    response = client.get("/api/solutions/test_solution/preview-structure")
+
+                    assert response.status_code == 200
+                    data = response.json()
+                    assert "presets" in data
+                    assert len(data["presets"]) == 1
+                    assert data["presets"][0]["id"] == "cloud"
+
+    def test_get_preview_structure_not_found(self):
+        """Test preview structure for nonexistent solution"""
+        from provisioning_station.services.solution_manager import solution_manager
+
+        with patch.object(solution_manager, 'get_structure_preview', new_callable=AsyncMock, return_value=None):
+            from provisioning_station.main import app
+            with TestClient(app, raise_server_exceptions=False) as client:
+                response = client.get("/api/solutions/nonexistent/preview-structure")
+
+                assert response.status_code == 404
+
+
+class TestRequiredDevicesEndpoint:
+    """Tests for required devices endpoint"""
+
+    def test_update_required_devices(self):
+        """Test updating required devices"""
+        from provisioning_station.services.solution_manager import solution_manager
+
+        mock_updated = [
+            {"id": "sensecap_watcher", "name": "SenseCAP Watcher", "name_zh": "SenseCAP 监视器"},
+            {"id": "recomputer_j4012", "name": "reComputer J4012", "name_zh": "reComputer J4012"}
+        ]
+
+        with patch.object(solution_manager, 'update_required_devices', new_callable=AsyncMock, return_value=mock_updated):
+            from provisioning_station.main import app
+            with TestClient(app, raise_server_exceptions=False) as client:
+                response = client.put(
+                    "/api/solutions/test_solution/required-devices",
+                    json={"device_ids": ["sensecap_watcher", "recomputer_j4012"]}
+                )
+
+                assert response.status_code == 200
+                data = response.json()
+                assert "devices" in data
+                assert len(data["devices"]) == 2
+
+    def test_update_required_devices_solution_not_found(self):
+        """Test updating devices for nonexistent solution"""
+        from provisioning_station.services.solution_manager import solution_manager
+
+        async def mock_update(solution_id, device_ids):
+            raise ValueError("Solution not found")
+
+        with patch.object(solution_manager, 'update_required_devices', new_callable=AsyncMock, side_effect=mock_update):
+            from provisioning_station.main import app
+            with TestClient(app, raise_server_exceptions=False) as client:
+                response = client.put(
+                    "/api/solutions/nonexistent/required-devices",
+                    json={"device_ids": ["device1"]}
+                )
+
+                assert response.status_code == 404
+
+
+class TestDeviceCatalogEndpoint:
+    """Tests for device catalog endpoint"""
+
+    def test_get_device_catalog(self):
+        """Test getting device catalog"""
+        from provisioning_station.services.solution_manager import solution_manager
+
+        mock_catalog = [
+            {"id": "sensecap_watcher", "name": "SenseCAP Watcher", "name_zh": "SenseCAP 监视器", "category": "sensing"},
+            {"id": "recomputer_j4012", "name": "reComputer J4012", "name_zh": "reComputer J4012", "category": "computing"}
+        ]
+
+        with patch.object(solution_manager, 'get_device_catalog_list', return_value=mock_catalog):
+            from provisioning_station.main import app
+            with TestClient(app, raise_server_exceptions=False) as client:
+                response = client.get("/api/devices/catalog")
+
+                assert response.status_code == 200
+                data = response.json()
+                assert "devices" in data
+                assert len(data["devices"]) == 2
+                assert any(d["id"] == "sensecap_watcher" for d in data["devices"])
+
+    def test_get_device_catalog_empty(self):
+        """Test getting empty device catalog"""
+        from provisioning_station.services.solution_manager import solution_manager
+
+        with patch.object(solution_manager, 'get_device_catalog_list', return_value=[]):
+            from provisioning_station.main import app
+            with TestClient(app, raise_server_exceptions=False) as client:
+                response = client.get("/api/devices/catalog")
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["devices"] == []

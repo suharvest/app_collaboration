@@ -15,6 +15,17 @@ import yaml
 from ..config import settings
 from ..models.device import DeviceConfig
 from ..models.solution import Solution
+from .markdown_parser import (
+    parse_bilingual_markdown,
+    parse_deployment_guide,
+    parse_guide_pair,
+    parse_single_language_guide,
+    validate_structure_consistency,
+    ParseResult,
+    StructureValidationResult,
+    DeploymentStep,
+    PresetGuide,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +211,232 @@ class SolutionManager:
             logger.error(f"Failed to load markdown {file_path}: {e}")
             return None
 
+    async def load_bilingual_markdown(
+        self,
+        solution_id: str,
+        relative_path: str,
+        lang: str = "en",
+        convert_to_html: bool = True,
+    ) -> Optional[str]:
+        """Load bilingual markdown and return content for specified language.
+
+        This method handles the new bilingual format with `<!-- @lang:en -->` markers.
+
+        Args:
+            solution_id: The solution ID
+            relative_path: Path to the bilingual markdown file
+            lang: Target language ('en' or 'zh')
+            convert_to_html: Whether to convert to HTML
+
+        Returns:
+            The markdown/HTML content for the specified language
+        """
+        solution = self.get_solution(solution_id)
+        if not solution or not solution.base_path:
+            return None
+
+        file_path = Path(solution.base_path) / relative_path
+        if not file_path.exists():
+            logger.warning(f"Bilingual markdown file not found: {file_path}")
+            return None
+
+        try:
+            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+                content = await f.read()
+
+            # Parse bilingual content
+            lang_content = parse_bilingual_markdown(content, lang)
+
+            if convert_to_html:
+                md = markdown.Markdown(extensions=["extra", "codehilite", "toc"])
+                return md.convert(lang_content)
+            return lang_content
+        except Exception as e:
+            logger.error(f"Failed to load bilingual markdown {file_path}: {e}")
+            return None
+
+    async def parse_deployment_guide(
+        self, solution_id: str, guide_path: str
+    ) -> Optional[ParseResult]:
+        """Parse a deployment guide markdown file.
+
+        Args:
+            solution_id: The solution ID
+            guide_path: Path to the guide.md file
+
+        Returns:
+            ParseResult with parsed steps, presets, and success content
+        """
+        solution = self.get_solution(solution_id)
+        if not solution or not solution.base_path:
+            return None
+
+        file_path = Path(solution.base_path) / guide_path
+        if not file_path.exists():
+            logger.warning(f"Deployment guide not found: {file_path}")
+            return None
+
+        try:
+            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+                content = await f.read()
+
+            result = parse_deployment_guide(content)
+            if result.has_errors:
+                for error in result.errors:
+                    logger.warning(f"Parse error in {guide_path}: {error}")
+            return result
+        except Exception as e:
+            logger.error(f"Failed to parse deployment guide {file_path}: {e}")
+            return None
+
+    async def validate_guide_pair(
+        self, solution_id: str
+    ) -> Optional[StructureValidationResult]:
+        """Validate structure consistency between guide.md and guide_zh.md.
+
+        Args:
+            solution_id: The solution ID
+
+        Returns:
+            StructureValidationResult with validation errors/warnings
+        """
+        solution = self.get_solution(solution_id)
+        if not solution or not solution.base_path:
+            return None
+
+        base_path = Path(solution.base_path)
+
+        # Get guide file paths from solution config
+        guide_en_path = solution.deployment.guide_file or "guide.md"
+        guide_zh_path = solution.deployment.guide_file_zh or "guide_zh.md"
+
+        en_file = base_path / guide_en_path
+        zh_file = base_path / guide_zh_path
+
+        # Check if both files exist
+        en_exists = en_file.exists()
+        zh_exists = zh_file.exists()
+
+        if not en_exists and not zh_exists:
+            result = StructureValidationResult(valid=True)
+            result.warnings.append(
+                type("ParseWarning", (), {"message": "No guide files found", "line_number": None})()
+            )
+            return result
+
+        if not en_exists:
+            from .markdown_parser import ParseError, ParseErrorType, ParseWarning
+            result = StructureValidationResult(valid=False)
+            result.warnings.append(
+                ParseWarning(message=f"English guide not found: {guide_en_path}")
+            )
+            return result
+
+        if not zh_exists:
+            from .markdown_parser import ParseWarning
+            result = StructureValidationResult(valid=True)
+            result.warnings.append(
+                ParseWarning(message=f"Chinese guide not found: {guide_zh_path}")
+            )
+            return result
+
+        try:
+            # Load both files
+            async with aiofiles.open(en_file, "r", encoding="utf-8") as f:
+                en_content = await f.read()
+            async with aiofiles.open(zh_file, "r", encoding="utf-8") as f:
+                zh_content = await f.read()
+
+            # Parse and validate
+            _, validation = parse_guide_pair(en_content, zh_content)
+            return validation
+
+        except Exception as e:
+            logger.error(f"Failed to validate guide pair: {e}")
+            return None
+
+    async def get_guide_structure(
+        self, solution_id: str
+    ) -> Optional[dict]:
+        """Get parsed structure from guide files for management UI.
+
+        Returns structure with presets and steps extracted from guide.md,
+        plus validation status.
+        """
+        solution = self.get_solution(solution_id)
+        if not solution or not solution.base_path:
+            return None
+
+        base_path = Path(solution.base_path)
+        guide_en_path = solution.deployment.guide_file or "guide.md"
+        guide_zh_path = solution.deployment.guide_file_zh or "guide_zh.md"
+
+        en_file = base_path / guide_en_path
+        zh_file = base_path / guide_zh_path
+
+        result = {
+            "guide_en": {
+                "path": guide_en_path,
+                "exists": en_file.exists(),
+                "size": en_file.stat().st_size if en_file.exists() else 0,
+            },
+            "guide_zh": {
+                "path": guide_zh_path,
+                "exists": zh_file.exists(),
+                "size": zh_file.stat().st_size if zh_file.exists() else 0,
+            },
+            "validation": None,
+            "presets": [],
+        }
+
+        # Validate if both files exist
+        if en_file.exists() and zh_file.exists():
+            validation = await self.validate_guide_pair(solution_id)
+            if validation:
+                result["validation"] = {
+                    "valid": validation.valid,
+                    "errors": [
+                        {
+                            "type": str(e.error_type.value),
+                            "message": e.message,
+                            "suggestion": e.suggestion,
+                        }
+                        for e in validation.errors
+                    ],
+                    "warnings": [
+                        {"message": w.message}
+                        for w in validation.warnings
+                    ],
+                }
+
+            # Parse EN file to get structure
+            try:
+                async with aiofiles.open(en_file, "r", encoding="utf-8") as f:
+                    en_content = await f.read()
+                en_result = parse_single_language_guide(en_content)
+
+                for preset in en_result.presets:
+                    preset_data = {
+                        "id": preset.id,
+                        "name": preset.name,
+                        "steps": [
+                            {
+                                "id": s.id,
+                                "title": s.title_en,
+                                "type": s.type,
+                                "required": s.required,
+                                "config": s.config_file,
+                            }
+                            for s in preset.steps
+                        ],
+                    }
+                    result["presets"].append(preset_data)
+
+            except Exception as e:
+                logger.error(f"Failed to parse EN guide for structure: {e}")
+
+        return result
+
     async def load_device_config(
         self, solution_id: str, config_file: str
     ) -> Optional[DeviceConfig]:
@@ -258,6 +495,409 @@ class SolutionManager:
                         del self._device_configs[solution_id]
                     return new_solution
         return None
+
+    # ============================================
+    # Guide-based Deployment Methods (Simplified Structure)
+    # ============================================
+
+    async def validate_preset_ids(self, solution_id: str) -> List[str]:
+        """Validate that preset IDs in YAML match those in guide.md.
+
+        Args:
+            solution_id: The solution ID
+
+        Returns:
+            List of error messages (empty if valid)
+        """
+        errors = []
+        solution = self.get_solution(solution_id)
+        if not solution:
+            return [f"Solution not found: {solution_id}"]
+
+        # Get preset IDs from YAML (used for intro page)
+        yaml_preset_ids = set()
+        if solution.intro and solution.intro.presets:
+            yaml_preset_ids = {p.id for p in solution.intro.presets}
+
+        # Parse guide.md to get preset IDs (used for deploy page)
+        guide_file = solution.deployment.guide_file or "guide.md"
+        guide_path = Path(solution.base_path) / guide_file
+
+        if not guide_path.exists():
+            errors.append(f"Guide file not found: {guide_file}")
+            return errors
+
+        try:
+            async with aiofiles.open(guide_path, "r", encoding="utf-8") as f:
+                content = await f.read()
+
+            parse_result = parse_single_language_guide(content)
+            guide_preset_ids = {p.id for p in parse_result.presets}
+
+            # Check for mismatches
+            missing_in_guide = yaml_preset_ids - guide_preset_ids
+            extra_in_guide = guide_preset_ids - yaml_preset_ids
+
+            if missing_in_guide:
+                errors.append(
+                    f"Presets in YAML but not in guide.md: {sorted(missing_in_guide)}"
+                )
+            if extra_in_guide:
+                errors.append(
+                    f"Presets in guide.md but not in YAML: {sorted(extra_in_guide)}"
+                )
+
+            if errors:
+                logger.warning(
+                    f"Solution {solution_id} preset mismatch:\n" + "\n".join(errors)
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to validate preset IDs for {solution_id}: {e}")
+            errors.append(str(e))
+
+        return errors
+
+    async def count_steps_from_guide(self, solution_id: str) -> int:
+        """Count unique step IDs from guide.md.
+
+        Args:
+            solution_id: The solution ID
+
+        Returns:
+            Number of unique step IDs across all presets
+        """
+        solution = self.get_solution(solution_id)
+        if not solution or not solution.base_path:
+            return 0
+
+        guide_file = solution.deployment.guide_file or "guide.md"
+        guide_path = Path(solution.base_path) / guide_file
+
+        if not guide_path.exists():
+            # Fall back to YAML-based count
+            return self.count_devices_in_solution(solution)
+
+        try:
+            async with aiofiles.open(guide_path, "r", encoding="utf-8") as f:
+                content = await f.read()
+
+            parse_result = parse_single_language_guide(content)
+
+            # Count unique step IDs across all presets
+            step_ids = set()
+            for preset in parse_result.presets:
+                for step in preset.steps:
+                    step_ids.add(step.id)
+
+            return len(step_ids) if step_ids else self.count_devices_in_solution(solution)
+
+        except Exception as e:
+            logger.error(f"Failed to count steps from guide for {solution_id}: {e}")
+            return self.count_devices_in_solution(solution)
+
+    async def get_deployment_from_guide(
+        self, solution_id: str, lang: str = "en"
+    ) -> Optional[Dict[str, Any]]:
+        """Load deployment page data 100% from guide.md.
+
+        This is the core method for the simplified structure. All deployment
+        information is parsed from guide.md and guide_zh.md, eliminating
+        redundancy with YAML.
+
+        Args:
+            solution_id: The solution ID
+            lang: Language code ('en' or 'zh')
+
+        Returns:
+            Dict with devices, presets, overview, and post_deployment
+        """
+        solution = self.get_solution(solution_id)
+        if not solution or not solution.base_path:
+            return None
+
+        base_path = Path(solution.base_path)
+
+        # Validate preset IDs consistency (logs warnings)
+        await self.validate_preset_ids(solution_id)
+
+        # Get guide file paths
+        guide_en_path = solution.deployment.guide_file or "guide.md"
+        guide_zh_path = solution.deployment.guide_file_zh or "guide_zh.md"
+
+        en_file = base_path / guide_en_path
+        zh_file = base_path / guide_zh_path
+
+        # Parse both EN and ZH guide files
+        en_result = None
+        zh_result = None
+
+        if en_file.exists():
+            try:
+                async with aiofiles.open(en_file, "r", encoding="utf-8") as f:
+                    en_content = await f.read()
+                en_result = parse_single_language_guide(en_content)
+            except Exception as e:
+                logger.error(f"Failed to parse EN guide: {e}")
+
+        if zh_file.exists():
+            try:
+                async with aiofiles.open(zh_file, "r", encoding="utf-8") as f:
+                    zh_content = await f.read()
+                zh_result = parse_single_language_guide(zh_content)
+            except Exception as e:
+                logger.error(f"Failed to parse ZH guide: {e}")
+
+        if not en_result:
+            logger.warning(f"No EN guide found for {solution_id}")
+            return None
+
+        # Build merged result with translations
+        devices = []
+        presets = []
+        seen_device_ids = set()
+
+        for en_preset in en_result.presets:
+            # Find corresponding ZH preset
+            zh_preset = None
+            if zh_result:
+                zh_preset = next(
+                    (p for p in zh_result.presets if p.id == en_preset.id), None
+                )
+
+            preset_device_ids = []
+
+            for en_step in en_preset.steps:
+                # Find corresponding ZH step
+                zh_step = None
+                if zh_preset:
+                    zh_step = next(
+                        (s for s in zh_preset.steps if s.id == en_step.id), None
+                    )
+
+                # Build device info (compatible with frontend)
+                device = await self._build_device_from_step(
+                    solution_id, en_step, zh_step, lang
+                )
+
+                # Only add unique devices to global list
+                if en_step.id not in seen_device_ids:
+                    devices.append(device)
+                    seen_device_ids.add(en_step.id)
+
+                preset_device_ids.append(en_step.id)
+
+            # Build preset info
+            presets.append({
+                "id": en_preset.id,
+                "name": (
+                    zh_preset.name if lang == "zh" and zh_preset
+                    else en_preset.name
+                ),
+                "name_zh": zh_preset.name if zh_preset else en_preset.name,
+                "description": (
+                    zh_preset.description if lang == "zh" and zh_preset
+                    else en_preset.description
+                ),
+                "description_zh": zh_preset.description if zh_preset else "",
+                "devices": preset_device_ids,
+            })
+
+        # Build post_deployment from success content
+        post_deployment = None
+        if en_result.success:
+            success_content = (
+                zh_result.success.content_en if lang == "zh" and zh_result and zh_result.success
+                else en_result.success.content_en
+            )
+
+            # Extract Next Steps links from markdown: [title](url)
+            next_steps = []
+            if success_content:
+                import re
+                links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', success_content)
+                for title, url in links:
+                    next_steps.append({"title": title, "url": url})
+
+            post_deployment = {
+                "success_message": success_content,
+                "next_steps": next_steps,
+            }
+
+        # Build overview
+        overview = (
+            zh_result.overview_en if lang == "zh" and zh_result
+            else en_result.overview_en
+        )
+
+        return {
+            "solution_id": solution_id,
+            "guide": overview,
+            "selection_mode": solution.deployment.selection_mode or "sequential",
+            "devices": devices,
+            "device_groups": [],  # No longer used
+            "presets": presets,
+            "order": [],  # Determined by guide.md structure
+            "post_deployment": post_deployment,
+        }
+
+    async def _build_device_from_step(
+        self,
+        solution_id: str,
+        en_step: DeploymentStep,
+        zh_step: Optional[DeploymentStep],
+        lang: str,
+    ) -> Dict[str, Any]:
+        """Build a device dict from a parsed step.
+
+        Args:
+            solution_id: The solution ID
+            en_step: English step from markdown parser
+            zh_step: Chinese step (optional)
+            lang: Target language
+
+        Returns:
+            Device dict compatible with frontend
+        """
+        solution = self.get_solution(solution_id)
+
+        # Choose titles based on language
+        title = zh_step.title_en if lang == "zh" and zh_step else en_step.title_en
+        title_zh = zh_step.title_en if zh_step else en_step.title_en
+
+        device = {
+            "id": en_step.id,
+            "name": title,
+            "name_zh": title_zh,
+            "type": en_step.type,
+            "required": en_step.required,
+        }
+
+        # Build section content
+        section = {
+            "title": title,
+            "title_zh": title_zh,
+        }
+
+        # Description (already HTML from parser)
+        if lang == "zh" and zh_step and zh_step.section.description:
+            section["description"] = zh_step.section.description
+        elif en_step.section.description:
+            section["description"] = en_step.section.description
+
+        # Troubleshoot
+        if lang == "zh" and zh_step and zh_step.section.troubleshoot:
+            section["troubleshoot"] = zh_step.section.troubleshoot
+        elif en_step.section.troubleshoot:
+            section["troubleshoot"] = en_step.section.troubleshoot
+
+        # Wiring - use Chinese step's wiring for Chinese language
+        wiring_source = (
+            zh_step.section.wiring if lang == "zh" and zh_step and zh_step.section.wiring
+            else en_step.section.wiring
+        )
+        if wiring_source:
+            section["wiring"] = {
+                "image": (
+                    f"/api/solutions/{solution_id}/assets/{wiring_source.image}"
+                    if wiring_source.image else None
+                ),
+                "steps": wiring_source.steps,
+            }
+
+        device["section"] = section
+
+        # Load device config if specified
+        if en_step.config_file:
+            device["config_file"] = en_step.config_file
+            config = await self.load_device_config(solution_id, en_step.config_file)
+            if config:
+                if config.ssh:
+                    device["ssh"] = config.ssh.model_dump()
+                if config.user_inputs:
+                    device["user_inputs"] = [
+                        inp.model_dump() for inp in config.user_inputs
+                    ]
+                if en_step.type == "preview":
+                    device["preview"] = {
+                        "user_inputs": (
+                            [inp.model_dump() for inp in config.user_inputs]
+                            if config.user_inputs
+                            else []
+                        ),
+                        "video": config.video.model_dump() if config.video else None,
+                        "mqtt": config.mqtt.model_dump() if config.mqtt else None,
+                        "overlay": config.overlay.model_dump() if config.overlay else None,
+                        "display": config.display.model_dump() if config.display else None,
+                    }
+
+        # Build targets (for docker_deploy type)
+        if en_step.targets:
+            # Build a lookup for Chinese targets by ID
+            zh_targets_by_id = {}
+            if zh_step and zh_step.targets:
+                for zt in zh_step.targets:
+                    zh_targets_by_id[zt.id] = zt
+
+            targets_data = {}
+            for target in en_step.targets:
+                # Get corresponding Chinese target for translation
+                zh_target = zh_targets_by_id.get(target.id)
+                zh_name = zh_target.name if zh_target else target.name
+                zh_desc = zh_target.description if zh_target else target.description
+                zh_troubleshoot = (
+                    zh_target.troubleshoot if zh_target else target.troubleshoot
+                )
+
+                target_info = {
+                    "name": target.name if lang == "en" else zh_name,
+                    "name_zh": zh_name,
+                    "description": (
+                        target.description if lang == "en" else zh_desc
+                    ),
+                    "description_zh": zh_desc,
+                    "default": target.default,
+                    "config_file": target.config_file,
+                }
+
+                # Build target section content (description, troubleshoot, wiring)
+                target_section = {}
+
+                # Add description
+                if lang == "en" and target.description:
+                    target_section["description"] = target.description
+                elif lang == "zh" and zh_desc:
+                    target_section["description"] = zh_desc
+
+                # Add troubleshoot
+                if lang == "en" and target.troubleshoot:
+                    target_section["troubleshoot"] = target.troubleshoot
+                elif lang == "zh" and zh_troubleshoot:
+                    target_section["troubleshoot"] = zh_troubleshoot
+
+                # Add wiring (from target.wiring parsed from guide.md)
+                # For Chinese: use zh_target's wiring if available
+                wiring_source = (
+                    zh_target.wiring if lang == "zh" and zh_target and zh_target.wiring
+                    else target.wiring
+                )
+                if wiring_source:
+                    wiring_data = {
+                        "image": (
+                            f"/api/solutions/{solution_id}/assets/{wiring_source.image}"
+                            if wiring_source.image else None
+                        ),
+                        "steps": wiring_source.steps,
+                    }
+                    target_section["wiring"] = wiring_data
+
+                if target_section:
+                    target_info["section"] = target_section
+
+                targets_data[target.id] = target_info
+            device["targets"] = targets_data
+
+        return device
 
     # ============================================
     # Solution Management Methods
@@ -1181,6 +1821,367 @@ class SolutionManager:
 
         await self.reload_solution(solution_id)
         return tags
+
+
+    # ============================================
+    # Content File Management (New Simplified API)
+    # ============================================
+
+    async def save_content_file(
+        self, solution_id: str, filename: str, content: str
+    ) -> str:
+        """Save a core content file (guide.md, description.md, etc.).
+
+        This is used by the simplified management UI to upload the 4 required files.
+
+        Args:
+            solution_id: The solution ID
+            filename: One of guide.md, guide_zh.md, description.md, description_zh.md
+            content: File content
+
+        Returns:
+            The saved file path
+        """
+        valid_files = [
+            "guide.md", "guide_zh.md",
+            "description.md", "description_zh.md"
+        ]
+        if filename not in valid_files:
+            raise ValueError(f"Invalid filename: {filename}. Must be one of: {valid_files}")
+
+        solution = self.get_solution(solution_id)
+        if not solution:
+            raise ValueError(f"Solution not found: {solution_id}")
+
+        file_path = Path(solution.base_path) / filename
+
+        # Write the file
+        async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
+            await f.write(content)
+
+        logger.info(f"Saved content file: {solution_id}/{filename}")
+
+        # If it's a guide file, sync presets to YAML
+        if filename.startswith("guide"):
+            await self.sync_presets_from_guide(solution_id)
+
+        return filename
+
+    async def sync_presets_from_guide(self, solution_id: str) -> bool:
+        """Sync preset metadata from guide.md to solution.yaml.
+
+        This extracts preset IDs, names, and descriptions from guide.md
+        and updates the intro.presets[] array in solution.yaml for use
+        on the introduction page.
+
+        Args:
+            solution_id: The solution ID
+
+        Returns:
+            True if sync was successful
+        """
+        solution = self.get_solution(solution_id)
+        if not solution or not solution.base_path:
+            return False
+
+        base_path = Path(solution.base_path)
+        guide_en_path = solution.deployment.guide_file or "guide.md"
+        guide_zh_path = solution.deployment.guide_file_zh or "guide_zh.md"
+
+        en_file = base_path / guide_en_path
+        zh_file = base_path / guide_zh_path
+
+        if not en_file.exists():
+            logger.warning(f"Cannot sync presets: {guide_en_path} not found")
+            return False
+
+        try:
+            # Parse EN guide
+            async with aiofiles.open(en_file, "r", encoding="utf-8") as f:
+                en_content = await f.read()
+            en_result = parse_single_language_guide(en_content)
+
+            # Parse ZH guide if exists
+            zh_result = None
+            if zh_file.exists():
+                async with aiofiles.open(zh_file, "r", encoding="utf-8") as f:
+                    zh_content = await f.read()
+                zh_result = parse_single_language_guide(zh_content)
+
+            # Build presets array for YAML
+            presets = []
+            for en_preset in en_result.presets:
+                zh_preset = None
+                if zh_result:
+                    zh_preset = next(
+                        (p for p in zh_result.presets if p.id == en_preset.id), None
+                    )
+
+                preset_data = {
+                    "id": en_preset.id,
+                    "name": en_preset.name,
+                    "name_zh": zh_preset.name if zh_preset else en_preset.name,
+                    "description": en_preset.description or "",
+                    "description_zh": zh_preset.description if zh_preset else "",
+                }
+                presets.append(preset_data)
+
+            # Update solution.yaml
+            yaml_path = base_path / "solution.yaml"
+            async with aiofiles.open(yaml_path, "r", encoding="utf-8") as f:
+                content = await f.read()
+                current_yaml = yaml.safe_load(content)
+
+            if "intro" not in current_yaml:
+                current_yaml["intro"] = {}
+            current_yaml["intro"]["presets"] = presets
+
+            async with aiofiles.open(yaml_path, "w", encoding="utf-8") as f:
+                await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False))
+
+            # Reload solution
+            await self.reload_solution(solution_id)
+            logger.info(f"Synced {len(presets)} presets from guide.md to YAML for {solution_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to sync presets from guide: {e}")
+            return False
+
+    async def get_structure_preview(self, solution_id: str) -> Optional[Dict[str, Any]]:
+        """Get a complete structure preview from guide.md for management UI.
+
+        Returns the parsed structure including presets, steps, and post-deployment
+        content, plus validation status.
+
+        Args:
+            solution_id: The solution ID
+
+        Returns:
+            Dict with presets, post_deployment, and validation info
+        """
+        solution = self.get_solution(solution_id)
+        if not solution or not solution.base_path:
+            return None
+
+        base_path = Path(solution.base_path)
+        guide_en_path = solution.deployment.guide_file or "guide.md"
+        guide_zh_path = solution.deployment.guide_file_zh or "guide_zh.md"
+
+        en_file = base_path / guide_en_path
+        zh_file = base_path / guide_zh_path
+
+        result = {
+            "solution_id": solution_id,
+            "presets": [],
+            "post_deployment": None,
+            "validation": {
+                "valid": True,
+                "errors": [],
+                "warnings": [],
+            },
+            "content_files": {
+                "guide_en": {
+                    "path": guide_en_path,
+                    "exists": en_file.exists(),
+                    "size": en_file.stat().st_size if en_file.exists() else 0,
+                },
+                "guide_zh": {
+                    "path": guide_zh_path,
+                    "exists": zh_file.exists(),
+                    "size": zh_file.stat().st_size if zh_file.exists() else 0,
+                },
+                "description_en": {
+                    "path": solution.intro.description_file or "description.md",
+                    "exists": (base_path / (solution.intro.description_file or "description.md")).exists(),
+                },
+                "description_zh": {
+                    "path": solution.intro.description_file_zh or "description_zh.md",
+                    "exists": (base_path / (solution.intro.description_file_zh or "description_zh.md")).exists(),
+                },
+            },
+        }
+
+        if not en_file.exists():
+            result["validation"]["warnings"].append({
+                "message": f"English guide not found: {guide_en_path}"
+            })
+            return result
+
+        try:
+            # Parse EN guide
+            async with aiofiles.open(en_file, "r", encoding="utf-8") as f:
+                en_content = await f.read()
+            en_result = parse_single_language_guide(en_content)
+
+            # Parse ZH guide if exists
+            zh_result = None
+            if zh_file.exists():
+                async with aiofiles.open(zh_file, "r", encoding="utf-8") as f:
+                    zh_content = await f.read()
+                zh_result = parse_single_language_guide(zh_content)
+
+            # Validate structure consistency
+            if zh_result:
+                validation = await self.validate_guide_pair(solution_id)
+                if validation:
+                    result["validation"]["valid"] = validation.valid
+                    result["validation"]["errors"] = [
+                        {
+                            "type": str(e.error_type.value),
+                            "message": e.message,
+                            "suggestion": e.suggestion,
+                        }
+                        for e in validation.errors
+                    ]
+                    result["validation"]["warnings"] = [
+                        {"message": w.message}
+                        for w in validation.warnings
+                    ]
+            else:
+                result["validation"]["warnings"].append({
+                    "message": f"Chinese guide not found: {guide_zh_path}"
+                })
+
+            # Build presets structure
+            for en_preset in en_result.presets:
+                zh_preset = None
+                if zh_result:
+                    zh_preset = next(
+                        (p for p in zh_result.presets if p.id == en_preset.id), None
+                    )
+
+                preset_data = {
+                    "id": en_preset.id,
+                    "name": en_preset.name,
+                    "name_zh": zh_preset.name if zh_preset else en_preset.name,
+                    "description": en_preset.description or "",
+                    "description_zh": zh_preset.description if zh_preset else "",
+                    "steps": [],
+                }
+
+                for en_step in en_preset.steps:
+                    zh_step = None
+                    if zh_preset:
+                        zh_step = next(
+                            (s for s in zh_preset.steps if s.id == en_step.id), None
+                        )
+
+                    step_data = {
+                        "id": en_step.id,
+                        "title": en_step.title_en,
+                        "title_zh": zh_step.title_en if zh_step else en_step.title_en,
+                        "type": en_step.type,
+                        "required": en_step.required,
+                        "config_file": en_step.config_file,
+                        "has_targets": bool(en_step.targets),
+                        "targets": [],
+                    }
+
+                    # Add targets info
+                    if en_step.targets:
+                        for target in en_step.targets:
+                            step_data["targets"].append({
+                                "id": target.id,
+                                "name": target.name,
+                                "default": target.default,
+                            })
+
+                    preset_data["steps"].append(step_data)
+
+                result["presets"].append(preset_data)
+
+            # Build post_deployment info
+            if en_result.success:
+                result["post_deployment"] = {
+                    "content_en": en_result.success.content_en,
+                    "content_zh": zh_result.success.content_en if zh_result and zh_result.success else None,
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to get structure preview: {e}")
+            result["validation"]["errors"].append({
+                "type": "parse_error",
+                "message": str(e),
+            })
+
+        return result
+
+    def get_device_catalog_list(self) -> List[Dict[str, Any]]:
+        """Get device catalog as a list for dropdown selectors.
+
+        Returns:
+            List of device info dicts with id, name, name_zh, category, image, product_url
+        """
+        result = []
+        for device_id, device in self._global_device_catalog.items():
+            result.append({
+                "id": device_id,
+                "name": device.get("name", device_id),
+                "name_zh": device.get("name_zh", device.get("name", device_id)),
+                "category": device.get("category"),
+                "image": device.get("image"),
+                "product_url": device.get("product_url"),
+                "description": device.get("description"),
+                "description_zh": device.get("description_zh"),
+            })
+        return result
+
+    async def update_required_devices(
+        self, solution_id: str, device_ids: List[str]
+    ) -> List[Dict[str, Any]]:
+        """Update the required_devices list for a solution from catalog IDs.
+
+        Args:
+            solution_id: The solution ID
+            device_ids: List of device IDs from the catalog
+
+        Returns:
+            List of updated required_devices
+        """
+        solution = self.get_solution(solution_id)
+        if not solution:
+            raise ValueError(f"Solution not found: {solution_id}")
+
+        yaml_path = Path(solution.base_path) / "solution.yaml"
+
+        # Read current yaml
+        async with aiofiles.open(yaml_path, "r", encoding="utf-8") as f:
+            content = await f.read()
+            current_yaml = yaml.safe_load(content)
+
+        if "intro" not in current_yaml:
+            current_yaml["intro"] = {}
+
+        # Build required_devices from catalog
+        required_devices = []
+        for device_id in device_ids:
+            device_info = self._global_device_catalog.get(device_id)
+            if device_info:
+                required_devices.append({
+                    "id": device_id,
+                    "name": device_info.get("name", device_id),
+                    "name_zh": device_info.get("name_zh", device_info.get("name", device_id)),
+                })
+            else:
+                # Device not in catalog, just use the ID
+                required_devices.append({
+                    "id": device_id,
+                    "name": device_id,
+                    "name_zh": device_id,
+                })
+
+        current_yaml["intro"]["required_devices"] = required_devices
+
+        # Write back
+        async with aiofiles.open(yaml_path, "w", encoding="utf-8") as f:
+            await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False))
+
+        # Reload solution
+        await self.reload_solution(solution_id)
+        logger.info(f"Updated required_devices for {solution_id}: {device_ids}")
+
+        return required_devices
 
 
 # Global instance

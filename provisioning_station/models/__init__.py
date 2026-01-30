@@ -62,6 +62,26 @@ from .version import (
     VersionInfo,
     VersionSummary,
 )
+from .websocket import (
+    WSDeploymentCompletedMessage,
+    WSDeviceCompletedMessage,
+    WSDeviceStartedMessage,
+    WSDockerNotInstalledMessage,
+    WSLogMessage,
+    WSMessage,
+    WSPingMessage,
+    WSPongMessage,
+    WSPreCheckFailedMessage,
+    WSPreCheckPassedMessage,
+    WSPreCheckStartedMessage,
+    WSProgressMessage,
+    WSStatusMessage,
+    WS_MESSAGE_TYPES,
+    create_log_message,
+    create_progress_message,
+    create_status_message,
+    parse_ws_message,
+)
 
 __all__ = [
     # Solution models
@@ -117,4 +137,23 @@ __all__ = [
     "ActiveDeployment",
     "DeploymentAction",
     "DeploymentActionResponse",
+    # WebSocket models
+    "WSLogMessage",
+    "WSStatusMessage",
+    "WSProgressMessage",
+    "WSDeviceStartedMessage",
+    "WSPreCheckStartedMessage",
+    "WSPreCheckPassedMessage",
+    "WSPreCheckFailedMessage",
+    "WSDeviceCompletedMessage",
+    "WSDeploymentCompletedMessage",
+    "WSDockerNotInstalledMessage",
+    "WSPingMessage",
+    "WSPongMessage",
+    "WSMessage",
+    "WS_MESSAGE_TYPES",
+    "create_log_message",
+    "create_status_message",
+    "create_progress_message",
+    "parse_ws_message",
 ]
