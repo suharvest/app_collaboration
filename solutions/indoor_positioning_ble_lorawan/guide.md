@@ -15,15 +15,7 @@
 2. Install at 2.5-3m height, 10-15m spacing
 3. Record each beacon's MAC address and location
 
-### Wiring
-
-1. Place BLE beacons at strategic locations in your facility
-2. Record each beacon's MAC address and installation location
-3. Configure beacons using SenseCraft app if needed
-
 ### Troubleshooting
-
-### Having Issues?
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -41,15 +33,7 @@
 2. Use SenseCraft App to scan QR code and bind gateway
 3. Solid green LED indicates ready
 
-### Wiring
-
-1. Power on the LoRaWAN gateway and connect to internet
-2. Register the gateway on SenseCraft Data or ChirpStack
-3. Verify gateway is online
-
 ### Troubleshooting
-
-### Having Issues?
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -79,12 +63,7 @@ Deploy the indoor positioning application on your local computer.
 2. Upload floor map, mark beacon positions on map (enter MAC addresses)
 3. Configure LoRaWAN network server webhook to `http://your-local-ip:5173/api/webhook`
 
-1. Ensure Docker is installed and running
-2. Click Deploy button to start services
-
-#### Troubleshooting
-
-### Having Issues?
+### Troubleshooting
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -111,13 +90,7 @@ Deploy the indoor positioning application to a remote server via SSH.
 2. Upload floor map, mark beacon positions on map (enter MAC addresses)
 3. Configure LoRaWAN network server webhook to `http://<device-ip>:5173/api/webhook`
 
-1. Connect target device to network
-2. Enter IP address and SSH credentials
-3. Click Deploy to install on remote device
-
-#### Troubleshooting
-
-### Having Issues?
+### Troubleshooting
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -136,15 +109,7 @@ Deploy the indoor positioning application to a remote server via SSH.
 3. Set mode to "BLE Scan", select correct LoRaWAN region
 4. Walk near beacons, press button to trigger report, verify positioning works
 
-### Wiring
-
-1. Activate SenseCAP T1000 tracker
-2. Join to your LoRaWAN network server
-3. Enable BLE scanning mode
-
 ### Troubleshooting
-
-### Having Issues?
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -165,15 +130,7 @@ Deploy the indoor positioning application to a remote server via SSH.
 2. Install at 2.5-3m height, 10-15m spacing
 3. Record each beacon's MAC address and location
 
-### Wiring
-
-1. Place BLE beacons at strategic locations in your facility
-2. Record each beacon's MAC address and installation location
-3. Configure beacons using SenseCraft app if needed
-
 ### Troubleshooting
-
-### Having Issues?
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -191,15 +148,7 @@ Deploy the indoor positioning application to a remote server via SSH.
 2. Use SenseCraft App to scan QR code and bind gateway
 3. Solid green LED indicates ready
 
-### Wiring
-
-1. Power on the LoRaWAN gateway and connect to internet
-2. Register the gateway on SenseCraft Data or ChirpStack
-3. Verify gateway is online
-
 ### Troubleshooting
-
-### Having Issues?
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -229,12 +178,7 @@ Deploy the indoor positioning application on your local computer.
 2. Upload floor map, mark beacon positions on map (enter MAC addresses)
 3. Configure LoRaWAN network server webhook to `http://your-local-ip:5173/api/webhook`
 
-1. Ensure Docker is installed and running
-2. Click Deploy button to start services
-
-#### Troubleshooting
-
-### Having Issues?
+### Troubleshooting
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -261,13 +205,7 @@ Deploy the indoor positioning application to a remote server via SSH.
 2. Upload floor map, mark beacon positions on map (enter MAC addresses)
 3. Configure LoRaWAN network server webhook to `http://<device-ip>:5173/api/webhook`
 
-1. Connect target device to network
-2. Enter IP address and SSH credentials
-3. Click Deploy to install on remote device
-
-#### Troubleshooting
-
-### Having Issues?
+### Troubleshooting
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -286,15 +224,7 @@ Deploy the indoor positioning application to a remote server via SSH.
 3. Set mode to "BLE Scan", select correct LoRaWAN region
 4. Walk near beacons, press button to trigger report, verify positioning works
 
-### Wiring
-
-1. Activate SenseCAP T1000 tracker
-2. Join to your LoRaWAN network server
-3. Enable BLE scanning mode
-
 ### Troubleshooting
-
-### Having Issues?
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -315,15 +245,7 @@ Deploy the indoor positioning application to a remote server via SSH.
 2. Install at 2.5-3m height, 10-15m spacing
 3. Record each beacon's MAC address and location
 
-### Wiring
-
-1. Place BLE beacons at strategic locations in your facility
-2. Record each beacon's MAC address and installation location
-3. Configure beacons using SenseCraft app if needed
-
 ### Troubleshooting
-
-### Having Issues?
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -341,15 +263,7 @@ Deploy the indoor positioning application to a remote server via SSH.
 2. Use SenseCraft App to scan QR code and bind gateway
 3. Solid green LED indicates ready
 
-### Wiring
-
-1. Power on the LoRaWAN gateway and connect to internet
-2. Register the gateway on SenseCraft Data or ChirpStack
-3. Verify gateway is online
-
 ### Troubleshooting
-
-### Having Issues?
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -379,12 +293,7 @@ Deploy the indoor positioning application on your local computer.
 2. Upload floor map, mark beacon positions on map (enter MAC addresses)
 3. Configure LoRaWAN network server webhook to `http://your-local-ip:5173/api/webhook`
 
-1. Ensure Docker is installed and running
-2. Click Deploy button to start services
-
-#### Troubleshooting
-
-### Having Issues?
+### Troubleshooting
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -411,13 +320,7 @@ Deploy the indoor positioning application to a remote server via SSH.
 2. Upload floor map, mark beacon positions on map (enter MAC addresses)
 3. Configure LoRaWAN network server webhook to `http://<device-ip>:5173/api/webhook`
 
-1. Connect target device to network
-2. Enter IP address and SSH credentials
-3. Click Deploy to install on remote device
-
-#### Troubleshooting
-
-### Having Issues?
+### Troubleshooting
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|
@@ -436,15 +339,7 @@ Deploy the indoor positioning application to a remote server via SSH.
 3. Set mode to "BLE Scan", select correct LoRaWAN region
 4. Walk near beacons, press button to trigger report, verify positioning works
 
-### Wiring
-
-1. Activate SenseCAP T1000 tracker
-2. Join to your LoRaWAN network server
-3. Enable BLE scanning mode
-
 ### Troubleshooting
-
-### Having Issues?
 
 | Problem | Possible Cause | Solution |
 |---------|---------------|----------|

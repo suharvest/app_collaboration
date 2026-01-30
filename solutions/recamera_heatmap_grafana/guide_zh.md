@@ -39,7 +39,7 @@ YOLO11 使用 DFL (Distribution Focal Loss) 进行更精确的边界框回归，
 
 部署完成后，在预览步骤中使用 MQTT 主题 `recamera/yolo11/detections`。
 
-### 故障排除
+### 故障排查
 
 | 问题 | 解决方案 |
 |------|----------|
@@ -50,7 +50,7 @@ YOLO11 使用 DFL (Distribution Focal Loss) 进行更精确的边界框回归，
 
 ### 部署目标: YOLO26 (~3 FPS) {#deploy_detector_yolo26 config=devices/recamera_yolo26.yaml}
 
-### 故障排除
+### 故障排查
 
 | 问题 | 解决方案 |
 |------|----------|
@@ -100,11 +100,6 @@ YOLO11 使用 DFL (Distribution Focal Loss) 进行更精确的边界框回归，
 
 ![接线图](intro/gallery/architecture.svg)
 
-1. 确保 Docker 已安装并运行
-2. 点击部署按钮启动服务
-
-#### 故障排除
-
 ### 故障排查
 
 | 问题 | 可能原因 | 解决方法 |
@@ -153,10 +148,6 @@ YOLO11 使用 DFL (Distribution Focal Loss) 进行更精确的边界框回归，
 
 ![接线图](intro/gallery/architecture.svg)
 
-1. 将目标设备连接到网络
-2. 输入 IP 地址和 SSH 凭据
-3. 点击部署安装到远程设备
-
 ---
 
 ## 步骤 2: 配置 reCamera {#recamera type=recamera_nodered required=true config=devices/recamera.yaml}
@@ -173,8 +164,6 @@ YOLO11 使用 DFL (Distribution Focal Loss) 进行更精确的边界框回归，
    - URL 填写 `http://<你的电脑IP>:8086`
    - 粘贴上一步获取的 API 令牌
 4. 点击 Deploy 部署流程
-
-### 故障排除
 
 ### 故障排查
 
@@ -206,8 +195,6 @@ YOLO11 使用 DFL (Distribution Focal Loss) 进行更精确的边界框回归，
 4. 导入图表模板：
    - 进入 **Dashboards** > **Import**
    - 上传方案提供的仪表板 JSON 文件
-
-### 故障排除
 
 ### 故障排查
 
@@ -244,8 +231,6 @@ YOLO11 使用 DFL (Distribution Focal Loss) 进行更精确的边界框回归，
 4. **启动服务**
    - 运行 `python -m http.server 8080`
    - 浏览器访问 `http://localhost:8080` 查看效果
-
-### 故障排除
 
 ### 故障排查
 

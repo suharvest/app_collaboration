@@ -8,14 +8,6 @@
 
 ## 套餐: 标准部署 {#default}
 
-基于 KNN 预测模型的暖通空调能源优化系统，支持 OPC-UA 集成。
-
-## 前提条件
-
-- **Docker** 已安装并运行（版本 20.0+）
-- **网络连接** 可访问镜像仓库
-- **可用端口**：8280（Web 界面），4841（OPC-UA 模拟器）
-
 ## 步骤 1: 暖通控制系统 {#hvac type=docker_deploy required=true}
 
 ### 部署目标: 本机部署 {#hvac_local config=devices/local.yaml default=true}

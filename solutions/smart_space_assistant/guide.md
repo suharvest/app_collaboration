@@ -73,21 +73,6 @@ Device will automatically restart. Xiaozhi face displayed on screen indicates su
 
 ### Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Port not found | Try different USB cable or port |
-| Flash failed | Unplug and replug the device, try again |
-
-### Wiring
-
-1. Connect Watcher to computer via USB-C cable
-2. Select the serial port (wchusbserial)
-3. Click Flash to program the firmware
-
-### Troubleshooting
-
-### Having Issues?
-
 | Problem | Solution |
 |---------|----------|
 | Serial port not found | Try a different USB cable or USB port |
@@ -113,21 +98,6 @@ After clicking Flash, you need to press the reset button on the device to enter 
 Device will automatically restart. Face recognition is now enabled.
 
 ### Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Device not responding | Unplug and replug USB cable |
-| Flash stuck | Press reset button and try again |
-
-### Wiring
-
-1. Ensure Watcher is connected via USB-C
-2. Select the serial port (usbmodem)
-3. Click Flash and press reset button when prompted
-
-### Troubleshooting
-
-### Having Issues?
 
 | Problem | Solution |
 |---------|----------|
@@ -239,12 +209,6 @@ Cast Xiaozhi conversations to TV or large display, ideal for exhibition halls, m
 2. Select the serial port above
 3. If not detected, try a different USB port or cable
 
-### Wiring
-
-1. Connect Watcher to computer via USB-C
-2. Select the serial port
-3. Click Flash to program the firmware
-
 ---
 
 ## Step 2: Deploy Display Service {#display_service type=docker_deploy required=true config=devices/display_local.yaml}
@@ -269,9 +233,6 @@ Deploy the display service on your local computer.
 
 ![Wiring](intro/gallery/architecture.svg)
 
-1. Ensure Docker is installed and running
-2. Click Deploy button to start services
-
 ### Target: Remote Deployment {#display_service_remote config=devices/recomputer.yaml}
 
 ## Remote Deployment
@@ -292,10 +253,6 @@ Deploy the display service to a remote device (reComputer, Raspberry Pi, etc.).
 4. Find "Display Address" and say the server address (e.g., `192.168.1.100:8765`)
 
 ![Wiring](intro/gallery/architecture.svg)
-
-1. Connect target device to network
-2. Enter IP address and SSH credentials
-3. Click Deploy to install on remote device
 
 ---
 

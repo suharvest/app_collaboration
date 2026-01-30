@@ -67,15 +67,7 @@
 2. 在上方选择串口（选 wchusbserial 开头的）
 3. 点击烧录按钮
 
-### 接线
-
-1. 用 USB-C 线连接 Watcher 到电脑
-2. 选择串口（wchusbserial 开头）
-3. 点击烧录按钮写入固件
-
-### 故障排除
-
-### 遇到问题？
+### 故障排查
 
 | 问题 | 解决方法 |
 |------|----------|
@@ -97,15 +89,7 @@
 
 点击烧录后，需要按一下设备的重启按钮，让设备进入烧录模式。
 
-### 接线
-
-1. 确保 Watcher 已通过 USB-C 线连接
-2. 选择串口（usbmodem 开头）
-3. 点击烧录并按提示按下重启按钮
-
-### 故障排除
-
-### 遇到问题？
+### 故障排查
 
 | 问题 | 解决方法 |
 |------|----------|
@@ -196,12 +180,6 @@
 2. 在上方选择对应的串口
 3. 如未检测到，请尝试其他 USB 口或更换数据线
 
-### 接线
-
-1. 使用 USB-C 线连接 Watcher 到电脑
-2. 选择串口
-3. 点击烧录按钮写入固件
-
 ---
 
 ## 步骤 2: 部署投屏服务 {#display_service type=docker_deploy required=true config=devices/display_local.yaml}
@@ -226,9 +204,6 @@
 
 ![接线图](intro/gallery/architecture.svg)
 
-1. 确保 Docker 已安装并运行
-2. 点击部署按钮启动服务
-
 ### 部署目标: 远程部署 {#display_service_remote config=devices/recomputer.yaml}
 
 ## 远程部署
@@ -249,10 +224,6 @@
 4. 找到"投屏地址"，说出服务器地址（如 `192.168.1.100:8765`）
 
 ![接线图](intro/gallery/architecture.svg)
-
-1. 将目标设备连接到网络
-2. 输入 IP 地址和 SSH 凭据
-3. 点击部署安装到远程设备
 
 ---
 

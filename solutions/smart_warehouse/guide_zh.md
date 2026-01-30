@@ -6,16 +6,16 @@
 
 ![接线图](intro/gallery/api-endpoint.png)
 
-1. 确保 Docker 已安装并运行
+1. 确保本机 Docker 已安装并运行
 2. 点击部署按钮启动服务
 
 ### 部署目标: 远程部署 {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
 
-![接线图](intro/gallery/api-endpoint.png)
+![接线图](solutions/smart_warehouse/gallery/R1100_connected.png)
 
-1. 将目标设备连接到网络
-2. 输入 IP 地址和 SSH 凭据
-3. 点击部署安装到远程设备
+1. 请将你的 R1100/2000 设备通电，并接入网线（跟您的电脑在同一个网络环境内）
+2. 输入 IP 地址（默认：reComputer-R110x.local 或通过路由器查询设备 IP 地址）和 SSH 凭据（recomputer：12345678）
+3. 点击部署安装到远程设备，等待完成
 
 ---
 
@@ -68,14 +68,14 @@
 
 ## 步骤 1: 仓库管理系统 {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
 
-### 部署目标: 本机部署 {#warehouse_local config=devices/recomputer.yaml default=true}
+### 部署目标: 本机部署 {#warehouse_local config=devices/recomputer.yaml}
 
 ![接线图](intro/gallery/api-endpoint.png)
 
 1. 确保 Docker 已安装并运行
 2. 点击部署按钮启动服务
 
-### 部署目标: 远程部署 {#warehouse_remote config=devices/warehouse_remote.yaml}
+### 部署目标: 远程部署（R1100） {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
 
 ![接线图](intro/gallery/api-endpoint.png)
 
@@ -134,14 +134,14 @@
 
 ## 步骤 1: 仓库管理系统 {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
 
-### 部署目标: 本机部署 {#warehouse_local config=devices/recomputer.yaml default=true}
+### 部署目标: 本机部署 {#warehouse_local config=devices/recomputer.yaml}
 
 ![接线图](intro/gallery/api-endpoint.png)
 
 1. 确保 Docker 已安装并运行
 2. 点击部署按钮启动服务
 
-### 部署目标: 远程部署 {#warehouse_remote config=devices/warehouse_remote.yaml}
+### 部署目标: 远程部署（R1100） {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
 
 ![接线图](intro/gallery/api-endpoint.png)
 

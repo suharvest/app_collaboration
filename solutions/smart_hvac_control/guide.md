@@ -8,14 +8,6 @@ HVAC energy optimization system using KNN prediction model with OPC-UA integrati
 
 ## Preset: Standard Deployment {#default}
 
-HVAC energy optimization system using KNN prediction model with OPC-UA integration.
-
-## Prerequisites
-
-- **Docker** installed and running (version 20.0+)
-- **Network connectivity** to pull container images
-- **Available ports**: 8280 (Web UI), 4841 (OPC-UA Simulator)
-
 ## Step 1: HVAC Control System {#hvac type=docker_deploy required=true}
 
 ### Target: Local Deployment {#hvac_local config=devices/local.yaml default=true}
