@@ -1178,6 +1178,20 @@
     @apply text-sm leading-relaxed;
   }
 
+  /* Deploy Disabled Banner (preset under development) */
+  .deploy-disabled-banner {
+    @apply flex items-center gap-3 p-4 mb-4 rounded-lg;
+    @apply bg-blue-50 border border-blue-200 text-blue-800;
+  }
+
+  .deploy-disabled-banner svg {
+    @apply flex-shrink-0 text-blue-500;
+  }
+
+  .deploy-disabled-banner span {
+    @apply text-sm leading-relaxed;
+  }
+
   /* Deploy Action Area */
   .deploy-action-area {
     @apply bg-primary-light/30 border border-primary/20 rounded-lg p-5 mb-4;
@@ -2019,12 +2033,13 @@ button.spinning {
 }
 
 .presets-grid {
-  @apply grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3;
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3;
 }
 
 .preset-card {
-  @apply relative bg-card rounded-lg p-3 border-2 border-border cursor-pointer;
+  @apply relative bg-card rounded-lg p-4 border-2 border-border cursor-pointer flex flex-col;
   transition: all 0.2s ease;
+  min-height: 100px;
 }
 
 .preset-card:hover {
@@ -2040,11 +2055,15 @@ button.spinning {
 }
 
 .preset-name {
-  @apply font-medium text-text-primary text-sm mb-0.5;
+  @apply font-medium text-text-primary text-sm mb-1;
 }
 
 .preset-description {
-  @apply text-xs text-text-secondary;
+  @apply text-xs text-text-secondary leading-relaxed flex-1;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* Divider */
@@ -2968,32 +2987,34 @@ button.spinning {
   @apply flex flex-col gap-4;
 }
 
-/* Preset Card (for management) */
-.preset-card {
+/* Preset Card (for management page - more specific selector to avoid conflict) */
+.presets-list .preset-card {
   @apply bg-white border border-border rounded-lg overflow-hidden;
+  min-height: auto;
+  flex-direction: column;
 }
 
-.preset-card .preset-header {
+.presets-list .preset-card .preset-header {
   @apply flex items-center justify-between p-4 bg-gray-50/50 border-b border-border;
 }
 
-.preset-card .preset-info {
+.presets-list .preset-card .preset-info {
   @apply flex items-center gap-3;
 }
 
-.preset-card .preset-index {
+.presets-list .preset-card .preset-index {
   @apply w-6 h-6 rounded-full bg-primary text-white text-xs font-medium flex items-center justify-center flex-shrink-0;
 }
 
-.preset-card .preset-name {
+.presets-list .preset-card .preset-name {
   @apply font-medium text-text-primary text-sm m-0;
 }
 
-.preset-card .preset-name-zh {
+.presets-list .preset-card .preset-name-zh {
   @apply text-xs text-text-secondary;
 }
 
-.preset-card .preset-actions {
+.presets-list .preset-card .preset-actions {
   @apply flex items-center gap-1;
 }
 

@@ -75,7 +75,7 @@ if ! command -v npm &> /dev/null; then
 fi
 
 # Install dependencies
-echo -e "${BLUE}[1/3]${NC} Syncing dependencies..."
+echo -e "${BLUE}[1/4]${NC} Syncing dependencies..."
 cd "$PROJECT_DIR"
 uv sync --quiet
 
@@ -84,15 +84,24 @@ if [ ! -d "node_modules" ]; then
     npm install --silent
 fi
 
+# Cleanup leftover processes on ports
+echo -e "${BLUE}[2/4]${NC} Checking ports..."
+cd "$PROJECT_DIR"
+if ! uv run python scripts/port_cleanup.py $BACKEND_PORT $FRONTEND_PORT; then
+    echo -e "${YELLOW}Warning: Some ports may still be in use${NC}"
+    echo "If startup fails, manually kill the blocking processes or use different ports."
+    sleep 2
+fi
+
 # Start servers
-echo -e "${BLUE}[2/3]${NC} Starting backend (port $BACKEND_PORT)..."
+echo -e "${BLUE}[3/4]${NC} Starting backend (port $BACKEND_PORT)..."
 cd "$PROJECT_DIR"
 uv run uvicorn provisioning_station.main:app --host 0.0.0.0 --port $BACKEND_PORT --reload &
 BACKEND_PID=$!
 
 sleep 1
 
-echo -e "${BLUE}[3/3]${NC} Starting frontend dev server (port $FRONTEND_PORT)..."
+echo -e "${BLUE}[4/4]${NC} Starting frontend dev server (port $FRONTEND_PORT)..."
 cd "$PROJECT_DIR/frontend"
 npm run dev -- --port $FRONTEND_PORT &
 FRONTEND_PID=$!

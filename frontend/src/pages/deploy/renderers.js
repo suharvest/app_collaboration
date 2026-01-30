@@ -45,6 +45,10 @@ export function renderDeployContent(container) {
   const name = getLocalizedField(currentSolution, 'name');
   const selectionMode = deployment.selection_mode || 'sequential';
 
+  // Check if current preset is disabled
+  const selectedPreset = presets.find(p => p.id === selectedPresetId);
+  const isPresetDisabled = selectedPreset?.disabled === true;
+
   // Render device group sections (with template-based instructions)
   const filteredDeviceGroups = getFilteredDeviceGroups(presets);
   const deviceGroupSectionsHtml = renderDeviceGroupSections(filteredDeviceGroups);
@@ -72,6 +76,17 @@ export function renderDeployContent(container) {
           <p class="text-sm text-text-secondary mt-2">${escapeHtml(currentSolution.summary || '')}</p>
         ` : ''}
       </div>
+
+      ${isPresetDisabled ? `
+        <div class="deploy-disabled-banner">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>${t('deploy.warnings.presetDisabled')}</span>
+        </div>
+      ` : ''}
 
       ${selectionMode === 'single_choice' ? `
         <!-- Single Choice Mode: Radio options -->
@@ -295,14 +310,14 @@ export function renderSelectedDeviceContent(device) {
         </div>
       ` : ''}
 
-      <!-- Connection Settings -->
-      ${device.type === 'ssh_deb' || device.type === 'docker_remote' || device.type === 'recamera_cpp' || device.type === 'recamera_nodered' ? renderSSHForm(device) : ''}
-
       <!-- Serial Port Selector (for ESP32/Himax devices) -->
       ${device.type === 'esp32_usb' || device.type === 'himax_usb' ? renderSerialPortSelector(device) : ''}
 
       <!-- Model Selection (for Himax devices with models) -->
       ${device.type === 'himax_usb' ? renderModelSelection(device) : ''}
+
+      <!-- Connection Settings (placed after instructions, before deploy button) -->
+      ${device.type === 'ssh_deb' || device.type === 'docker_remote' || device.type === 'recamera_cpp' || device.type === 'recamera_nodered' ? renderSSHForm(device) : ''}
 
       <!-- Deploy Action Area -->
       <div class="deploy-action-area">
@@ -522,12 +537,6 @@ function renderAutoSectionContent(device, state, sectionDescription, isScript) {
     <!-- User Inputs (for script type) -->
     ${isScript && state.details?.user_inputs ? renderUserInputs(device, state.details.user_inputs) : ''}
 
-    <!-- Connection Settings (for SSH-based devices) -->
-    ${device.type === 'ssh_deb' || device.type === 'docker_remote' || device.type === 'recamera_cpp' || device.type === 'recamera_nodered' ? renderSSHForm(device) : ''}
-
-    <!-- Additional User Inputs (for docker_remote devices, excluding SSH fields) -->
-    ${device.type === 'docker_remote' && state.details?.user_inputs ? renderUserInputs(device, state.details.user_inputs, ['host', 'username', 'password', 'port']) : ''}
-
     <!-- Markdown Content from section.description (pre-deployment instructions) -->
     ${sectionDescription ? `
       <div class="deploy-pre-instructions">
@@ -536,6 +545,12 @@ function renderAutoSectionContent(device, state, sectionDescription, isScript) {
         </div>
       </div>
     ` : ''}
+
+    <!-- Connection Settings (for SSH-based devices) - placed after instructions, before deploy button -->
+    ${device.type === 'ssh_deb' || device.type === 'docker_remote' || device.type === 'recamera_cpp' || device.type === 'recamera_nodered' ? renderSSHForm(device) : ''}
+
+    <!-- Additional User Inputs (for docker_remote devices, excluding SSH fields) -->
+    ${device.type === 'docker_remote' && state.details?.user_inputs ? renderUserInputs(device, state.details.user_inputs, ['host', 'username', 'password', 'port']) : ''}
 
     <!-- Serial Port Selector (for ESP32/Himax USB devices) -->
     ${device.type === 'esp32_usb' || device.type === 'himax_usb' ? renderSerialPortSelector(device) : ''}
@@ -762,12 +777,7 @@ export function renderDockerTargetContent(device) {
     `;
   }
 
-  // SSH form for remote target
-  if (isRemote) {
-    html += renderSSHForm(device, target);
-  }
-
-  // Description content
+  // Description content (placed before SSH form)
   if (description) {
     html += `
       <div class="deploy-pre-instructions">
@@ -776,6 +786,11 @@ export function renderDockerTargetContent(device) {
         </div>
       </div>
     `;
+  }
+
+  // SSH form for remote target (placed after description, before deploy button)
+  if (isRemote) {
+    html += renderSSHForm(device, target);
   }
 
   return html;

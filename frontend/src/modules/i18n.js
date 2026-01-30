@@ -124,6 +124,7 @@ const translations = {
         serviceSwitch: 'Deploying this application will stop any currently running applications on the device.',
         recameraSwitch: 'Deploying will stop the currently running application on reCamera to free up resources.',
         confirmDeploy: 'The current application will be stopped. Continue?',
+        presetDisabled: 'This solution preset is under development and not yet ready for deployment.',
       },
     },
     deployments: {
@@ -551,6 +552,7 @@ const translations = {
         serviceSwitch: '部署此应用将会停止设备上当前正在运行的应用。',
         recameraSwitch: '部署新应用将停止 reCamera 上当前运行的应用以释放资源。',
         confirmDeploy: '当前应用将被停止。是否继续？',
+        presetDisabled: '此方案预设正在开发中，暂时无法部署。',
       },
     },
     deployments: {

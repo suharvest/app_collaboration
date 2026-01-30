@@ -60,6 +60,13 @@ app_collaboration/
 
 ## 从 Wiki 文档创建新方案
 
+### 方案 ID 命名规则
+
+- 只能使用小写字母、数字和下划线
+- 必须以小写字母开头
+- 正则表达式：`^[a-z][a-z0-9_]*$`
+- 示例：`my_solution_name`、`smart_factory_v2`、`voice_assistant`
+
 ### 步骤 1: 创建方案目录结构
 
 ```bash

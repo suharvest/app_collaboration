@@ -104,6 +104,7 @@ class Preset(BaseModel):
     description_zh: Optional[str] = None
     badge: Optional[str] = None
     badge_zh: Optional[str] = None
+    disabled: bool = False  # If true, show warning that preset is incomplete
     device_groups: List[DeviceGroup] = []  # Device groups for this preset
     architecture_image: Optional[str] = None  # Architecture diagram for this preset
     links: Optional[PresetLinks] = None  # Per-preset wiki/github links
