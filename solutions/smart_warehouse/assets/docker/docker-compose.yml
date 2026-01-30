@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   backend:
     image: sensecraft-missionpack.seeed.cn/solution/warehouse-backend:latest
@@ -14,24 +12,26 @@ services:
     volumes:
       - warehouse_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:2124/api/dashboard/stats"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:2124/api/dashboard/stats', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
     restart: unless-stopped
 
   frontend:
     image: sensecraft-missionpack.seeed.cn/solution/warehouse-frontend:latest
     container_name: mcp_warehouse_frontend
     ports:
-      - "2125:80"
+      - "2125:2125"
     depends_on:
       - backend
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      test: ["CMD", "curl", "-f", "http://localhost:2125/"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 5s
     restart: unless-stopped
 
 volumes:
