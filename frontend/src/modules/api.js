@@ -502,6 +502,62 @@ export const solutionsApi = {
       body: JSON.stringify(tags),
     });
   },
+
+  /**
+   * Validate guide structure consistency between EN and ZH
+   * @param {string} id - Solution ID
+   * @returns {Promise<Object>} Validation result with errors and warnings
+   */
+  validateGuides(id) {
+    return request(`/solutions/${id}/validate-guides`);
+  },
+
+  /**
+   * Get parsed guide structure for management UI
+   * @param {string} id - Solution ID
+   * @returns {Promise<Object>} Guide structure with presets and steps
+   */
+  getGuideStructure(id) {
+    return request(`/solutions/${id}/guide-structure`);
+  },
+
+  // ============================================
+  // Content File Management (Simplified API)
+  // ============================================
+
+  /**
+   * Upload a core content file (guide.md, description.md, etc.)
+   * @param {string} id - Solution ID
+   * @param {string} filename - One of: guide.md, guide_zh.md, description.md, description_zh.md
+   * @param {string} content - File content
+   */
+  uploadContentFile(id, filename, content) {
+    return request(`/solutions/${id}/content/${encodeURIComponent(filename)}`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  },
+
+  /**
+   * Get structure preview parsed from guide.md
+   * @param {string} id - Solution ID
+   * @returns {Promise<Object>} Structure with presets, steps, validation
+   */
+  getPreviewStructure(id) {
+    return request(`/solutions/${id}/preview-structure`);
+  },
+
+  /**
+   * Update required devices from catalog IDs
+   * @param {string} id - Solution ID
+   * @param {string[]} deviceIds - Array of device IDs from catalog
+   */
+  updateRequiredDevices(id, deviceIds) {
+    return request(`/solutions/${id}/required-devices`, {
+      method: 'PUT',
+      body: JSON.stringify({ device_ids: deviceIds }),
+    });
+  },
 };
 
 // ============================================
@@ -510,6 +566,14 @@ export const solutionsApi = {
 // ============================================
 
 export const devicesApi = {
+  /**
+   * Get device catalog for dropdown selectors
+   * @returns {Promise<Object>} Catalog with devices array
+   */
+  getCatalog() {
+    return request('/devices/catalog');
+  },
+
   /**
    * Detect connected devices for a solution
    * @param {string} solutionId - Solution ID
@@ -538,6 +602,21 @@ export const devicesApi = {
       method: 'POST',
       body: JSON.stringify(config),
     });
+  },
+
+  /**
+   * Scan for SSH devices on the local network using mDNS
+   * @param {Object} options - Scan options
+   * @param {number} options.timeout - Scan timeout in seconds (default: 3)
+   * @param {boolean} options.filterKnown - Only return known IoT devices (default: true)
+   * @returns {Promise<Object>} Object with devices array
+   */
+  scanMdns(options = {}) {
+    const params = new URLSearchParams();
+    if (options.timeout) params.append('timeout', options.timeout);
+    if (options.filterKnown !== undefined) params.append('filter_known', options.filterKnown);
+    const query = params.toString();
+    return request(`/devices/scan-mdns${query ? '?' + query : ''}`, { timeout: 10000 });
   },
 };
 

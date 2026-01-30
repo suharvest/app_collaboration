@@ -27,6 +27,7 @@ import {
   getButtonClass,
   getDeployButtonContent,
   getFilteredLogs,
+  areAllRequiredDevicesCompleted,
 } from './utils.js';
 
 // ============================================
@@ -53,13 +54,13 @@ export function renderDeployContent(container) {
   const filteredDeviceGroups = getFilteredDeviceGroups(presets);
   const deviceGroupSectionsHtml = renderDeviceGroupSections(filteredDeviceGroups);
 
-  // Check if presets have sections (Level 1)
-  const presetsWithSections = presets.filter(p => p.section);
-  const hasPresetSections = presetsWithSections.length > 0;
+  // Check if we need preset selector (multiple presets means user can switch between them)
+  const hasMultiplePresets = presets.length > 1;
 
   // Render preset selector and section (Level 1)
-  const presetSelectorHtml = hasPresetSections ? renderPresetSelector(presets) : '';
-  const presetSectionHtml = hasPresetSections ? renderPresetSectionContent(presets) : '';
+  const presetSelectorHtml = hasMultiplePresets ? renderPresetSelector(presets) : '';
+  // Preset section content only if current preset has a section
+  const presetSectionHtml = renderPresetSectionContent(presets);
 
   container.innerHTML = `
     <div class="back-btn" id="back-btn">
@@ -72,7 +73,7 @@ export function renderDeployContent(container) {
     <div class="deploy-page">
       <div class="page-header">
         <h1 class="page-title">${t('deploy.title')}: ${escapeHtml(name)}</h1>
-        ${!hasPresetSections && deployment.guide ? `
+        ${!hasMultiplePresets && deployment.guide ? `
           <p class="text-sm text-text-secondary mt-2">${escapeHtml(currentSolution.summary || '')}</p>
         ` : ''}
       </div>
@@ -120,6 +121,11 @@ export function renderDeployContent(container) {
         </div>
       `}
 
+      <!-- Post-Deployment Success Section -->
+      <div id="post-deployment-container">
+        ${renderPostDeploymentSection(deployment)}
+      </div>
+
       ${currentSolution.wiki_url ? `
         <div class="mt-6 text-center">
           <a href="${currentSolution.wiki_url}" target="_blank" class="btn btn-secondary">
@@ -136,22 +142,80 @@ export function renderDeployContent(container) {
 }
 
 // ============================================
+// Post-Deployment Success Section
+// ============================================
+
+/**
+ * Render post-deployment success section
+ * Only shown when all required devices are completed
+ */
+export function renderPostDeploymentSection(deployment) {
+  const postDeployment = deployment?.post_deployment;
+  if (!postDeployment) return '';
+
+  const currentSolution = getCurrentSolution();
+  const devices = deployment.devices || [];
+
+  // Check if all required devices are completed
+  const allCompleted = areAllRequiredDevicesCompleted(devices);
+  if (!allCompleted) return '';
+
+  const successMessage = postDeployment.success_message || '';
+  const nextSteps = postDeployment.next_steps || [];
+
+  return `
+    <div class="post-deployment-section">
+      <div class="post-deployment-header">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="post-deployment-icon">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <h2 class="post-deployment-title">${t('deploy.postDeployment.title')}</h2>
+      </div>
+
+      ${successMessage ? `
+        <div class="post-deployment-content markdown-body">
+          ${successMessage}
+        </div>
+      ` : ''}
+
+      ${nextSteps.length > 0 ? `
+        <div class="post-deployment-next-steps">
+          <h3 class="post-deployment-next-steps-title">${t('deploy.postDeployment.nextSteps')}</h3>
+          <div class="post-deployment-actions">
+            ${nextSteps.map(step => {
+              const title = getLocalizedField(step, 'title');
+              const description = getLocalizedField(step, 'description');
+              return `
+                <a href="${step.url || '#'}" target="_blank" class="post-deployment-action-btn">
+                  <span class="post-deployment-action-title">${escapeHtml(title)}</span>
+                  ${description ? `<span class="post-deployment-action-desc">${escapeHtml(description)}</span>` : ''}
+                </a>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+// ============================================
 // Preset Selector (Level 1)
 // ============================================
 
 /**
  * Render preset selector (Level 1 tab group)
- * Only shown when multiple presets have sections
+ * Shown when multiple presets exist for switching deployment paths
  */
 export function renderPresetSelector(presets) {
   const selectedPresetId = getSelectedPresetId();
-  const presetsWithSections = presets.filter(p => p.section);
   // Don't show selector for single preset
-  if (presetsWithSections.length <= 1) return '';
+  if (presets.length <= 1) return '';
 
   return `
     <div class="deploy-preset-selector">
-      ${presetsWithSections.map(preset => {
+      ${presets.map(preset => {
         const isSelected = preset.id === selectedPresetId;
         const name = getLocalizedField(preset, 'name');
         const badge = getLocalizedField(preset, 'badge');
@@ -755,7 +819,8 @@ export function renderDockerTargetContent(device) {
   const description = targetSection.description || '';
   const wiring = targetSection.wiring || {};
   const wiringSteps = getLocalizedField(wiring, 'steps') || [];
-  const isRemote = target.id === 'remote';
+  // Check if target is remote: supports 'remote', 'xxx_remote', or id containing 'remote'
+  const isRemote = target.id === 'remote' || target.id?.endsWith('_remote') || target.id?.includes('remote');
 
   let html = '';
 
@@ -836,7 +901,17 @@ export function renderSSHForm(device, mode = null) {
       <div class="flex gap-4">
         <div class="form-group flex-1">
           <label>${t('deploy.connection.host')}</label>
-          <input type="text" id="ssh-host-${device.id}" value="${conn.host || defaultHost}" placeholder="192.168.42.1">
+          <div class="input-with-scan">
+            <input type="text" id="ssh-host-${device.id}" value="${conn.host || defaultHost}" placeholder="192.168.42.1">
+            <button type="button" class="btn btn-secondary btn-scan" id="scan-mdns-${device.id}" data-device-id="${device.id}" title="${t('deploy.connection.scanHint')}">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+              </svg>
+              ${t('deploy.connection.scan')}
+            </button>
+          </div>
+          <div class="mdns-devices-dropdown" id="mdns-dropdown-${device.id}" style="display: none;"></div>
         </div>
         <div class="form-group" style="width: 100px;">
           <label>${t('deploy.connection.port')}</label>

@@ -5,7 +5,7 @@
  * Bottom section: Previously deployed apps (legacy device management)
  */
 
-import { deviceManagementApi, dockerDevicesApi, restoreApi } from '../modules/api.js';
+import { deviceManagementApi, dockerDevicesApi, restoreApi, devicesApi } from '../modules/api.js';
 import { t, i18n } from '../modules/i18n.js';
 import { router } from '../modules/router.js';
 import { toast } from '../modules/toast.js';
@@ -97,7 +97,17 @@ export async function renderDevicesPage() {
           <div class="docker-connect-fields">
             <div class="form-group mb-0">
               <label>${t('deploy.connection.host')}</label>
-              <input type="text" id="docker-host" class="input" placeholder="192.168.x.x" required>
+              <div class="input-with-scan">
+                <input type="text" id="docker-host" class="input" placeholder="192.168.x.x" required>
+                <button type="button" class="btn btn-secondary btn-scan" id="scan-mdns-btn" title="${t('deploy.connection.scanHint')}">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                  </svg>
+                  ${t('deploy.connection.scan')}
+                </button>
+              </div>
+              <div class="mdns-devices-dropdown" id="mdns-dropdown-devices" style="display: none;"></div>
             </div>
             <div class="form-group mb-0">
               <label>${t('deploy.connection.username')}</label>
@@ -406,6 +416,12 @@ function setupDockerConnectForm() {
     refreshBtn.addEventListener('click', () => loadDeployedApps());
   }
 
+  // mDNS scan button
+  const scanBtn = document.getElementById('scan-mdns-btn');
+  if (scanBtn) {
+    scanBtn.addEventListener('click', () => scanMdnsForDevices());
+  }
+
   // Prune images button
   const pruneBtn = document.getElementById('prune-images-btn');
   if (pruneBtn) {
@@ -481,6 +497,99 @@ async function handleDockerConnect(e) {
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalText;
+  }
+}
+
+// ============================================
+// mDNS Device Discovery
+// ============================================
+
+async function scanMdnsForDevices() {
+  const btn = document.getElementById('scan-mdns-btn');
+  const dropdown = document.getElementById('mdns-dropdown-devices');
+  const hostInput = document.getElementById('docker-host');
+
+  if (!btn || !dropdown) return;
+
+  const originalContent = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner spinner-sm"></span> ${t('deploy.connection.scanning')}`;
+
+  try {
+    const result = await devicesApi.scanMdns({ timeout: 3, filterKnown: true });
+    const devices = result.devices || [];
+
+    if (devices.length === 0) {
+      dropdown.innerHTML = `
+        <div class="mdns-empty">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>${t('deploy.connection.noDevicesFound')}</span>
+        </div>
+      `;
+      dropdown.style.display = 'block';
+
+      // Auto-hide after 3 seconds
+      setTimeout(() => {
+        dropdown.style.display = 'none';
+      }, 3000);
+    } else {
+      dropdown.innerHTML = `
+        <div class="mdns-header">${t('deploy.connection.discoveredDevices')}</div>
+        ${devices.map(device => `
+          <div class="mdns-device" data-ip="${device.ip}" data-hostname="${device.hostname}">
+            <span class="mdns-device-icon">${getMdnsDeviceIcon(device.device_type)}</span>
+            <span class="mdns-device-name">${device.hostname}</span>
+            <span class="mdns-device-ip">${device.ip}</span>
+          </div>
+        `).join('')}
+      `;
+      dropdown.style.display = 'block';
+
+      // Setup click handlers for device selection
+      dropdown.querySelectorAll('.mdns-device').forEach(el => {
+        el.addEventListener('click', () => {
+          const ip = el.dataset.ip;
+          if (hostInput) {
+            hostInput.value = ip;
+            hostInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          dropdown.style.display = 'none';
+        });
+      });
+
+      // Close dropdown when clicking outside
+      const closeDropdown = (e) => {
+        if (!dropdown.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+          dropdown.style.display = 'none';
+          document.removeEventListener('click', closeDropdown);
+        }
+      };
+      setTimeout(() => document.addEventListener('click', closeDropdown), 100);
+    }
+  } catch (error) {
+    console.error('mDNS scan failed:', error);
+    toast.error(error.message || t('common.error'));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalContent;
+  }
+}
+
+function getMdnsDeviceIcon(deviceType) {
+  switch (deviceType) {
+    case 'raspberry':
+      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="9" cy="15" r="1"/><circle cx="15" cy="15" r="1"/></svg>';
+    case 'jetson':
+      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M9 2v2M9 20v2M2 15h2M20 15h2M2 9h2M20 9h2"/></svg>';
+    case 'recomputer':
+    case 'recamera':
+      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>';
+    default:
+      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>';
   }
 }
 

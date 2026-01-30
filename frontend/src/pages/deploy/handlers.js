@@ -4,7 +4,7 @@
  */
 
 import { t, getLocalizedField, i18n } from '../../modules/i18n.js';
-import { solutionsApi } from '../../modules/api.js';
+import { solutionsApi, devicesApi } from '../../modules/api.js';
 import { escapeHtml } from '../../modules/utils.js';
 import { toast } from '../../modules/toast.js';
 import { router } from '../../modules/router.js';
@@ -166,6 +166,15 @@ export function setupEventHandlers(container) {
     });
   });
 
+  // mDNS scan buttons
+  container.querySelectorAll('[id^="scan-mdns-"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const deviceId = btn.dataset.deviceId;
+      await scanMdnsDevices(deviceId, btn);
+    });
+  });
+
   // Setup handlers for selected device section (single_choice mode)
   setupSelectedDeviceHandlers(container);
 
@@ -238,6 +247,15 @@ export function setupSelectedDeviceHandlers(container) {
       e.stopPropagation();
       const deviceId = btn.dataset.deviceId;
       await testSSHConnection(deviceId, btn);
+    });
+  });
+
+  // mDNS scan in selected section
+  container.querySelectorAll('.deploy-selected-card [id^="scan-mdns-"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const deviceId = btn.dataset.deviceId;
+      await scanMdnsDevices(deviceId, btn);
     });
   });
 
@@ -341,6 +359,15 @@ export function attachSectionEventHandlers(container) {
       e.stopPropagation();
       const deviceId = btn.dataset.deviceId;
       await testSSHConnection(deviceId, btn);
+    });
+  });
+
+  // mDNS scan
+  container.querySelectorAll('[id^="scan-mdns-"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const deviceId = btn.dataset.deviceId;
+      await scanMdnsDevices(deviceId, btn);
     });
   });
 
@@ -545,5 +572,107 @@ export function updateSelectedDevice(container) {
 
     // Re-attach event handlers for the new content
     setupSelectedDeviceHandlers(container);
+  }
+}
+
+// ============================================
+// mDNS Device Discovery
+// ============================================
+
+/**
+ * Scan for devices on the local network using mDNS
+ * @param {string} deviceId - The device ID for the SSH form
+ * @param {HTMLElement} btn - The scan button element
+ */
+async function scanMdnsDevices(deviceId, btn) {
+  const originalContent = btn.innerHTML;
+  const dropdown = document.getElementById(`mdns-dropdown-${deviceId}`);
+  const hostInput = document.getElementById(`ssh-host-${deviceId}`);
+
+  // Show loading state
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner spinner-sm"></span> ${t('deploy.connection.scanning')}`;
+
+  try {
+    const result = await devicesApi.scanMdns({ timeout: 3, filterKnown: true });
+    const devices = result.devices || [];
+
+    if (!dropdown) return;
+
+    if (devices.length === 0) {
+      dropdown.innerHTML = `
+        <div class="mdns-empty">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>${t('deploy.connection.noDevicesFound')}</span>
+        </div>
+      `;
+      dropdown.style.display = 'block';
+
+      // Auto-hide after 3 seconds
+      setTimeout(() => {
+        dropdown.style.display = 'none';
+      }, 3000);
+    } else {
+      dropdown.innerHTML = `
+        <div class="mdns-header">${t('deploy.connection.discoveredDevices')}</div>
+        ${devices.map(device => `
+          <div class="mdns-device" data-ip="${device.ip}" data-hostname="${device.hostname}">
+            <span class="mdns-device-icon">${getMdnsDeviceIcon(device.device_type)}</span>
+            <span class="mdns-device-name">${device.hostname}</span>
+            <span class="mdns-device-ip">${device.ip}</span>
+          </div>
+        `).join('')}
+      `;
+      dropdown.style.display = 'block';
+
+      // Setup click handlers for device selection
+      dropdown.querySelectorAll('.mdns-device').forEach(el => {
+        el.addEventListener('click', () => {
+          const ip = el.dataset.ip;
+          if (hostInput) {
+            hostInput.value = ip;
+            // Trigger input event for any listeners
+            hostInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          dropdown.style.display = 'none';
+        });
+      });
+
+      // Close dropdown when clicking outside
+      const closeDropdown = (e) => {
+        if (!dropdown.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+          dropdown.style.display = 'none';
+          document.removeEventListener('click', closeDropdown);
+        }
+      };
+      setTimeout(() => document.addEventListener('click', closeDropdown), 100);
+    }
+  } catch (error) {
+    console.error('mDNS scan failed:', error);
+    toast.error(error.message || t('common.error'));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalContent;
+  }
+}
+
+/**
+ * Get icon for mDNS device type
+ */
+function getMdnsDeviceIcon(deviceType) {
+  switch (deviceType) {
+    case 'raspberry':
+      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="9" cy="15" r="1"/><circle cx="15" cy="15" r="1"/></svg>';
+    case 'jetson':
+      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M9 2v2M9 20v2M2 15h2M20 15h2M2 9h2M20 9h2"/></svg>';
+    case 'recomputer':
+    case 'recamera':
+      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>';
+    default:
+      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>';
   }
 }
