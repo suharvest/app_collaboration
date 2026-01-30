@@ -126,57 +126,68 @@ class SolutionManager:
         """Get all loaded solutions"""
         return list(self.solutions.values())
 
-    def find_device_in_solution(
-        self, solution: Solution, device_id: str, preset_id: str = None
+    async def find_device_async(
+        self, solution_id: str, device_id: str, preset_id: str = None
     ):
-        """Find a device by ID from presets.
+        """Find a device by ID from guide.md.
 
         Args:
-            solution: The solution object
+            solution_id: The solution ID
             device_id: The device ID to find
-            preset_id: Optional preset ID to search within
+            preset_id: Optional preset ID to search within (unused, for API compatibility)
 
         Returns:
-            The device reference if found, None otherwise
+            Device dict if found, None otherwise
         """
-        if solution.intro and solution.intro.presets:
-            for preset in solution.intro.presets:
-                if preset_id and preset.id != preset_id:
-                    continue
-                if preset.devices:
-                    for device in preset.devices:
-                        if device.id == device_id:
-                            return device
+        deployment_info = await self.get_deployment_from_guide(solution_id, "en")
+        if deployment_info and deployment_info.get("devices"):
+            for device in deployment_info["devices"]:
+                if device.get("id") == device_id:
+                    return device
         return None
 
-    def get_all_devices_from_solution(self, solution: Solution, preset_id: str = None):
-        """Get all devices from a solution's presets.
+    async def get_all_devices_async(self, solution_id: str, preset_id: str = None):
+        """Get all devices from guide.md.
 
         Args:
-            solution: The solution object
+            solution_id: The solution ID
             preset_id: Optional preset ID to filter by
 
         Returns:
-            List of device references from presets
+            List of device dicts
         """
-        devices = []
-        if solution.intro and solution.intro.presets:
-            for preset in solution.intro.presets:
-                if preset_id and preset.id != preset_id:
-                    continue
-                if preset.devices:
-                    devices.extend(preset.devices)
-        return devices
+        deployment_info = await self.get_deployment_from_guide(solution_id, "en")
+        if deployment_info and deployment_info.get("devices"):
+            all_devices = deployment_info["devices"]
+            if preset_id and deployment_info.get("presets"):
+                preset = next(
+                    (p for p in deployment_info["presets"] if p["id"] == preset_id), None
+                )
+                if preset and preset.get("devices"):
+                    device_ids = preset["devices"]
+                    return [d for d in all_devices if d["id"] in device_ids]
+            return all_devices
+        return []
 
     def count_devices_in_solution(self, solution: Solution) -> int:
-        """Count unique devices in a solution (from presets).
+        """Count unique devices in a solution (legacy - always returns 0).
 
-        Args:
-            solution: The solution object
-
-        Returns:
-            Number of unique device IDs
+        Kept for backward compatibility. Use count_steps_from_guide() instead.
         """
+        # Devices are now defined in guide.md, not solution.yaml
+        return 0
+
+    # Legacy alias for backward compatibility
+    def find_device_in_solution(self, solution: Solution, device_id: str, preset_id: str = None):
+        """Legacy method - always returns None. Use find_device_async() instead."""
+        return None
+
+    def get_all_devices_from_solution(self, solution: Solution, preset_id: str = None):
+        """Legacy method - always returns empty list. Use get_all_devices_async() instead."""
+        return []
+
+    def _legacy_count_devices(self, solution: Solution) -> int:
+        """Internal: Count devices from solution.yaml presets (deprecated)."""
         device_ids = set()
         if solution.intro and solution.intro.presets:
             for preset in solution.intro.presets:
@@ -575,8 +586,7 @@ class SolutionManager:
         guide_path = Path(solution.base_path) / guide_file
 
         if not guide_path.exists():
-            # Fall back to YAML-based count
-            return self.count_devices_in_solution(solution)
+            return 0
 
         try:
             async with aiofiles.open(guide_path, "r", encoding="utf-8") as f:
@@ -590,11 +600,11 @@ class SolutionManager:
                 for step in preset.steps:
                     step_ids.add(step.id)
 
-            return len(step_ids) if step_ids else self.count_devices_in_solution(solution)
+            return len(step_ids)
 
         except Exception as e:
             logger.error(f"Failed to count steps from guide for {solution_id}: {e}")
-            return self.count_devices_in_solution(solution)
+            return 0
 
     async def get_deployment_from_guide(
         self, solution_id: str, lang: str = "en"

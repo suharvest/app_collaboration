@@ -83,30 +83,35 @@ class DeploymentEngine:
             devices=[],
         )
 
-        # Get devices list - either from preset or legacy deployment.devices
+        # Get devices list from guide.md
         devices_list = []
         deploy_order = []
 
-        if preset_id and solution.intro.presets:
-            # Find the preset by ID
-            preset = next(
-                (p for p in solution.intro.presets if p.id == preset_id), None
-            )
-            if preset and preset.devices:
-                devices_list = preset.devices
-                deploy_order = [d.id for d in preset.devices]
-                logger.info(
-                    f"Using preset '{preset_id}' with {len(devices_list)} devices"
-                )
-            else:
-                logger.warning(
-                    f"Preset '{preset_id}' not found or has no devices, falling back to legacy"
-                )
+        deployment_info = await solution_manager.get_deployment_from_guide(solution.id, "en")
+        if deployment_info and deployment_info.get("devices"):
+            all_devices = deployment_info["devices"]
 
-        # Fallback to legacy deployment.devices if no preset devices
-        if not devices_list:
-            devices_list = solution.deployment.devices
-            deploy_order = solution.deployment.order
+            if preset_id and deployment_info.get("presets"):
+                # Find preset and get its device IDs
+                preset = next(
+                    (p for p in deployment_info["presets"] if p["id"] == preset_id), None
+                )
+                if preset and preset.get("devices"):
+                    deploy_order = preset["devices"]
+                    devices_list = [d for d in all_devices if d["id"] in deploy_order]
+                    logger.info(
+                        f"Using preset '{preset_id}' with {len(devices_list)} devices"
+                    )
+                else:
+                    logger.warning(
+                        f"Preset '{preset_id}' not found, using all devices"
+                    )
+                    devices_list = all_devices
+                    deploy_order = [d["id"] for d in all_devices]
+            else:
+                # No preset specified, use all devices
+                devices_list = all_devices
+                deploy_order = [d["id"] for d in all_devices]
 
         # Filter by selected_devices if provided
         if selected_devices:
@@ -114,18 +119,21 @@ class DeploymentEngine:
 
         # Initialize device deployments
         for device_id in deploy_order:
-            device_ref = next((d for d in devices_list if d.id == device_id), None)
+            device_ref = next(
+                (d for d in devices_list if d.get("id") == device_id), None
+            )
             if not device_ref:
                 continue
 
             # Determine effective type and config_file
-            effective_type = device_ref.type
-            config_file = device_ref.config_file
+            device_type = device_ref.get("type")
+            effective_type = device_type
+            config_file = device_ref.get("config_file")
             logger.debug(
-                f"Device {device_id}: type={device_ref.type}, config_file={config_file}"
+                f"Device {device_id}: type={device_type}, config_file={config_file}"
             )
 
-            if device_ref.type == "docker_deploy":
+            if device_type == "docker_deploy":
                 # Get selected target from options (local/remote)
                 deploy_target = (
                     options.get("deploy_target", "local") if options else "local"
@@ -136,10 +144,12 @@ class DeploymentEngine:
                 # Use config_file from options if provided, otherwise resolve from targets
                 if options and options.get("config_file"):
                     config_file = options["config_file"]
-                elif device_ref.targets and deploy_target in device_ref.targets:
-                    target = device_ref.targets[deploy_target]
-                    if target.config_file:
-                        config_file = target.config_file
+                else:
+                    targets = device_ref.get("targets")
+                    if targets and deploy_target in targets:
+                        target = targets[deploy_target]
+                        if target.get("config_file"):
+                            config_file = target["config_file"]
                 logger.info(
                     f"docker_deploy resolved: target={deploy_target}, effective_type={effective_type}, config_file={config_file}"
                 )
@@ -147,7 +157,7 @@ class DeploymentEngine:
                 # Support config_file override for any device type with targets
                 config_file = options["config_file"]
                 logger.info(
-                    f"{device_ref.type}: using target config_file={config_file}"
+                    f"{device_type}: using target config_file={config_file}"
                 )
 
             # Skip devices without config_file (e.g., manual info-only steps)
@@ -161,14 +171,16 @@ class DeploymentEngine:
                 continue
 
             # Check if we have connection info for this device
-            if device_id not in device_connections and device_ref.required:
+            is_required = device_ref.get("required", True)
+            if device_id not in device_connections and is_required:
                 # Skip if required device has no connection
                 logger.warning(f"No connection info for required device: {device_id}")
                 continue
 
+            device_name = device_ref.get("name", device_id)
             device_deployment = DeviceDeployment(
                 device_id=device_id,
-                name=device_ref.name,
+                name=device_name,
                 type=effective_type,  # Use effective type for deployer selection
                 config_file=config_file,  # Store config_file for _run_deployment
                 status=DeploymentStatus.PENDING,
