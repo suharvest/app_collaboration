@@ -1,12 +1,13 @@
 /**
  * Solution Management Page
  * Provides structured management for solutions with tab-based UI
- * - Basic Info: name, summary, category, tags, links
- * - Presets: deployment presets with structured device/step management
- * - Files: file browser for solution resources
+ * - Basic Info: name, summary, category, tags, links, required devices
+ * - Content Files: 4 core markdown files (guide.md, description.md)
+ * - Assets: file browser for solution resources
+ * - Preview: structure preview from guide.md
  */
 
-import { solutionsApi, getAssetUrl } from '../modules/api.js';
+import { solutionsApi, devicesApi, getAssetUrl } from '../modules/api.js';
 import { t, i18n, getLocalizedField } from '../modules/i18n.js';
 import { toast } from '../modules/toast.js';
 
@@ -15,13 +16,19 @@ let solutions = [];
 let isLoading = false;
 let editingSolution = null;
 let solutionStructure = null;
+let deviceCatalog = [];
 let activeTab = 'basic';
 
 // Constants
 const SOLUTION_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
 const CATEGORIES = ['general', 'voice_ai', 'sensing', 'automation', 'vision', 'smart_building', 'industrial_iot'];
 const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'];
-const DEVICE_TYPES = ['manual', 'esp32_usb', 'himax_usb', 'docker_deploy', 'script', 'preview'];
+const CONTENT_FILES = [
+  { name: 'guide.md', label: 'Deploy Guide (EN)', group: 'deploy' },
+  { name: 'guide_zh.md', label: 'Deploy Guide (ZH)', group: 'deploy' },
+  { name: 'description.md', label: 'Introduction (EN)', group: 'intro' },
+  { name: 'description_zh.md', label: 'Introduction (ZH)', group: 'intro' },
+];
 
 /**
  * Flatten tree structure to flat array of files
@@ -60,6 +67,21 @@ async function loadSolutionStructure(solutionId) {
   ]);
   structure.files = flattenFileTree(filesResult.files);
   return structure;
+}
+
+/**
+ * Load device catalog
+ */
+async function loadDeviceCatalog() {
+  if (deviceCatalog.length > 0) return deviceCatalog;
+  try {
+    const result = await devicesApi.getCatalog();
+    deviceCatalog = result.devices || [];
+    return deviceCatalog;
+  } catch (error) {
+    console.error('Failed to load device catalog:', error);
+    return [];
+  }
 }
 
 /**
@@ -217,6 +239,9 @@ async function openModal(solution = null) {
   activeTab = 'basic';
   const isEdit = !!solution;
 
+  // Load device catalog
+  await loadDeviceCatalog();
+
   // Load structure and files for edit mode
   if (isEdit) {
     try {
@@ -238,6 +263,11 @@ function renderModal(isEdit) {
   const solution = editingSolution;
   const structure = solutionStructure;
 
+  // Tab structure: Basic Info always, others only in edit mode
+  const tabs = isEdit
+    ? ['basic', 'contentFiles', 'assets', 'preview']
+    : ['basic'];
+
   const modalHtml = `
     <div class="modal" id="solution-modal">
       <div class="modal-content modal-xl">
@@ -251,11 +281,14 @@ function renderModal(isEdit) {
           <button class="tab-btn ${activeTab === 'basic' ? 'active' : ''}" data-tab="basic">
             ${t('management.tabs.basicInfo')}
           </button>
-          <button class="tab-btn ${activeTab === 'presets' ? 'active' : ''}" data-tab="presets">
-            ${t('management.tabs.presets')}
+          <button class="tab-btn ${activeTab === 'contentFiles' ? 'active' : ''}" data-tab="contentFiles">
+            ${t('management.tabs.contentFiles')}
           </button>
-          <button class="tab-btn ${activeTab === 'files' ? 'active' : ''}" data-tab="files">
-            ${t('management.tabs.files')}
+          <button class="tab-btn ${activeTab === 'assets' ? 'active' : ''}" data-tab="assets">
+            ${t('management.tabs.assets')}
+          </button>
+          <button class="tab-btn ${activeTab === 'preview' ? 'active' : ''}" data-tab="preview">
+            ${t('management.tabs.preview')}
           </button>
         </div>
         ` : ''}
@@ -265,11 +298,14 @@ function renderModal(isEdit) {
             ${renderBasicInfoTab(solution, structure)}
           </div>
           ${isEdit ? `
-          <div class="tab-content ${activeTab === 'presets' ? 'active' : ''}" data-tab-content="presets">
-            ${renderPresetsTab(structure)}
+          <div class="tab-content ${activeTab === 'contentFiles' ? 'active' : ''}" data-tab-content="contentFiles">
+            ${renderContentFilesTab(structure)}
           </div>
-          <div class="tab-content ${activeTab === 'files' ? 'active' : ''}" data-tab-content="files">
-            ${renderFilesTab(structure)}
+          <div class="tab-content ${activeTab === 'assets' ? 'active' : ''}" data-tab-content="assets">
+            ${renderAssetsTab(structure)}
+          </div>
+          <div class="tab-content ${activeTab === 'preview' ? 'active' : ''}" data-tab-content="preview">
+            ${renderPreviewTab(structure)}
           </div>
           ` : ''}
         </div>
@@ -304,11 +340,16 @@ function renderModal(isEdit) {
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
         document.querySelector(`[data-tab-content="${activeTab}"]`).classList.add('active');
+
+        // Load preview when tab is activated
+        if (activeTab === 'preview') {
+          loadPreviewStructure();
+        }
       });
     });
 
-    setupPresetsTab();
-    setupFilesTab();
+    setupContentFilesTab();
+    setupAssetsTab();
   }
 
   // ID validation for new solutions
@@ -324,8 +365,11 @@ function renderModal(isEdit) {
     });
   }
 
-  // Setup file uploads for basic info
+  // Setup tags, links, and required devices in basic info
   if (isEdit) {
+    setupTagsEditor();
+    setupLinksEditor();
+    setupRequiredDevicesSelector();
     setupFileUploads();
   }
 }
@@ -337,6 +381,7 @@ function renderBasicInfoTab(solution, structure) {
   const isEdit = !!solution;
   const tags = structure?.intro?.tags || [];
   const links = structure?.intro?.links || {};
+  const requiredDevices = structure?.intro?.required_devices || [];
 
   return `
     <form id="solution-form">
@@ -409,6 +454,27 @@ function renderBasicInfoTab(solution, structure) {
 
       ${isEdit ? `
       <div class="form-section">
+        <h4 class="form-section-title">${t('management.devices.title')}</h4>
+        <p class="form-hint mb-4">${t('management.devices.subtitle')}</p>
+        <div class="required-devices-editor" id="required-devices-editor">
+          <div class="required-devices-list" id="required-devices-list">
+            ${requiredDevices.map(device => renderRequiredDeviceItem(device)).join('')}
+          </div>
+          <div class="add-device-wrapper">
+            <select id="add-device-select" class="device-select">
+              <option value="">${t('management.devices.searchDevices')}</option>
+              ${deviceCatalog.map(d => `
+                <option value="${d.id}">${d.name} (${d.id})</option>
+              `).join('')}
+            </select>
+            <button type="button" class="btn btn-sm btn-secondary" id="btn-add-device">
+              + ${t('management.devices.addDevice')}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
         <h4 class="form-section-title">${t('management.form.tags')}</h4>
         <div class="tags-editor" id="tags-editor">
           <div class="tags-list">
@@ -445,7 +511,7 @@ function renderBasicInfoTab(solution, structure) {
         <h4 class="form-section-title">${t('management.form.files')}</h4>
         <div class="form-group">
           <label>${t('management.form.coverImage')}</label>
-          <div class="file-upload-area" data-field="intro.cover_image" data-path="intro/gallery/cover.png" data-accept="image/*">
+          <div class="file-upload-area" data-field="intro.cover_image" data-path="gallery/cover.png" data-accept="image/*">
             <div class="file-upload-content">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -465,142 +531,544 @@ function renderBasicInfoTab(solution, structure) {
 }
 
 /**
- * Render Presets tab content
+ * Render a required device item
  */
-function renderPresetsTab(structure) {
-  const presets = structure?.presets || [];
-
+function renderRequiredDeviceItem(device) {
   return `
-    <div class="presets-container">
-      <div class="presets-header">
-        <h4>${t('management.presets.title')}</h4>
-        <button class="btn btn-primary btn-sm" id="btn-add-preset">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          ${t('management.presets.add')}
-        </button>
-      </div>
-
-      <div class="presets-list" id="presets-list">
-        ${presets.length === 0 ? `
-          <div class="empty-state-sm">
-            <p>${t('management.presets.empty')}</p>
-          </div>
-        ` : presets.map((preset, index) => renderPresetCard(preset, index)).join('')}
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Render a single preset card
- */
-function renderPresetCard(preset, index) {
-  const devices = preset.devices || [];
-  const isDefault = preset.default === true;
-
-  return `
-    <div class="preset-card" data-preset-id="${preset.id}">
-      <div class="preset-header">
-        <div class="preset-info">
-          <span class="preset-index">${index + 1}</span>
-          <div>
-            <h5 class="preset-name">${preset.name || preset.id}</h5>
-            ${preset.name_zh ? `<span class="preset-name-zh">${preset.name_zh}</span>` : ''}
-          </div>
-          ${isDefault ? `<span class="badge badge-primary">${t('management.presets.default')}</span>` : ''}
-        </div>
-        <div class="preset-actions">
-          <button class="btn-icon" title="${t('management.actions.edit')}" data-action="edit-preset" data-preset-id="${preset.id}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-          </button>
-          <button class="btn-icon btn-icon-danger" title="${t('management.actions.delete')}" data-action="delete-preset" data-preset-id="${preset.id}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <div class="preset-devices">
-        <div class="devices-header">
-          <span class="text-sm text-text-secondary">${t('management.presets.steps')} (${devices.length})</span>
-          <button class="btn btn-sm btn-secondary" data-action="add-device" data-preset-id="${preset.id}">
-            + ${t('management.presets.addStep')}
-          </button>
-        </div>
-
-        <div class="devices-list">
-          ${devices.length === 0 ? `
-            <p class="text-sm text-text-muted">${t('management.presets.noSteps')}</p>
-          ` : devices.map((device, deviceIndex) => renderDeviceRow(preset.id, device, deviceIndex)).join('')}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Render a device/step row within a preset
- */
-function renderDeviceRow(presetId, device, index) {
-  const section = device.section || {};
-
-  return `
-    <div class="device-row" data-device-id="${device.id}">
+    <div class="required-device-item" data-device-id="${device.id || device}">
       <div class="device-info">
-        <span class="device-index">${index + 1}</span>
-        <div class="device-details">
-          <span class="device-name">${device.name || device.id}</span>
-          <span class="device-type badge badge-sm">${device.type}</span>
-          ${device.required ? '<span class="badge badge-sm badge-warning">Required</span>' : ''}
+        <span class="device-name">${device.name || device.id || device}</span>
+        <span class="device-id text-text-muted">${device.id || device}</span>
+      </div>
+      <button type="button" class="btn-icon btn-icon-sm btn-icon-danger remove-device" data-device-id="${device.id || device}">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  `;
+}
+
+/**
+ * Setup required devices selector
+ */
+function setupRequiredDevicesSelector() {
+  const container = document.getElementById('required-devices-editor');
+  if (!container) return;
+
+  const addBtn = document.getElementById('btn-add-device');
+  const select = document.getElementById('add-device-select');
+
+  addBtn?.addEventListener('click', async () => {
+    const deviceId = select.value;
+    if (!deviceId) {
+      toast.error(t('management.devices.selectFirst'));
+      return;
+    }
+
+    // Get current device IDs
+    const currentIds = Array.from(
+      document.querySelectorAll('#required-devices-list .required-device-item')
+    ).map(el => el.dataset.deviceId);
+
+    if (currentIds.includes(deviceId)) {
+      toast.error(t('management.devices.alreadyAdded'));
+      return;
+    }
+
+    const newIds = [...currentIds, deviceId];
+
+    try {
+      const updatedDevices = await solutionsApi.updateRequiredDevices(editingSolution.id, newIds);
+      solutionStructure.intro.required_devices = updatedDevices;
+
+      // Find the device in catalog
+      const device = deviceCatalog.find(d => d.id === deviceId) || { id: deviceId, name: deviceId };
+      const list = document.getElementById('required-devices-list');
+      list.insertAdjacentHTML('beforeend', renderRequiredDeviceItem(device));
+
+      select.value = '';
+      toast.success(t('management.messages.devicesUpdated'));
+    } catch (error) {
+      toast.error(error.message);
+    }
+  });
+
+  // Remove device
+  container.addEventListener('click', async (e) => {
+    const removeBtn = e.target.closest('.remove-device');
+    if (!removeBtn) return;
+
+    const deviceId = removeBtn.dataset.deviceId;
+    const currentIds = Array.from(
+      document.querySelectorAll('#required-devices-list .required-device-item')
+    ).map(el => el.dataset.deviceId);
+
+    const newIds = currentIds.filter(id => id !== deviceId);
+
+    try {
+      const updatedDevices = await solutionsApi.updateRequiredDevices(editingSolution.id, newIds);
+      solutionStructure.intro.required_devices = updatedDevices;
+      removeBtn.closest('.required-device-item').remove();
+      toast.success(t('management.messages.devicesUpdated'));
+    } catch (error) {
+      toast.error(error.message);
+    }
+  });
+}
+
+/**
+ * Render Content Files tab
+ */
+function renderContentFilesTab(structure) {
+  const files = structure?.files || [];
+  const existingFiles = new Set(files.map(f => f.path));
+
+  return `
+    <div class="content-files-container">
+      <div class="content-files-header">
+        <h4>${t('management.contentFiles.title')}</h4>
+        <p class="text-sm text-text-muted">${t('management.contentFiles.subtitle')}</p>
+      </div>
+
+      <div class="content-files-sections">
+        <!-- Deploy Guides -->
+        <div class="content-files-group">
+          <h5 class="group-title">${t('management.contentFiles.deployGuides')}</h5>
+          <div class="content-files-list">
+            ${CONTENT_FILES.filter(f => f.group === 'deploy').map(file => {
+              const exists = existingFiles.has(file.name);
+              return `
+                <div class="content-file-item" data-filename="${file.name}">
+                  <div class="file-info">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    </svg>
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-label text-text-muted">${file.label}</span>
+                  </div>
+                  <div class="file-status">
+                    ${exists
+                      ? `<span class="status-badge status-exists">${t('management.contentFiles.exists')}</span>`
+                      : `<span class="status-badge status-missing">${t('management.contentFiles.missing')}</span>`
+                    }
+                  </div>
+                  <div class="file-actions">
+                    <button class="btn btn-sm btn-secondary" data-action="edit-content" data-filename="${file.name}">
+                      ${t('management.contentFiles.edit')}
+                    </button>
+                    <button class="btn btn-sm btn-secondary" data-action="upload-content" data-filename="${file.name}">
+                      ${t('management.contentFiles.upload')}
+                    </button>
+                    ${exists ? `
+                      <button class="btn btn-sm btn-secondary" data-action="view-content" data-filename="${file.name}">
+                        ${t('management.contentFiles.view')}
+                      </button>
+                    ` : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Introduction Pages -->
+        <div class="content-files-group">
+          <h5 class="group-title">${t('management.contentFiles.introPages')}</h5>
+          <div class="content-files-list">
+            ${CONTENT_FILES.filter(f => f.group === 'intro').map(file => {
+              const exists = existingFiles.has(file.name);
+              return `
+                <div class="content-file-item" data-filename="${file.name}">
+                  <div class="file-info">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    </svg>
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-label text-text-muted">${file.label}</span>
+                  </div>
+                  <div class="file-status">
+                    ${exists
+                      ? `<span class="status-badge status-exists">${t('management.contentFiles.exists')}</span>`
+                      : `<span class="status-badge status-missing">${t('management.contentFiles.missing')}</span>`
+                    }
+                  </div>
+                  <div class="file-actions">
+                    <button class="btn btn-sm btn-secondary" data-action="edit-content" data-filename="${file.name}">
+                      ${t('management.contentFiles.edit')}
+                    </button>
+                    <button class="btn btn-sm btn-secondary" data-action="upload-content" data-filename="${file.name}">
+                      ${t('management.contentFiles.upload')}
+                    </button>
+                    ${exists ? `
+                      <button class="btn btn-sm btn-secondary" data-action="view-content" data-filename="${file.name}">
+                        ${t('management.contentFiles.view')}
+                      </button>
+                    ` : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
         </div>
       </div>
-      <div class="device-files">
-        ${section.description_file ? `
-          <span class="file-badge" title="${section.description_file}">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            </svg>
-            ${section.description_file.split('/').pop()}
-          </span>
-        ` : ''}
-      </div>
-      <div class="device-actions">
-        <button class="btn-icon btn-icon-sm" title="${t('management.actions.edit')}"
-                data-action="edit-device" data-preset-id="${presetId}" data-device-id="${device.id}">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-          </svg>
-        </button>
-        <button class="btn-icon btn-icon-sm btn-icon-danger" title="${t('management.actions.delete')}"
-                data-action="delete-device" data-preset-id="${presetId}" data-device-id="${device.id}">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-          </svg>
-        </button>
+
+      <div class="content-validation" id="content-validation">
+        <div class="validation-loading">
+          <span class="spinner-sm"></span>
+          <span>${t('common.loading')}</span>
+        </div>
       </div>
     </div>
   `;
 }
 
 /**
- * Render Files tab content
+ * Setup Content Files tab
  */
-function renderFilesTab(structure) {
+function setupContentFilesTab() {
+  const container = document.querySelector('[data-tab-content="contentFiles"]');
+  if (!container) return;
+
+  // Load validation status
+  loadContentValidation();
+
+  // Handle action buttons
+  container.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+
+    const action = btn.dataset.action;
+    const filename = btn.dataset.filename;
+
+    switch (action) {
+      case 'edit-content':
+        openContentEditDialog(filename);
+        break;
+      case 'upload-content':
+        openContentUploadDialog(filename);
+        break;
+      case 'view-content':
+        openContentViewDialog(filename);
+        break;
+    }
+  });
+}
+
+/**
+ * Load content validation
+ */
+async function loadContentValidation() {
+  const container = document.getElementById('content-validation');
+  if (!container || !editingSolution) return;
+
+  try {
+    const result = await solutionsApi.validateGuides(editingSolution.id);
+    container.innerHTML = renderContentValidationResult(result);
+  } catch (error) {
+    console.error('Failed to load validation:', error);
+    container.innerHTML = `
+      <div class="validation-box validation-error">
+        <div class="validation-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>${t('management.validation.loadError')}</span>
+        </div>
+      </div>
+    `;
+  }
+}
+
+/**
+ * Render content validation result
+ */
+function renderContentValidationResult(result) {
+  if (result.warnings?.length > 0) {
+    const warningMsg = result.warnings[0]?.message || '';
+    if (warningMsg.includes('No guide files found')) {
+      return `
+        <div class="validation-box validation-warning">
+          <div class="validation-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>${t('management.contentFiles.noGuides')}</span>
+          </div>
+        </div>
+      `;
+    }
+    if (warningMsg.includes('Chinese guide not found')) {
+      return `
+        <div class="validation-box validation-warning">
+          <div class="validation-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>${t('management.contentFiles.enOnly')}</span>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  if (result.valid) {
+    const presetCount = result.en_presets?.length || 0;
+    let totalSteps = 0;
+    if (result.en_steps_by_preset) {
+      for (const steps of Object.values(result.en_steps_by_preset)) {
+        totalSteps += steps?.length || 0;
+      }
+    }
+
+    return `
+      <div class="validation-box validation-success">
+        <div class="validation-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          <span>${t('management.contentFiles.validated')}</span>
+        </div>
+        <div class="validation-detail text-sm text-text-muted">
+          ${t('management.contentFiles.presetsFound', { count: presetCount })},
+          ${t('management.contentFiles.stepsFound', { count: totalSteps })}
+        </div>
+      </div>
+    `;
+  }
+
+  const errorCount = result.errors?.length || 0;
+  return `
+    <div class="validation-box validation-errors">
+      <div class="validation-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+        <span>${t('management.contentFiles.errorCount', { count: errorCount })}</span>
+      </div>
+      <div class="validation-error-list">
+        ${result.errors.map(err => `
+          <div class="validation-error-item">
+            <strong>${err.type}</strong>: ${err.message}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Open content edit dialog
+ */
+async function openContentEditDialog(filename) {
+  let content = '';
+  try {
+    content = await solutionsApi.getContent(editingSolution.id, filename);
+  } catch (error) {
+    // File doesn't exist, start with empty content
+    content = '';
+  }
+
+  const dialogHtml = `
+    <div class="dialog-overlay" id="content-edit-dialog">
+      <div class="dialog dialog-lg">
+        <div class="dialog-header">
+          <h3>${t('management.contentFiles.edit')}: ${filename}</h3>
+        </div>
+        <div class="dialog-body">
+          <div class="form-group">
+            <textarea id="content-textarea" rows="25" class="code-editor">${escapeHtml(content)}</textarea>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" id="btn-cancel-content">${t('management.actions.cancel')}</button>
+          <button class="btn btn-primary" id="btn-save-content">${t('management.actions.save')}</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const modalBody = document.querySelector('.modal-body');
+  const dialogContainer = document.createElement('div');
+  dialogContainer.id = 'nested-dialog-container';
+  dialogContainer.innerHTML = dialogHtml;
+  modalBody.appendChild(dialogContainer);
+
+  document.getElementById('btn-cancel-content').addEventListener('click', closeContentDialog);
+  document.getElementById('btn-save-content').addEventListener('click', () => saveContentFile(filename));
+  document.getElementById('content-edit-dialog').addEventListener('click', (e) => {
+    if (e.target.id === 'content-edit-dialog') closeContentDialog();
+  });
+}
+
+function closeContentDialog() {
+  document.getElementById('nested-dialog-container')?.remove();
+}
+
+async function saveContentFile(filename) {
+  const content = document.getElementById('content-textarea').value;
+
+  try {
+    await solutionsApi.uploadContentFile(editingSolution.id, filename, content);
+
+    // Reload structure to update file list
+    solutionStructure = await loadSolutionStructure(editingSolution.id);
+    document.querySelector('[data-tab-content="contentFiles"]').innerHTML = renderContentFilesTab(solutionStructure);
+    setupContentFilesTab();
+
+    closeContentDialog();
+    toast.success(t('management.messages.contentFileSaved'));
+  } catch (error) {
+    toast.error(error.message);
+  }
+}
+
+/**
+ * Open content upload dialog
+ */
+function openContentUploadDialog(filename) {
+  const dialogHtml = `
+    <div class="dialog-overlay" id="content-upload-dialog">
+      <div class="dialog dialog-md">
+        <div class="dialog-header">
+          <h3>${t('management.contentFiles.upload')}: ${filename}</h3>
+        </div>
+        <div class="dialog-body">
+          <div class="form-group">
+            <label>${t('management.files.selectFile')}</label>
+            <div class="file-upload-area" id="content-upload-area">
+              <div class="file-upload-content">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <p>${t('management.form.dropOrClick')}</p>
+              </div>
+              <input type="file" class="file-input" id="content-file-input" accept=".md,.markdown,text/markdown">
+            </div>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" id="btn-cancel-upload">${t('management.actions.cancel')}</button>
+          <button class="btn btn-primary" id="btn-do-upload">${t('management.files.upload')}</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const modalBody = document.querySelector('.modal-body');
+  const dialogContainer = document.createElement('div');
+  dialogContainer.id = 'nested-dialog-container';
+  dialogContainer.innerHTML = dialogHtml;
+  modalBody.appendChild(dialogContainer);
+
+  const uploadArea = document.getElementById('content-upload-area');
+  const fileInput = document.getElementById('content-file-input');
+
+  uploadArea.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files[0]) {
+      uploadArea.querySelector('.file-upload-content p').textContent = e.target.files[0].name;
+    }
+  });
+
+  document.getElementById('btn-cancel-upload').addEventListener('click', closeContentDialog);
+  document.getElementById('btn-do-upload').addEventListener('click', () => doContentUpload(filename));
+  document.getElementById('content-upload-dialog').addEventListener('click', (e) => {
+    if (e.target.id === 'content-upload-dialog') closeContentDialog();
+  });
+}
+
+async function doContentUpload(filename) {
+  const fileInput = document.getElementById('content-file-input');
+  const file = fileInput.files[0];
+
+  if (!file) {
+    toast.error(t('management.messages.requiredFields'));
+    return;
+  }
+
+  try {
+    const content = await file.text();
+    await solutionsApi.uploadContentFile(editingSolution.id, filename, content);
+
+    solutionStructure = await loadSolutionStructure(editingSolution.id);
+    document.querySelector('[data-tab-content="contentFiles"]').innerHTML = renderContentFilesTab(solutionStructure);
+    setupContentFilesTab();
+
+    closeContentDialog();
+    toast.success(t('management.messages.contentFileSaved'));
+  } catch (error) {
+    toast.error(error.message);
+  }
+}
+
+/**
+ * Open content view dialog
+ */
+async function openContentViewDialog(filename) {
+  let content = '';
+  try {
+    content = await solutionsApi.getContent(editingSolution.id, filename);
+  } catch (error) {
+    toast.error(error.message);
+    return;
+  }
+
+  const dialogHtml = `
+    <div class="dialog-overlay" id="content-view-dialog">
+      <div class="dialog dialog-lg">
+        <div class="dialog-header">
+          <h3>${t('management.contentFiles.view')}: ${filename}</h3>
+        </div>
+        <div class="dialog-body">
+          <div class="form-group">
+            <textarea readonly rows="25" class="code-editor">${escapeHtml(content)}</textarea>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" id="btn-close-view">${t('management.actions.close')}</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const modalBody = document.querySelector('.modal-body');
+  const dialogContainer = document.createElement('div');
+  dialogContainer.id = 'nested-dialog-container';
+  dialogContainer.innerHTML = dialogHtml;
+  modalBody.appendChild(dialogContainer);
+
+  document.getElementById('btn-close-view').addEventListener('click', closeContentDialog);
+  document.getElementById('content-view-dialog').addEventListener('click', (e) => {
+    if (e.target.id === 'content-view-dialog') closeContentDialog();
+  });
+}
+
+/**
+ * Render Assets tab content (formerly Files tab)
+ */
+function renderAssetsTab(structure) {
   const files = structure?.files || [];
+
+  // Filter out the 4 content files
+  const contentFileNames = CONTENT_FILES.map(f => f.name);
+  const assetFiles = files.filter(f => !contentFileNames.includes(f.path));
 
   // Group files by directory
   const grouped = {};
-  files.forEach(file => {
+  assetFiles.forEach(file => {
     const parts = file.path.split('/');
     const dir = parts.length > 1 ? parts.slice(0, -1).join('/') : '.';
     if (!grouped[dir]) grouped[dir] = [];
@@ -610,7 +1078,7 @@ function renderFilesTab(structure) {
   return `
     <div class="files-container">
       <div class="files-header">
-        <h4>${t('management.files.title')}</h4>
+        <h4>${t('management.tabs.assets')}</h4>
         <div class="files-actions">
           <button class="btn btn-secondary btn-sm" id="btn-upload-file">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -682,418 +1150,10 @@ function formatFileSize(bytes) {
 }
 
 /**
- * Setup Presets tab event handlers
+ * Setup Assets tab event handlers
  */
-function setupPresetsTab() {
-  const container = document.querySelector('[data-tab-content="presets"]');
-  if (!container) return;
-
-  // Add preset button
-  container.querySelector('#btn-add-preset')?.addEventListener('click', () => openPresetModal());
-
-  // Preset and device action buttons
-  container.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-action]');
-    if (!btn) return;
-
-    const action = btn.dataset.action;
-    const presetId = btn.dataset.presetId;
-    const deviceId = btn.dataset.deviceId;
-
-    switch (action) {
-      case 'edit-preset':
-        openPresetModal(presetId);
-        break;
-      case 'delete-preset':
-        confirmDeletePreset(presetId);
-        break;
-      case 'add-device':
-        openDeviceModal(presetId);
-        break;
-      case 'edit-device':
-        openDeviceModal(presetId, deviceId);
-        break;
-      case 'delete-device':
-        confirmDeleteDevice(presetId, deviceId);
-        break;
-    }
-  });
-
-  // Tags functionality
-  setupTagsEditor();
-
-  // Links save button
-  document.getElementById('btn-save-links')?.addEventListener('click', saveLinks);
-}
-
-/**
- * Setup tags editor
- */
-function setupTagsEditor() {
-  const tagsEditor = document.getElementById('tags-editor');
-  if (!tagsEditor) return;
-
-  // Remove tag
-  tagsEditor.addEventListener('click', async (e) => {
-    const removeBtn = e.target.closest('.tag-remove');
-    if (!removeBtn) return;
-
-    const tag = removeBtn.dataset.tag;
-    const currentTags = solutionStructure?.intro?.tags || [];
-    const newTags = currentTags.filter(t => t !== tag);
-
-    try {
-      await solutionsApi.updateTags(editingSolution.id, newTags);
-      solutionStructure.intro.tags = newTags;
-      removeBtn.closest('.tag-item').remove();
-      toast.success(t('management.messages.tagRemoved'));
-    } catch (error) {
-      toast.error(error.message);
-    }
-  });
-
-  // Add tag
-  const addBtn = document.getElementById('btn-add-tag');
-  const input = document.getElementById('new-tag-input');
-
-  const addTag = async () => {
-    const tag = input.value.trim().toLowerCase();
-    if (!tag) return;
-
-    const currentTags = solutionStructure?.intro?.tags || [];
-    if (currentTags.includes(tag)) {
-      toast.error(t('management.messages.tagExists'));
-      return;
-    }
-
-    try {
-      const newTags = [...currentTags, tag];
-      await solutionsApi.updateTags(editingSolution.id, newTags);
-      solutionStructure.intro.tags = newTags;
-
-      // Add to UI
-      const tagsList = tagsEditor.querySelector('.tags-list');
-      const tagHtml = `
-        <span class="tag-item">
-          ${tag}
-          <button type="button" class="tag-remove" data-tag="${tag}">&times;</button>
-        </span>
-      `;
-      tagsList.insertAdjacentHTML('beforeend', tagHtml);
-      input.value = '';
-      toast.success(t('management.messages.tagAdded'));
-    } catch (error) {
-      toast.error(error.message);
-    }
-  };
-
-  addBtn?.addEventListener('click', addTag);
-  input?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addTag();
-    }
-  });
-}
-
-/**
- * Save links
- */
-async function saveLinks() {
-  const wiki = document.getElementById('link-wiki')?.value || '';
-  const github = document.getElementById('link-github')?.value || '';
-
-  try {
-    await solutionsApi.updateLinks(editingSolution.id, { wiki, github });
-    toast.success(t('management.messages.linksSaved'));
-  } catch (error) {
-    toast.error(error.message);
-  }
-}
-
-/**
- * Open preset modal for create/edit
- */
-function openPresetModal(presetId = null) {
-  const preset = presetId ? solutionStructure?.presets?.find(p => p.id === presetId) : null;
-  const isEdit = !!preset;
-
-  const dialogHtml = `
-    <div class="dialog-overlay" id="preset-dialog">
-      <div class="dialog dialog-md">
-        <div class="dialog-header">
-          <h3>${isEdit ? t('management.presets.edit') : t('management.presets.add')}</h3>
-        </div>
-        <div class="dialog-body">
-          <form id="preset-form">
-            <div class="form-group">
-              <label for="preset-id">ID *</label>
-              <input type="text" id="preset-id" value="${preset?.id || ''}" ${isEdit ? 'disabled' : ''} required
-                     pattern="^[a-z][a-z0-9_]*$" placeholder="preset_id">
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="preset-name">${t('management.form.nameEn')} *</label>
-                <input type="text" id="preset-name" value="${preset?.name || ''}" required>
-              </div>
-              <div class="form-group">
-                <label for="preset-name-zh">${t('management.form.nameZh')}</label>
-                <input type="text" id="preset-name-zh" value="${preset?.name_zh || ''}">
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="preset-default" ${preset?.default ? 'checked' : ''}>
-                <span>${t('management.presets.setDefault')}</span>
-              </label>
-            </div>
-          </form>
-        </div>
-        <div class="dialog-actions">
-          <button class="btn btn-secondary" id="btn-cancel-preset">${t('management.actions.cancel')}</button>
-          <button class="btn btn-primary" id="btn-save-preset">${t('management.actions.save')}</button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Insert into modal container (nested dialog)
-  const modalBody = document.querySelector('.modal-body');
-  const dialogContainer = document.createElement('div');
-  dialogContainer.id = 'nested-dialog-container';
-  dialogContainer.innerHTML = dialogHtml;
-  modalBody.appendChild(dialogContainer);
-
-  document.getElementById('btn-cancel-preset').addEventListener('click', closePresetDialog);
-  document.getElementById('btn-save-preset').addEventListener('click', () => savePreset(presetId));
-  document.getElementById('preset-dialog').addEventListener('click', (e) => {
-    if (e.target.id === 'preset-dialog') closePresetDialog();
-  });
-}
-
-function closePresetDialog() {
-  document.getElementById('nested-dialog-container')?.remove();
-}
-
-async function savePreset(existingPresetId = null) {
-  const id = document.getElementById('preset-id').value.trim();
-  const name = document.getElementById('preset-name').value.trim();
-  const name_zh = document.getElementById('preset-name-zh').value.trim();
-  const isDefault = document.getElementById('preset-default').checked;
-
-  if (!id || !name) {
-    toast.error(t('management.messages.requiredFields'));
-    return;
-  }
-
-  const data = { id, name, name_zh, default: isDefault };
-
-  try {
-    if (existingPresetId) {
-      await solutionsApi.updatePreset(editingSolution.id, existingPresetId, data);
-    } else {
-      await solutionsApi.addPreset(editingSolution.id, data);
-    }
-
-    // Reload structure and refresh presets tab
-    solutionStructure = await loadSolutionStructure(editingSolution.id);
-    document.querySelector('[data-tab-content="presets"]').innerHTML = renderPresetsTab(solutionStructure);
-    setupPresetsTab();
-    closePresetDialog();
-    toast.success(existingPresetId ? t('management.messages.presetUpdated') : t('management.messages.presetAdded'));
-  } catch (error) {
-    toast.error(error.message);
-  }
-}
-
-async function confirmDeletePreset(presetId) {
-  if (!confirm(t('management.confirm.deletePreset'))) return;
-
-  try {
-    await solutionsApi.deletePreset(editingSolution.id, presetId);
-    solutionStructure = await loadSolutionStructure(editingSolution.id);
-    document.querySelector('[data-tab-content="presets"]').innerHTML = renderPresetsTab(solutionStructure);
-    setupPresetsTab();
-    toast.success(t('management.messages.presetDeleted'));
-  } catch (error) {
-    toast.error(error.message);
-  }
-}
-
-/**
- * Open device modal for create/edit
- */
-function openDeviceModal(presetId, deviceId = null) {
-  const preset = solutionStructure?.presets?.find(p => p.id === presetId);
-  const device = deviceId ? preset?.devices?.find(d => d.id === deviceId) : null;
-  const isEdit = !!device;
-  const section = device?.section || {};
-
-  const dialogHtml = `
-    <div class="dialog-overlay" id="device-dialog">
-      <div class="dialog dialog-lg">
-        <div class="dialog-header">
-          <h3>${isEdit ? t('management.presets.editStep') : t('management.presets.addStep')}</h3>
-        </div>
-        <div class="dialog-body">
-          <form id="device-form">
-            <div class="form-row">
-              <div class="form-group">
-                <label for="device-id">ID *</label>
-                <input type="text" id="device-id" value="${device?.id || ''}" ${isEdit ? 'disabled' : ''} required
-                       pattern="^[a-z][a-z0-9_]*$" placeholder="step_id">
-              </div>
-              <div class="form-group">
-                <label for="device-type">${t('management.form.type')} *</label>
-                <select id="device-type" required>
-                  ${DEVICE_TYPES.map(type => `
-                    <option value="${type}" ${device?.type === type ? 'selected' : ''}>${type}</option>
-                  `).join('')}
-                </select>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="device-name">${t('management.form.nameEn')} *</label>
-                <input type="text" id="device-name" value="${device?.name || ''}" required>
-              </div>
-              <div class="form-group">
-                <label for="device-name-zh">${t('management.form.nameZh')}</label>
-                <input type="text" id="device-name-zh" value="${device?.name_zh || ''}">
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="device-required" ${device?.required !== false ? 'checked' : ''}>
-                <span>${t('management.presets.required')}</span>
-              </label>
-            </div>
-
-            <hr class="form-divider">
-            <h4 class="form-section-title">${t('management.presets.sectionFiles')}</h4>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label for="section-title">${t('management.form.sectionTitle')}</label>
-                <input type="text" id="section-title" value="${section.title || ''}" placeholder="Section title">
-              </div>
-              <div class="form-group">
-                <label for="section-title-zh">${t('management.form.sectionTitleZh')}</label>
-                <input type="text" id="section-title-zh" value="${section.title_zh || ''}">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="section-desc-file">${t('management.form.descFile')}</label>
-                <div class="input-with-status">
-                  <input type="text" id="section-desc-file" value="${section.description_file || ''}"
-                         placeholder="deploy/sections/step1.md">
-                  ${section.description_file ? `
-                    <span class="file-status ${section.description_file_exists ? 'file-exists' : 'file-missing'}"
-                          title="${section.description_file_exists ? t('management.files.exists') : t('management.files.missing')}">
-                      ${section.description_file_exists ? '✓' : '✗'}
-                    </span>
-                  ` : ''}
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="section-desc-file-zh">${t('management.form.descFileZh')}</label>
-                <div class="input-with-status">
-                  <input type="text" id="section-desc-file-zh" value="${section.description_file_zh || ''}"
-                         placeholder="deploy/sections/step1_zh.md">
-                  ${section.description_file_zh ? `
-                    <span class="file-status ${section.description_file_zh_exists ? 'file-exists' : 'file-missing'}"
-                          title="${section.description_file_zh_exists ? t('management.files.exists') : t('management.files.missing')}">
-                      ${section.description_file_zh_exists ? '✓' : '✗'}
-                    </span>
-                  ` : ''}
-                </div>
-              </div>
-            </div>
-          </form>
-        </div>
-        <div class="dialog-actions">
-          <button class="btn btn-secondary" id="btn-cancel-device">${t('management.actions.cancel')}</button>
-          <button class="btn btn-primary" id="btn-save-device">${t('management.actions.save')}</button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  const modalBody = document.querySelector('.modal-body');
-  const dialogContainer = document.createElement('div');
-  dialogContainer.id = 'nested-dialog-container';
-  dialogContainer.innerHTML = dialogHtml;
-  modalBody.appendChild(dialogContainer);
-
-  document.getElementById('btn-cancel-device').addEventListener('click', closeDeviceDialog);
-  document.getElementById('btn-save-device').addEventListener('click', () => saveDevice(presetId, deviceId));
-  document.getElementById('device-dialog').addEventListener('click', (e) => {
-    if (e.target.id === 'device-dialog') closeDeviceDialog();
-  });
-}
-
-function closeDeviceDialog() {
-  document.getElementById('nested-dialog-container')?.remove();
-}
-
-async function saveDevice(presetId, existingDeviceId = null) {
-  const id = document.getElementById('device-id').value.trim();
-  const type = document.getElementById('device-type').value;
-  const name = document.getElementById('device-name').value.trim();
-  const name_zh = document.getElementById('device-name-zh').value.trim();
-  const required = document.getElementById('device-required').checked;
-
-  const section = {
-    title: document.getElementById('section-title').value.trim(),
-    title_zh: document.getElementById('section-title-zh').value.trim(),
-    description_file: document.getElementById('section-desc-file').value.trim(),
-    description_file_zh: document.getElementById('section-desc-file-zh').value.trim(),
-  };
-
-  if (!id || !name) {
-    toast.error(t('management.messages.requiredFields'));
-    return;
-  }
-
-  const data = { id, type, name, name_zh, required, section };
-
-  try {
-    if (existingDeviceId) {
-      await solutionsApi.updatePresetDevice(editingSolution.id, presetId, existingDeviceId, data);
-    } else {
-      await solutionsApi.addPresetDevice(editingSolution.id, presetId, data);
-    }
-
-    solutionStructure = await loadSolutionStructure(editingSolution.id);
-    document.querySelector('[data-tab-content="presets"]').innerHTML = renderPresetsTab(solutionStructure);
-    setupPresetsTab();
-    closeDeviceDialog();
-    toast.success(existingDeviceId ? t('management.messages.stepUpdated') : t('management.messages.stepAdded'));
-  } catch (error) {
-    toast.error(error.message);
-  }
-}
-
-async function confirmDeleteDevice(presetId, deviceId) {
-  if (!confirm(t('management.confirm.deleteStep'))) return;
-
-  try {
-    await solutionsApi.deletePresetDevice(editingSolution.id, presetId, deviceId);
-    solutionStructure = await loadSolutionStructure(editingSolution.id);
-    document.querySelector('[data-tab-content="presets"]').innerHTML = renderPresetsTab(solutionStructure);
-    setupPresetsTab();
-    toast.success(t('management.messages.stepDeleted'));
-  } catch (error) {
-    toast.error(error.message);
-  }
-}
-
-/**
- * Setup Files tab event handlers
- */
-function setupFilesTab() {
-  const container = document.querySelector('[data-tab-content="files"]');
+function setupAssetsTab() {
+  const container = document.querySelector('[data-tab-content="assets"]');
   if (!container) return;
 
   // File upload button
@@ -1114,8 +1174,8 @@ function setupFilesTab() {
       try {
         await solutionsApi.deleteFile(editingSolution.id, path);
         solutionStructure = await loadSolutionStructure(editingSolution.id);
-        document.querySelector('[data-tab-content="files"]').innerHTML = renderFilesTab(solutionStructure);
-        setupFilesTab();
+        document.querySelector('[data-tab-content="assets"]').innerHTML = renderAssetsTab(solutionStructure);
+        setupAssetsTab();
         toast.success(t('management.messages.fileDeleted'));
       } catch (error) {
         toast.error(error.message);
@@ -1134,7 +1194,7 @@ function openFileUploadDialog() {
         <div class="dialog-body">
           <div class="form-group">
             <label for="upload-path">${t('management.files.path')}</label>
-            <input type="text" id="upload-path" placeholder="deploy/sections/new_file.md" required>
+            <input type="text" id="upload-path" placeholder="gallery/image.png" required>
             <p class="form-hint">${t('management.files.pathHint')}</p>
           </div>
           <div class="form-group">
@@ -1200,8 +1260,8 @@ async function doFileUpload() {
   try {
     await solutionsApi.uploadAsset(editingSolution.id, file, path);
     solutionStructure = await loadSolutionStructure(editingSolution.id);
-    document.querySelector('[data-tab-content="files"]').innerHTML = renderFilesTab(solutionStructure);
-    setupFilesTab();
+    document.querySelector('[data-tab-content="assets"]').innerHTML = renderAssetsTab(solutionStructure);
+    setupAssetsTab();
     closeUploadDialog();
     toast.success(t('management.messages.uploadSuccess'));
   } catch (error) {
@@ -1210,7 +1270,6 @@ async function doFileUpload() {
 }
 
 async function openFileEditDialog(path) {
-  // Load file content
   let content = '';
   try {
     content = await solutionsApi.getContent(editingSolution.id, path);
@@ -1267,10 +1326,229 @@ async function saveFileContent(path) {
   }
 }
 
+/**
+ * Render Preview tab
+ */
+function renderPreviewTab(structure) {
+  return `
+    <div class="preview-container">
+      <div class="preview-header">
+        <h4>${t('management.preview.title')}</h4>
+        <p class="text-sm text-text-muted">${t('management.preview.subtitle')}</p>
+        <button class="btn btn-secondary btn-sm" id="btn-refresh-preview">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+          ${t('management.preview.refresh')}
+        </button>
+      </div>
+      <div class="preview-content" id="preview-content">
+        <div class="loading-spinner">${t('common.loading')}</div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Load and render preview structure
+ */
+async function loadPreviewStructure() {
+  const container = document.getElementById('preview-content');
+  if (!container || !editingSolution) return;
+
+  try {
+    const preview = await solutionsApi.getPreviewStructure(editingSolution.id);
+    container.innerHTML = renderPreviewContent(preview);
+
+    // Setup refresh button
+    document.getElementById('btn-refresh-preview')?.addEventListener('click', loadPreviewStructure);
+  } catch (error) {
+    console.error('Failed to load preview:', error);
+    container.innerHTML = `
+      <div class="empty-state-sm">
+        <p class="text-danger">${t('management.preview.loadError')}: ${error.message}</p>
+      </div>
+    `;
+  }
+}
+
+/**
+ * Render preview content
+ */
+function renderPreviewContent(preview) {
+  if (!preview || !preview.presets || preview.presets.length === 0) {
+    return `
+      <div class="empty-state-sm">
+        <p>${t('management.preview.noPresets')}</p>
+        <p class="text-sm text-text-muted">${t('management.preview.addGuide')}</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="preview-presets">
+      ${preview.presets.map(preset => `
+        <div class="preview-preset">
+          <div class="preset-header">
+            <span class="preset-name">${preset.name}</span>
+            <span class="preset-id text-text-muted">#${preset.id}</span>
+            ${preset.is_default ? `<span class="badge badge-primary">${t('management.preview.default')}</span>` : ''}
+          </div>
+          ${preset.description ? `<p class="preset-description text-sm text-text-muted">${preset.description}</p>` : ''}
+
+          <div class="preset-steps">
+            ${(preset.steps || []).map((step, index) => `
+              <div class="preview-step">
+                <span class="step-index">${index + 1}</span>
+                <div class="step-info">
+                  <span class="step-name">${step.name}</span>
+                  <span class="step-type badge badge-sm">${step.type}</span>
+                  ${step.required ? `<span class="badge badge-sm badge-warning">${t('management.preview.required')}</span>` : ''}
+                </div>
+                ${step.targets && step.targets.length > 0 ? `
+                  <div class="step-targets">
+                    ${step.targets.map(target => `
+                      <span class="target-badge ${target.is_default ? 'target-default' : ''}"
+                            title="${target.is_default ? t('management.preview.defaultTarget') : ''}">
+                        ${target.name} (#${target.id})
+                      </span>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    ${preview.post_deployment ? `
+      <div class="preview-section">
+        <h5>${t('management.preview.postDeployment')}</h5>
+        ${preview.post_deployment.success_message ? `
+          <div class="post-deployment-message">
+            <strong>${t('management.preview.successMessage')}:</strong>
+            <p>${preview.post_deployment.success_message}</p>
+          </div>
+        ` : ''}
+        ${preview.post_deployment.next_steps && preview.post_deployment.next_steps.length > 0 ? `
+          <div class="post-deployment-steps">
+            <strong>${t('management.preview.nextSteps')}:</strong>
+            <ul>
+              ${preview.post_deployment.next_steps.map(step => `<li>${step.label || step.text}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      </div>
+    ` : ''}
+
+    ${preview.validation ? `
+      <div class="preview-section">
+        <h5>${t('management.preview.validation')}</h5>
+        <div class="validation-box ${preview.validation.valid ? 'validation-success' : 'validation-errors'}">
+          ${preview.validation.valid
+            ? `<span class="text-success">${t('management.preview.validationPassed')}</span>`
+            : `<span class="text-danger">${t('management.preview.validationFailed')}</span>`
+          }
+        </div>
+      </div>
+    ` : ''}
+  `;
+}
+
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+/**
+ * Setup tags editor
+ */
+function setupTagsEditor() {
+  const tagsEditor = document.getElementById('tags-editor');
+  if (!tagsEditor) return;
+
+  // Remove tag
+  tagsEditor.addEventListener('click', async (e) => {
+    const removeBtn = e.target.closest('.tag-remove');
+    if (!removeBtn) return;
+
+    const tag = removeBtn.dataset.tag;
+    const currentTags = solutionStructure?.intro?.tags || [];
+    const newTags = currentTags.filter(t => t !== tag);
+
+    try {
+      await solutionsApi.updateTags(editingSolution.id, newTags);
+      solutionStructure.intro.tags = newTags;
+      removeBtn.closest('.tag-item').remove();
+      toast.success(t('management.messages.tagRemoved'));
+    } catch (error) {
+      toast.error(error.message);
+    }
+  });
+
+  // Add tag
+  const addBtn = document.getElementById('btn-add-tag');
+  const input = document.getElementById('new-tag-input');
+
+  const addTag = async () => {
+    const tag = input.value.trim().toLowerCase();
+    if (!tag) return;
+
+    const currentTags = solutionStructure?.intro?.tags || [];
+    if (currentTags.includes(tag)) {
+      toast.error(t('management.messages.tagExists'));
+      return;
+    }
+
+    try {
+      const newTags = [...currentTags, tag];
+      await solutionsApi.updateTags(editingSolution.id, newTags);
+      solutionStructure.intro.tags = newTags;
+
+      const tagsList = tagsEditor.querySelector('.tags-list');
+      const tagHtml = `
+        <span class="tag-item">
+          ${tag}
+          <button type="button" class="tag-remove" data-tag="${tag}">&times;</button>
+        </span>
+      `;
+      tagsList.insertAdjacentHTML('beforeend', tagHtml);
+      input.value = '';
+      toast.success(t('management.messages.tagAdded'));
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
+  addBtn?.addEventListener('click', addTag);
+  input?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTag();
+    }
+  });
+}
+
+/**
+ * Setup links editor
+ */
+function setupLinksEditor() {
+  document.getElementById('btn-save-links')?.addEventListener('click', saveLinks);
+}
+
+async function saveLinks() {
+  const wiki = document.getElementById('link-wiki')?.value || '';
+  const github = document.getElementById('link-github')?.value || '';
+
+  try {
+    await solutionsApi.updateLinks(editingSolution.id, { wiki, github });
+    toast.success(t('management.messages.linksSaved'));
+  } catch (error) {
+    toast.error(error.message);
+  }
 }
 
 /**

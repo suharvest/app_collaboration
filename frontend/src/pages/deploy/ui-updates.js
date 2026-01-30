@@ -18,11 +18,13 @@ import {
   getStatusText,
   getButtonClass,
   getDeployButtonContent,
+  areAllRequiredDevicesCompleted,
 } from './utils.js';
 import {
   renderSelectedDeviceContent,
   renderDockerTargetContent,
   renderRecameraCppTargetContent,
+  renderPostDeploymentSection,
 } from './renderers.js';
 
 // ============================================
@@ -64,6 +66,25 @@ export function updateSectionUI(deviceId) {
   if (logsCount) {
     logsCount.textContent = state.logs.length;
   }
+
+  // Update post-deployment section if all required devices are now complete
+  updatePostDeploymentUI();
+}
+
+/**
+ * Update the post-deployment success section
+ * Called when any device status changes to check if all required devices are complete
+ */
+export function updatePostDeploymentUI() {
+  const currentSolution = getCurrentSolution();
+  const deployment = currentSolution?.deployment;
+  if (!deployment) return;
+
+  const container = document.getElementById('post-deployment-container');
+  if (!container) return;
+
+  // Re-render the post-deployment section
+  container.innerHTML = renderPostDeploymentSection(deployment);
 }
 
 /**
