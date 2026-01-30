@@ -24,12 +24,33 @@ intro:
   - display
   - voice
   - xiaozhi
+  device_catalog:
+    sensecap_watcher:
+      name: SenseCAP Watcher
+      name_zh: SenseCAP Watcher
+      image: gallery/watcher.svg
+      product_url: https://www.seeedstudio.com/sensecap-watcher
+      description: AI voice assistant with camera
+      description_zh: 带摄像头的 AI 语音助手
+    recomputer_r1000:
+      name: reComputer R1000
+      name_zh: reComputer R1000
+      image: gallery/recomputer.svg
+      product_url: https://www.seeedstudio.com/recomputer-r1000
+      description: Edge computing device for display service
+      description_zh: 边缘计算设备，用于投屏服务
+    hdmi_display:
+      name: HDMI Display
+      name_zh: HDMI 显示器
+      description: Any HDMI-compatible TV or monitor
+      description_zh: 任何 HDMI 兼容的电视或显示器
   stats:
     deployed_count: 0
     likes_count: 0
     difficulty: intermediate
     estimated_time: 40min
-  links: {}
+  links:
+    github: https://github.com/78/xiaozhi-esp32
   presets:
   - id: face_recognition
     name: Face Recognition
@@ -38,11 +59,43 @@ intro:
     badge_zh: 推荐
     description: Add face recognition to Xiaozhi - greet family by name
     description_zh: 给小智装上"眼睛"，认识家人朋友
+    architecture_image: gallery/demo.svg
+    device_groups:
+    - id: voice_assistant
+      name: Voice Assistant Device
+      name_zh: 语音助手设备
+      type: single
+      required: true
+      options:
+      - device_ref: sensecap_watcher
+      default: sensecap_watcher
+    links:
+      github: https://github.com/78/xiaozhi-esp32
   - id: display_cast
     name: Display Cast
     name_zh: 大屏投屏
     description: Cast Xiaozhi conversations to large display
     description_zh: 把小智对话投射到电视/大屏
+    architecture_image: gallery/architecture.svg
+    device_groups:
+    - id: voice_assistant
+      name: Voice Assistant Device
+      name_zh: 语音助手设备
+      type: single
+      required: true
+      options:
+      - device_ref: sensecap_watcher
+      default: sensecap_watcher
+    - id: edge_device
+      name: Edge Computing Device
+      name_zh: 边缘计算设备
+      type: single
+      required: false
+      options:
+      - device_ref: recomputer_r1000
+      default: recomputer_r1000
+    links:
+      github: https://github.com/78/xiaozhi-esp32
 deployment:
   guide_file: guide.md
   guide_file_zh: guide_zh.md

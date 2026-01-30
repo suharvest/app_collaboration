@@ -25,17 +25,36 @@ intro:
   - industrial
   - automation
   - recomputer
+  device_catalog:
+    recomputer_r:
+      name: reComputer R Series
+      name_zh: reComputer R 系列
+      image: gallery/recomputer.svg
+      product_url: https://www.seeedstudio.com/reComputer-R1000-Series
+      description: Optional - only needed for remote deployment
+      description_zh: 可选 - 仅远程部署时需要
   stats:
     deployed_count: 0
     likes_count: 0
     difficulty: intermediate
     estimated_time: 15min
-  links: {}
+  links:
+    github: https://github.com/seeed-solution/missionpack-knn
   presets:
   - id: default
     name: Standard Deployment
     name_zh: 标准部署
+    device_groups:
+    - id: edge_device
+      name: Edge Device
+      name_zh: 边缘设备
+      type: single
+      required: false
+      description: Only needed for remote deployment
+      description_zh: 仅远程部署时需要
+      options:
+      - device_ref: recomputer_r
+      default: recomputer_r
 deployment:
   guide_file: guide.md
   guide_file_zh: guide_zh.md
-  selection_mode: sequential
