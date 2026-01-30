@@ -194,8 +194,9 @@ export function updateChoiceOptionUI(deviceId, setupHandlers = null) {
  * @param {string} deviceId
  * @param {HTMLElement} container
  * @param {Function} testSSHHandler - Optional SSH test handler to avoid circular dependency
+ * @param {Function} scanMdnsHandler - Optional mDNS scan handler to avoid circular dependency
  */
-export function updateDockerTargetUI(deviceId, container, testSSHHandler = null) {
+export function updateDockerTargetUI(deviceId, container, testSSHHandler = null, scanMdnsHandler = null) {
   const device = getDeviceById(deviceId);
   if (!device || !device.targets) return;
 
@@ -226,6 +227,17 @@ export function updateDockerTargetUI(deviceId, container, testSSHHandler = null)
         testBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           await testSSHHandler(deviceId, testBtn);
+        });
+      }
+    }
+
+    // Re-attach mDNS scan button handler if provided
+    if (scanMdnsHandler) {
+      const scanBtn = contentEl.querySelector(`#scan-mdns-${deviceId}`);
+      if (scanBtn) {
+        scanBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await scanMdnsHandler(deviceId, scanBtn);
         });
       }
     }
