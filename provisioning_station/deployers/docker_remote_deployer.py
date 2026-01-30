@@ -321,7 +321,7 @@ class DockerRemoteDeployer(BaseDeployer):
                                 host,
                                 service.port,
                                 service.health_check_endpoint,
-                                timeout=30,
+                                timeout=90,  # Increased from 30s for slower services
                             )
                             if not healthy:
                                 if service.required:

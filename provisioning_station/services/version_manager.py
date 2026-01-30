@@ -23,20 +23,28 @@ class VersionManager:
 
         devices: List[VersionInfo] = []
 
-        # Get all devices from presets
-        all_devices = solution_manager.get_all_devices_from_solution(solution)
+        # Get all devices from guide.md or solution.yaml
+        all_devices = await solution_manager.get_all_devices_async(solution_id)
         for device_ref in all_devices:
             try:
-                if not device_ref.config_file:
+                config_file = (
+                    device_ref.get("config_file") if isinstance(device_ref, dict)
+                    else getattr(device_ref, "config_file", None)
+                )
+                if not config_file:
                     continue
                 config = await solution_manager.load_device_config(
-                    solution_id, device_ref.config_file
+                    solution_id, config_file
                 )
                 if not config:
                     continue
 
+                device_id = (
+                    device_ref.get("id") if isinstance(device_ref, dict)
+                    else getattr(device_ref, "id", None)
+                )
                 version_info = await self._get_device_version(
-                    solution_id, device_ref.id, config.type, config
+                    solution_id, device_id, config.type, config
                 )
                 devices.append(version_info)
 
@@ -162,14 +170,19 @@ class VersionManager:
         if not solution:
             return None
 
-        # Find device from presets
-        device_ref = solution_manager.find_device_in_solution(solution, device_id)
-        if not device_ref or not device_ref.config_file:
+        # Find device from guide.md or solution.yaml
+        device_ref = await solution_manager.find_device_async(solution_id, device_id)
+        if not device_ref:
             return None
 
-        config = await solution_manager.load_device_config(
-            solution_id, device_ref.config_file
+        config_file = (
+            device_ref.get("config_file") if isinstance(device_ref, dict)
+            else getattr(device_ref, "config_file", None)
         )
+        if not config_file:
+            return None
+
+        config = await solution_manager.load_device_config(solution_id, config_file)
         if not config:
             return None
 
@@ -214,10 +227,14 @@ class VersionManager:
             return []
 
         results = []
-        # Get all devices from presets
-        all_devices = solution_manager.get_all_devices_from_solution(solution)
+        # Get all devices from guide.md or solution.yaml
+        all_devices = await solution_manager.get_all_devices_async(solution_id)
         for device_ref in all_devices:
-            result = await self.check_update_available(solution_id, device_ref.id)
+            device_id = (
+                device_ref.get("id") if isinstance(device_ref, dict)
+                else getattr(device_ref, "id", None)
+            )
+            result = await self.check_update_available(solution_id, device_id)
             if result:
                 results.append(result)
 

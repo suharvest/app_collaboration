@@ -54,87 +54,70 @@ async def detect_devices(
     if not solution:
         raise HTTPException(status_code=404, detail="Solution not found")
 
-    # Get devices from preset or deployment
+    # Get devices from guide.md
     devices = []
-    if preset and solution.intro and solution.intro.presets:
-        # Find the preset and get its devices
-        for p in solution.intro.presets:
-            if p.id == preset:
-                devices = p.devices or []
-                break
-
-    # Fallback to deployment.devices if no preset or preset not found
-    if not devices:
-        devices = solution.deployment.devices if solution.deployment else []
+    deployment_info = await solution_manager.get_deployment_from_guide(solution_id, lang)
+    if deployment_info and deployment_info.get("devices"):
+        all_devices = deployment_info["devices"]
+        if preset and deployment_info.get("presets"):
+            preset_data = next(
+                (p for p in deployment_info["presets"] if p["id"] == preset), None
+            )
+            if preset_data and preset_data.get("devices"):
+                device_ids = preset_data["devices"]
+                devices = [d for d in all_devices if d["id"] in device_ids]
+            else:
+                devices = all_devices
+        else:
+            devices = all_devices
 
     # Load device configs and detect
     detected = []
     for device_ref in devices:
         # Build section info if available
         section_info = None
-        if device_ref.section:
-            section = device_ref.section
+        section = device_ref.get("section")
+        if section:
             section_info = {
-                "title": (
-                    section.title
-                    if lang == "en"
-                    else (section.title_zh or section.title)
-                ),
+                "title": section.get("title", ""),
             }
-            if section.wiring:
+            wiring = section.get("wiring")
+            if wiring:
                 section_info["wiring"] = {
-                    "image": (
-                        f"/api/solutions/{solution_id}/assets/{section.wiring.image}"
-                        if section.wiring.image
-                        else None
-                    ),
-                    "steps": (
-                        section.wiring.steps_zh
-                        if lang == "zh"
-                        else section.wiring.steps
-                    ),
+                    "image": wiring.get("image"),
+                    "steps": wiring.get("steps", []),
                 }
 
+        device_id = device_ref.get("id")
+        device_name = device_ref.get("name", device_id)
+        device_name_zh = device_ref.get("name_zh", device_name)
+        device_type = device_ref.get("type")
+        config_file = device_ref.get("config_file")
+
         # Handle devices without config files (manual/script types)
-        if not device_ref.config_file:
-            # For manual or script types, no detection needed
+        if not config_file:
+            user_inputs = device_ref.get("user_inputs", [])
             detected.append(
                 DetectedDevice(
-                    config_id=device_ref.id,
-                    name=(
-                        device_ref.name
-                        if lang == "en"
-                        else (device_ref.name_zh or device_ref.name)
-                    ),
-                    name_zh=device_ref.name_zh,
-                    type=device_ref.type,
-                    status=(
-                        "manual_required" if device_ref.type == "manual" else "detected"
-                    ),
+                    config_id=device_id,
+                    name=device_name if lang == "en" else device_name_zh,
+                    name_zh=device_name_zh,
+                    type=device_type,
+                    status="manual_required" if device_type == "manual" else "detected",
                     connection_info=None,
-                    details=(
-                        {
-                            "user_inputs": [
-                                ui.model_dump() for ui in device_ref.user_inputs
-                            ]
-                        }
-                        if device_ref.user_inputs
-                        else None
-                    ),
+                    details={"user_inputs": user_inputs} if user_inputs else None,
                     section=section_info,
                 )
             )
             continue
 
-        config = await solution_manager.load_device_config(
-            solution_id, device_ref.config_file
-        )
+        config = await solution_manager.load_device_config(solution_id, config_file)
         if config:
             result = await device_detector.detect_device(config)
 
             detected.append(
                 DetectedDevice(
-                    config_id=device_ref.id,  # Use device_ref.id, not config.id
+                    config_id=device_id,
                     name=(
                         config.name if lang == "en" else (config.name_zh or config.name)
                     ),
@@ -198,16 +181,14 @@ async def configure_device_connection(
     if not solution:
         raise HTTPException(status_code=404, detail="Solution not found")
 
-    # Find device ref from presets
-    device_ref = solution_manager.find_device_in_solution(solution, device_id)
-
+    # Find device ref from guide.md
+    device_ref = await solution_manager.find_device_async(solution_id, device_id)
     if not device_ref:
         raise HTTPException(status_code=404, detail="Device not found")
 
     # Load device config
-    config = await solution_manager.load_device_config(
-        solution_id, device_ref.config_file
-    )
+    config_file = device_ref.get("config_file")
+    config = await solution_manager.load_device_config(solution_id, config_file)
     if not config:
         raise HTTPException(status_code=404, detail="Device config not found")
 
@@ -239,16 +220,14 @@ async def get_device_config(
     if not solution:
         raise HTTPException(status_code=404, detail="Solution not found")
 
-    # Find device ref from presets
-    device_ref = solution_manager.find_device_in_solution(solution, device_id)
-
+    # Find device ref from guide.md
+    device_ref = await solution_manager.find_device_async(solution_id, device_id)
     if not device_ref:
         raise HTTPException(status_code=404, detail="Device not found")
 
     # Load device config
-    config = await solution_manager.load_device_config(
-        solution_id, device_ref.config_file
-    )
+    config_file = device_ref.get("config_file")
+    config = await solution_manager.load_device_config(solution_id, config_file)
     if not config:
         raise HTTPException(status_code=404, detail="Device config not found")
 

@@ -208,7 +208,7 @@ async def list_solutions(
             estimated_time=solution.intro.stats.estimated_time,
             deployed_count=solution.intro.stats.deployed_count,
             likes_count=solution.intro.stats.likes_count,
-            device_count=solution_manager.count_devices_in_solution(solution),
+            device_count=await solution_manager.count_steps_from_guide(solution.id),
             has_description=has_description,
             has_description_zh=has_description_zh,
             has_guide=has_guide,
@@ -252,19 +252,22 @@ async def get_solution(
             )
         gallery.append(gallery_item)
 
-    # Build devices summary from presets
+    # Build devices summary from guide.md or solution.yaml
     devices = []
-    all_preset_devices = solution_manager.get_all_devices_from_solution(solution)
+    all_preset_devices = await solution_manager.get_all_devices_async(solution_id)
     for device in all_preset_devices:
+        device_id = device.get("id") if isinstance(device, dict) else device.id
+        device_name = device.get("name") if isinstance(device, dict) else device.name
+        device_name_zh = device.get("name_zh") if isinstance(device, dict) else device.name_zh
+        device_type = device.get("type") if isinstance(device, dict) else device.type
+        device_required = device.get("required", True) if isinstance(device, dict) else device.required
         devices.append(
             {
-                "id": device.id,
-                "name": (
-                    device.name if lang == "en" else (device.name_zh or device.name)
-                ),
-                "name_zh": device.name_zh,
-                "type": device.type,
-                "required": device.required,
+                "id": device_id,
+                "name": device_name if lang == "en" else (device_name_zh or device_name),
+                "name_zh": device_name_zh,
+                "type": device_type,
+                "required": device_required,
             }
         )
 
@@ -1207,7 +1210,7 @@ async def update_solution(solution_id: str, data: SolutionUpdate):
             estimated_time=solution.intro.stats.estimated_time,
             deployed_count=solution.intro.stats.deployed_count,
             likes_count=solution.intro.stats.likes_count,
-            device_count=solution_manager.count_devices_in_solution(solution),
+            device_count=await solution_manager.count_steps_from_guide(solution.id),
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
