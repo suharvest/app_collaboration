@@ -3,10 +3,10 @@ id: smart_hvac_control
 name: HVAC Automation Control
 name_zh: 暖通自动化控制
 intro:
-  summary: Intelligently adjust air conditioning based on occupancy and environment,
-    saving energy automatically
+  summary: Intelligently adjust air conditioning based on occupancy and environment, saving energy automatically
   summary_zh: 根据人流和环境智能调节空调温度，自动节省能耗
   description_file: description.md
+  description_file_zh: description_zh.md
   cover_image: gallery/cover.svg
   gallery:
   - type: image
@@ -25,96 +25,17 @@ intro:
   - industrial
   - automation
   - recomputer
-  device_catalog:
-    recomputer_r:
-      name: reComputer R Series
-      name_zh: reComputer R 系列
-      image: intro/gallery/recomputer.svg
-      product_url: https://www.seeedstudio.com/reComputer-R1000-Series
-      description: Optional - only needed for remote deployment
-      description_zh: 可选 - 仅远程部署时需要
-  presets:
-  - id: default
-    name: Standard Deployment
-    name_zh: 标准部署
-    device_groups:
-    - id: edge_device
-      name: Edge Device
-      name_zh: 边缘设备
-      type: single
-      required: false
-      description: Only needed for remote deployment
-      description_zh: 仅远程部署时需要
-      options:
-      - device_ref: recomputer_r
-      default: recomputer_r
-    links:
-      github: https://github.com/seeed-solution/missionpack-knn
-    section:
-      title: Deployment Guide
-      title_zh: 部署指南
-      description_file: deploy/guide.md
-      description_file_zh: deploy/guide_zh.md
-    devices:
-    - id: hvac
-      name: HVAC Control System
-      name_zh: 暖通控制系统
-      type: docker_deploy
-      required: true
-      targets:
-        local:
-          name: Local Deployment
-          name_zh: 本机部署
-          default: true
-          config_file: devices/local.yaml
-          section:
-            title: Deploy on This Machine
-            title_zh: 在本机部署
-            description_file: deploy/sections/hvac_local.md
-            description_file_zh: deploy/sections/hvac_local_zh.md
-            wiring:
-              image: intro/gallery/architecture.svg
-              steps:
-              - Ensure Docker is installed and running
-              - Click deploy to start the container
-              - Access the web interface at localhost:8280
-              steps_zh:
-              - 确保 Docker 已安装并运行
-              - 点击部署启动容器
-              - 通过 localhost:8280 访问 Web 界面
-        remote:
-          name: Remote Deployment
-          name_zh: 远程部署
-          config_file: devices/remote.yaml
-          section:
-            title: Deploy to Remote Device
-            title_zh: 部署到远程设备
-            description_file: deploy/sections/hvac_remote.md
-            description_file_zh: deploy/sections/hvac_remote_zh.md
-            wiring:
-              image: intro/gallery/recomputer.svg
-              steps:
-              - Connect to remote device via SSH
-              - Deploy Docker container remotely
-              - Access the web interface at device IP:8280
-              steps_zh:
-              - 通过 SSH 连接远程设备
-              - 远程部署 Docker 容器
-              - 通过设备 IP:8280 访问 Web 界面
   stats:
     deployed_count: 0
     likes_count: 0
     difficulty: intermediate
     estimated_time: 15min
-  description_file_zh: description_zh.md
+  links: {}
+  presets:
+  - id: default
+    name: Standard Deployment
+    name_zh: 标准部署
 deployment:
   guide_file: guide.md
-  devices: []
-  order: []
-  post_deployment:
-    next_steps:
-    - title: Access Web Interface
-      title_zh: 访问 Web 界面
-      action: open_url
-      url: http://localhost:8280
   guide_file_zh: guide_zh.md
+  selection_mode: sequential
