@@ -238,7 +238,7 @@ Cast Xiaozhi conversations to TV or large display, ideal for exhibition halls, m
 
 ## Step 2: Deploy Display Service {#display_service type=docker_deploy required=true config=devices/display_local.yaml}
 
-### Target: Local Deployment {#display_service_local config=devices/display_local.yaml default=true}
+### Target: Local Deployment {#display_service_local type=local config=devices/display_local.yaml default=true}
 
 Deploy the display service on your local computer.
 
@@ -256,7 +256,7 @@ Deploy the display service on your local computer.
 
 ![Wiring](gallery/architecture.svg)
 
-### Target: Remote Deployment {#display_service_remote config=devices/recomputer.yaml}
+### Target: Remote Deployment {#display_service_remote type=remote config=devices/recomputer.yaml}
 
 Deploy the display service to a remote device (reComputer, Raspberry Pi, etc.).
 

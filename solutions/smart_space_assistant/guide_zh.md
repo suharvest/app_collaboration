@@ -209,7 +209,7 @@
 
 ## 步骤 2: 部署投屏服务 {#display_service type=docker_deploy required=true config=devices/display_local.yaml}
 
-### 部署目标: 本机部署 {#display_service_local config=devices/display_local.yaml default=true}
+### 部署目标: 本机部署 {#display_service_local type=local config=devices/display_local.yaml default=true}
 
 将投屏服务部署到您的本地电脑。
 
@@ -227,7 +227,7 @@
 
 ![接线图](gallery/architecture.svg)
 
-### 部署目标: 远程部署 {#display_service_remote config=devices/recomputer.yaml}
+### 部署目标: 远程部署 {#display_service_remote type=remote config=devices/recomputer.yaml}
 
 将投屏服务部署到远程设备（reComputer、树莓派等）。
 

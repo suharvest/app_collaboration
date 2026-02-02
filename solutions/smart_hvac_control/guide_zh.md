@@ -23,7 +23,7 @@
 
 ## 步骤 1: 暖通控制系统 {#hvac type=docker_deploy required=true}
 
-### 部署目标: 本机部署 {#hvac_local config=devices/local.yaml default=true}
+### 部署目标: 本机部署 {#hvac_local type=local config=devices/local.yaml default=true}
 
 点击下方"部署"按钮，系统将自动在本机启动暖通控制服务。
 
@@ -42,7 +42,7 @@
 | 容器启动后停止 | 执行 `docker logs missionpack_knn` 查看错误日志 |
 | 网页打不开 | 等待 30 秒让服务完全启动 |
 
-### 部署目标: 远程部署 {#hvac_remote config=devices/remote.yaml}
+### 部署目标: 远程部署 {#hvac_remote type=remote config=devices/remote.yaml}
 
 点击下方"部署"按钮，系统将自动把暖通控制服务部署到远程设备。
 

@@ -75,6 +75,7 @@ class TargetInfo:
     name_zh: str
     config_file: Optional[str] = None
     default: bool = False
+    target_type: str = "local"  # "local" or "remote"
     description: str = ""
     description_zh: str = ""
     troubleshoot: str = ""
@@ -418,8 +419,8 @@ def parse_deployment_step(
         section=section
     )
 
-    # Parse targets (for docker_deploy type)
-    if step_type == 'docker_deploy':
+    # Parse targets (for docker_deploy and recamera_cpp types)
+    if step_type in ('docker_deploy', 'recamera_cpp'):
         targets = parse_targets(content_en, content_zh)
         if targets:
             step.targets = targets
@@ -428,7 +429,7 @@ def parse_deployment_step(
 
 
 def parse_targets(content_en: str, content_zh: str) -> list[TargetInfo]:
-    """Parse target sections from step content (for docker_deploy type).
+    """Parse target sections from step content (for docker_deploy and recamera_cpp types).
 
     Target format: ### Target: Name {#id config=xxx default=true}
     Content below each target header is the description + wiring steps.
@@ -505,6 +506,7 @@ def parse_targets(content_en: str, content_zh: str) -> list[TargetInfo]:
                     name_zh=current_target_name,  # Will be updated from zh content
                     config_file=current_attrs.get('config'),
                     default=current_attrs.get('default', False),
+                    target_type=current_attrs.get('type', 'local'),
                     description=desc.strip() if desc else "",  # Plain text for selector
                     wiring=wiring,
                 )
@@ -535,6 +537,7 @@ def parse_targets(content_en: str, content_zh: str) -> list[TargetInfo]:
             name_zh=current_target_name,
             config_file=current_attrs.get('config'),
             default=current_attrs.get('default', False),
+            target_type=current_attrs.get('type', 'local'),
             description=desc.strip() if desc else "",  # Plain text for selector
             wiring=wiring,
         )

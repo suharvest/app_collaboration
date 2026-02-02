@@ -70,7 +70,7 @@ Deploy an edge-based voice collection and analysis system for your retail store.
 
 ## Step 3: Deploy Voice Services {#voice_services type=docker_deploy required=true config=devices/rerouter.yaml}
 
-### Target: Local Deployment {#voice_services_local config=devices/voice_local.yaml}
+### Target: Local Deployment {#voice_services_local type=local config=devices/voice_local.yaml}
 
 Deploy voice services on your local computer.
 
@@ -96,7 +96,7 @@ Deploy voice services on your local computer.
 | Microphone device not found | Unplug and replug USB, verify it appears in Device Manager |
 | Container startup failed | Check Docker logs: `docker logs <container_name>` |
 
-### Target: Remote Deployment {#voice_services_remote config=devices/rerouter.yaml default=true}
+### Target: Remote Deployment {#voice_services_remote type=remote config=devices/rerouter.yaml default=true}
 
 Deploy voice services to a remote device (reRouter, Raspberry Pi, etc.).
 

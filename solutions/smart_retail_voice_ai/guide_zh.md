@@ -141,7 +141,7 @@ reSpeaker 出厂默认启用了回声消除功能，会影响本方案的录音�
 
 ## 步骤 3: 部署语音服务 {#voice_services type=docker_deploy required=true config=devices/rerouter.yaml}
 
-### 部署目标: 本机部署 {#voice_services_local config=devices/voice_local.yaml}
+### 部署目标: 本机部署 {#voice_services_local type=local config=devices/voice_local.yaml}
 
 在本地电脑上部署语音服务。
 
@@ -175,7 +175,7 @@ reSpeaker 出厂默认启用了回声消除功能，会影响本方案的录音�
 | 找不到麦克风设备 | 重新插拔 USB，确认设备管理器中有显示 |
 | 容器启动失败 | 检查 Docker 日志：`docker logs <容器名>` |
 
-### 部署目标: 远程部署 {#voice_services_remote config=devices/rerouter.yaml default=true}
+### 部署目标: 远程部署 {#voice_services_remote type=remote config=devices/rerouter.yaml default=true}
 
 ### 硬件连接
 

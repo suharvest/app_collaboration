@@ -342,7 +342,7 @@ deployment:
 在 `docker_deploy` 类型的步骤下，使用 H3 标题定义多个部署目标：
 
 ```markdown
-### Target: 目标名称 {#target_id config=xxx default=true}
+### Target: 目标名称 {#target_id type=local config=xxx default=true}
 ```
 
 **属性说明**：
@@ -350,6 +350,7 @@ deployment:
 | 属性 | 必填 | 说明 |
 |------|------|------|
 | `#target_id` | 是 | 目标唯一标识 |
+| `type` | 是 | 目标类型：`local`（本机部署）或 `remote`（远程部署） |
 | `config` | 是 | 该目标的设备配置文件路径 |
 | `default` | 否 | 是否默认选中（只能有一个为 true） |
 
@@ -358,7 +359,7 @@ deployment:
 ```markdown
 ## Step 1: Warehouse System {#warehouse type=docker_deploy required=true config=devices/warehouse.yaml}
 
-### Target: Local Deployment {#warehouse_local config=devices/warehouse_local.yaml}
+### Target: Local Deployment {#warehouse_local type=local config=devices/warehouse_local.yaml}
 
 在本机部署仓库管理系统。
 
@@ -366,7 +367,7 @@ deployment:
 - Docker Desktop 已安装并运行
 - 端口 2125 可用
 
-### Target: Remote Deployment {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
+### Target: Remote Deployment {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
 
 部署到远程设备（reComputer R1100）。
 
@@ -383,14 +384,14 @@ deployment:
 
 ## Step 1: Warehouse System {#warehouse type=docker_deploy required=true config=devices/warehouse.yaml}
 
-### Target: Local Deployment {#warehouse_local config=devices/warehouse_local.yaml}
+### Target: Local Deployment {#warehouse_local type=local config=devices/warehouse_local.yaml}
 
 ![架构图](gallery/architecture.png)
 
 1. 确保 Docker 已安装并运行
 2. 点击部署按钮启动服务
 
-### Target: Remote Deployment (R1100) {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
+### Target: Remote Deployment (R1100) {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
 
 ![架构图](gallery/architecture.png)
 
@@ -402,9 +403,9 @@ deployment:
 
 ## Step 2: Voice AI Service {#voice_service type=docker_deploy required=true config=devices/xiaozhi.yaml}
 
-### Target: Local Deployment {#voice_local config=devices/xiaozhi_local.yaml}
+### Target: Local Deployment {#voice_local type=local config=devices/xiaozhi_local.yaml}
 
-### Target: Remote Deployment {#voice_remote config=devices/xiaozhi_remote.yaml default=true}
+### Target: Remote Deployment {#voice_remote type=remote config=devices/xiaozhi_remote.yaml default=true}
 
 ---
 
@@ -447,17 +448,17 @@ deployment:
 
 （与云方案共享相同步骤定义）
 
-### Target: Local Deployment {#warehouse_local config=devices/warehouse_local.yaml}
+### Target: Local Deployment {#warehouse_local type=local config=devices/warehouse_local.yaml}
 
-### Target: Remote Deployment {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
+### Target: Remote Deployment {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
 
 ---
 
 ## Step 2: Voice AI Service {#voice_service type=docker_deploy required=true config=devices/xiaozhi.yaml}
 
-### Target: Local Deployment {#voice_local config=devices/xiaozhi_local.yaml}
+### Target: Local Deployment {#voice_local type=local config=devices/xiaozhi_local.yaml}
 
-### Target: Remote Deployment {#voice_remote config=devices/xiaozhi_remote.yaml default=true}
+### Target: Remote Deployment {#voice_remote type=remote config=devices/xiaozhi_remote.yaml default=true}
 
 ---
 
@@ -530,7 +531,7 @@ deployment:
 ```markdown
 ## Step 1: Deploy Backend {#backend type=docker_deploy required=true config=devices/backend.yaml}
 
-### Target: Local Deployment {#backend_local config=devices/backend_local.yaml default=true}
+### Target: Local Deployment {#backend_local type=local config=devices/backend_local.yaml default=true}
 
 ## 本机部署
 

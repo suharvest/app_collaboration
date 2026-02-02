@@ -41,9 +41,9 @@ See heatmap directly on reCamera's web interface - no extra computer or dashboar
 
 Install the person detection program on reCamera so it can identify people in the video.
 
-### Target: High Accuracy (~8 FPS) {#deploy_detector_yolo11 config=devices/recamera_yolo11.yaml default=true}
+### Target: YOLO11 (~8 FPS) {#deploy_detector_yolo11 config=devices/recamera_yolo11.yaml default=true}
 
-More accurate detection, suitable for most scenarios.
+Recommended for most scenarios.
 
 ### Troubleshooting
 
@@ -53,9 +53,9 @@ More accurate detection, suitable for most scenarios.
 | Wrong password | Try `recamera` or `recamera.2` |
 | Install failed | Restart the camera and try again |
 
-### Target: Fast Mode (~3 FPS) {#deploy_detector_yolo26 config=devices/recamera_yolo26.yaml}
+### Target: YOLOv26 (~3 FPS) {#deploy_detector_yolo26 config=devices/recamera_yolo26.yaml}
 
-Lower accuracy but uses less resources. Choose this if camera runs slow.
+Alternative model, try if needed.
 
 ### Troubleshooting
 
@@ -99,7 +99,7 @@ Make sure reCamera and your computer are on the **same WiFi network**.
 
 Start the data storage and chart display services on your computer (or a dedicated server).
 
-### Target: Run on This Computer {#backend_local config=devices/backend.yaml default=true}
+### Target: Run on This Computer {#backend_local type=local config=devices/backend.yaml default=true}
 
 Run the dashboard on your current computer.
 
@@ -118,7 +118,7 @@ Run the dashboard on your current computer.
 | Docker not starting | Open Docker Desktop application |
 | Stops after starting | Make sure you have at least 4GB RAM |
 
-### Target: Run on Another Device {#backend_remote config=devices/backend_remote.yaml}
+### Target: Run on Another Device {#backend_remote type=remote config=devices/backend_remote.yaml}
 
 Run the dashboard on a reComputer R1100 for dedicated edge deployment.
 

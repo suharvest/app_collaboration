@@ -16,7 +16,7 @@
 
 ## 步骤 1: 仓库管理系统 {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
 
-### 部署目标: 本机部署 {#warehouse_local config=devices/recomputer.yaml}
+### 部署目标: 本机部署 {#warehouse_local type=local config=devices/recomputer.yaml}
 
 1. 确保本机 Docker 已安装并运行
 2. 点击部署按钮启动服务
@@ -28,7 +28,7 @@
 | 端口被占用 | 检查 2125 端口是否被其他服务使用 |
 | Docker 未运行 | 启动 Docker Desktop 后重试 |
 
-### 部署目标: 远程部署 {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
+### 部署目标: 远程部署 {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
 
 ![接线图](gallery/R1100_connected.png)
 
@@ -149,7 +149,7 @@
 
 ## 步骤 1: 仓库管理系统 {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
 
-### 部署目标: 本机部署 {#warehouse_local config=devices/recomputer.yaml}
+### 部署目标: 本机部署 {#warehouse_local type=local config=devices/recomputer.yaml}
 
 1. 确保本机 Docker 已安装并运行
 2. 点击部署按钮启动服务
@@ -161,7 +161,7 @@
 | 端口被占用 | 检查 2125 端口是否被其他服务使用 |
 | Docker 未运行 | 启动 Docker Desktop 后重试 |
 
-### 部署目标: 远程部署 {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
+### 部署目标: 远程部署 {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
 
 ![接线图](gallery/R1100_connected.png)
 
@@ -203,12 +203,12 @@
 
 部署语音 AI 服务，为 Watcher 提供语音交互能力。部署时选择「私有云方案」，需要填写 LLM API 信息。
 
-### 部署目标: 本机部署 {#voice_local config=devices/xiaozhi_server.yaml}
+### 部署目标: 本机部署 {#voice_local type=local config=devices/xiaozhi_server.yaml}
 
 1. 确保 Docker 已安装并运行
 2. 点击部署按钮启动服务
 
-### 部署目标: 远程部署（R1100） {#voice_remote config=devices/xiaozhi_remote.yaml default=true}
+### 部署目标: 远程部署（R1100） {#voice_remote type=remote config=devices/xiaozhi_remote.yaml default=true}
 
 1. 输入 R1100 的 IP 地址和 SSH 凭据
 2. 点击部署，等待安装完成
@@ -324,7 +324,7 @@ TTS 默认使用免费的 Edge TTS，无需额外配置。
 
 ## 步骤 1: 仓库管理系统 {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
 
-### 部署目标: 本机部署 {#warehouse_local config=devices/recomputer.yaml}
+### 部署目标: 本机部署 {#warehouse_local type=local config=devices/recomputer.yaml}
 
 1. 确保本机 Docker 已安装并运行
 2. 点击部署按钮启动服务
@@ -336,7 +336,7 @@ TTS 默认使用免费的 Edge TTS，无需额外配置。
 | 端口被占用 | 检查 2125 端口是否被其他服务使用 |
 | Docker 未运行 | 启动 Docker Desktop 后重试 |
 
-### 部署目标: 远程部署 {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
+### 部署目标: 远程部署 {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
 
 ![接线图](gallery/R1100_connected.png)
 
@@ -400,12 +400,12 @@ TTS 默认使用免费的 Edge TTS，无需额外配置。
 
 在 R1100 上部署语音 AI 服务，连接 Jetson 进行推理。部署时选择「边缘计算方案」，并输入 Jetson IP 地址。
 
-### 部署目标: 本机部署 {#voice_local config=devices/xiaozhi_server.yaml}
+### 部署目标: 本机部署 {#voice_local type=local config=devices/xiaozhi_server.yaml}
 
 1. 确保 Docker 已安装并运行
 2. 点击部署按钮启动服务
 
-### 部署目标: 远程部署（R1100） {#voice_remote config=devices/xiaozhi_remote.yaml default=true}
+### 部署目标: 远程部署（R1100） {#voice_remote type=remote config=devices/xiaozhi_remote.yaml default=true}
 
 1. 输入 R1100 的 IP 地址和 SSH 凭据
 2. 点击部署，等待安装完成

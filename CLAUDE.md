@@ -155,28 +155,8 @@ intro:
             - device_ref: device_key  # 引用 device_catalog 中的设备
           default: device_key
       architecture_image: gallery/architecture.png
-      devices:                 # 部署步骤
-        - id: step1
-          name: Step Name
-          name_zh: 步骤名称
-          type: docker_deploy  # docker_deploy | docker_local | esp32_usb | script | manual
-          required: true
-          targets:             # 部署目标（本地/远程）
-            local:
-              name: Local Deployment
-              name_zh: 本机部署
-              default: true
-              config_file: devices/config.yaml
-              section:
-                description_file: deploy/sections/step1_local.md
-                description_file_zh: deploy/sections/step1_local_zh.md
-            remote:
-              name: Remote Deployment
-              name_zh: 远程部署
-              config_file: devices/config_remote.yaml
-              section:
-                description_file: deploy/sections/step1_remote.md
-                description_file_zh: deploy/sections/step1_remote_zh.md
+      # 注意：部署步骤现在在 guide.md 中定义，不在 solution.yaml 中
+      # 使用 ## Step: 和 ### Target: 语法，参见"guide.md 中的 Step 和 Target 语法"
 
   # 统计信息
   stats:
@@ -240,6 +220,27 @@ deployment:
 - 一键部署后，不需要写详细的命令步骤
 - 只保留用户需要手动操作的内容
 - 部署后的验证步骤放在最后
+
+#### guide.md 中的 Step 和 Target 语法
+
+**Step 定义**（H2 标题）:
+```markdown
+## Step 1: Deploy Service {#step_id type=docker_deploy required=true config=devices/default.yaml}
+```
+
+**Target 定义**（H3 标题，仅 `docker_deploy` 类型需要）:
+```markdown
+### Target: Local Deployment {#target_id type=local config=devices/local.yaml default=true}
+
+### Target: Remote Deployment {#target_id type=remote config=devices/remote.yaml}
+```
+
+| 属性 | 说明 | 示例 |
+|------|------|------|
+| `#id` | 唯一标识符 | `#warehouse_local` |
+| `type=` | Target 类型：`local` 或 `remote` | `type=remote` |
+| `config=` | 设备配置文件路径 | `config=devices/remote.yaml` |
+| `default=true` | 标记为默认选项 | `default=true` |
 
 ---
 
@@ -370,9 +371,7 @@ device_catalog:
 
 | 类型 | 说明 |
 |------|------|
-| `docker_local` | 本地 Docker 部署 |
-| `docker_deploy` | Docker 部署（支持本地/远程目标） |
-| `docker_remote` | 远程 Docker 部署（SSH） |
+| `docker_deploy` | Docker 部署，配合 `### Target:` 定义本地/远程目标 |
 | `esp32_usb` | ESP32 USB 烧录 |
 | `himax_usb` | Himax USB 烧录 |
 | `recamera_cpp` | reCamera C++ 部署 |
@@ -381,6 +380,8 @@ device_catalog:
 | `script` | 脚本执行 |
 | `manual` | 手动步骤 |
 | `preview` | 预览步骤（无实际部署） |
+
+**注意**: `docker_local` 和 `docker_remote` 已废弃，统一使用 `docker_deploy` + Target。
 
 ### WebSocket 消息类型
 

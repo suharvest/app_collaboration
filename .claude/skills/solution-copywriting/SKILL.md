@@ -244,7 +244,7 @@ Use [SenseCraft](https://sensecraft.seeed.cc/ai/) cloud services for AI capabili
 
 Deploy the backend services.
 
-### Target: Local Deployment {#backend_local config=devices/docker.yaml default=true}
+### Target: Local Deployment {#backend_local type=local config=devices/docker.yaml default=true}
 
 ![Wiring](gallery/architecture.png)
 
@@ -258,7 +258,7 @@ Deploy the backend services.
 | Port 8080 busy | Stop other services using this port |
 | Docker not found | Install Docker Desktop |
 
-### Target: Remote Deployment {#backend_remote config=devices/docker_remote.yaml}
+### Target: Remote Deployment {#backend_remote type=remote config=devices/docker_remote.yaml}
 
 ![Wiring](gallery/architecture.png)
 
@@ -533,12 +533,13 @@ Use [SenseCraft](https://sensecraft.seeed.cc/ai/) cloud services for AI capabili
 #### Target 头格式（用于 docker_deploy 类型）
 
 ```
-### Target: Name {#target_id config=devices/xxx.yaml default=true}
-### 部署目标: 名称 {#target_id config=devices/xxx.yaml default=true}
+### Target: Name {#target_id type=local config=devices/xxx.yaml default=true}
+### 部署目标: 名称 {#target_id type=remote config=devices/xxx.yaml default=true}
 ```
 
 参数说明：
 - `#target_id` - Target ID（必需，小写+下划线）
+- `type` - 部署类型：`local`（本机部署）或 `remote`（远程部署）（必需）
 - `config` - 设备配置文件路径（可选）
 - `default` - 是否为默认选项（可选，true/false）
 

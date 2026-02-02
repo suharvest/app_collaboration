@@ -16,7 +16,7 @@ Use [SenseCraft](https://sensecraft.seeed.cc/ai/) cloud service for voice AI. Si
 
 ## Step 1: Warehouse System {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
 
-### Target: Local Deployment {#warehouse_local config=devices/recomputer.yaml}
+### Target: Local Deployment {#warehouse_local type=local config=devices/recomputer.yaml}
 
 1. Ensure Docker is installed and running
 2. Click Deploy button to start services
@@ -28,7 +28,7 @@ Use [SenseCraft](https://sensecraft.seeed.cc/ai/) cloud service for voice AI. Si
 | Port in use | Check if port 2125 is used by another service |
 | Docker not running | Start Docker Desktop and retry |
 
-### Target: Remote Deployment (R1100) {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
+### Target: Remote Deployment (R1100) {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
 
 ![Wiring](gallery/R1100_connected.png)
 
@@ -149,7 +149,7 @@ Self-host the voice AI server while using cloud APIs (DeepSeek, OpenAI, etc.) fo
 
 ## Step 1: Warehouse System {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
 
-### Target: Local Deployment {#warehouse_local config=devices/recomputer.yaml}
+### Target: Local Deployment {#warehouse_local type=local config=devices/recomputer.yaml}
 
 1. Ensure Docker is installed and running on your machine
 2. Click Deploy button to start services
@@ -161,7 +161,7 @@ Self-host the voice AI server while using cloud APIs (DeepSeek, OpenAI, etc.) fo
 | Port in use | Check if port 2125 is used by another service |
 | Docker not running | Start Docker Desktop and retry |
 
-### Target: Remote Deployment (R1100) {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
+### Target: Remote Deployment (R1100) {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
 
 ![Wiring](gallery/R1100_connected.png)
 
@@ -203,12 +203,12 @@ After deployment, open the warehouse system to complete initial setup:
 
 Deploy the voice AI service to enable voice interaction with Watcher. Select "Private Cloud" mode and fill in your LLM API details.
 
-### Target: Local Deployment {#voice_local config=devices/xiaozhi_server.yaml}
+### Target: Local Deployment {#voice_local type=local config=devices/xiaozhi_server.yaml}
 
 1. Ensure Docker is installed and running
 2. Click Deploy button to start services
 
-### Target: Remote Deployment (R1100) {#voice_remote config=devices/xiaozhi_remote.yaml default=true}
+### Target: Remote Deployment (R1100) {#voice_remote type=remote config=devices/xiaozhi_remote.yaml default=true}
 
 1. Enter R1100 IP address and SSH credentials
 2. Click Deploy and wait for installation to complete
@@ -324,7 +324,7 @@ Run everything locally including LLM and TTS - no internet required. Ideal for a
 
 ## Step 1: Warehouse System {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
 
-### Target: Local Deployment {#warehouse_local config=devices/recomputer.yaml}
+### Target: Local Deployment {#warehouse_local type=local config=devices/recomputer.yaml}
 
 1. Ensure Docker is installed and running on your machine
 2. Click Deploy button to start services
@@ -336,7 +336,7 @@ Run everything locally including LLM and TTS - no internet required. Ideal for a
 | Port in use | Check if port 2125 is used by another service |
 | Docker not running | Start Docker Desktop and retry |
 
-### Target: Remote Deployment (R1100) {#warehouse_remote config=devices/warehouse_remote.yaml default=true}
+### Target: Remote Deployment (R1100) {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
 
 ![Wiring](gallery/R1100_connected.png)
 
@@ -400,12 +400,12 @@ Deploy local LLM and TTS services on the Jetson device:
 
 Deploy voice AI service on R1100, connecting to Jetson for inference. Select "Edge Computing" mode and enter the Jetson IP address.
 
-### Target: Local Deployment {#voice_local config=devices/xiaozhi_server.yaml}
+### Target: Local Deployment {#voice_local type=local config=devices/xiaozhi_server.yaml}
 
 1. Ensure Docker is installed and running
 2. Click Deploy button to start services
 
-### Target: Remote Deployment (R1100) {#voice_remote config=devices/xiaozhi_remote.yaml default=true}
+### Target: Remote Deployment (R1100) {#voice_remote type=remote config=devices/xiaozhi_remote.yaml default=true}
 
 1. Enter R1100 IP address and SSH credentials
 2. Click Deploy and wait for installation to complete
