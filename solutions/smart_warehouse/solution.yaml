@@ -39,10 +39,17 @@ intro:
     recomputer_r1100:
       name: reComputer R1100
       name_zh: reComputer R1100
-      image: gallery/r1100.png
-      product_url: https://www.seeedstudio.com/recomputer-r1100
-      description: Edge gateway with built-in warehouse management system
-      description_zh: 边缘网关，内置智慧仓管系统
+      image: gallery/R1100_connected.png
+      product_url: https://www.seeedstudio.com/reComputer-R1100-4-POE-ports-powered-by-Raspberry-Pi-CM4-p-6203.html
+      description: Edge gateway, entry-level option
+      description_zh: 边缘网关，入门级选择
+    recomputer_r2000:
+      name: reComputer R2000
+      name_zh: reComputer R2000
+      image: gallery/R1100_connected.png
+      product_url: https://www.seeedstudio.com/reComputer-R2000-4-POE-ports-powered-by-Raspberry-Pi-CM5-p-6621.html
+      description: Edge gateway, higher performance with CM5
+      description_zh: 边缘网关，CM5 更高性能
     nvidia_agx_orin:
       name: NVIDIA AGX Orin
       name_zh: NVIDIA AGX Orin
@@ -83,6 +90,7 @@ intro:
       required: true
       options:
       - device_ref: recomputer_r1100
+      - device_ref: recomputer_r2000
       default: recomputer_r1100
   - id: private_cloud
     name: Private Cloud
@@ -106,6 +114,7 @@ intro:
       required: true
       options:
       - device_ref: recomputer_r1100
+      - device_ref: recomputer_r2000
       default: recomputer_r1100
   - id: edge_computing
     name: Edge Computing
@@ -130,6 +139,7 @@ intro:
       required: true
       options:
       - device_ref: recomputer_r1100
+      - device_ref: recomputer_r2000
       default: recomputer_r1100
     - id: ai_compute
       name: AI Compute
