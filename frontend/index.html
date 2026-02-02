@@ -11,7 +11,23 @@
   <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
 </head>
 <body>
-  <div id="app" class="app-wrapper">
+  <!-- Splash Screen (shown while backend starts) -->
+  <div id="splash-screen" class="splash-screen">
+    <div class="splash-content">
+      <div class="splash-logo">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5"/>
+          <path d="M2 12l10 5 10-5"/>
+        </svg>
+      </div>
+      <h1 class="splash-title">SenseCraft Solution</h1>
+      <div class="splash-spinner"></div>
+      <p class="splash-status" id="splash-status">Initializing...</p>
+    </div>
+  </div>
+
+  <div id="app" class="app-wrapper" style="display: none;">
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="logo-area">

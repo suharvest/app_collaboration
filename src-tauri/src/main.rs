@@ -477,6 +477,152 @@ fn main() {
         });
 }
 
+/// Get the sidecar cache directory for PyInstaller onedir extraction
+/// Returns a path outside the .app bundle to avoid PyInstaller's bundle detection
+fn get_sidecar_cache_dir(handle: &tauri::AppHandle) -> std::path::PathBuf {
+    // Use app data directory for consistent location
+    let app_data = handle.path().app_data_dir()
+        .expect("Failed to get app data directory");
+    app_data.join("sidecar")
+}
+
+/// Setup sidecar bundle for PyInstaller onedir mode
+/// Extracts the sidecar executable + _internal to a cache directory outside the .app bundle
+/// This avoids PyInstaller's macOS .app bundle detection which causes path issues
+/// Returns the path to the extracted sidecar executable
+fn setup_sidecar_bundle(handle: &tauri::AppHandle) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    let resource_path = handle.path().resource_dir()
+        .expect("Failed to get resource directory");
+
+    // _internal is bundled via binaries/_internal/**/*
+    let internal_src = resource_path.join("binaries").join("_internal");
+
+    // Check if we're in bundled mode (have _internal in resources)
+    if !internal_src.exists() {
+        // Development mode - sidecar runs from src-tauri/binaries/ directly
+        log::info!("_internal not found in resources (development mode)");
+        // Return None to indicate we should use normal sidecar path
+        return Err("Development mode - use normal sidecar".into());
+    }
+
+    // Get cache directory
+    let cache_dir = get_sidecar_cache_dir(handle);
+    let extracted_exe = cache_dir.join(get_sidecar_exe_name());
+    let extracted_internal = cache_dir.join("_internal");
+
+    // Check if already extracted by verifying both exe and _internal exist
+    if extracted_exe.exists() && extracted_internal.exists() {
+        log::info!("Sidecar already extracted at {:?}", cache_dir);
+        return Ok(extracted_exe);
+    }
+
+    log::info!("Extracting sidecar bundle to {:?}", cache_dir);
+
+    // Create cache directory
+    std::fs::create_dir_all(&cache_dir)?;
+
+    // Find and copy the sidecar executable from resources
+    // The exe is bundled via externalBin in MacOS/ directory
+    // Tauri strips the target triple suffix when bundling
+    let app_exe = std::env::current_exe()?;
+    let macos_dir = app_exe.parent().unwrap();
+
+    // The sidecar is named "provisioning-station" (or .exe on Windows)
+    #[cfg(windows)]
+    let sidecar_name = "provisioning-station.exe";
+    #[cfg(not(windows))]
+    let sidecar_name = "provisioning-station";
+
+    let sidecar_src = macos_dir.join(sidecar_name);
+    if !sidecar_src.exists() {
+        return Err(format!("Sidecar executable not found at {:?}", sidecar_src).into());
+    }
+    log::info!("Found sidecar at: {:?}", sidecar_src);
+
+    // Copy sidecar executable
+    log::info!("Copying sidecar executable to: {:?}", extracted_exe);
+    std::fs::copy(&sidecar_src, &extracted_exe)?;
+
+    // Set executable permission on Unix
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&extracted_exe)?.permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&extracted_exe, perms)?;
+    }
+
+    // Copy _internal directory
+    if extracted_internal.exists() {
+        log::info!("Removing old _internal directory");
+        std::fs::remove_dir_all(&extracted_internal)?;
+    }
+    log::info!("Copying _internal directory to: {:?}", extracted_internal);
+    copy_dir_recursive(&internal_src, &extracted_internal)?;
+
+    // Set executable permissions on dynamic libraries (Unix)
+    #[cfg(unix)]
+    {
+        set_dylib_permissions(&extracted_internal)?;
+    }
+
+    log::info!("Sidecar bundle extracted successfully");
+    Ok(extracted_exe)
+}
+
+/// Get the sidecar executable name (platform-specific)
+fn get_sidecar_exe_name() -> &'static str {
+    #[cfg(windows)]
+    { "provisioning-station.exe" }
+    #[cfg(not(windows))]
+    { "provisioning-station" }
+}
+
+/// Set executable permissions on dynamic libraries recursively
+#[cfg(unix)]
+fn set_dylib_permissions(dir: &std::path::Path) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            set_dylib_permissions(&path)?;
+        } else {
+            let name = path.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            // Set executable for .so, .dylib files
+            if name.ends_with(".so") || name.contains(".so.") || name.ends_with(".dylib") {
+                let mut perms = std::fs::metadata(&path)?.permissions();
+                perms.set_mode(0o755);
+                std::fs::set_permissions(&path, perms)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Recursively copy a directory
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if ty.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
+}
+
 /// Start the Python backend sidecar
 async fn start_sidecar(
     handle: &tauri::AppHandle,
@@ -517,51 +663,116 @@ async fn start_sidecar(
         args.push(solutions_dir.to_string_lossy().to_string());
     }
 
-    let sidecar = handle
-        .shell()
-        .sidecar("provisioning-station")
-        .expect("Failed to create sidecar command")
-        .args(&args);
+    // Try to setup and use extracted sidecar (PyInstaller onedir mode)
+    // This extracts sidecar + _internal to a cache directory outside the .app bundle
+    // which avoids PyInstaller's macOS bundle detection issues
+    match setup_sidecar_bundle(handle) {
+        Ok(extracted_exe) => {
+            // Use extracted sidecar directly via Command
+            log::info!("Using extracted sidecar at: {:?}", extracted_exe);
 
-    let (mut rx, child) = sidecar.spawn()?;
+            use std::process::Stdio;
 
-    // Store PID for cleanup on exit
-    let pid = child.pid();
-    SIDECAR_PID.store(pid, Ordering::SeqCst);
-    log::info!("Sidecar spawned with PID: {}", pid);
+            let mut cmd = std::process::Command::new(&extracted_exe);
+            cmd.args(&args)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
 
-    // Store child handle for graceful shutdown
-    if let Ok(mut guard) = SIDECAR_CHILD.lock() {
-        *guard = Some(child);
-    }
+            let mut process = cmd.spawn()?;
+            let pid = process.id();
 
-    SIDECAR_STARTED.store(true, Ordering::SeqCst);
+            // Store PID for cleanup on exit
+            SIDECAR_PID.store(pid, Ordering::SeqCst);
+            log::info!("Sidecar spawned with PID: {}", pid);
+            SIDECAR_STARTED.store(true, Ordering::SeqCst);
 
-    // Handle sidecar output in background
-    tauri::async_runtime::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            match event {
-                CommandEvent::Stdout(line) => {
-                    let line_str = String::from_utf8_lossy(&line);
-                    log::info!("[sidecar] {}", line_str);
-                }
-                CommandEvent::Stderr(line) => {
-                    let line_str = String::from_utf8_lossy(&line);
-                    log::warn!("[sidecar] {}", line_str);
-                }
-                CommandEvent::Terminated(status) => {
-                    log::info!("Sidecar terminated with status: {:?}", status);
-                    SIDECAR_STARTED.store(false, Ordering::SeqCst);
-                    SIDECAR_PID.store(0, Ordering::SeqCst);
-                    break;
-                }
-                CommandEvent::Error(err) => {
-                    log::error!("Sidecar error: {}", err);
-                }
-                _ => {}
+            // Spawn threads to read stdout/stderr
+            let stdout = process.stdout.take();
+            let stderr = process.stderr.take();
+
+            if let Some(stdout) = stdout {
+                std::thread::spawn(move || {
+                    use std::io::BufRead;
+                    let reader = std::io::BufReader::new(stdout);
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            log::info!("[sidecar] {}", line);
+                        }
+                    }
+                });
             }
+
+            if let Some(stderr) = stderr {
+                std::thread::spawn(move || {
+                    use std::io::BufRead;
+                    let reader = std::io::BufReader::new(stderr);
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            log::warn!("[sidecar] {}", line);
+                        }
+                    }
+                });
+            }
+
+            // Wait for process to exit in background and update state
+            std::thread::spawn(move || {
+                let _ = process.wait();
+                log::info!("Sidecar process exited");
+                SIDECAR_STARTED.store(false, Ordering::SeqCst);
+                SIDECAR_PID.store(0, Ordering::SeqCst);
+            });
         }
-    });
+        Err(_) => {
+            // Development mode - use Tauri's sidecar mechanism
+            log::info!("Using Tauri sidecar (development mode)");
+
+            let sidecar = handle
+                .shell()
+                .sidecar("provisioning-station")
+                .expect("Failed to create sidecar command")
+                .args(&args);
+
+            let (mut rx, child) = sidecar.spawn()?;
+
+            // Store PID for cleanup on exit
+            let pid = child.pid();
+            SIDECAR_PID.store(pid, Ordering::SeqCst);
+            log::info!("Sidecar spawned with PID: {}", pid);
+
+            // Store child handle for graceful shutdown
+            if let Ok(mut guard) = SIDECAR_CHILD.lock() {
+                *guard = Some(child);
+            }
+
+            SIDECAR_STARTED.store(true, Ordering::SeqCst);
+
+            // Handle sidecar output in background
+            tauri::async_runtime::spawn(async move {
+                while let Some(event) = rx.recv().await {
+                    match event {
+                        CommandEvent::Stdout(line) => {
+                            let line_str = String::from_utf8_lossy(&line);
+                            log::info!("[sidecar] {}", line_str);
+                        }
+                        CommandEvent::Stderr(line) => {
+                            let line_str = String::from_utf8_lossy(&line);
+                            log::warn!("[sidecar] {}", line_str);
+                        }
+                        CommandEvent::Terminated(status) => {
+                            log::info!("Sidecar terminated with status: {:?}", status);
+                            SIDECAR_STARTED.store(false, Ordering::SeqCst);
+                            SIDECAR_PID.store(0, Ordering::SeqCst);
+                            break;
+                        }
+                        CommandEvent::Error(err) => {
+                            log::error!("Sidecar error: {}", err);
+                        }
+                        _ => {}
+                    }
+                }
+            });
+        }
+    }
 
     // Wait for backend to be ready
     let health_url = format!("http://127.0.0.1:{}/api/health", port);

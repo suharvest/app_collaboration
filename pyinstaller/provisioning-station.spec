@@ -151,21 +151,17 @@ a = Analysis(
 # PYZ archive
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
-# Executable
+# Executable (onedir mode - faster startup)
+# Note: EXE name must differ from COLLECT name to avoid path conflicts
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
-    name=exe_name.replace('.exe', ''),
+    [],  # Don't include binaries/zipfiles/datas in EXE for onedir mode
+    name=exe_name.replace('.exe', '') + '-bin',  # Temp name, COLLECT will place in final dir
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
     console=True,  # Keep console for logging
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -173,4 +169,17 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=icon_file if icon_file and os.path.exists(icon_file) else None,
+)
+
+# Collect all files into a directory (onedir mode)
+# The executable inside will be named 'provisioning-station-bin'
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='provisioning-station',
 )

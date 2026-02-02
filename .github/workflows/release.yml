@@ -126,7 +126,11 @@ jobs:
 
       - name: Make sidecar executable (Unix)
         if: runner.os != 'Windows'
-        run: chmod +x src-tauri/binaries/*
+        run: |
+          # Make main executable file executable
+          find src-tauri/binaries -maxdepth 1 -type f -name "provisioning-station*" -exec chmod +x {} \;
+          # Make .so/.dylib files in _internal executable
+          find src-tauri/binaries/_internal -type f \( -name "*.so" -o -name "*.so.*" -o -name "*.dylib" \) -exec chmod +x {} \; 2>/dev/null || true
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'

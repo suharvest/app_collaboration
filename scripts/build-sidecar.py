@@ -103,16 +103,24 @@ def main():
         print("Error: PyInstaller build failed")
         sys.exit(1)
 
-    # Find the built executable
+    # Find the built executable (onedir mode creates a directory)
     system = platform.system().lower()
     if system == 'windows':
-        exe_name = 'provisioning-station.exe'
+        exe_name = 'provisioning-station-bin.exe'  # Temp name from spec
     else:
-        exe_name = 'provisioning-station'
+        exe_name = 'provisioning-station-bin'  # Temp name from spec
 
-    built_exe = dist_dir / exe_name
+    # onedir mode creates: dist/provisioning-station/provisioning-station-bin[.exe]
+    built_dir = dist_dir / 'provisioning-station'
+    built_exe = built_dir / exe_name
+    built_internal = built_dir / '_internal'
+
     if not built_exe.exists():
         print(f"Error: Built executable not found: {built_exe}")
+        sys.exit(1)
+
+    if not built_internal.exists():
+        print(f"Error: _internal directory not found: {built_internal}")
         sys.exit(1)
 
     # Rename for Tauri sidecar format
@@ -124,16 +132,36 @@ def main():
 
     sidecar_path = binaries_dir / sidecar_name
 
-    print(f"Copying to: {sidecar_path}")
+    # Copy the executable
+    print(f"Copying executable to: {sidecar_path}")
     shutil.copy2(built_exe, sidecar_path)
+
+    # Copy the _internal directory
+    internal_dest = binaries_dir / '_internal'
+    if internal_dest.exists():
+        print(f"Removing existing _internal directory...")
+        shutil.rmtree(internal_dest)
+    print(f"Copying _internal to: {internal_dest}")
+    shutil.copytree(built_internal, internal_dest)
 
     # Make executable on Unix systems
     if system != 'windows':
         os.chmod(sidecar_path, 0o755)
+        # Also set execute permission on .so/.dylib files in _internal
+        for ext in ['*.so', '*.so.*', '*.dylib']:
+            for lib_file in internal_dest.rglob(ext):
+                os.chmod(lib_file, 0o755)
+
+    # Calculate total size
+    total_size = sidecar_path.stat().st_size
+    for f in internal_dest.rglob('*'):
+        if f.is_file():
+            total_size += f.stat().st_size
 
     print(f"\nSidecar built successfully!")
-    print(f"  Output: {sidecar_path}")
-    print(f"  Size: {sidecar_path.stat().st_size / 1024 / 1024:.1f} MB")
+    print(f"  Executable: {sidecar_path}")
+    print(f"  Internal dir: {internal_dest}")
+    print(f"  Total size: {total_size / 1024 / 1024:.1f} MB")
 
 
 if __name__ == '__main__':

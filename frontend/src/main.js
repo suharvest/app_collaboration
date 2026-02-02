@@ -19,32 +19,60 @@ import { renderSettingsPage } from './pages/settings.js';
 
 // Initialize application
 async function initApp() {
-  // Wait for backend to be ready (Tauri mode)
-  await waitForBackendReady();
-  // Initialize i18n
-  i18n.updateDOM();
+  const splash = document.getElementById('splash-screen');
+  const splashStatus = document.getElementById('splash-status');
+  const app = document.getElementById('app');
 
-  // Setup language toggle
-  const langToggle = document.getElementById('lang-toggle');
-  const currentLangEl = document.getElementById('current-lang');
+  const updateStatus = (msg) => {
+    if (splashStatus) splashStatus.textContent = msg;
+  };
 
-  if (langToggle && currentLangEl) {
-    currentLangEl.textContent = i18n.locale.toUpperCase();
+  try {
+    // Show backend startup message in Tauri mode
+    if (window.__TAURI__) {
+      updateStatus('Starting backend...');
+    }
 
-    langToggle.addEventListener('click', () => {
-      i18n.toggle();
+    // Wait for backend to be ready (Tauri mode)
+    await waitForBackendReady();
+    updateStatus('Loading...');
+
+    // Initialize i18n
+    i18n.updateDOM();
+
+    // Setup language toggle
+    const langToggle = document.getElementById('lang-toggle');
+    const currentLangEl = document.getElementById('current-lang');
+
+    if (langToggle && currentLangEl) {
       currentLangEl.textContent = i18n.locale.toUpperCase();
-    });
+
+      langToggle.addEventListener('click', () => {
+        i18n.toggle();
+        currentLangEl.textContent = i18n.locale.toUpperCase();
+      });
+    }
+
+    // Setup navigation
+    setupNavigation();
+
+    // Setup router
+    setupRouter();
+
+    // Start router
+    router.init();
+
+    // Hide splash and show app
+    if (splash && app) {
+      splash.classList.add('hidden');
+      app.style.display = '';
+      // Remove splash from DOM after transition
+      setTimeout(() => splash.remove(), 400);
+    }
+  } catch (error) {
+    console.error('Application initialization failed:', error);
+    updateStatus('Failed to start. Please restart the application.');
   }
-
-  // Setup navigation
-  setupNavigation();
-
-  // Setup router
-  setupRouter();
-
-  // Start router
-  router.init();
 }
 
 function setupNavigation() {
