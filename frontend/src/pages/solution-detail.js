@@ -1040,8 +1040,8 @@ function setupDeviceConfiguratorHandlers(container) {
 
       if (!group) return;
 
-      // Clear preset selection
-      selectedPreset = null;
+      // Visually deselect preset cards to indicate custom configuration,
+      // but keep selectedPreset for architecture image display
       container.querySelectorAll('.preset-card').forEach(c => c.classList.remove('selected'));
 
       if (type === 'single') {
@@ -1072,7 +1072,7 @@ function setupDeviceConfiguratorHandlers(container) {
       const group = findDeviceGroupById(groupId);
       if (!group) return;
 
-      selectedPreset = null;
+      // Visually deselect preset cards to indicate custom configuration
       container.querySelectorAll('.preset-card').forEach(c => c.classList.remove('selected'));
 
       const current = deviceSelections[groupId] || 1;
@@ -1091,7 +1091,7 @@ function setupDeviceConfiguratorHandlers(container) {
       const group = findDeviceGroupById(groupId);
       if (!group) return;
 
-      selectedPreset = null;
+      // Visually deselect preset cards to indicate custom configuration
       container.querySelectorAll('.preset-card').forEach(c => c.classList.remove('selected'));
 
       const current = deviceSelections[groupId] || 1;
@@ -1110,7 +1110,7 @@ function setupDeviceConfiguratorHandlers(container) {
       const group = findDeviceGroupById(groupId);
       if (!group) return;
 
-      selectedPreset = null;
+      // Visually deselect preset cards to indicate custom configuration
       container.querySelectorAll('.preset-card').forEach(c => c.classList.remove('selected'));
 
       let value = parseInt(input.value, 10);
