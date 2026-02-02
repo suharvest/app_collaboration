@@ -79,3 +79,4 @@ deployment:
   guide_file: guide.md
   guide_file_zh: guide_zh.md
   selection_mode: sequential
+enabled: false
