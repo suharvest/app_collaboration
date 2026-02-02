@@ -24,7 +24,8 @@
       "binaries/provisioning-station"
     ],
     "resources": [
-      "../solutions/**/*"
+      "../solutions/**/*",
+      "binaries/_internal/**/*"
     ],
     "targets": "all",
     "linux": {
