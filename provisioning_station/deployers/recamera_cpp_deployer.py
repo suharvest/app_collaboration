@@ -10,11 +10,14 @@ Key features:
 - Automatic conflict service handling (stop node-red, sscma-node, etc.)
 - Optional MQTT external access configuration
 - Optional service disabling (rename S* to K*)
+- Pre-deployment state check with automatic cleanup for idempotency
 """
 
 import asyncio
 import logging
 import shlex
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -22,6 +25,38 @@ from ..models.device import DeviceConfig
 from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
+
+
+class DeviceMode(str, Enum):
+    """Current deployment mode of the reCamera device"""
+
+    CLEAN = "clean"  # No C++ services, no C++ packages, Node-RED at default state
+    CPP = "cpp"  # C++ services running or C++ packages installed
+    NODERED = "nodered"  # Node-RED running, no C++ services
+    MIXED = "mixed"  # Both running (abnormal state)
+
+
+@dataclass
+class DeviceState:
+    """Represents the current state of a reCamera device"""
+
+    mode: DeviceMode
+    cpp_services: List[str]  # Found C++ init scripts (S* or K*)
+    cpp_packages: List[str]  # Installed C++ packages
+    cpp_processes_running: bool  # C++ processes detected
+    nodered_enabled: bool  # Node-RED S* script exists
+    nodered_running: bool  # Node-RED process running
+
+    @property
+    def ready_for_cpp(self) -> bool:
+        """Check if device is ready for C++ deployment without cleanup"""
+        # Ready if clean or already in cpp mode (will reinstall)
+        return self.mode in (DeviceMode.CLEAN, DeviceMode.CPP)
+
+    @property
+    def needs_nodered_cleanup(self) -> bool:
+        """Check if Node-RED needs to be stopped/disabled"""
+        return self.nodered_running or self.nodered_enabled
 
 
 def _build_sudo_cmd(password: str, cmd: str) -> str:
@@ -144,6 +179,47 @@ class ReCameraCppDeployer(BaseDeployer):
             )
 
             try:
+                # Step 1.5: Pre-deploy state check
+                await self._report_progress(
+                    progress_callback, "precheck", 0, "Checking device state..."
+                )
+
+                state = await self._check_device_state(client, password)
+                logger.info(
+                    f"Device state: mode={state.mode.value}, "
+                    f"cpp_services={state.cpp_services}, "
+                    f"cpp_packages={state.cpp_packages}, "
+                    f"nodered_enabled={state.nodered_enabled}, "
+                    f"nodered_running={state.nodered_running}"
+                )
+
+                # Report state to user
+                state_msg = f"Device mode: {state.mode.value}"
+                if state.cpp_packages:
+                    state_msg += f", packages: {', '.join(state.cpp_packages)}"
+                if state.nodered_running:
+                    state_msg += ", Node-RED running"
+
+                await self._report_progress(
+                    progress_callback, "precheck", 30, state_msg
+                )
+
+                # Perform cleanup if needed
+                if not state.ready_for_cpp or state.needs_nodered_cleanup:
+                    await self._report_progress(
+                        progress_callback,
+                        "precheck",
+                        50,
+                        "Cleaning up conflicting state...",
+                    )
+                    await self._ensure_clean_state_for_cpp(
+                        client, state, password, progress_callback
+                    )
+
+                await self._report_progress(
+                    progress_callback, "precheck", 100, "Device ready for deployment"
+                )
+
                 # Step 2: Stop conflicting services
                 await self._report_progress(
                     progress_callback, "prepare", 0, "Stopping conflicting services..."
@@ -331,6 +407,180 @@ class ReCameraCppDeployer(BaseDeployer):
                 progress_callback, "deploy", 0, f"Deployment failed: {e}"
             )
             return False
+
+    async def _check_device_state(
+        self,
+        client,
+        password: str,
+    ) -> DeviceState:
+        """Check the current deployment state of the device.
+
+        Detects:
+        - C++ services (init scripts matching yolo*, detector*, sensecraft*)
+        - Installed C++ packages (via opkg)
+        - Running C++ processes
+        - Node-RED service state (enabled/disabled, running)
+
+        Note: Only S* scripts (enabled) are counted as active services.
+        K* scripts (disabled) are tracked separately but don't count as "has service".
+        """
+        # Check for C++ init scripts (both S* enabled and K* disabled)
+        cpp_services = []
+        cpp_services_enabled = []  # Only S* scripts
+        cpp_patterns = ["yolo", "detector", "sensecraft", "sscma-cpp", "recamera-app"]
+
+        for pattern in cpp_patterns:
+            cmd = f"ls /etc/init.d/S*{pattern}* /etc/init.d/K*{pattern}* 2>/dev/null || true"
+            exit_code, stdout, _ = await self._exec_sudo(client, cmd, password, timeout=10)
+            if stdout.strip():
+                for line in stdout.strip().split("\n"):
+                    svc = line.strip()
+                    if svc and svc not in cpp_services:
+                        cpp_services.append(svc)
+                        # Track enabled services separately
+                        if "/S" in svc:
+                            cpp_services_enabled.append(svc)
+
+        # Check for installed C++ packages
+        cpp_packages = []
+        cmd = "opkg list-installed 2>/dev/null | grep -E 'yolo|detector|sensecraft|sscma' || true"
+        exit_code, stdout, _ = await self._exec_sudo(client, cmd, password, timeout=10)
+        if stdout.strip():
+            for line in stdout.strip().split("\n"):
+                parts = line.strip().split()
+                if parts:
+                    pkg_name = parts[0].split("-")[0]  # Get base package name
+                    if pkg_name and pkg_name not in cpp_packages:
+                        cpp_packages.append(parts[0])  # Full package name
+
+        # Check for running C++ processes (use ps instead of pgrep for BusyBox compatibility)
+        cmd = "ps aux 2>/dev/null | grep -v grep | grep -E 'yolo.*detector|sensecraft|sscma-cpp' && echo 'running' || true"
+        exit_code, stdout, _ = await self._exec_sudo(client, cmd, password, timeout=10)
+        cpp_processes_running = "running" in stdout
+
+        # Check Node-RED enabled state (S* script exists)
+        cmd = "ls /etc/init.d/S*node-red* 2>/dev/null && echo 'enabled' || true"
+        exit_code, stdout, _ = await self._exec_sudo(client, cmd, password, timeout=10)
+        nodered_enabled = "enabled" in stdout
+
+        # Check Node-RED running (use ps instead of pgrep for BusyBox compatibility)
+        cmd = "ps aux 2>/dev/null | grep -v grep | grep node-red && echo 'running' || true"
+        exit_code, stdout, _ = await self._exec_sudo(client, cmd, password, timeout=10)
+        nodered_running = "running" in stdout
+
+        # Determine mode
+        # Only count enabled services (S*) as active, not disabled ones (K*)
+        has_cpp = bool(cpp_services_enabled) or bool(cpp_packages) or cpp_processes_running
+        has_nodered = nodered_running or nodered_enabled
+
+        if has_cpp and has_nodered:
+            mode = DeviceMode.MIXED
+        elif has_cpp:
+            mode = DeviceMode.CPP
+        elif has_nodered:
+            mode = DeviceMode.NODERED
+        else:
+            mode = DeviceMode.CLEAN
+
+        return DeviceState(
+            mode=mode,
+            cpp_services=cpp_services,  # All scripts (for cleanup purposes)
+            cpp_packages=cpp_packages,
+            cpp_processes_running=cpp_processes_running,
+            nodered_enabled=nodered_enabled,
+            nodered_running=nodered_running,
+        )
+
+    async def _ensure_clean_state_for_cpp(
+        self,
+        client,
+        state: DeviceState,
+        password: str,
+        progress_callback: Optional[Callable] = None,
+    ) -> None:
+        """Ensure device is ready for C++ deployment by cleaning up conflicts.
+
+        Actions:
+        - Stop Node-RED if running
+        - Disable Node-RED autostart (S* → K*)
+        - Stop any running C++ processes
+        - Uninstall old C++ packages for clean reinstall
+        """
+        # Stop Node-RED if running
+        if state.nodered_running:
+            logger.info("Stopping Node-RED service...")
+            await self._report_progress(
+                progress_callback, "precheck", 60, "Stopping Node-RED..."
+            )
+
+            # Find and stop Node-RED service
+            cmd = _build_sudo_cmd(
+                password,
+                "sh -c 'for f in /etc/init.d/S*node-red*; do [ -f \"$f\" ] && $f stop; done' 2>/dev/null || true",
+            )
+            await self._exec_sudo(client, cmd, password, timeout=30)
+
+            # Also kill any remaining node-red processes (use killall, no pkill on BusyBox)
+            cmd = _build_sudo_cmd(password, "killall node-red 2>/dev/null || true")
+            await self._exec_sudo(client, cmd, password, timeout=10)
+
+        # Disable Node-RED autostart (rename S* to K*)
+        if state.nodered_enabled:
+            logger.info("Disabling Node-RED autostart...")
+            await self._report_progress(
+                progress_callback, "precheck", 70, "Disabling Node-RED autostart..."
+            )
+
+            disable_script = """for svc in /etc/init.d/S*node-red*; do
+    if [ -f "$svc" ]; then
+        new_name=$(echo "$svc" | sed "s|/S|/K|")
+        mv "$svc" "$new_name" 2>/dev/null && echo "Disabled: $svc -> $new_name"
+    fi
+done"""
+            cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(disable_script)}")
+            exit_code, stdout, _ = await self._exec_sudo(client, cmd, password, timeout=30)
+            if stdout and "Disabled:" in stdout:
+                logger.info(stdout.strip())
+
+        # Stop C++ processes if running
+        if state.cpp_processes_running:
+            logger.info("Stopping C++ processes...")
+            await self._report_progress(
+                progress_callback, "precheck", 80, "Stopping C++ services..."
+            )
+
+            # Stop via init scripts first
+            for svc_path in state.cpp_services:
+                if "/S" in svc_path:  # Only stop enabled services
+                    cmd = _build_sudo_cmd(
+                        password, f"{svc_path} stop 2>/dev/null || true"
+                    )
+                    await self._exec_sudo(client, cmd, password, timeout=30)
+
+            # Kill remaining processes (use killall, no pkill on BusyBox)
+            kill_processes = ["yolo11-detector", "yolo26-detector", "sensecraft", "sscma-cpp"]
+            for proc in kill_processes:
+                cmd = _build_sudo_cmd(
+                    password, f"killall {proc} 2>/dev/null || true"
+                )
+                await self._exec_sudo(client, cmd, password, timeout=10)
+
+        # Uninstall old C++ packages for clean reinstall (optional, but ensures idempotency)
+        if state.cpp_packages and state.mode == DeviceMode.CPP:
+            logger.info(f"Uninstalling old packages: {state.cpp_packages}")
+            await self._report_progress(
+                progress_callback, "precheck", 90, "Removing old packages..."
+            )
+
+            for pkg in state.cpp_packages:
+                cmd = _build_sudo_cmd(
+                    password, f"opkg remove {shlex.quote(pkg)} 2>/dev/null || true"
+                )
+                await self._exec_sudo(client, cmd, password, timeout=60)
+
+        # Wait for services to fully stop
+        await asyncio.sleep(2)
+        logger.info("Device cleanup completed, ready for C++ deployment")
 
     async def _stop_conflict_services(
         self,
