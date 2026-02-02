@@ -240,11 +240,9 @@ Cast Xiaozhi conversations to TV or large display, ideal for exhibition halls, m
 
 ### Target: Local Deployment {#display_service_local config=devices/display_local.yaml default=true}
 
-## Local Deployment
-
 Deploy the display service on your local computer.
 
-### Requirements
+### Prerequisites
 
 - Docker Desktop installed and running
 - Port 8765 available
@@ -256,11 +254,9 @@ Deploy the display service on your local computer.
 3. Wake up Watcher and say "Open settings"
 4. Find "Display Address" and say the server address (e.g., `your-ip:8765`)
 
-![Wiring](intro/gallery/architecture.svg)
+![Wiring](gallery/architecture.svg)
 
 ### Target: Remote Deployment {#display_service_remote config=devices/recomputer.yaml}
-
-## Remote Deployment
 
 Deploy the display service to a remote device (reComputer, Raspberry Pi, etc.).
 
@@ -277,7 +273,7 @@ Deploy the display service to a remote device (reComputer, Raspberry Pi, etc.).
 3. Wake up Watcher and say "Open settings"
 4. Find "Display Address" and say the server address (e.g., `192.168.1.100:8765`)
 
-![Wiring](intro/gallery/architecture.svg)
+![Wiring](gallery/architecture.svg)
 
 ---
 

@@ -72,11 +72,9 @@ Deploy an edge-based voice collection and analysis system for your retail store.
 
 ### Target: Local Deployment {#voice_services_local config=devices/voice_local.yaml}
 
-## Local Deployment
-
 Deploy voice services on your local computer.
 
-### Requirements
+### Prerequisites
 
 - Docker Desktop installed and running
 - reSpeaker XVF3800 connected via USB
@@ -99,8 +97,6 @@ Deploy voice services on your local computer.
 | Container startup failed | Check Docker logs: `docker logs <container_name>` |
 
 ### Target: Remote Deployment {#voice_services_remote config=devices/rerouter.yaml default=true}
-
-## Remote Deployment
 
 Deploy voice services to a remote device (reRouter, Raspberry Pi, etc.).
 
@@ -129,7 +125,7 @@ Enter the following information:
 2. Visit `http://192.168.49.1:8090` to open edge client
 3. Start real-time voice transcription testing
 
-![Wiring](intro/gallery/wan_lan.png)
+![Wiring](gallery/wan_lan.png)
 
 ### Troubleshooting
 

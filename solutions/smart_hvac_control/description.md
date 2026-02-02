@@ -23,7 +23,7 @@ HVAC systems in office buildings, shopping malls, and factories often run on fix
 ## Requirements
 
 **Hardware**:
-- A computer or industrial PC with Docker installed (reComputer R series recommended)
+- reComputer R1100 edge computing device
 - HVAC controller must support industrial communication protocol (OPC-UA)
 
 **Data**:

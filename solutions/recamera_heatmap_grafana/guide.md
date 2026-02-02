@@ -82,7 +82,7 @@ Save historical data and view traffic trends with charts over time.
 | Device | Purpose |
 |--------|---------|
 | reCamera | AI camera with person detection |
-| Computer/Server | Runs Grafana dashboard + InfluxDB |
+| reComputer R1100 | Runs Grafana dashboard + InfluxDB |
 
 **What you'll get:**
 - Historical people flow data with time-series charts
@@ -108,7 +108,7 @@ Run the dashboard on your current computer.
 - Docker Desktop installed and running
 - At least 2GB free disk space
 
-![Wiring](intro/gallery/architecture.svg)
+![Wiring](gallery/architecture.svg)
 
 ### Troubleshooting
 
@@ -120,7 +120,7 @@ Run the dashboard on your current computer.
 
 ### Target: Run on Another Device {#backend_remote config=devices/backend_remote.yaml}
 
-Run the dashboard on a dedicated device like reComputer or Raspberry Pi.
+Run the dashboard on a reComputer R1100 for dedicated edge deployment.
 
 ### Before You Begin
 
@@ -136,7 +136,7 @@ Run the dashboard on a dedicated device like reComputer or Raspberry Pi.
 | Username | recomputer |
 | Password | 12345678 |
 
-![Wiring](intro/gallery/architecture.svg)
+![Wiring](gallery/architecture.svg)
 
 ---
 

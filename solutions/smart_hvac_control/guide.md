@@ -12,8 +12,7 @@ Deploy a KNN-based HVAC optimization system that learns from your historical dat
 
 | Device | Purpose |
 |--------|---------|
-| Your computer | For local deployment (Docker required) |
-| reComputer R Series | Optional, for remote/edge deployment |
+| reComputer R1100 | Edge computing device with Docker support |
 
 **What you'll get:**
 - AI-powered temperature recommendations based on historical patterns
@@ -28,21 +27,39 @@ Deploy a KNN-based HVAC optimization system that learns from your historical dat
 
 Click the "Deploy" button below to automatically start the HVAC control service on this machine.
 
-![Wiring](intro/gallery/architecture.svg)
+![Wiring](gallery/architecture.svg)
 
 1. Ensure Docker is installed and running
 2. Click deploy to start the container
 3. Access the web interface at localhost:8280
 
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Docker not running | Start Docker Desktop application |
+| Port 8280 in use | Close the program using that port, or modify config to use another port |
+| Container stops after starting | Run `docker logs missionpack_knn` to check error logs |
+| Web page not loading | Wait 30 seconds for the service to fully start |
+
 ### Target: Remote Deployment {#hvac_remote config=devices/remote.yaml}
 
 Click the "Deploy" button below to automatically deploy the HVAC control service to the remote device.
 
-![Wiring](intro/gallery/recomputer.svg)
+![Wiring](gallery/recomputer.svg)
 
 1. Connect to remote device via SSH
 2. Deploy Docker container remotely
 3. Access the web interface at device IP:8280
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| SSH connection failed | Check IP address and credentials |
+| Remote device has no Docker | Install Docker on the remote device first |
+| Deployment timeout | Check remote device network, ensure it can access image registry |
+| Web page not loading | Check if firewall allows port 8280 |
 
 ---
 
