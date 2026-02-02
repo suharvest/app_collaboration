@@ -16,15 +16,13 @@ from ..config import settings
 from ..models.device import DeviceConfig
 from ..models.solution import Solution
 from .markdown_parser import (
+    DeploymentStep,
+    ParseResult,
+    StructureValidationResult,
     parse_bilingual_markdown,
     parse_deployment_guide,
     parse_guide_pair,
     parse_single_language_guide,
-    validate_structure_consistency,
-    ParseResult,
-    StructureValidationResult,
-    DeploymentStep,
-    PresetGuide,
 )
 
 logger = logging.getLogger(__name__)
@@ -336,7 +334,7 @@ class SolutionManager:
             return result
 
         if not en_exists:
-            from .markdown_parser import ParseError, ParseErrorType, ParseWarning
+            from .markdown_parser import ParseWarning
             result = StructureValidationResult(valid=False)
             result.warnings.append(
                 ParseWarning(message=f"English guide not found: {guide_en_path}")
