@@ -36,8 +36,15 @@ app_collaboration/
 ├── solutions/                  # 方案配置目录
 │   └── [solution_id]/
 │       ├── solution.yaml       # 方案配置
-│       ├── intro/              # 介绍页内容
-│       └── deploy/             # 部署页内容
+│       ├── description.md      # 英文介绍
+│       ├── description_zh.md   # 中文介绍
+│       ├── guide.md            # 英文部署指南
+│       ├── guide_zh.md         # 中文部署指南
+│       ├── gallery/            # 图片资源
+│       └── devices/            # 设备部署配置
+├── tests/                       # 测试
+│   ├── unit/                   # 单元测试
+│   └── integration/            # 集成测试
 ├── src-tauri/                  # Tauri 桌面应用
 │   ├── src/main.rs
 │   ├── tauri.conf.json
@@ -142,25 +149,21 @@ cargo tauri dev
 ```bash
 solutions/
 └── your_solution_id/
-    ├── solution.yaml           # 必须
-    ├── intro/
-    │   ├── description.md      # 英文介绍
-    │   ├── description_zh.md   # 中文介绍
-    │   └── gallery/
-    │       └── cover.png       # 封面图
-    ├── deploy/
-    │   ├── guide.md            # 英文部署指南
-    │   ├── guide_zh.md         # 中文部署指南
-    │   └── sections/           # 部署步骤说明
-    │       ├── step1.md
-    │       └── step1_zh.md
-    └── devices/                # 设备配置
-        └── device.yaml
+    ├── solution.yaml           # 方案配置（必须）
+    ├── description.md          # 英文介绍（必须）
+    ├── description_zh.md       # 中文介绍（必须）
+    ├── guide.md                # 英文部署指南（必须）
+    ├── guide_zh.md             # 中文部署指南（必须）
+    ├── gallery/                # 图片资源
+    │   ├── cover.png           # 封面图
+    │   └── architecture.png    # 架构图
+    └── devices/                # 设备部署配置
+        └── docker-compose.yaml
 ```
 
 #### 2. 编写 solution.yaml
 
-每个 **preset（预设套餐）** 包含完整的 **devices（部署步骤）** 列表：
+部署步骤定义在 `guide.md` 中，YAML 只需配置元数据和预设信息：
 
 ```yaml
 version: "1.0"
@@ -172,99 +175,88 @@ intro:
   summary: One-line description
   summary_zh: 一句话描述
 
-  description_file: intro/description.md
-  description_file_zh: intro/description_zh.md
-  cover_image: intro/gallery/cover.png
+  description_file: description.md
+  description_file_zh: description_zh.md
+  cover_image: gallery/cover.png
 
   category: voice_ai  # voice_ai | sensing | automation
   tags: [iot, watcher]
 
-  # 设备目录
+  # 设备目录（介绍页显示的设备信息）
   device_catalog:
     sensecap_watcher:
       name: SenseCAP Watcher
       name_zh: SenseCAP Watcher
-      image: intro/gallery/watcher.png
+      image: gallery/watcher.png
       product_url: https://www.seeedstudio.com/...
 
-  # 预设套餐（每个 preset 包含完整的部署步骤）
+  # 预设套餐（具体步骤定义在 guide.md）
   presets:
     - id: default
       name: Standard Deployment
       name_zh: 标准部署
+      description: Quick setup with cloud services
+      description_zh: 使用云服务快速部署
+      architecture_image: gallery/architecture.png
       device_groups:
         - id: main_device
           name: Main Device
+          name_zh: 主设备
           type: single
           options:
             - device_ref: sensecap_watcher
           default: sensecap_watcher
-      # 该套餐的部署步骤
-      devices:
-        - id: step1
-          name: Flash Firmware
-          name_zh: 烧录固件
-          type: esp32_usb
-          required: true
-          config_file: devices/device.yaml
-          section:
-            title: Step 1
-            title_zh: 第一步
-            description_file: deploy/sections/step1.md
-            description_file_zh: deploy/sections/step1_zh.md
-        - id: step2
-          name: Configure Device
-          name_zh: 配置设备
-          type: manual
-          required: true
-          section:
-            title: Step 2
-            title_zh: 第二步
-            description_file: deploy/sections/step2.md
 
   stats:
     difficulty: beginner  # beginner | intermediate | advanced
     estimated_time: 30min
 
-# 部署配置（设备已移至 preset.devices）
 deployment:
-  guide_file: deploy/guide.md
-  guide_file_zh: deploy/guide_zh.md
-  devices: []   # 保持为空
-  order: []     # 保持为空
-  post_deployment:
-    success_message_file: deploy/success.md
+  guide_file: guide.md
+  guide_file_zh: guide_zh.md
+  selection_mode: sequential
 ```
 
 #### 3. 部署器类型
 
+在 `guide.md` 中使用 `type=xxx` 定义步骤类型：
+
 | 类型 | 说明 | 配置要求 |
 |------|------|----------|
-| `esp32_usb` | ESP32 USB 烧录 | `config_file` 指定固件配置 |
-| `himax_usb` | Himax WE2 烧录 | `config_file` 指定固件配置 |
-| `docker_deploy` | Docker 容器部署 | `config_file` 或 `targets` |
-| `manual` | 手动步骤 | 仅需 `section` |
-| `preview` | 实时预览 | `config_file` 指定视频/MQTT |
+| `docker_deploy` | Docker 容器部署（支持本地/远程） | `config=devices/xxx.yaml` |
+| `docker_local` | 本地 Docker 部署 | `config=devices/xxx.yaml` |
+| `docker_remote` | 远程 Docker 部署 | `config=devices/xxx.yaml` |
+| `esp32_usb` | ESP32 USB 烧录 | `config=devices/xxx.yaml` |
+| `himax_usb` | Himax WE2 烧录 | `config=devices/xxx.yaml` |
+| `recamera_cpp` | reCamera C++ 部署 | `config=devices/xxx.yaml` |
+| `recamera_nodered` | reCamera Node-RED 部署 | `config=devices/xxx.yaml` |
+| `ssh_deb` | SSH + DEB 包安装 | `config=devices/xxx.yaml` |
+| `manual` | 手动步骤 | 无需 config |
+| `script` | 脚本执行 | `config=devices/xxx.yaml` |
+| `preview` | 预览步骤（无部署） | 无需 config |
 
-#### 4. 多套餐支持
+#### 4. guide.md 示例
 
-不同 preset 可以有不同的部署步骤：
+部署步骤定义在 guide.md 中：
 
-```yaml
-intro:
-  presets:
-    - id: cloud
-      name: Cloud Version
-      devices:
-        - id: step1
-        - id: cloud_config  # 云版本特有
+```markdown
+## Preset: Cloud Version {#cloud}
 
-    - id: edge
-      name: Edge Version
-      devices:
-        - id: step1
-        - id: edge_setup    # 边缘版本特有
-        - id: local_llm     # 边缘版本特有
+使用云服务快速部署。
+
+## Step 1: 配置设备 {#sensecraft type=manual required=true}
+
+按照以下步骤配置设备...
+
+## Step 2: 部署服务 {#warehouse type=docker_deploy required=true config=devices/docker-compose.yaml}
+
+### Target: 本机部署 {#warehouse_local default=true}
+
+在本机部署 Docker 容器。
+
+### Target: 远程部署 {#warehouse_remote}
+
+部署到远程服务器。
 ```
 
 ### 相关文档
@@ -281,13 +273,16 @@ intro:
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
+| `/api/health` | GET | 健康检查 |
 | `/api/solutions?lang=zh` | GET | 获取方案列表 |
 | `/api/solutions/{id}?lang=zh` | GET | 获取方案详情 |
 | `/api/solutions/{id}/deployment?lang=zh` | GET | 获取部署信息 |
 | `/api/solutions/{id}/assets/{path}` | GET | 获取静态资源 |
-| `/api/deployments` | POST | 开始部署 |
-| `/api/deployments/{id}/logs` | WS | 部署日志流 |
-| `/api/devices` | GET | 获取已连接设备 |
+| `/api/devices/scan-mdns` | GET | mDNS 局域网设备扫描 |
+| `/api/docker-devices/local/check` | GET | 检查本地 Docker 状态 |
+| `/api/docker-devices/local/managed-apps` | GET | 获取已部署应用 |
+| `/api/deployments/start` | POST | 开始部署 |
+| `/ws/deployments/{id}` | WS | 部署日志 WebSocket |
 
 ---
 
