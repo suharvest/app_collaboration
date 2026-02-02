@@ -45,6 +45,7 @@ test = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
+    "pytest-dependency>=0.6.0",
 ]
 
 [project.scripts]
@@ -77,3 +78,11 @@ ignore = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "e2e: End-to-end tests requiring real devices (skip in CI)",
+    "device_watcher: Tests requiring SenseCAP Watcher USB",
+    "device_recamera: Tests requiring reCamera at 192.168.42.1",
+    "device_r1100: Tests requiring R1100 at 192.168.10.76",
+    "device_local_docker: Tests requiring local Docker",
+    "slow: Tests that take longer than 60 seconds",
+]
