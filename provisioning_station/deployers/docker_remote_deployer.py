@@ -345,6 +345,20 @@ class DockerRemoteDeployer(BaseDeployer):
                     progress_callback, "health_check", 100, "All services healthy"
                 )
 
+                # Open browser if configured (post_deployment)
+                if config.post_deployment and config.post_deployment.open_browser and config.post_deployment.url:
+                    try:
+                        import webbrowser
+
+                        # Substitute template variables in URL (e.g., {{host}})
+                        url = self._substitute_variables(
+                            config.post_deployment.url, self._subst_context
+                        )
+                        webbrowser.open(url)
+                        logger.info(f"Opened browser: {url}")
+                    except Exception as e:
+                        logger.warning(f"Failed to open browser: {e}")
+
                 return True
 
             finally:
