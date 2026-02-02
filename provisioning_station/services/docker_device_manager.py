@@ -369,7 +369,8 @@ class DockerDeviceManager:
                     prefixes = [solution_id, solution_id.replace("-", "_")]
 
                 solution_volumes = [
-                    v for v in all_volumes
+                    v
+                    for v in all_volumes
                     if any(v.startswith(f"{prefix}_") for prefix in prefixes)
                 ]
 
@@ -795,7 +796,8 @@ class DockerDeviceManager:
                             prefixes = [solution_id, solution_id.replace("-", "_")]
 
                         solution_volumes = [
-                            v for v in all_volumes
+                            v
+                            for v in all_volumes
                             if any(v.startswith(f"{prefix}_") for prefix in prefixes)
                         ]
 
@@ -806,7 +808,9 @@ class DockerDeviceManager:
                                 )
                                 volumes_removed.append(volume)
                             except Exception as e:
-                                volumes_skipped.append({"volume": volume, "reason": str(e)})
+                                volumes_skipped.append(
+                                    {"volume": volume, "reason": str(e)}
+                                )
                     except Exception as e:
                         logger.warning(f"Failed to list volumes: {e}")
 

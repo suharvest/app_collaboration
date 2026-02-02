@@ -159,7 +159,8 @@ class SolutionManager:
             all_devices = deployment_info["devices"]
             if preset_id and deployment_info.get("presets"):
                 preset = next(
-                    (p for p in deployment_info["presets"] if p["id"] == preset_id), None
+                    (p for p in deployment_info["presets"] if p["id"] == preset_id),
+                    None,
                 )
                 if preset and preset.get("devices"):
                     device_ids = preset["devices"]
@@ -176,7 +177,9 @@ class SolutionManager:
         return 0
 
     # Legacy alias for backward compatibility
-    def find_device_in_solution(self, solution: Solution, device_id: str, preset_id: str = None):
+    def find_device_in_solution(
+        self, solution: Solution, device_id: str, preset_id: str = None
+    ):
         """Legacy method - always returns None. Use find_device_async() instead."""
         return None
 
@@ -329,12 +332,17 @@ class SolutionManager:
         if not en_exists and not zh_exists:
             result = StructureValidationResult(valid=True)
             result.warnings.append(
-                type("ParseWarning", (), {"message": "No guide files found", "line_number": None})()
+                type(
+                    "ParseWarning",
+                    (),
+                    {"message": "No guide files found", "line_number": None},
+                )()
             )
             return result
 
         if not en_exists:
             from .markdown_parser import ParseWarning
+
             result = StructureValidationResult(valid=False)
             result.warnings.append(
                 ParseWarning(message=f"English guide not found: {guide_en_path}")
@@ -343,6 +351,7 @@ class SolutionManager:
 
         if not zh_exists:
             from .markdown_parser import ParseWarning
+
             result = StructureValidationResult(valid=True)
             result.warnings.append(
                 ParseWarning(message=f"Chinese guide not found: {guide_zh_path}")
@@ -364,9 +373,7 @@ class SolutionManager:
             logger.error(f"Failed to validate guide pair: {e}")
             return None
 
-    async def get_guide_structure(
-        self, solution_id: str
-    ) -> Optional[dict]:
+    async def get_guide_structure(self, solution_id: str) -> Optional[dict]:
         """Get parsed structure from guide files for management UI.
 
         Returns structure with presets and steps extracted from guide.md,
@@ -412,10 +419,7 @@ class SolutionManager:
                         }
                         for e in validation.errors
                     ],
-                    "warnings": [
-                        {"message": w.message}
-                        for w in validation.warnings
-                    ],
+                    "warnings": [{"message": w.message} for w in validation.warnings],
                 }
 
             # Parse EN file to get structure
@@ -707,31 +711,38 @@ class SolutionManager:
 
             # Build preset info with section for frontend compatibility
             preset_description = (
-                zh_preset.description if lang == "zh" and zh_preset
+                zh_preset.description
+                if lang == "zh" and zh_preset
                 else en_preset.description
             )
-            presets.append({
-                "id": en_preset.id,
-                "name": (
-                    zh_preset.name if lang == "zh" and zh_preset
-                    else en_preset.name
-                ),
-                "name_zh": zh_preset.name if zh_preset else en_preset.name,
-                "description": preset_description,
-                "description_zh": zh_preset.description if zh_preset else "",
-                "devices": preset_device_ids,
-                # Section object for frontend renderPresetSectionContent()
-                "section": {
-                    "title": "",
+            presets.append(
+                {
+                    "id": en_preset.id,
+                    "name": (
+                        zh_preset.name if lang == "zh" and zh_preset else en_preset.name
+                    ),
+                    "name_zh": zh_preset.name if zh_preset else en_preset.name,
                     "description": preset_description,
-                } if preset_description else None,
-            })
+                    "description_zh": zh_preset.description if zh_preset else "",
+                    "devices": preset_device_ids,
+                    # Section object for frontend renderPresetSectionContent()
+                    "section": (
+                        {
+                            "title": "",
+                            "description": preset_description,
+                        }
+                        if preset_description
+                        else None
+                    ),
+                }
+            )
 
         # Build post_deployment from success content
         post_deployment = None
         if en_result.success:
             success_content = (
-                zh_result.success.content_en if lang == "zh" and zh_result and zh_result.success
+                zh_result.success.content_en
+                if lang == "zh" and zh_result and zh_result.success
                 else en_result.success.content_en
             )
 
@@ -739,7 +750,8 @@ class SolutionManager:
             next_steps = []
             if success_content:
                 import re
-                links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', success_content)
+
+                links = re.findall(r"\[([^\]]+)\]\(([^)]+)\)", success_content)
                 for title, url in links:
                     next_steps.append({"title": title, "url": url})
 
@@ -750,7 +762,8 @@ class SolutionManager:
 
         # Build overview
         overview = (
-            zh_result.overview_en if lang == "zh" and zh_result
+            zh_result.overview_en
+            if lang == "zh" and zh_result
             else en_result.overview_en
         )
 
@@ -817,14 +830,16 @@ class SolutionManager:
 
         # Wiring - use Chinese step's wiring for Chinese language
         wiring_source = (
-            zh_step.section.wiring if lang == "zh" and zh_step and zh_step.section.wiring
+            zh_step.section.wiring
+            if lang == "zh" and zh_step and zh_step.section.wiring
             else en_step.section.wiring
         )
         if wiring_source:
             section["wiring"] = {
                 "image": (
                     f"/api/solutions/{solution_id}/assets/{wiring_source.image}"
-                    if wiring_source.image else None
+                    if wiring_source.image
+                    else None
                 ),
                 "steps": wiring_source.steps,
             }
@@ -851,8 +866,12 @@ class SolutionManager:
                         ),
                         "video": config.video.model_dump() if config.video else None,
                         "mqtt": config.mqtt.model_dump() if config.mqtt else None,
-                        "overlay": config.overlay.model_dump() if config.overlay else None,
-                        "display": config.display.model_dump() if config.display else None,
+                        "overlay": (
+                            config.overlay.model_dump() if config.overlay else None
+                        ),
+                        "display": (
+                            config.display.model_dump() if config.display else None
+                        ),
                     }
 
         # Build targets (for docker_deploy type)
@@ -876,9 +895,7 @@ class SolutionManager:
                 target_info = {
                     "name": target.name if lang == "en" else zh_name,
                     "name_zh": zh_name,
-                    "description": (
-                        target.description if lang == "en" else zh_desc
-                    ),
+                    "description": (target.description if lang == "en" else zh_desc),
                     "description_zh": zh_desc,
                     "default": target.default,
                     "config_file": target.config_file,
@@ -915,14 +932,16 @@ class SolutionManager:
                 # Add wiring (from target.wiring parsed from guide.md)
                 # For Chinese: use zh_target's wiring if available
                 wiring_source = (
-                    zh_target.wiring if lang == "zh" and zh_target and zh_target.wiring
+                    zh_target.wiring
+                    if lang == "zh" and zh_target and zh_target.wiring
                     else target.wiring
                 )
                 if wiring_source:
                     wiring_data = {
                         "image": (
                             f"/api/solutions/{solution_id}/assets/{wiring_source.image}"
-                            if wiring_source.image else None
+                            if wiring_source.image
+                            else None
                         ),
                         "steps": wiring_source.steps,
                     }
@@ -1627,9 +1646,9 @@ class SolutionManager:
 
                 # Add section if provided (supports both nested and flat formats)
                 section_data = device_data.get("section", {})
-                desc_file = section_data.get(
+                desc_file = section_data.get("description_file") or device_data.get(
                     "description_file"
-                ) or device_data.get("description_file")
+                )
                 desc_file_zh = section_data.get(
                     "description_file_zh"
                 ) or device_data.get("description_file_zh")
@@ -1743,7 +1762,9 @@ class SolutionManager:
                             if section_data.get("title"):
                                 device["section"]["title"] = section_data["title"]
                             elif "section_title" in device_data:
-                                device["section"]["title"] = device_data["section_title"]
+                                device["section"]["title"] = device_data[
+                                    "section_title"
+                                ]
 
                             if section_data.get("title_zh"):
                                 device["section"]["title_zh"] = section_data["title_zh"]
@@ -1888,7 +1909,6 @@ class SolutionManager:
         await self.reload_solution(solution_id)
         return tags
 
-
     # ============================================
     # Content File Management (New Simplified API)
     # ============================================
@@ -1908,12 +1928,11 @@ class SolutionManager:
         Returns:
             The saved file path
         """
-        valid_files = [
-            "guide.md", "guide_zh.md",
-            "description.md", "description_zh.md"
-        ]
+        valid_files = ["guide.md", "guide_zh.md", "description.md", "description_zh.md"]
         if filename not in valid_files:
-            raise ValueError(f"Invalid filename: {filename}. Must be one of: {valid_files}")
+            raise ValueError(
+                f"Invalid filename: {filename}. Must be one of: {valid_files}"
+            )
 
         solution = self.get_solution(solution_id)
         if not solution:
@@ -2003,11 +2022,15 @@ class SolutionManager:
             current_yaml["intro"]["presets"] = presets
 
             async with aiofiles.open(yaml_path, "w", encoding="utf-8") as f:
-                await f.write(yaml.dump(current_yaml, allow_unicode=True, sort_keys=False))
+                await f.write(
+                    yaml.dump(current_yaml, allow_unicode=True, sort_keys=False)
+                )
 
             # Reload solution
             await self.reload_solution(solution_id)
-            logger.info(f"Synced {len(presets)} presets from guide.md to YAML for {solution_id}")
+            logger.info(
+                f"Synced {len(presets)} presets from guide.md to YAML for {solution_id}"
+            )
             return True
 
         except Exception as e:
@@ -2059,19 +2082,25 @@ class SolutionManager:
                 },
                 "description_en": {
                     "path": solution.intro.description_file or "description.md",
-                    "exists": (base_path / (solution.intro.description_file or "description.md")).exists(),
+                    "exists": (
+                        base_path
+                        / (solution.intro.description_file or "description.md")
+                    ).exists(),
                 },
                 "description_zh": {
                     "path": solution.intro.description_file_zh or "description_zh.md",
-                    "exists": (base_path / (solution.intro.description_file_zh or "description_zh.md")).exists(),
+                    "exists": (
+                        base_path
+                        / (solution.intro.description_file_zh or "description_zh.md")
+                    ).exists(),
                 },
             },
         }
 
         if not en_file.exists():
-            result["validation"]["warnings"].append({
-                "message": f"English guide not found: {guide_en_path}"
-            })
+            result["validation"]["warnings"].append(
+                {"message": f"English guide not found: {guide_en_path}"}
+            )
             return result
 
         try:
@@ -2101,13 +2130,12 @@ class SolutionManager:
                         for e in validation.errors
                     ]
                     result["validation"]["warnings"] = [
-                        {"message": w.message}
-                        for w in validation.warnings
+                        {"message": w.message} for w in validation.warnings
                     ]
             else:
-                result["validation"]["warnings"].append({
-                    "message": f"Chinese guide not found: {guide_zh_path}"
-                })
+                result["validation"]["warnings"].append(
+                    {"message": f"Chinese guide not found: {guide_zh_path}"}
+                )
 
             # Build presets structure
             for en_preset in en_result.presets:
@@ -2147,11 +2175,13 @@ class SolutionManager:
                     # Add targets info
                     if en_step.targets:
                         for target in en_step.targets:
-                            step_data["targets"].append({
-                                "id": target.id,
-                                "name": target.name,
-                                "default": target.default,
-                            })
+                            step_data["targets"].append(
+                                {
+                                    "id": target.id,
+                                    "name": target.name,
+                                    "default": target.default,
+                                }
+                            )
 
                     preset_data["steps"].append(step_data)
 
@@ -2161,15 +2191,21 @@ class SolutionManager:
             if en_result.success:
                 result["post_deployment"] = {
                     "content_en": en_result.success.content_en,
-                    "content_zh": zh_result.success.content_en if zh_result and zh_result.success else None,
+                    "content_zh": (
+                        zh_result.success.content_en
+                        if zh_result and zh_result.success
+                        else None
+                    ),
                 }
 
         except Exception as e:
             logger.error(f"Failed to get structure preview: {e}")
-            result["validation"]["errors"].append({
-                "type": "parse_error",
-                "message": str(e),
-            })
+            result["validation"]["errors"].append(
+                {
+                    "type": "parse_error",
+                    "message": str(e),
+                }
+            )
 
         return result
 
@@ -2181,16 +2217,18 @@ class SolutionManager:
         """
         result = []
         for device_id, device in self._global_device_catalog.items():
-            result.append({
-                "id": device_id,
-                "name": device.get("name", device_id),
-                "name_zh": device.get("name_zh", device.get("name", device_id)),
-                "category": device.get("category"),
-                "image": device.get("image"),
-                "product_url": device.get("product_url"),
-                "description": device.get("description"),
-                "description_zh": device.get("description_zh"),
-            })
+            result.append(
+                {
+                    "id": device_id,
+                    "name": device.get("name", device_id),
+                    "name_zh": device.get("name_zh", device.get("name", device_id)),
+                    "category": device.get("category"),
+                    "image": device.get("image"),
+                    "product_url": device.get("product_url"),
+                    "description": device.get("description"),
+                    "description_zh": device.get("description_zh"),
+                }
+            )
         return result
 
     async def update_required_devices(
@@ -2224,18 +2262,24 @@ class SolutionManager:
         for device_id in device_ids:
             device_info = self._global_device_catalog.get(device_id)
             if device_info:
-                required_devices.append({
-                    "id": device_id,
-                    "name": device_info.get("name", device_id),
-                    "name_zh": device_info.get("name_zh", device_info.get("name", device_id)),
-                })
+                required_devices.append(
+                    {
+                        "id": device_id,
+                        "name": device_info.get("name", device_id),
+                        "name_zh": device_info.get(
+                            "name_zh", device_info.get("name", device_id)
+                        ),
+                    }
+                )
             else:
                 # Device not in catalog, just use the ID
-                required_devices.append({
-                    "id": device_id,
-                    "name": device_id,
-                    "name_zh": device_id,
-                })
+                required_devices.append(
+                    {
+                        "id": device_id,
+                        "name": device_id,
+                        "name_zh": device_id,
+                    }
+                )
 
         current_yaml["intro"]["required_devices"] = required_devices
 

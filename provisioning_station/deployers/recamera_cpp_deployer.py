@@ -431,7 +431,9 @@ class ReCameraCppDeployer(BaseDeployer):
 
         for pattern in cpp_patterns:
             cmd = f"ls /etc/init.d/S*{pattern}* /etc/init.d/K*{pattern}* 2>/dev/null || true"
-            exit_code, stdout, _ = await self._exec_sudo(client, cmd, password, timeout=10)
+            exit_code, stdout, _ = await self._exec_sudo(
+                client, cmd, password, timeout=10
+            )
             if stdout.strip():
                 for line in stdout.strip().split("\n"):
                     svc = line.strip()
@@ -470,7 +472,9 @@ class ReCameraCppDeployer(BaseDeployer):
 
         # Determine mode
         # Only count enabled services (S*) as active, not disabled ones (K*)
-        has_cpp = bool(cpp_services_enabled) or bool(cpp_packages) or cpp_processes_running
+        has_cpp = (
+            bool(cpp_services_enabled) or bool(cpp_packages) or cpp_processes_running
+        )
         has_nodered = nodered_running or nodered_enabled
 
         if has_cpp and has_nodered:
@@ -538,7 +542,9 @@ class ReCameraCppDeployer(BaseDeployer):
     fi
 done"""
             cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(disable_script)}")
-            exit_code, stdout, _ = await self._exec_sudo(client, cmd, password, timeout=30)
+            exit_code, stdout, _ = await self._exec_sudo(
+                client, cmd, password, timeout=30
+            )
             if stdout and "Disabled:" in stdout:
                 logger.info(stdout.strip())
 
@@ -558,11 +564,14 @@ done"""
                     await self._exec_sudo(client, cmd, password, timeout=30)
 
             # Kill remaining processes (use killall, no pkill on BusyBox)
-            kill_processes = ["yolo11-detector", "yolo26-detector", "sensecraft", "sscma-cpp"]
+            kill_processes = [
+                "yolo11-detector",
+                "yolo26-detector",
+                "sensecraft",
+                "sscma-cpp",
+            ]
             for proc in kill_processes:
-                cmd = _build_sudo_cmd(
-                    password, f"killall {proc} 2>/dev/null || true"
-                )
+                cmd = _build_sudo_cmd(password, f"killall {proc} 2>/dev/null || true")
                 await self._exec_sudo(client, cmd, password, timeout=10)
 
         # Uninstall old C++ packages for clean reinstall (optional, but ensures idempotency)

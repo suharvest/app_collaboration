@@ -346,7 +346,11 @@ class DockerRemoteDeployer(BaseDeployer):
                 )
 
                 # Open browser if configured (post_deployment)
-                if config.post_deployment and config.post_deployment.open_browser and config.post_deployment.url:
+                if (
+                    config.post_deployment
+                    and config.post_deployment.open_browser
+                    and config.post_deployment.url
+                ):
                     try:
                         import webbrowser
 

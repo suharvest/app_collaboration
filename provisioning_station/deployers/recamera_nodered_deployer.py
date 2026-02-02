@@ -169,9 +169,7 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
                 if state.nodered_disabled:
                     state_msg += ", Node-RED disabled"
 
-                await self._report_progress(
-                    progress_callback, "prepare", 20, state_msg
-                )
+                await self._report_progress(progress_callback, "prepare", 20, state_msg)
 
                 # Step 2: Perform cleanup if needed
                 if state.needs_cpp_cleanup or state.needs_nodered_restore:
@@ -272,7 +270,9 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
 
         # Determine mode
         # Only count enabled services (S*) as active, not disabled ones (K*)
-        has_cpp = bool(cpp_services_enabled) or bool(cpp_packages) or cpp_processes_running
+        has_cpp = (
+            bool(cpp_services_enabled) or bool(cpp_packages) or cpp_processes_running
+        )
         has_nodered = nodered_running or nodered_enabled
 
         if has_cpp and has_nodered:

@@ -28,7 +28,8 @@ class VersionManager:
         for device_ref in all_devices:
             try:
                 config_file = (
-                    device_ref.get("config_file") if isinstance(device_ref, dict)
+                    device_ref.get("config_file")
+                    if isinstance(device_ref, dict)
                     else getattr(device_ref, "config_file", None)
                 )
                 if not config_file:
@@ -40,7 +41,8 @@ class VersionManager:
                     continue
 
                 device_id = (
-                    device_ref.get("id") if isinstance(device_ref, dict)
+                    device_ref.get("id")
+                    if isinstance(device_ref, dict)
                     else getattr(device_ref, "id", None)
                 )
                 version_info = await self._get_device_version(
@@ -176,7 +178,8 @@ class VersionManager:
             return None
 
         config_file = (
-            device_ref.get("config_file") if isinstance(device_ref, dict)
+            device_ref.get("config_file")
+            if isinstance(device_ref, dict)
             else getattr(device_ref, "config_file", None)
         )
         if not config_file:
@@ -231,7 +234,8 @@ class VersionManager:
         all_devices = await solution_manager.get_all_devices_async(solution_id)
         for device_ref in all_devices:
             device_id = (
-                device_ref.get("id") if isinstance(device_ref, dict)
+                device_ref.get("id")
+                if isinstance(device_ref, dict)
                 else getattr(device_ref, "id", None)
             )
             result = await self.check_update_available(solution_id, device_id)

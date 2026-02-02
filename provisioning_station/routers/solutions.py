@@ -159,7 +159,9 @@ async def load_preset_section(
 async def list_solutions(
     category: Optional[str] = None,
     lang: str = Query("en", pattern="^(en|zh)$"),
-    include_disabled: bool = Query(False, description="Include disabled solutions (for management UI)"),
+    include_disabled: bool = Query(
+        False, description="Include disabled solutions (for management UI)"
+    ),
 ):
     """List all available solutions"""
     solutions = solution_manager.get_all_solutions()
@@ -264,13 +266,21 @@ async def get_solution(
     for device in all_preset_devices:
         device_id = device.get("id") if isinstance(device, dict) else device.id
         device_name = device.get("name") if isinstance(device, dict) else device.name
-        device_name_zh = device.get("name_zh") if isinstance(device, dict) else device.name_zh
+        device_name_zh = (
+            device.get("name_zh") if isinstance(device, dict) else device.name_zh
+        )
         device_type = device.get("type") if isinstance(device, dict) else device.type
-        device_required = device.get("required", True) if isinstance(device, dict) else device.required
+        device_required = (
+            device.get("required", True)
+            if isinstance(device, dict)
+            else device.required
+        )
         devices.append(
             {
                 "id": device_id,
-                "name": device_name if lang == "en" else (device_name_zh or device_name),
+                "name": (
+                    device_name if lang == "en" else (device_name_zh or device_name)
+                ),
                 "name_zh": device_name_zh,
                 "type": device_type,
                 "required": device_required,
@@ -414,7 +424,9 @@ async def get_solution(
 async def get_deployment_info(
     solution_id: str,
     lang: str = Query("en", pattern="^(en|zh)$"),
-    use_guide: bool = Query(True, description="Load from guide.md (new) vs YAML (legacy)"),
+    use_guide: bool = Query(
+        True, description="Load from guide.md (new) vs YAML (legacy)"
+    ),
 ):
     """Get deployment page information.
 
@@ -860,15 +872,26 @@ async def get_solution_asset(solution_id: str, path: str):
 
     # Set Content-Disposition: attachment for downloadable file types
     downloadable_extensions = {
-        '.xlsx', '.xls', '.pdf', '.zip', '.csv', '.doc', '.docx',
-        '.ppt', '.pptx', '.mp3', '.mp4', '.rar', '.7z', '.tar', '.gz'
+        ".xlsx",
+        ".xls",
+        ".pdf",
+        ".zip",
+        ".csv",
+        ".doc",
+        ".docx",
+        ".ppt",
+        ".pptx",
+        ".mp3",
+        ".mp4",
+        ".rar",
+        ".7z",
+        ".tar",
+        ".gz",
     }
     file_ext = asset_path.suffix.lower()
     if file_ext in downloadable_extensions:
         return FileResponse(
-            asset_path,
-            filename=asset_path.name,
-            media_type='application/octet-stream'
+            asset_path, filename=asset_path.name, media_type="application/octet-stream"
         )
 
     return FileResponse(asset_path)
@@ -940,7 +963,9 @@ async def get_preset_section(
         raise HTTPException(status_code=404, detail="Solution not found")
 
     # First, try to get preset description from guide.md
-    deployment_data = await solution_manager.get_deployment_from_guide(solution_id, lang)
+    deployment_data = await solution_manager.get_deployment_from_guide(
+        solution_id, lang
+    )
     if deployment_data:
         presets = deployment_data.get("presets", [])
         for p in presets:
@@ -999,9 +1024,7 @@ async def parse_guide(
 
     result = await solution_manager.parse_deployment_guide(solution_id, path)
     if not result:
-        raise HTTPException(
-            status_code=404, detail=f"Guide file not found: {path}"
-        )
+        raise HTTPException(status_code=404, detail=f"Guide file not found: {path}")
 
     # Convert to API response format
     response = {
@@ -1024,7 +1047,11 @@ async def parse_guide(
             }
             for w in result.warnings
         ],
-        "overview": result.overview_en if lang == "en" else (result.overview_zh or result.overview_en),
+        "overview": (
+            result.overview_en
+            if lang == "en"
+            else (result.overview_zh or result.overview_en)
+        ),
         "presets": [],
         "steps": [],
         "success": None,
@@ -1034,20 +1061,45 @@ async def parse_guide(
     def format_step(step):
         return {
             "id": step.id,
-            "title": step.title_en if lang == "en" else (step.title_zh or step.title_en),
+            "title": (
+                step.title_en if lang == "en" else (step.title_zh or step.title_en)
+            ),
             "title_en": step.title_en,
             "title_zh": step.title_zh,
             "type": step.type,
             "required": step.required,
             "config_file": step.config_file,
             "section": {
-                "title": step.section.title if lang == "en" else (step.section.title_zh or step.section.title),
-                "description": step.section.description if lang == "en" else (step.section.description_zh or step.section.description),
-                "troubleshoot": step.section.troubleshoot if lang == "en" else (step.section.troubleshoot_zh or step.section.troubleshoot),
+                "title": (
+                    step.section.title
+                    if lang == "en"
+                    else (step.section.title_zh or step.section.title)
+                ),
+                "description": (
+                    step.section.description
+                    if lang == "en"
+                    else (step.section.description_zh or step.section.description)
+                ),
+                "troubleshoot": (
+                    step.section.troubleshoot
+                    if lang == "en"
+                    else (step.section.troubleshoot_zh or step.section.troubleshoot)
+                ),
                 "wiring": (
                     {
-                        "image": f"/api/solutions/{solution_id}/assets/{step.section.wiring.image}" if step.section.wiring.image else None,
-                        "steps": step.section.wiring.steps if lang == "en" else (step.section.wiring.steps_zh or step.section.wiring.steps),
+                        "image": (
+                            f"/api/solutions/{solution_id}/assets/{step.section.wiring.image}"
+                            if step.section.wiring.image
+                            else None
+                        ),
+                        "steps": (
+                            step.section.wiring.steps
+                            if lang == "en"
+                            else (
+                                step.section.wiring.steps_zh
+                                or step.section.wiring.steps
+                            )
+                        ),
                     }
                     if step.section.wiring
                     else None
@@ -1062,7 +1114,11 @@ async def parse_guide(
             "name": preset.name if lang == "en" else (preset.name_zh or preset.name),
             "name_en": preset.name,
             "name_zh": preset.name_zh,
-            "description": preset.description if lang == "en" else (preset.description_zh or preset.description),
+            "description": (
+                preset.description
+                if lang == "en"
+                else (preset.description_zh or preset.description)
+            ),
             "steps": [format_step(s) for s in preset.steps],
         }
         response["presets"].append(preset_data)
@@ -1073,7 +1129,11 @@ async def parse_guide(
     # Format success content
     if result.success:
         response["success"] = {
-            "content": result.success.content_en if lang == "en" else (result.success.content_zh or result.success.content_en),
+            "content": (
+                result.success.content_en
+                if lang == "en"
+                else (result.success.content_zh or result.success.content_en)
+            ),
         }
 
     return response
@@ -1098,9 +1158,7 @@ async def get_bilingual_content(
         solution_id, path, lang=lang, convert_to_html=True
     )
     if not content:
-        raise HTTPException(
-            status_code=404, detail=f"Bilingual file not found: {path}"
-        )
+        raise HTTPException(status_code=404, detail=f"Bilingual file not found: {path}")
 
     return {
         "solution_id": solution_id,
@@ -1152,7 +1210,7 @@ async def validate_guides(solution_id: str):
         "warnings": [
             {
                 "message": w.message,
-                "line_number": getattr(w, 'line_number', None),
+                "line_number": getattr(w, "line_number", None),
             }
             for w in result.warnings
         ],
