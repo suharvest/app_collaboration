@@ -317,11 +317,15 @@ name_zh: 新名称
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
+| `/api/health` | GET | 健康检查 |
 | `/api/solutions?lang=zh` | GET | 获取方案列表 |
 | `/api/solutions/{id}?lang=zh` | GET | 获取方案详情 |
 | `/api/solutions/{id}/deployment?lang=zh` | GET | 获取部署信息 |
 | `/api/solutions/{id}/assets/{path}` | GET | 获取静态资源 |
 | `/api/devices/detect/{solution_id}` | GET | 检测设备 |
+| `/api/devices/scan-mdns` | GET | mDNS 局域网设备扫描 |
+| `/api/docker-devices/local/check` | GET | 检查本地 Docker 状态 |
+| `/api/docker-devices/local/managed-apps` | GET | 获取已部署应用列表 |
 | `/api/deployments/start` | POST | 启动部署 |
 | `/ws/deployments/{deployment_id}` | WS | 部署日志 WebSocket |
 
@@ -341,6 +345,7 @@ name_zh: 新名称
 | `ssh_deb` | SSH + DEB 包安装 |
 | `script` | 脚本执行 |
 | `manual` | 手动步骤 |
+| `preview` | 预览步骤（无实际部署） |
 
 ### WebSocket 消息类型
 
@@ -378,19 +383,26 @@ rm -rf frontend/dist
 
 ### 后端测试 (pytest)
 
+**重要**：必须使用 `--group test` 参数，因为 pytest 在 test 依赖组中，不在主依赖中。
+
 ```bash
-# 运行所有后端测试
-uv run pytest tests/ -v
+# 运行所有后端测试（单元测试 + 集成测试）
+uv run --group test pytest tests/ -v
 
-# 运行单元测试
-uv run pytest tests/unit/ -v
+# 只运行单元测试（不需要后端服务）
+uv run --group test pytest tests/unit/ -v
 
-# 运行集成测试
-uv run pytest tests/integration/ -v
+# 只运行集成测试（需要后端服务运行）
+uv run --group test pytest tests/integration/ -v
 
 # 运行带覆盖率
-uv run pytest tests/ --cov=provisioning_station -v
+uv run --group test pytest tests/ --cov=provisioning_station -v
 ```
+
+**注意**：
+- 单元测试 (`tests/unit/`) 不需要后端服务运行
+- 集成测试 (`tests/integration/`) 需要先启动后端服务 (`./dev.sh`)
+- 如果直接使用 `uv run pytest` 会报错 `No module named pytest`
 
 ### 前端测试 (Vitest)
 
@@ -409,15 +421,15 @@ npm run test:coverage
 
 ### API 契约测试
 
-契约测试验证前后端数据结构一致性：
+契约测试验证前后端数据结构一致性，需要后端服务运行：
 
 ```bash
-# 需要先启动后端
+# 1. 先启动后端服务
 ./dev.sh &
 sleep 5
 
-# 运行契约测试
-uv run pytest tests/integration/test_*_contract.py -v
+# 2. 运行契约测试
+uv run --group test pytest tests/integration/test_*_contract.py -v
 ```
 
 ### 共享常量
