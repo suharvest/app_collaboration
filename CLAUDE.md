@@ -297,6 +297,41 @@ name: New Name
 name_zh: 新名称
 ```
 
+### 修改方案设备列表
+
+**重要**：设备信息在多处显示，修改时必须同步更新以保持一致：
+
+| 文件 | 位置 | 说明 |
+|------|------|------|
+| `solution.yaml` | `device_catalog` | 介绍页的设备选择器 |
+| `guide.md` | Preset 下的设备表格 | 部署页顶部的设备列表 |
+| `guide_zh.md` | 套餐下的设备表格 | 中文部署页顶部的设备列表 |
+
+示例：将设备从"电脑"改为"reComputer R1100"
+
+1. 编辑 `solution.yaml` 的 `device_catalog`：
+```yaml
+device_catalog:
+  recomputer_r1100:           # 设备 key
+    name: reComputer R1100
+    name_zh: reComputer R1100
+    product_url: https://www.seeedstudio.com/...
+```
+
+2. 同步更新 `guide.md` 的设备表格：
+```markdown
+| Device | Purpose |
+|--------|---------|
+| reComputer R1100 | Edge computing device |
+```
+
+3. 同步更新 `guide_zh.md` 的设备表格：
+```markdown
+| 设备 | 用途 |
+|------|------|
+| reComputer R1100 | 边缘计算设备 |
+```
+
 ### 调整侧边栏宽度
 
 编辑 `frontend/design-system/components.css`:

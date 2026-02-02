@@ -211,8 +211,6 @@
 
 ### 部署目标: 本机部署 {#display_service_local config=devices/display_local.yaml default=true}
 
-## 本机部署
-
 将投屏服务部署到您的本地电脑。
 
 ### 前提条件
@@ -227,11 +225,9 @@
 3. 唤醒 Watcher，说"打开设置"
 4. 找到"投屏地址"，说出服务器地址（如 `你的IP:8765`）
 
-![接线图](intro/gallery/architecture.svg)
+![接线图](gallery/architecture.svg)
 
 ### 部署目标: 远程部署 {#display_service_remote config=devices/recomputer.yaml}
-
-## 远程部署
 
 将投屏服务部署到远程设备（reComputer、树莓派等）。
 
@@ -248,7 +244,7 @@
 3. 唤醒 Watcher，说"打开设置"
 4. 找到"投屏地址"，说出服务器地址（如 `192.168.1.100:8765`）
 
-![接线图](intro/gallery/architecture.svg)
+![接线图](gallery/architecture.svg)
 
 ---
 

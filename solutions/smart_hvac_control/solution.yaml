@@ -26,13 +26,13 @@ intro:
   - automation
   - recomputer
   device_catalog:
-    recomputer_r:
-      name: reComputer R Series
-      name_zh: reComputer R 系列
+    recomputer_r1100:
+      name: reComputer R1100
+      name_zh: reComputer R1100
       image: gallery/recomputer.svg
-      product_url: https://www.seeedstudio.com/reComputer-R1000-Series
-      description: Optional - only needed for remote deployment
-      description_zh: 可选 - 仅远程部署时需要
+      product_url: https://www.seeedstudio.com/reComputer-R1100-p-6253.html
+      description: Edge computing device with Docker support
+      description_zh: 边缘计算设备，内置 Docker
   stats:
     deployed_count: 0
     likes_count: 0
@@ -44,6 +44,8 @@ intro:
   - id: default
     name: Standard Deployment
     name_zh: 标准部署
+    description: Deploy KNN-based HVAC optimization that learns from historical data
+    description_zh: 部署基于 KNN 算法的暖通优化系统，从历史数据中学习最优参数
     device_groups:
     - id: edge_device
       name: Edge Device
@@ -53,8 +55,8 @@ intro:
       description: Only needed for remote deployment
       description_zh: 仅远程部署时需要
       options:
-      - device_ref: recomputer_r
-      default: recomputer_r
+      - device_ref: recomputer_r1100
+      default: recomputer_r1100
 deployment:
   guide_file: guide.md
   guide_file_zh: guide_zh.md

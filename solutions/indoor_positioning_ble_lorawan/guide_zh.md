@@ -85,8 +85,6 @@
 
 ### 部署目标: 本机部署 {#app_server_local config=devices/app_local.yaml default=true}
 
-### 本机部署
-
 将室内定位应用程序部署到您的本地电脑。
 
 **前提条件**：
@@ -104,8 +102,6 @@
 | 网页打不开 | 服务未启动完成 | 等待几分钟，刷新页面 |
 
 ### 部署目标: 远程部署 {#app_server_remote config=devices/app_remote.yaml}
-
-### 远程部署
 
 通过 SSH 将室内定位应用程序部署到远程服务器。
 
@@ -233,8 +229,6 @@
 
 ### 部署目标: 本机部署 {#app_server_local config=devices/app_local.yaml default=true}
 
-### 本机部署
-
 将室内定位应用程序部署到您的本地电脑。
 
 **前提条件**：
@@ -252,8 +246,6 @@
 | 网页打不开 | 服务未启动完成 | 等待几分钟，刷新页面 |
 
 ### 部署目标: 远程部署 {#app_server_remote config=devices/app_remote.yaml}
-
-### 远程部署
 
 通过 SSH 将室内定位应用程序部署到远程服务器。
 
@@ -381,8 +373,6 @@
 
 ### 部署目标: 本机部署 {#app_server_local config=devices/app_local.yaml default=true}
 
-### 本机部署
-
 将室内定位应用程序部署到您的本地电脑。
 
 **前提条件**：
@@ -400,8 +390,6 @@
 | 网页打不开 | 服务未启动完成 | 等待几分钟，刷新页面 |
 
 ### 部署目标: 远程部署 {#app_server_remote config=devices/app_remote.yaml}
-
-### 远程部署
 
 通过 SSH 将室内定位应用程序部署到远程服务器。
 

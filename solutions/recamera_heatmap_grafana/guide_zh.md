@@ -82,7 +82,7 @@
 | 设备 | 用途 |
 |------|------|
 | reCamera | 带人员识别功能的 AI 摄像头 |
-| 电脑/服务器 | 运行 Grafana 看板 + InfluxDB |
+| reComputer R1100 | 运行 Grafana 看板 + InfluxDB |
 
 **部署完成后你可以：**
 - 查看历史人流数据的时序图表
@@ -108,7 +108,7 @@
 - Docker Desktop 已安装并运行
 - 至少 2GB 可用磁盘空间
 
-![接线图](intro/gallery/architecture.svg)
+![接线图](gallery/architecture.svg)
 
 ### 故障排查
 
@@ -120,7 +120,7 @@
 
 ### 部署目标: 在其他设备运行 {#backend_remote config=devices/backend_remote.yaml}
 
-在 reComputer、树莓派等专用设备上运行看板。
+在 reComputer R1100 上运行看板，作为专用的边缘部署方案。
 
 ### 开始之前
 
@@ -136,7 +136,7 @@
 | 用户名 | recomputer |
 | 密码 | 12345678 |
 
-![接线图](intro/gallery/architecture.svg)
+![接线图](gallery/architecture.svg)
 
 ---
 

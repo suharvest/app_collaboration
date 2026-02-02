@@ -143,6 +143,8 @@ reSpeaker 出厂默认启用了回声消除功能，会影响本方案的录音�
 
 ### 部署目标: 本机部署 {#voice_services_local config=devices/voice_local.yaml}
 
+在本地电脑上部署语音服务。
+
 ### 硬件连接
 
 | 设备 | 连接方式 | 注意事项 |
@@ -210,7 +212,7 @@ reSpeaker 出厂默认启用了回声消除功能，会影响本方案的录音�
                         └──────────┘
 ```
 
-![接线图](intro/gallery/wan_lan.png)
+![接线图](gallery/wan_lan.png)
 
 ### 故障排查
 

@@ -12,8 +12,7 @@
 
 | 设备 | 用途 |
 |------|------|
-| 你的电脑 | 本机部署（需安装 Docker） |
-| reComputer R 系列 | 可选，用于远程/边缘部署 |
+| reComputer R1100 | 边缘计算设备，内置 Docker |
 
 **部署完成后你可以：**
 - 获得 AI 根据历史数据给出的温度调节建议
@@ -28,21 +27,39 @@
 
 点击下方"部署"按钮，系统将自动在本机启动暖通控制服务。
 
-![接线图](intro/gallery/architecture.svg)
+![接线图](gallery/architecture.svg)
 
 1. 确保 Docker 已安装并运行
 2. 点击部署启动容器
 3. 通过 localhost:8280 访问 Web 界面
 
+### 故障排除
+
+| 问题 | 解决方法 |
+|------|----------|
+| Docker 未运行 | 启动 Docker Desktop 应用 |
+| 端口 8280 被占用 | 关闭占用该端口的程序，或修改配置使用其他端口 |
+| 容器启动后停止 | 执行 `docker logs missionpack_knn` 查看错误日志 |
+| 网页打不开 | 等待 30 秒让服务完全启动 |
+
 ### 部署目标: 远程部署 {#hvac_remote config=devices/remote.yaml}
 
 点击下方"部署"按钮，系统将自动把暖通控制服务部署到远程设备。
 
-![接线图](intro/gallery/recomputer.svg)
+![接线图](gallery/recomputer.svg)
 
 1. 通过 SSH 连接远程设备
 2. 远程部署 Docker 容器
 3. 通过设备 IP:8280 访问 Web 界面
+
+### 故障排除
+
+| 问题 | 解决方法 |
+|------|----------|
+| SSH 连接失败 | 检查 IP 地址和用户名密码是否正确 |
+| 远程设备无 Docker | 先在远程设备上安装 Docker |
+| 部署超时 | 检查远程设备网络，确保能访问镜像仓库 |
+| 网页打不开 | 检查防火墙是否开放 8280 端口 |
 
 ---
 
