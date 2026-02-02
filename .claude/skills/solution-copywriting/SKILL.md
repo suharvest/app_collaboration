@@ -180,6 +180,20 @@ solutions/[id]/
 ```markdown
 ## Preset: Cloud Solution {#cloud_mode}
 
+Use [SenseCraft](https://sensecraft.seeed.cc/ai/) cloud services for AI capabilities. Simplest deployment - just set up the system and connect devices to the platform.
+
+| Device | Purpose |
+|--------|---------|
+| SenseCAP Watcher | Voice assistant for receiving commands |
+| Computer | Runs Docker services |
+
+**What you'll get:**
+- Voice-controlled operations
+- Real-time web dashboard
+- Works out of the box
+
+**Requirements:** Internet connection · [SenseCraft account](https://sensecraft.seeed.cc/ai/) (free)
+
 ## Step 1: Deploy Backend {#backend type=docker_deploy required=true config=devices/docker.yaml}
 
 Deploy the backend services.
@@ -266,6 +280,20 @@ Congratulations! All components deployed successfully.
 
 ```markdown
 ## 套餐: 云方案 {#cloud_mode}
+
+使用 [SenseCraft](https://sensecraft.seeed.cc/ai/) 云服务提供 AI 能力。最简单的部署方式——只需部署系统，将设备连接到平台即可。
+
+| 设备 | 用途 |
+|------|------|
+| SenseCAP Watcher | 语音助手，接收语音指令 |
+| 电脑 | 运行 Docker 服务 |
+
+**部署完成后你可以：**
+- 语音操控系统
+- 网页实时查看数据
+- 开箱即用，无需额外配置
+
+**前提条件：** 需要联网 · [SenseCraft 账号](https://sensecraft.seeed.cc/ai/)（免费注册）
 
 ## 步骤 1: 部署后端 {#backend type=docker_deploy required=true config=devices/docker.yaml}
 
@@ -360,6 +388,73 @@ Congratulations! All components deployed successfully.
 
 - `#preset_id` - Preset ID（必需，小写+下划线）
 - 必须与 solution.yaml 中 `intro.presets[].id` 一致
+
+#### Preset 全局说明（推荐）
+
+在 Preset 标题后、第一个步骤之前的内容会作为该预设的全局说明，显示在部署页的预设选择器下方。
+
+**标准格式**：
+
+```markdown
+## Preset: Cloud Solution {#cloud_mode}
+
+Use [SenseCraft](https://sensecraft.seeed.cc/ai/) cloud services for AI capabilities. Simplest deployment - just set up the system and connect Watcher to the platform.
+
+| Device | Purpose |
+|--------|---------|
+| SenseCAP Watcher | Voice assistant for receiving commands |
+| reComputer R1100 | Runs the management system |
+
+**What you'll get:**
+- Voice-controlled operations
+- Real-time web dashboard
+- Works out of the box
+
+**Requirements:** Internet connection · [SenseCraft account](https://sensecraft.seeed.cc/ai/) (free registration)
+
+## Step 1: Deploy Backend {#backend ...}
+```
+
+**中文版本**：
+
+```markdown
+## 套餐: 云方案 {#cloud_mode}
+
+使用 [SenseCraft](https://sensecraft.seeed.cc/ai/) 云服务提供 AI 能力。最简单的部署方式——只需部署系统，将 Watcher 连接到 SenseCraft 平台即可。
+
+| 设备 | 用途 |
+|------|------|
+| SenseCAP Watcher | 语音助手，接收语音指令 |
+| reComputer R1100 | 运行管理系统 |
+
+**部署完成后你可以：**
+- 语音操控系统
+- 网页实时查看数据
+- 开箱即用，无需额外配置
+
+**前提条件：** 需要联网 · [SenseCraft 账号](https://sensecraft.seeed.cc/ai/)（免费注册）
+
+## 步骤 1: 部署后端 {#backend ...}
+```
+
+**格式要点**：
+
+| 元素 | 英文 | 中文 | 说明 |
+|------|------|------|------|
+| 设备表格 | `\| Device \| Purpose \|` | `\| 设备 \| 用途 \|` | 列出该预设所需的设备 |
+| 能力列表 | `**What you'll get:**` | `**部署完成后你可以：**` | 3-4 个要点说明部署后能做什么 |
+| 前提条件 | `**Requirements:**` | `**前提条件：**` | 用 · 分隔多个条件，支持链接 |
+
+**用途**：
+- 介绍该预设的特点和适用场景
+- 用表格展示所需设备（避免用列表）
+- 说明部署后能实现什么（用 bullet list）
+- 一行说明前提条件，支持添加链接（如 SenseCraft、小智 App）
+
+**样式说明**：
+- CSS 使用浅色背景（`bg-gray-50/50`）+ 虚线边框（`border-dashed`）
+- 与步骤卡片形成视觉层次区分
+- 文字使用次要颜色（`text-secondary`），不抢夺步骤的注意力
 
 #### 步骤头格式
 

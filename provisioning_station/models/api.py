@@ -26,6 +26,7 @@ class SolutionSummary(BaseModel):
     deployed_count: int = 0
     likes_count: int = 0
     device_count: int = 0
+    enabled: bool = True  # Whether solution is visible in public listing
     # File existence flags for management UI
     has_description: bool = False
     has_description_zh: bool = False
@@ -213,3 +214,4 @@ class SolutionUpdate(BaseModel):
     category: Optional[str] = None
     difficulty: Optional[str] = None
     estimated_time: Optional[str] = None
+    enabled: Optional[bool] = None

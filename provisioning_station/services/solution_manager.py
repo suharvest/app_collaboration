@@ -430,13 +430,23 @@ class SolutionManager:
                     preset_data = {
                         "id": preset.id,
                         "name": preset.name,
+                        "description": preset.description,
+                        "is_default": preset.is_default,
                         "steps": [
                             {
                                 "id": s.id,
-                                "title": s.title_en,
+                                "name": s.title_en or s.id,  # Use title_en as name
                                 "type": s.type,
                                 "required": s.required,
-                                "config": s.config_file,
+                                "config_file": s.config_file,
+                                "targets": [
+                                    {
+                                        "id": t.id,
+                                        "name": t.name,
+                                        "is_default": t.is_default,
+                                    }
+                                    for t in (s.targets or [])
+                                ],
                             }
                             for s in preset.steps
                         ],
@@ -697,7 +707,11 @@ class SolutionManager:
 
                 preset_device_ids.append(en_step.id)
 
-            # Build preset info
+            # Build preset info with section for frontend compatibility
+            preset_description = (
+                zh_preset.description if lang == "zh" and zh_preset
+                else en_preset.description
+            )
             presets.append({
                 "id": en_preset.id,
                 "name": (
@@ -705,12 +719,14 @@ class SolutionManager:
                     else en_preset.name
                 ),
                 "name_zh": zh_preset.name if zh_preset else en_preset.name,
-                "description": (
-                    zh_preset.description if lang == "zh" and zh_preset
-                    else en_preset.description
-                ),
+                "description": preset_description,
                 "description_zh": zh_preset.description if zh_preset else "",
                 "devices": preset_device_ids,
+                # Section object for frontend renderPresetSectionContent()
+                "section": {
+                    "title": "",
+                    "description": preset_description,
+                } if preset_description else None,
             })
 
         # Build post_deployment from success content
@@ -869,6 +885,19 @@ class SolutionManager:
                     "default": target.default,
                     "config_file": target.config_file,
                 }
+
+                # Load target's device config for user_inputs and ssh settings
+                if target.config_file:
+                    target_config = await self.load_device_config(
+                        solution_id, target.config_file
+                    )
+                    if target_config:
+                        if target_config.ssh:
+                            target_info["ssh"] = target_config.ssh.model_dump()
+                        if target_config.user_inputs:
+                            target_info["user_inputs"] = [
+                                inp.model_dump() for inp in target_config.user_inputs
+                            ]
 
                 # Build target section content (description, troubleshoot, wiring)
                 target_section = {}
@@ -1037,6 +1066,8 @@ class SolutionManager:
             current_yaml["name"] = data["name"]
         if data.get("name_zh"):
             current_yaml["name_zh"] = data["name_zh"]
+        if "enabled" in data:
+            current_yaml["enabled"] = data["enabled"]
         if data.get("summary"):
             current_yaml["intro"]["summary"] = data["summary"]
         if data.get("summary_zh"):
@@ -1356,10 +1387,36 @@ class SolutionManager:
 
             presets.append(preset_data)
 
+        # Build required devices with image URLs
+        required_devices = []
+        if solution.intro.required_devices:
+            # Use legacy required_devices if present
+            for device in solution.intro.required_devices:
+                dev = device.model_dump()
+                if device.image:
+                    dev["image"] = f"/api/solutions/{solution_id}/assets/{device.image}"
+                required_devices.append(dev)
+        elif solution.intro.device_catalog:
+            # Fall back to device_catalog if required_devices is empty
+            for device_id, device in solution.intro.device_catalog.items():
+                dev = {
+                    "id": device_id,
+                    "name": device.name,
+                    "name_zh": device.name_zh,
+                    "description": device.description,
+                    "description_zh": device.description_zh,
+                }
+                if device.image:
+                    dev["image"] = f"/api/solutions/{solution_id}/assets/{device.image}"
+                if device.product_url:
+                    dev["purchase_url"] = device.product_url
+                required_devices.append(dev)
+
         return {
             "id": solution.id,
             "name": solution.name,
             "name_zh": solution.name_zh,
+            "enabled": solution.enabled,
             "intro": {
                 "summary": solution.intro.summary,
                 "summary_zh": solution.intro.summary_zh,
@@ -1376,6 +1433,7 @@ class SolutionManager:
                 "links": (
                     solution.intro.links.model_dump() if solution.intro.links else {}
                 ),
+                "required_devices": required_devices,
             },
             "deployment": {
                 "guide_file": solution.deployment.guide_file,

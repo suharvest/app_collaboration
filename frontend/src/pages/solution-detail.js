@@ -6,7 +6,15 @@ import { solutionsApi, getAssetUrl } from '../modules/api.js';
 import { t, getLocalizedField, i18n } from '../modules/i18n.js';
 import { router } from '../modules/router.js';
 import { toast } from '../modules/toast.js';
-import { PLACEHOLDER_IMAGE, DEVICE_PLACEHOLDER, escapeHtml } from '../modules/utils.js';
+import { PLACEHOLDER_IMAGE, DEVICE_PLACEHOLDER, escapeHtml, processMarkdownImages } from '../modules/utils.js';
+
+/**
+ * Process markdown content to fix image paths for current solution
+ */
+function processMarkdown(html) {
+  if (!currentSolution?.id) return html;
+  return processMarkdownImages(html, currentSolution.id, getAssetUrl);
+}
 
 let currentSolution = null;
 let deviceSelections = {};
@@ -49,6 +57,32 @@ export async function renderSolutionDetailPage(params) {
   }
 }
 
+/**
+ * Split description HTML into main content and appendix (comparison tables, optional features).
+ * Appendix starts at headings like "三种部署方案对比" or "Deployment Options".
+ */
+function splitDescriptionContent(html) {
+  if (!html) return { main: '', appendix: '' };
+
+  // Find the split point: H3 headings for deployment options or comparison tables
+  // Chinese: "三种部署方案对比", English: "Deployment Options"
+  const splitPatterns = [
+    /<h3[^>]*>.*?(三种部署方案对比|Deployment Options).*?<\/h3>/i
+  ];
+
+  for (const pattern of splitPatterns) {
+    const match = html.match(pattern);
+    if (match && match.index !== undefined) {
+      return {
+        main: html.slice(0, match.index),
+        appendix: html.slice(match.index)
+      };
+    }
+  }
+
+  return { main: html, appendix: '' };
+}
+
 function renderSolutionIntro(solution, descriptionHtml) {
   const name = getLocalizedField(solution, 'name');
   // API returns fields directly on solution, not nested under intro
@@ -67,6 +101,9 @@ function renderSolutionIntro(solution, descriptionHtml) {
   if (hasDeviceGroups) {
     initializeSelections(solution);
   }
+
+  // Split description into main content and appendix (comparison tables go after architecture)
+  const { main: mainDescription, appendix: descriptionAppendix } = splitDescriptionContent(descriptionHtml);
 
   // Use getAssetUrl to handle Tauri mode (converts relative /api/... paths to full URLs)
   const coverImage = solution.cover_image ? getAssetUrl(solution.id, solution.cover_image) : PLACEHOLDER_IMAGE;
@@ -136,19 +173,26 @@ function renderSolutionIntro(solution, descriptionHtml) {
         </div>
       </div>
 
-      <!-- Description -->
-      ${descriptionHtml ? `
+      <!-- Description (main content) -->
+      ${mainDescription ? `
         <div class="markdown-content markdown-content-intro mb-8">
-          ${descriptionHtml}
+          ${processMarkdown(mainDescription)}
         </div>
       ` : ''}
 
-      <!-- Device Configuration (after description) -->
+      <!-- Device Configuration (after main description) -->
       ${hasDeviceGroups ? `
         ${renderDeviceConfigurator(solution)}
       ` : requiredDevices.length > 0 ? `
         <div class="solution-devices-inline">
           ${requiredDevices.map(device => renderRequiredDeviceInline(solution.id, device)).join('')}
+        </div>
+      ` : ''}
+
+      <!-- Description Appendix (comparison tables, optional features - after architecture) -->
+      ${descriptionAppendix ? `
+        <div class="markdown-content markdown-content-intro mb-8">
+          ${processMarkdown(descriptionAppendix)}
         </div>
       ` : ''}
 

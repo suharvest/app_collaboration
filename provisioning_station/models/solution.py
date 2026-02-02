@@ -20,6 +20,7 @@ class MediaItem(BaseModel):
 class RequiredDevice(BaseModel):
     """Device shown in intro page (legacy, kept for backward compatibility)"""
 
+    id: Optional[str] = None  # Device ID from catalog
     name: str
     name_zh: Optional[str] = None
     image: Optional[str] = None
@@ -312,6 +313,7 @@ class Solution(BaseModel):
     id: str
     name: str
     name_zh: Optional[str] = None
+    enabled: bool = True  # Whether the solution is visible in the solutions list
     intro: SolutionIntro
     deployment: SolutionDeployment
 

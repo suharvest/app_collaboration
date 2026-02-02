@@ -20,11 +20,16 @@ Guide for preparing Docker images and deployment configuration.
 
 ```
 solutions/[solution_id]/
+├── solution.yaml              # Solution configuration
+├── guide.md                   # English deployment guide (defines steps)
+├── guide_zh.md                # Chinese deployment guide
+├── gallery/                   # Images
+│   └── architecture.png
 ├── assets/
 │   └── docker/
 │       └── docker-compose.yml
 └── devices/
-    └── [device_id].yaml
+    └── [device_id].yaml       # Device config
 ```
 
 ## Image Naming Convention
@@ -212,20 +217,44 @@ async def health_check():
     return {"status": "healthy"}
 ```
 
-## Update solution.yaml
+## Update guide.md
 
-```yaml
-deployment:
-  devices:
-    - id: warehouse
-      name: Warehouse System
-      name_zh: 仓库管理系统
-      type: docker_local
-      config_file: devices/recomputer.yaml
-      section:
-        title: Deploy Services
-        title_zh: 部署服务
+Add deployment step in `guide.md`:
+
+```markdown
+## Step 1: Deploy Backend Services {#backend type=docker_deploy required=true config=devices/recomputer.yaml}
+
+Deploy the backend services using Docker.
+
+### Target: Local Deployment {#backend_local config=devices/recomputer.yaml default=true}
+
+![Architecture](gallery/architecture.png)
+
+1. Ensure Docker is installed and running
+2. Click Deploy button to start services
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Port 2124 busy | Stop other services using this port |
+| Docker not found | Install Docker Desktop |
+
+### Target: Remote Deployment {#backend_remote config=devices/warehouse_remote.yaml}
+
+1. Connect target device to network
+2. Enter IP address and SSH credentials
+3. Click Deploy to install on remote device
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| SSH connection failed | Check IP address and credentials |
+| Timeout | Ensure target device is online |
 ```
+
+> **Note**: Device step configuration is now defined in `guide.md` / `guide_zh.md` using markdown format. The `config_file` path points to the device YAML configuration.
 
 ## Local Test
 

@@ -7,6 +7,21 @@
 
 ## Preset: Starter Kit {#starter}
 
+Best for small offices or single rooms up to 500 sqm. Quick to set up, minimal hardware required.
+
+| Device | Quantity | Purpose |
+|--------|----------|---------|
+| SenseCAP M2 Gateway | 1 | LoRaWAN network coverage |
+| BC01 BLE Beacons | 6 | Position reference points |
+| SenseCAP T1000 Tracker | 1+ | Tracked asset/person |
+
+**What you'll get:**
+- Real-time location of tracked assets/people
+- Web-based map visualization
+- Zone-based or triangulation positioning
+
+**Coverage:** Up to 500 sqm · 2km LoRaWAN range
+
 ## Step 1: Deploy BLE Beacons {#beacons type=manual required=true}
 
 ### Install Beacons
@@ -122,6 +137,21 @@ Deploy the indoor positioning application to a remote server via SSH.
 
 ## Preset: Standard Setup {#standard}
 
+Best for medium facilities (500-2000 sqm) like warehouses, offices, or retail stores.
+
+| Device | Quantity | Purpose |
+|--------|----------|---------|
+| SenseCAP M2 Gateway | 1 | LoRaWAN network coverage |
+| BC01 BLE Beacons | 15 | Position reference points |
+| SenseCAP T1000 Tracker | 3+ | Tracked assets/people |
+
+**What you'll get:**
+- Real-time location of tracked assets/people
+- Multi-zone coverage with meter-level accuracy
+- Web-based map visualization with history
+
+**Coverage:** Up to 2000 sqm · Multiple rooms/floors supported
+
 ## Step 1: Deploy BLE Beacons {#beacons type=manual required=true}
 
 ### Install Beacons
@@ -236,6 +266,21 @@ Deploy the indoor positioning application to a remote server via SSH.
 ---
 
 ## Preset: Enterprise {#enterprise}
+
+Best for large facilities (2000+ sqm) like factories, hospitals, or campus buildings.
+
+| Device | Quantity | Purpose |
+|--------|----------|---------|
+| SenseCAP M2 Gateway | 1+ | LoRaWAN coverage (add more for larger areas) |
+| BC01 BLE Beacons | 30+ | Position reference points |
+| SenseCAP T1000 Tracker | 10+ | Tracked assets/people |
+
+**What you'll get:**
+- Campus-wide real-time tracking
+- High-precision triangulation positioning
+- Scalable to thousands of tracked assets
+
+**Coverage:** 2000+ sqm · Add gateways for multi-building coverage
 
 ## Step 1: Deploy BLE Beacons {#beacons type=manual required=true}
 

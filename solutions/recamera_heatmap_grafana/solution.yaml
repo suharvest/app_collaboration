@@ -48,12 +48,12 @@ intro:
   links: {}
   presets:
   - id: simple
-    name: Simple Preview
-    name_zh: 简单预览
+    name: Quick Preview
+    name_zh: 快速预览
     badge: Quick Start
     badge_zh: 快速上手
-    description: Just reCamera - real-time heatmap preview without backend
-    description_zh: 仅需 reCamera，实时热力图预览，无需后端服务
+    description: Just reCamera - see heatmap directly on camera, no extra setup
+    description_zh: 只需 reCamera，直接在摄像头上看热力图，无需额外设置
     device_groups:
     - id: camera
       name: AI Camera
@@ -67,10 +67,10 @@ intro:
       wiki: https://wiki.seeedstudio.com/
       github: https://github.com/Seeed-Studio/sscma-example-sg200x
   - id: grafana
-    name: Grafana Dashboard
-    name_zh: Grafana 仪表板
-    description: Full analytics with InfluxDB storage and Grafana visualization
-    description_zh: 完整分析方案，包含 InfluxDB 存储和 Grafana 可视化
+    name: Data Dashboard
+    name_zh: 数据看板
+    description: Save historical data and view trends with charts
+    description_zh: 保存历史数据，用图表查看人流趋势
     device_groups:
     - id: camera
       name: AI Camera

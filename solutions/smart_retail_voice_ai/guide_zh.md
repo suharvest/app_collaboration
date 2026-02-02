@@ -45,6 +45,20 @@
 
 ## 套餐: 标准部署 {#default}
 
+为你的门店部署一套边缘语音采集分析系统。
+
+| 设备 | 用途 |
+|------|------|
+| reRouter CM4 | 边缘计算设备，运行语音服务 |
+| reSpeaker XVF3800 | 4麦克风阵列，采集门店对话 |
+
+**部署完成后你可以：**
+- 实时转录门店内的顾客对话
+- 对接 [SenseCraft Voice](https://voice.sensecraft.seeed.cc/) 云平台，多门店数据汇总分析
+- 隐私优先——音频在本地处理，不上传原始录音
+
+**前提条件：** USB-C 数据线 · 网线
+
 ## 步骤 1: 刷写 OpenWrt 固件 {#firmware type=manual required=true config=devices/firmware.yaml}
 
 ### 硬件连接

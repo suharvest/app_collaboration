@@ -124,7 +124,8 @@ async function loadSolutions() {
   const container = document.getElementById('solutions-table-container');
 
   try {
-    solutions = await solutionsApi.list(i18n.locale);
+    // Include disabled solutions for management UI
+    solutions = await solutionsApi.list(i18n.locale, true);
     renderSolutionsTable();
   } catch (error) {
     console.error('Failed to load solutions:', error);
@@ -171,12 +172,13 @@ function renderSolutionsTable() {
           <th>${t('management.table.name')}</th>
           <th>${t('management.table.category')}</th>
           <th>${t('management.table.difficulty')}</th>
+          <th>${t('management.table.status')}</th>
           <th>${t('management.table.actions')}</th>
         </tr>
       </thead>
       <tbody>
         ${solutions.map(solution => `
-          <tr data-id="${solution.id}">
+          <tr data-id="${solution.id}" class="${solution.enabled === false ? 'row-disabled' : ''}">
             <td class="font-mono text-sm">${solution.id}</td>
             <td>
               <div class="solution-name-cell">
@@ -193,6 +195,12 @@ function renderSolutionsTable() {
               <span class="difficulty-badge difficulty-${solution.difficulty}">
                 ${t(`solutions.difficulty.${solution.difficulty}`)}
               </span>
+            </td>
+            <td>
+              <label class="toggle-switch" title="${solution.enabled !== false ? t('management.status.clickToDisable') : t('management.status.clickToEnable')}">
+                <input type="checkbox" ${solution.enabled !== false ? 'checked' : ''} data-action="toggle-enabled" data-id="${solution.id}">
+                <span class="toggle-slider"></span>
+              </label>
             </td>
             <td>
               <div class="table-actions">
@@ -216,8 +224,9 @@ function renderSolutionsTable() {
     </table>
   `;
 
+  // Handle button actions
   container.querySelectorAll('[data-action]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async (e) => {
       const action = btn.dataset.action;
       const id = btn.dataset.id;
       if (action === 'edit') {
@@ -228,6 +237,43 @@ function renderSolutionsTable() {
       }
     });
   });
+
+  // Handle toggle enabled checkbox
+  container.querySelectorAll('[data-action="toggle-enabled"]').forEach(checkbox => {
+    checkbox.addEventListener('change', async (e) => {
+      const id = checkbox.dataset.id;
+      const enabled = checkbox.checked;
+      await toggleSolutionEnabled(id, enabled);
+    });
+  });
+}
+
+/**
+ * Toggle solution enabled status
+ */
+async function toggleSolutionEnabled(solutionId, enabled) {
+  try {
+    await solutionsApi.toggleEnabled(solutionId, enabled);
+    // Update local state
+    const solution = solutions.find(s => s.id === solutionId);
+    if (solution) {
+      solution.enabled = enabled;
+    }
+    // Update row style
+    const row = document.querySelector(`tr[data-id="${solutionId}"]`);
+    if (row) {
+      row.classList.toggle('row-disabled', !enabled);
+    }
+    toast.success(enabled ? t('management.messages.solutionEnabled') : t('management.messages.solutionDisabled'));
+  } catch (error) {
+    console.error('Failed to toggle enabled:', error);
+    toast.error(error.message);
+    // Revert checkbox state
+    const checkbox = document.querySelector(`[data-action="toggle-enabled"][data-id="${solutionId}"]`);
+    if (checkbox) {
+      checkbox.checked = !enabled;
+    }
+  }
 }
 
 /**
@@ -820,13 +866,19 @@ function renderContentValidationResult(result) {
   }
 
   if (result.valid) {
-    const presetCount = result.en_presets?.length || 0;
-    let totalSteps = 0;
-    if (result.en_steps_by_preset) {
-      for (const steps of Object.values(result.en_steps_by_preset)) {
-        totalSteps += steps?.length || 0;
-      }
-    }
+    // en_presets is an array of preset IDs (strings)
+    const presetIds = result.en_presets || [];
+    const stepsByPreset = result.en_steps_by_preset || {};
+
+    // Build summary: "组合1 (3步), 组合2 (5步), 组合3 (2步)"
+    const isZh = i18n.locale === 'zh';
+    const summaryParts = presetIds.map((presetId) => {
+      const stepCount = stepsByPreset[presetId]?.length || 0;
+      return isZh
+        ? `${presetId} (${stepCount}步)`
+        : `${presetId} (${stepCount} steps)`;
+    });
+    const summary = summaryParts.join(', ') || (isZh ? '无组合' : 'No presets');
 
     return `
       <div class="validation-box validation-success">
@@ -838,8 +890,7 @@ function renderContentValidationResult(result) {
           <span>${t('management.contentFiles.validated')}</span>
         </div>
         <div class="validation-detail text-sm text-text-muted">
-          ${t('management.contentFiles.presetsFound', { count: presetCount })},
-          ${t('management.contentFiles.stepsFound', { count: totalSteps })}
+          ${t('management.contentFiles.presetStepsSummary', { summary })}
         </div>
       </div>
     `;
@@ -1402,20 +1453,22 @@ function renderPreviewContent(preview) {
               <div class="preview-step">
                 <span class="step-index">${index + 1}</span>
                 <div class="step-info">
-                  <span class="step-name">${step.name}</span>
-                  <span class="step-type badge badge-sm">${step.type}</span>
-                  ${step.required ? `<span class="badge badge-sm badge-warning">${t('management.preview.required')}</span>` : ''}
-                </div>
-                ${step.targets && step.targets.length > 0 ? `
-                  <div class="step-targets">
-                    ${step.targets.map(target => `
-                      <span class="target-badge ${target.is_default ? 'target-default' : ''}"
-                            title="${target.is_default ? t('management.preview.defaultTarget') : ''}">
-                        ${target.name} (#${target.id})
-                      </span>
-                    `).join('')}
+                  <div class="step-main">
+                    <span class="step-name">${step.name || step.id || 'Untitled'}</span>
+                    <span class="step-type badge badge-sm">${step.type}</span>
+                    ${step.required ? `<span class="badge badge-sm badge-warning step-required">${t('management.preview.required')}</span>` : ''}
                   </div>
-                ` : ''}
+                  ${step.targets && step.targets.length > 0 ? `
+                    <div class="step-targets">
+                      ${step.targets.map(target => `
+                        <span class="target-badge ${target.is_default ? 'target-default' : ''}"
+                              title="${target.is_default ? t('management.preview.defaultTarget') : ''}">
+                          ${target.name} (#${target.id})
+                        </span>
+                      `).join('')}
+                    </div>
+                  ` : ''}
+                </div>
               </div>
             `).join('')}
           </div>
@@ -1444,14 +1497,11 @@ function renderPreviewContent(preview) {
     ` : ''}
 
     ${preview.validation ? `
-      <div class="preview-section">
-        <h5>${t('management.preview.validation')}</h5>
-        <div class="validation-box ${preview.validation.valid ? 'validation-success' : 'validation-errors'}">
-          ${preview.validation.valid
-            ? `<span class="text-success">${t('management.preview.validationPassed')}</span>`
-            : `<span class="text-danger">${t('management.preview.validationFailed')}</span>`
-          }
-        </div>
+      <div class="validation-box mt-4 ${preview.validation.valid ? 'validation-success' : 'validation-errors'}">
+        ${preview.validation.valid
+          ? `<span class="text-success">${t('management.preview.validationPassed')}</span>`
+          : `<span class="text-danger">${t('management.preview.validationFailed')}</span>`
+        }
       </div>
     ` : ''}
   `;

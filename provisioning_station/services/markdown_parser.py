@@ -505,7 +505,7 @@ def parse_targets(content_en: str, content_zh: str) -> list[TargetInfo]:
                     name_zh=current_target_name,  # Will be updated from zh content
                     config_file=current_attrs.get('config'),
                     default=current_attrs.get('default', False),
-                    description=md_to_html(desc) if desc else "",
+                    description=desc.strip() if desc else "",  # Plain text for selector
                     wiring=wiring,
                 )
                 targets.append(target)
@@ -535,7 +535,7 @@ def parse_targets(content_en: str, content_zh: str) -> list[TargetInfo]:
             name_zh=current_target_name,
             config_file=current_attrs.get('config'),
             default=current_attrs.get('default', False),
-            description=md_to_html(desc) if desc else "",
+            description=desc.strip() if desc else "",  # Plain text for selector
             wiring=wiring,
         )
         targets.append(target)
@@ -556,7 +556,7 @@ def parse_targets(content_en: str, content_zh: str) -> list[TargetInfo]:
                     target.name_zh = current_zh_name
                     desc, wiring_steps_zh, _ = parse_target_content(current_zh_content)
                     if desc:
-                        target.description_zh = md_to_html(desc)
+                        target.description_zh = desc.strip()  # Plain text for selector
                     # Update wiring steps_zh if target has wiring
                     if target.wiring and wiring_steps_zh:
                         target.wiring.steps_zh = wiring_steps_zh
@@ -574,7 +574,7 @@ def parse_targets(content_en: str, content_zh: str) -> list[TargetInfo]:
             target.name_zh = current_zh_name
             desc, wiring_steps_zh, _ = parse_target_content(current_zh_content)
             if desc:
-                target.description_zh = md_to_html(desc)
+                target.description_zh = desc.strip()  # Plain text for selector
             if target.wiring and wiring_steps_zh:
                 target.wiring.steps_zh = wiring_steps_zh
 
@@ -763,12 +763,20 @@ def _parse_guide_content(content: str, lang: str, result: ParseResult) -> None:
             if not result.success:
                 result.success = SuccessContent()
             result.success.content_en = md_to_html('\n'.join(success_lines).strip())
+        # Convert preset descriptions to HTML
+        for preset in result.presets:
+            if preset.description:
+                preset.description = md_to_html(preset.description.strip())
     else:
         result.overview_zh = md_to_html('\n'.join(overview_lines).strip())
         if success_lines:
             if not result.success:
                 result.success = SuccessContent()
             result.success.content_zh = md_to_html('\n'.join(success_lines).strip())
+        # Convert preset descriptions to HTML
+        for preset in result.presets:
+            if preset.description_zh:
+                preset.description_zh = md_to_html(preset.description_zh.strip())
 
 
 def parse_bilingual_markdown(content: str, lang: str = 'en') -> str:
@@ -902,6 +910,11 @@ def parse_single_language_guide(content: str) -> ParseResult:
     result.overview_en = md_to_html('\n'.join(overview_lines).strip())
     if success_lines:
         result.success = SuccessContent(content_en=md_to_html('\n'.join(success_lines).strip()))
+
+    # Convert preset descriptions to HTML
+    for preset in result.presets:
+        if preset.description:
+            preset.description = md_to_html(preset.description.strip())
 
     return result
 

@@ -8,6 +8,20 @@
 
 ## 套餐: 标准部署 {#default}
 
+部署一套基于 KNN 算法的暖通优化系统，从历史数据中学习并给出最优参数建议。
+
+| 设备 | 用途 |
+|------|------|
+| 你的电脑 | 本机部署（需安装 Docker） |
+| reComputer R 系列 | 可选，用于远程/边缘部署 |
+
+**部署完成后你可以：**
+- 获得 AI 根据历史数据给出的温度调节建议
+- 通过 OPC-UA 对接工业暖通控制器
+- 通过 Web 面板监控和调参
+
+**前提条件：** Docker 已安装 · OPC-UA 控制器（或用内置模拟器测试）
+
 ## 步骤 1: 暖通控制系统 {#hvac type=docker_deploy required=true}
 
 ### 部署目标: 本机部署 {#hvac_local config=devices/local.yaml default=true}

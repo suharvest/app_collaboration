@@ -61,7 +61,7 @@ intro:
   presets:
   - id: sensecraft_cloud
     name: SenseCraft Cloud
-    name_zh: 云方案
+    name_zh: SenseCraft 云方案
     badge: Recommended
     badge_zh: 推荐
     description: Connect to SenseCraft cloud, quick setup and low cost

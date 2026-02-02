@@ -27,3 +27,56 @@ export function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+/**
+ * Process markdown HTML content to fix image and link paths
+ * Converts relative paths like "gallery/image.png" or "assets/file.xlsx" to proper asset URLs
+ * @param {string} html - HTML content from markdown conversion
+ * @param {string} solutionId - Solution ID for building asset URLs
+ * @param {function} getAssetUrl - Function to build asset URLs
+ * @returns {string} HTML with fixed paths
+ */
+export function processMarkdownImages(html, solutionId, getAssetUrl) {
+  if (!html || !solutionId) return html;
+
+  // Helper to check if path needs processing
+  const needsProcessing = (path) => {
+    return path &&
+           !path.startsWith('http://') &&
+           !path.startsWith('https://') &&
+           !path.startsWith('data:') &&
+           !path.startsWith('/api/') &&
+           !path.startsWith('#') &&
+           !path.startsWith('mailto:') &&
+           !path.startsWith('tel:');
+  };
+
+  // Process img tags
+  let result = html.replace(
+    /<img\s+([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi,
+    (match, before, src, after) => {
+      if (!needsProcessing(src)) return match;
+      const assetUrl = getAssetUrl(solutionId, src);
+      return `<img ${before}src="${assetUrl}"${after}>`;
+    }
+  );
+
+  // Process anchor tags with asset links (files like .xlsx, .pdf, .zip, etc.)
+  result = result.replace(
+    /<a\s+([^>]*?)href=["']([^"']+)["']([^>]*?)>/gi,
+    (match, before, href, after) => {
+      if (!needsProcessing(href)) return match;
+      // Only process if it looks like an asset file (has extension)
+      if (!/\.(xlsx|xls|pdf|zip|csv|doc|docx|ppt|pptx|png|jpg|jpeg|gif|mp4|mp3)$/i.test(href)) {
+        return match;
+      }
+      const assetUrl = getAssetUrl(solutionId, href);
+      // Add download attribute for file downloads
+      const hasDownload = /download/i.test(before + after);
+      const downloadAttr = hasDownload ? '' : ' download';
+      return `<a ${before}href="${assetUrl}"${after}${downloadAttr}>`;
+    }
+  );
+
+  return result;
+}
