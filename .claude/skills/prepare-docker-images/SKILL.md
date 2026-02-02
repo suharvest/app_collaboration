@@ -226,7 +226,7 @@ Add deployment step in `guide.md`:
 
 Deploy the backend services using Docker.
 
-### Target: Local Deployment {#backend_local config=devices/recomputer.yaml default=true}
+### Target: Local Deployment {#backend_local type=local config=devices/recomputer.yaml default=true}
 
 ![Architecture](gallery/architecture.png)
 
@@ -240,7 +240,7 @@ Deploy the backend services using Docker.
 | Port 2124 busy | Stop other services using this port |
 | Docker not found | Install Docker Desktop |
 
-### Target: Remote Deployment {#backend_remote config=devices/warehouse_remote.yaml}
+### Target: Remote Deployment {#backend_remote type=remote config=devices/warehouse_remote.yaml}
 
 1. Connect target device to network
 2. Enter IP address and SSH credentials

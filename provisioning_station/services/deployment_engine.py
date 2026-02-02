@@ -140,10 +140,17 @@ class DeploymentEngine:
             if target_override:
                 # Target specifies a device config file directly (e.g., warehouse_remote -> devices/warehouse_remote.yaml)
                 config_file = f"devices/{target_override}.yaml"
-                # Determine effective type from the target config (will be loaded later)
-                # For now, check if "remote" is in the target name
-                if "remote" in target_override.lower():
+                # Determine effective type from explicit target_type or fallback to name-based detection
+                target_type = connection_info.get("target_type")
+                if target_type == "remote":
                     effective_type = "docker_remote"
+                elif target_type == "local":
+                    effective_type = "docker_local"
+                elif "remote" in target_override.lower():
+                    # Fallback: detect from target name for backwards compatibility
+                    effective_type = "docker_remote"
+                else:
+                    effective_type = "docker_local"
                 logger.info(
                     f"Device {device_id}: using target override config_file={config_file}, effective_type={effective_type}"
                 )

@@ -61,7 +61,7 @@ Best for small offices or single rooms up to 500 sqm. Quick to set up, minimal h
 
 ## Step 3: Deploy Positioning Application {#app_server type=docker_deploy required=true config=devices/app_local.yaml}
 
-### Target: Local Deployment {#app_server_local config=devices/app_local.yaml default=true}
+### Target: Local Deployment {#app_server_local type=local config=devices/app_local.yaml default=true}
 
 ## Local Deployment
 
@@ -86,7 +86,7 @@ Deploy the indoor positioning application on your local computer.
 | Port occupied | Other program using port 5173 | Close the program or change port |
 | Webpage won't open | Service not fully started | Wait a few minutes and refresh the page |
 
-### Target: Remote Deployment {#app_server_remote config=devices/app_remote.yaml}
+### Target: Remote Deployment {#app_server_remote type=remote config=devices/app_remote.yaml}
 
 ## Remote Deployment
 
@@ -191,7 +191,7 @@ Best for medium facilities (500-2000 sqm) like warehouses, offices, or retail st
 
 ## Step 3: Deploy Positioning Application {#app_server type=docker_deploy required=true config=devices/app_local.yaml}
 
-### Target: Local Deployment {#app_server_local config=devices/app_local.yaml default=true}
+### Target: Local Deployment {#app_server_local type=local config=devices/app_local.yaml default=true}
 
 ## Local Deployment
 
@@ -216,7 +216,7 @@ Deploy the indoor positioning application on your local computer.
 | Port occupied | Other program using port 5173 | Close the program or change port |
 | Webpage won't open | Service not fully started | Wait a few minutes and refresh the page |
 
-### Target: Remote Deployment {#app_server_remote config=devices/app_remote.yaml}
+### Target: Remote Deployment {#app_server_remote type=remote config=devices/app_remote.yaml}
 
 ## Remote Deployment
 
@@ -321,7 +321,7 @@ Best for large facilities (2000+ sqm) like factories, hospitals, or campus build
 
 ## Step 3: Deploy Positioning Application {#app_server type=docker_deploy required=true config=devices/app_local.yaml}
 
-### Target: Local Deployment {#app_server_local config=devices/app_local.yaml default=true}
+### Target: Local Deployment {#app_server_local type=local config=devices/app_local.yaml default=true}
 
 ## Local Deployment
 
@@ -346,7 +346,7 @@ Deploy the indoor positioning application on your local computer.
 | Port occupied | Other program using port 5173 | Close the program or change port |
 | Webpage won't open | Service not fully started | Wait a few minutes and refresh the page |
 
-### Target: Remote Deployment {#app_server_remote config=devices/app_remote.yaml}
+### Target: Remote Deployment {#app_server_remote type=remote config=devices/app_remote.yaml}
 
 ## Remote Deployment
 

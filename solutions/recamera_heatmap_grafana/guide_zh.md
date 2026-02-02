@@ -41,9 +41,9 @@
 
 给 reCamera 安装人员识别程序，让它能在画面中找到人。
 
-### 部署目标: 高精度模式 (~8 FPS) {#deploy_detector_yolo11 config=devices/recamera_yolo11.yaml default=true}
+### 部署目标: YOLO11 (~8 FPS) {#deploy_detector_yolo11 config=devices/recamera_yolo11.yaml default=true}
 
-识别更准确，适合大多数场景。
+推荐大多数场景使用。
 
 ### 故障排查
 
@@ -53,9 +53,9 @@
 | 密码错误 | 试试 `recamera` 或 `recamera.2` |
 | 安装失败 | 重启摄像头再试一次 |
 
-### 部署目标: 流畅模式 (~3 FPS) {#deploy_detector_yolo26 config=devices/recamera_yolo26.yaml}
+### 部署目标: YOLOv26 (~3 FPS) {#deploy_detector_yolo26 config=devices/recamera_yolo26.yaml}
 
-精度稍低但更省资源，摄像头运行卡顿时选这个。
+备选模型，可自行尝试。
 
 ### 故障排查
 
@@ -99,7 +99,7 @@
 
 在你的电脑（或专用服务器）上启动数据存储和图表显示服务。
 
-### 部署目标: 在本机运行 {#backend_local config=devices/backend.yaml default=true}
+### 部署目标: 在本机运行 {#backend_local type=local config=devices/backend.yaml default=true}
 
 在当前电脑上运行看板。
 
@@ -118,7 +118,7 @@
 | Docker 启动不了 | 打开 Docker Desktop 应用 |
 | 启动后自动停止 | 确保电脑有至少 4GB 内存 |
 
-### 部署目标: 在其他设备运行 {#backend_remote config=devices/backend_remote.yaml}
+### 部署目标: 在其他设备运行 {#backend_remote type=remote config=devices/backend_remote.yaml}
 
 在 reComputer R1100 上运行看板，作为专用的边缘部署方案。
 

@@ -306,6 +306,8 @@ export async function startDeployment(deviceId) {
     };
   } else if (effectiveType === 'ssh_deb' || effectiveType === 'docker_remote') {
     params.device_connections[deviceId] = {
+      target: selectedTarget?.id,
+      target_type: selectedTarget?.target_type || 'remote',
       host: document.getElementById(`ssh-host-${deviceId}`)?.value,
       port: parseInt(document.getElementById(`ssh-port-${deviceId}`)?.value || '22'),
       username: document.getElementById(`ssh-user-${deviceId}`)?.value,
@@ -330,8 +332,11 @@ export async function startDeployment(deviceId) {
       password: document.getElementById(`ssh-pass-${deviceId}`)?.value,
     };
   } else {
-    // For local docker or other types, include empty connection
-    params.device_connections[deviceId] = {};
+    // For local docker or other types, include target if selected
+    params.device_connections[deviceId] = {
+      target: selectedTarget?.id,
+      target_type: selectedTarget?.target_type || 'local',
+    };
   }
 
   try {

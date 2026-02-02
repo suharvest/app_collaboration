@@ -83,7 +83,7 @@
 
 ## 步骤 3: 部署定位应用程序 {#app_server type=docker_deploy required=true config=devices/app_local.yaml}
 
-### 部署目标: 本机部署 {#app_server_local config=devices/app_local.yaml default=true}
+### 部署目标: 本机部署 {#app_server_local type=local config=devices/app_local.yaml default=true}
 
 将室内定位应用程序部署到您的本地电脑。
 
@@ -101,7 +101,7 @@
 | 端口被占用 | 其他程序占用 5173 | 关闭占用程序或修改端口 |
 | 网页打不开 | 服务未启动完成 | 等待几分钟，刷新页面 |
 
-### 部署目标: 远程部署 {#app_server_remote config=devices/app_remote.yaml}
+### 部署目标: 远程部署 {#app_server_remote type=remote config=devices/app_remote.yaml}
 
 通过 SSH 将室内定位应用程序部署到远程服务器。
 
@@ -227,7 +227,7 @@
 
 ## 步骤 3: 部署定位应用程序 {#app_server type=docker_deploy required=true config=devices/app_local.yaml}
 
-### 部署目标: 本机部署 {#app_server_local config=devices/app_local.yaml default=true}
+### 部署目标: 本机部署 {#app_server_local type=local config=devices/app_local.yaml default=true}
 
 将室内定位应用程序部署到您的本地电脑。
 
@@ -245,7 +245,7 @@
 | 端口被占用 | 其他程序占用 5173 | 关闭占用程序或修改端口 |
 | 网页打不开 | 服务未启动完成 | 等待几分钟，刷新页面 |
 
-### 部署目标: 远程部署 {#app_server_remote config=devices/app_remote.yaml}
+### 部署目标: 远程部署 {#app_server_remote type=remote config=devices/app_remote.yaml}
 
 通过 SSH 将室内定位应用程序部署到远程服务器。
 
@@ -371,7 +371,7 @@
 
 ## 步骤 3: 部署定位应用程序 {#app_server type=docker_deploy required=true config=devices/app_local.yaml}
 
-### 部署目标: 本机部署 {#app_server_local config=devices/app_local.yaml default=true}
+### 部署目标: 本机部署 {#app_server_local type=local config=devices/app_local.yaml default=true}
 
 将室内定位应用程序部署到您的本地电脑。
 
@@ -389,7 +389,7 @@
 | 端口被占用 | 其他程序占用 5173 | 关闭占用程序或修改端口 |
 | 网页打不开 | 服务未启动完成 | 等待几分钟，刷新页面 |
 
-### 部署目标: 远程部署 {#app_server_remote config=devices/app_remote.yaml}
+### 部署目标: 远程部署 {#app_server_remote type=remote config=devices/app_remote.yaml}
 
 通过 SSH 将室内定位应用程序部署到远程服务器。
 
