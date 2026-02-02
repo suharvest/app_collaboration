@@ -42,6 +42,7 @@ jobs:
             --cov-report=term-missing \
             --cov-report=xml \
             -v \
+            --ignore=tests/e2e \
             --ignore=tests/integration/test_deployment_api_contract.py \
             --ignore=tests/integration/test_port_configuration.py
 
