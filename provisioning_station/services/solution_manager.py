@@ -1927,9 +1927,12 @@ class SolutionManager:
 
         logger.info(f"Saved content file: {solution_id}/{filename}")
 
-        # If it's a guide file, sync presets to YAML
+        # If it's a guide file, sync presets to YAML (which also reloads)
         if filename.startswith("guide"):
             await self.sync_presets_from_guide(solution_id)
+        else:
+            # For description files, just reload to update cache
+            await self.reload_solution(solution_id)
 
         return filename
 
