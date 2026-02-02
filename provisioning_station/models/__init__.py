@@ -63,6 +63,7 @@ from .version import (
     VersionSummary,
 )
 from .websocket import (
+    WS_MESSAGE_TYPES,
     WSDeploymentCompletedMessage,
     WSDeviceCompletedMessage,
     WSDeviceStartedMessage,
@@ -76,7 +77,6 @@ from .websocket import (
     WSPreCheckStartedMessage,
     WSProgressMessage,
     WSStatusMessage,
-    WS_MESSAGE_TYPES,
     create_log_message,
     create_progress_message,
     create_status_message,
