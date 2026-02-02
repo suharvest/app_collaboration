@@ -396,6 +396,7 @@ const translations = {
         validated: 'Guide structure validated',
         presetStepsSummary: '{summary}',
         errorCount: '{count} validation error(s)',
+        presetsFound: '{count} presets found',
       },
       preview: {
         title: 'Structure Preview',
@@ -924,6 +925,7 @@ const translations = {
         validated: 'Guide 结构验证通过',
         presetStepsSummary: '{summary}',
         errorCount: '{count} 个验证错误',
+        presetsFound: '找到 {count} 个预设',
       },
       preview: {
         title: '结构预览',
