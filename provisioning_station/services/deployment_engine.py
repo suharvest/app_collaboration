@@ -87,14 +87,17 @@ class DeploymentEngine:
         devices_list = []
         deploy_order = []
 
-        deployment_info = await solution_manager.get_deployment_from_guide(solution.id, "en")
+        deployment_info = await solution_manager.get_deployment_from_guide(
+            solution.id, "en"
+        )
         if deployment_info and deployment_info.get("devices"):
             all_devices = deployment_info["devices"]
 
             if preset_id and deployment_info.get("presets"):
                 # Find preset and get its device IDs
                 preset = next(
-                    (p for p in deployment_info["presets"] if p["id"] == preset_id), None
+                    (p for p in deployment_info["presets"] if p["id"] == preset_id),
+                    None,
                 )
                 if preset and preset.get("devices"):
                     deploy_order = preset["devices"]
@@ -103,9 +106,7 @@ class DeploymentEngine:
                         f"Using preset '{preset_id}' with {len(devices_list)} devices"
                     )
                 else:
-                    logger.warning(
-                        f"Preset '{preset_id}' not found, using all devices"
-                    )
+                    logger.warning(f"Preset '{preset_id}' not found, using all devices")
                     devices_list = all_devices
                     deploy_order = [d["id"] for d in all_devices]
             else:
@@ -177,9 +178,7 @@ class DeploymentEngine:
             elif options and options.get("config_file"):
                 # Support config_file override for any device type with targets
                 config_file = options["config_file"]
-                logger.info(
-                    f"{device_type}: using target config_file={config_file}"
-                )
+                logger.info(f"{device_type}: using target config_file={config_file}")
 
             # Skip devices without config_file (e.g., manual info-only steps)
             if not config_file:

@@ -56,7 +56,9 @@ async def detect_devices(
 
     # Get devices from guide.md
     devices = []
-    deployment_info = await solution_manager.get_deployment_from_guide(solution_id, lang)
+    deployment_info = await solution_manager.get_deployment_from_guide(
+        solution_id, lang
+    )
     if deployment_info and deployment_info.get("devices"):
         all_devices = deployment_info["devices"]
         if preset and deployment_info.get("presets"):

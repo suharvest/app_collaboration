@@ -35,7 +35,7 @@ class WSLogMessage(WSBaseMessage):
                 "level": "info",
                 "message": "Starting Docker deployment...",
                 "timestamp": "2024-01-15T10:30:00Z",
-                "device_id": "warehouse"
+                "device_id": "warehouse",
             }
         }
     )
@@ -51,11 +51,7 @@ class WSStatusMessage(WSBaseMessage):
 
     model_config = ConfigDict(
         json_schema_extra={
-            "example": {
-                "type": "status",
-                "status": "running",
-                "device_id": "warehouse"
-            }
+            "example": {"type": "status", "status": "running", "device_id": "warehouse"}
         }
     )
 
@@ -78,7 +74,7 @@ class WSProgressMessage(WSBaseMessage):
                 "device_id": "warehouse",
                 "step": "Pulling Docker images",
                 "current_step": 2,
-                "total_steps": 5
+                "total_steps": 5,
             }
         }
     )
@@ -139,7 +135,9 @@ class WSDockerNotInstalledMessage(WSBaseMessage):
     type: Literal["docker_not_installed"] = "docker_not_installed"
     device_id: str
     host: str
-    issue: Literal["not_installed", "not_running", "permission_denied"] = "not_installed"
+    issue: Literal["not_installed", "not_running", "permission_denied"] = (
+        "not_installed"
+    )
     message: str | None = None
 
     model_config = ConfigDict(
@@ -149,7 +147,7 @@ class WSDockerNotInstalledMessage(WSBaseMessage):
                 "device_id": "warehouse",
                 "host": "192.168.1.100",
                 "issue": "not_installed",
-                "message": "Docker is not installed on the remote device"
+                "message": "Docker is not installed on the remote device",
             }
         }
     )
