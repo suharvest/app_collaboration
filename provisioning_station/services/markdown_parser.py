@@ -195,7 +195,7 @@ SUCCESS_HEADER_PATTERN = re.compile(
 SUBSECTION_PATTERNS = {
     'prerequisites': re.compile(r'^###\s+(Prerequisites|前置条件)\s*$', re.IGNORECASE),
     'wiring': re.compile(r'^###\s+(Wiring|接线)\s*$', re.IGNORECASE),
-    'troubleshoot': re.compile(r'^###\s+(Troubleshooting|故障排除)\s*$', re.IGNORECASE),
+    'troubleshoot': re.compile(r'^###\s+(Troubleshooting|故障排查|故障排除)\s*$', re.IGNORECASE),
 }
 IMAGE_PATTERN = re.compile(r'!\[([^\]]*)\]\(([^)]+)\)')
 ORDERED_LIST_PATTERN = re.compile(r'^\d+\.\s+(.+)$')
