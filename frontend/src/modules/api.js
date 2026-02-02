@@ -110,12 +110,14 @@ if (isTauri) {
 // Wait for backend to be ready (for use in app initialization)
 export async function waitForBackendReady() {
   if (!isTauri) return true;
-  if (backendReady) return true;
+
+  // Wait for port to be available first
   if (backendReadyPromise) {
     await backendReadyPromise;
   }
 
-  // Wait for backend health check to pass
+  // Always perform health check - backendReady only means port is known,
+  // not that the sidecar has actually started
   const healthUrl = `http://127.0.0.1:${getBackendPort()}/api/health`;
   for (let i = 0; i < 50; i++) {  // Up to 10 seconds
     try {
@@ -130,7 +132,7 @@ export async function waitForBackendReady() {
   }
 
   console.warn('Backend health check timeout, proceeding anyway');
-  return backendReady;
+  return false;
 }
 
 // Request timeout in milliseconds
