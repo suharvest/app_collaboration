@@ -159,12 +159,17 @@ async def load_preset_section(
 async def list_solutions(
     category: Optional[str] = None,
     lang: str = Query("en", pattern="^(en|zh)$"),
+    include_disabled: bool = Query(False, description="Include disabled solutions (for management UI)"),
 ):
     """List all available solutions"""
     solutions = solution_manager.get_all_solutions()
 
     result = []
     for solution in solutions:
+        # Filter disabled solutions unless include_disabled is True
+        if not include_disabled and not solution.enabled:
+            continue
+
         if category and solution.intro.category != category:
             continue
 
@@ -209,6 +214,7 @@ async def list_solutions(
             deployed_count=solution.intro.stats.deployed_count,
             likes_count=solution.intro.stats.likes_count,
             device_count=await solution_manager.count_steps_from_guide(solution.id),
+            enabled=solution.enabled,
             has_description=has_description,
             has_description_zh=has_description_zh,
             has_guide=has_guide,
@@ -852,6 +858,19 @@ async def get_solution_asset(solution_id: str, path: str):
     if not asset_path.exists():
         raise HTTPException(status_code=404, detail="Asset not found")
 
+    # Set Content-Disposition: attachment for downloadable file types
+    downloadable_extensions = {
+        '.xlsx', '.xls', '.pdf', '.zip', '.csv', '.doc', '.docx',
+        '.ppt', '.pptx', '.mp3', '.mp4', '.rar', '.7z', '.tar', '.gz'
+    }
+    file_ext = asset_path.suffix.lower()
+    if file_ext in downloadable_extensions:
+        return FileResponse(
+            asset_path,
+            filename=asset_path.name,
+            media_type='application/octet-stream'
+        )
+
     return FileResponse(asset_path)
 
 
@@ -1128,6 +1147,10 @@ async def validate_guides(solution_id: str):
         ],
         "en_presets": result.en_presets,
         "zh_presets": result.zh_presets,
+        "en_steps_by_preset": {
+            preset_id: [step[0] for step in steps]  # Extract step IDs only
+            for preset_id, steps in result.en_steps_by_preset.items()
+        },
     }
 
 
@@ -1551,4 +1574,31 @@ async def update_required_devices(solution_id: str, data: Dict = None):
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to update required devices: {str(e)}"
+        )
+
+
+@router.put("/{solution_id}/enabled")
+async def toggle_solution_enabled(solution_id: str, data: Dict = None):
+    """Toggle solution enabled status.
+
+    Args:
+        data: {"enabled": true/false}
+
+    Returns:
+        {"enabled": bool} - Updated enabled status
+    """
+    if data is None or "enabled" not in data:
+        raise HTTPException(
+            status_code=400, detail="Request body with 'enabled' boolean required"
+        )
+    try:
+        solution = await solution_manager.update_solution(
+            solution_id, {"enabled": data["enabled"]}
+        )
+        return {"enabled": solution.enabled}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update enabled status: {str(e)}"
         )

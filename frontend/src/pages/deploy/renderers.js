@@ -5,7 +5,18 @@
 
 import { t, getLocalizedField } from '../../modules/i18n.js';
 import { getAssetUrl } from '../../modules/api.js';
-import { escapeHtml } from '../../modules/utils.js';
+import { escapeHtml, processMarkdownImages } from '../../modules/utils.js';
+
+/**
+ * Process markdown content to fix image paths for current solution
+ * @param {string} html - HTML content from markdown
+ * @returns {string} HTML with fixed image paths
+ */
+function processMarkdown(html) {
+  const currentSolution = getCurrentSolution();
+  if (!currentSolution?.id) return html;
+  return processMarkdownImages(html, currentSolution.id, getAssetUrl);
+}
 import {
   getCurrentSolution,
   getDeviceStates,
@@ -175,7 +186,7 @@ export function renderPostDeploymentSection(deployment) {
 
       ${successMessage ? `
         <div class="post-deployment-content markdown-body">
-          ${successMessage}
+          ${processMarkdown(successMessage)}
         </div>
       ` : ''}
 
@@ -249,7 +260,7 @@ export function renderPresetSectionContent(presets) {
     <div class="deploy-preset-section" id="deploy-preset-section">
       ${title ? `<h3 class="deploy-preset-section-title">${escapeHtml(title)}</h3>` : ''}
       <div class="deploy-preset-section-content markdown-content" id="deploy-preset-section-content">
-        ${description}
+        ${processMarkdown(description)}
       </div>
     </div>
   `;
@@ -277,7 +288,7 @@ export function renderDeviceGroupSections(deviceGroups) {
             ${hasMultipleOptions ? renderDeviceGroupSelector(group) : ''}
           </div>
           <div class="deploy-device-group-content markdown-content" id="device-group-content-${group.id}">
-            ${section.description}
+            ${processMarkdown(section.description)}
           </div>
         </div>
       `;
@@ -370,7 +381,7 @@ export function renderSelectedDeviceContent(device) {
       <!-- Pre-deployment Instructions -->
       ${sectionDescription ? `
         <div class="deploy-pre-instructions">
-          <div class="markdown-content">${sectionDescription}</div>
+          <div class="markdown-content">${processMarkdown(sectionDescription)}</div>
         </div>
       ` : ''}
 
@@ -396,7 +407,7 @@ export function renderSelectedDeviceContent(device) {
       <!-- Troubleshoot Section (shown below deploy button) -->
       ${sectionTroubleshoot ? `
         <div class="deploy-troubleshoot">
-          <div class="markdown-content">${sectionTroubleshoot}</div>
+          <div class="markdown-content">${processMarkdown(sectionTroubleshoot)}</div>
         </div>
       ` : ''}
 
@@ -462,7 +473,7 @@ export function renderDeploySection(device, stepNumber) {
         <!-- Troubleshoot Section (shown below deploy button) -->
         ${sectionTroubleshoot ? `
           <div class="deploy-troubleshoot">
-            <div class="markdown-content">${sectionTroubleshoot}</div>
+            <div class="markdown-content">${processMarkdown(sectionTroubleshoot)}</div>
           </div>
         ` : ''}
 
@@ -482,7 +493,7 @@ function renderManualSectionContent(device, state, sectionDescription) {
     <!-- Manual: Instructions first, then mark done button -->
     ${sectionDescription ? `
       <div class="markdown-content">
-        ${sectionDescription}
+        ${processMarkdown(sectionDescription)}
       </div>
     ` : ''}
 
@@ -511,7 +522,7 @@ function renderPreviewSectionContent(device, sectionDescription) {
     ${sectionDescription ? `
       <div class="deploy-pre-instructions">
         <div class="markdown-content">
-          ${sectionDescription}
+          ${processMarkdown(sectionDescription)}
         </div>
       </div>
     ` : ''}
@@ -605,7 +616,7 @@ function renderAutoSectionContent(device, state, sectionDescription, isScript) {
     ${sectionDescription ? `
       <div class="deploy-pre-instructions">
         <div class="markdown-content">
-          ${sectionDescription}
+          ${processMarkdown(sectionDescription)}
         </div>
       </div>
     ` : ''}
@@ -847,7 +858,7 @@ export function renderDockerTargetContent(device) {
     html += `
       <div class="deploy-pre-instructions">
         <div class="markdown-content">
-          ${description}
+          ${processMarkdown(description)}
         </div>
       </div>
     `;
@@ -877,7 +888,7 @@ export function renderRecameraCppTargetContent(device) {
   return `
     <div class="deploy-pre-instructions">
       <div class="markdown-content">
-        ${description}
+        ${processMarkdown(description)}
       </div>
     </div>
   `;

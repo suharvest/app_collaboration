@@ -216,9 +216,26 @@ export const solutionsApi = {
   /**
    * Get list of all solutions
    * @param {string} lang - Language code ('en' or 'zh')
+   * @param {boolean} includeDisabled - Include disabled solutions (for management UI)
    */
-  list(lang = 'en') {
-    return request(`/solutions?lang=${lang}`);
+  list(lang = 'en', includeDisabled = false) {
+    const params = new URLSearchParams({ lang });
+    if (includeDisabled) {
+      params.append('include_disabled', 'true');
+    }
+    return request(`/solutions?${params}`);
+  },
+
+  /**
+   * Toggle solution enabled status
+   * @param {string} id - Solution ID
+   * @param {boolean} enabled - New enabled status
+   */
+  toggleEnabled(id, enabled) {
+    return request(`/solutions/${id}/enabled`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    });
   },
 
   /**

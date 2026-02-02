@@ -29,27 +29,26 @@ This solution turns complex system operations into **speaking** — say "Stock i
 | Device | Description | Required |
 |--------|-------------|----------|
 | SenseCAP Watcher | AI voice assistant, worn on body for speaking and listening | ✓ Required |
-| reComputer R1100 | Edge gateway with built-in warehouse management system | ✓ Required |
+| reComputer R1100/R2000 | Edge gateway with built-in warehouse management system (either model works) | ✓ Required |
 | NVIDIA AGX Orin | Edge AI computer for local LLM/TTS processing | Edge mode only |
-| reComputer R2000 | R1100 upgrade for face recognition (20+ users) | Optional |
-
-### Deployment Options
-
-| Option | Network | Devices | Best For |
-|--------|---------|---------|----------|
-| **Cloud** ⭐Recommended | Internet required | Watcher + R1100 | Quick start, low cost |
-| **Private Cloud** | Internet required | Watcher + R1100 | Data privacy, use your own cloud APIs |
-| **Edge Computing** | LAN only | Watcher + R1100 + AGX Orin | Fully offline, data never leaves facility |
-
-### Optional: Face Recognition for Operator Verification
-
-| Scale | Recommendation |
-|-------|----------------|
-| Light use (≤10 users) | Watcher built-in face recognition |
-| Heavy use (20+ users) | Upgrade to R2000 (R1100 upgrade, not a Watcher replacement) |
 
 ### Network Requirements
 
 - Watcher needs 2.4GHz WiFi (5GHz not supported)
 - Cloud and Private Cloud options require internet
 - Edge Computing works completely offline
+
+### Deployment Options
+
+| Option | Network | Devices | Best For |
+|--------|---------|---------|----------|
+| **SenseCraft Cloud** ⭐Recommended | Internet required | Watcher + R1100/R2000 | Quick start, low cost |
+| **Private Cloud** | Internet required | Watcher + R1100/R2000 | Data privacy, use your own cloud APIs |
+| **Edge Computing** | LAN only | Watcher + R1100/R2000 + AGX Orin | Fully offline, data never leaves facility |
+
+### Optional: Face Recognition for Operator Verification
+
+| Scale | Recommendation |
+|-------|----------------|
+| Light use (≤20 users) | Watcher built-in face recognition (stores up to 20 faces) |
+| Heavy use (20+ users) | Use R2000 + Watcher camera (supports more faces) |

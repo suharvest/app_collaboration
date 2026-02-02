@@ -20,6 +20,7 @@ user_inputs:
     name: reCamera IP Address
     name_zh: reCamera IP 地址
     type: text
+    default: "192.168.42.1"
     placeholder: "192.168.42.1"
     description: IP address of your reCamera device
     description_zh: 您的 reCamera 设备 IP 地址
@@ -27,40 +28,23 @@ user_inputs:
     validation:
       pattern: "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"
 
-  - id: influxdb_url
-    name: InfluxDB URL
-    name_zh: InfluxDB URL
+  - id: influxdb_host
+    name: InfluxDB Server IP
+    name_zh: InfluxDB 服务器 IP
     type: text
-    placeholder: "http://192.168.1.100:8086"
-    description: URL of your InfluxDB instance
-    description_zh: 您的 InfluxDB 实例 URL
+    placeholder: "192.168.1.100"
+    description: IP address of InfluxDB server (from Step 1)
+    description_zh: InfluxDB 服务器 IP 地址（来自步骤 1）
     required: true
+    validation:
+      pattern: "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"
 
-  - id: influxdb_token
-    name: InfluxDB API Token
-    name_zh: InfluxDB API 令牌
-    type: password
-    description: API token from InfluxDB
-    description_zh: 来自 InfluxDB 的 API 令牌
-    required: true
-
-  - id: influxdb_org
-    name: InfluxDB Organization
-    name_zh: InfluxDB 组织
-    type: text
-    default: "seeed"
-    description: Organization name in InfluxDB
-    description_zh: InfluxDB 中的组织名称
-    required: false
-
-  - id: influxdb_bucket
-    name: InfluxDB Bucket
-    name_zh: InfluxDB 存储桶
-    type: text
-    default: "recamera"
-    description: Bucket name for storing data
-    description_zh: 用于存储数据的存储桶名称
-    required: false
+# Fixed configuration - no user input needed
+influxdb:
+  token: "recamera-heatmap-token"
+  org: "seeed"
+  bucket: "recamera"
+  port: 8086
 
 steps:
   - id: load_flow

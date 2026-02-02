@@ -8,6 +8,20 @@ HVAC energy optimization system using KNN prediction model with OPC-UA integrati
 
 ## Preset: Standard Deployment {#default}
 
+Deploy a KNN-based HVAC optimization system that learns from your historical data to suggest optimal settings.
+
+| Device | Purpose |
+|--------|---------|
+| Your computer | For local deployment (Docker required) |
+| reComputer R Series | Optional, for remote/edge deployment |
+
+**What you'll get:**
+- AI-powered temperature recommendations based on historical patterns
+- OPC-UA integration for industrial HVAC systems
+- Web dashboard for monitoring and control
+
+**Requirements:** Docker installed · OPC-UA controller (or use built-in simulator)
+
 ## Step 1: HVAC Control System {#hvac type=docker_deploy required=true}
 
 ### Target: Local Deployment {#hvac_local config=devices/local.yaml default=true}

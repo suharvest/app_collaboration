@@ -68,7 +68,7 @@ user_inputs:
     name: SSH Username
     name_zh: SSH 用户名
     type: text
-    default: root
+    default: recomputer
     required: true
     description: SSH login username
     description_zh: SSH 登录用户名
@@ -77,18 +77,10 @@ user_inputs:
     name: SSH Password
     name_zh: SSH 密码
     type: password
+    default: "12345678"
     required: true
     description: SSH login password
     description_zh: SSH 登录密码
-
-  - id: port
-    name: SSH Port
-    name_zh: SSH 端口
-    type: text
-    default: "22"
-    required: false
-    description: SSH port (default 22)
-    description_zh: SSH 端口（默认 22）
 
 pre_checks:
   - type: docker_version

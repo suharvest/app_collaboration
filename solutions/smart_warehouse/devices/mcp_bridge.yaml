@@ -1,11 +1,10 @@
-# MCP Bridge Service Configuration
-# This defines how to deploy and configure the MCP bridge that connects
-# AI intents to your business system APIs
+# Agent Connection Configuration
+# This defines how to connect Watcher AI agent to the warehouse system
 
 type: script
 id: mcp_bridge
-name: MCP Bridge Service
-name_zh: MCP 桥接服务
+name: Connect to Agent
+name_zh: 联动智能体
 
 detection:
   method: manual
@@ -16,12 +15,12 @@ detection:
 # User inputs required before deployment
 user_inputs:
   - id: mcp_endpoint
-    name: MCP WebSocket Endpoint
-    name_zh: MCP WebSocket 端点地址
+    name: Agent Endpoint
+    name_zh: 智能体接入点
     type: text
     placeholder: "wss://your-endpoint-address"
-    description: Get this from SenseCraft AI Platform -> Watcher Agent -> Configuration
-    description_zh: 从 SenseCraft AI 平台 -> Watcher Agent -> Configuration 获取
+    description: Get this from SenseCraft AI Platform -> Watcher Agent -> MCP Setting
+    description_zh: 从 SenseCraft AI 平台 -> Watcher Agent -> MCP Setting 获取
     required: true
     validation:
       pattern: "^wss://.*"

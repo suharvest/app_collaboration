@@ -1,252 +1,192 @@
-This solution deploys a real-time traffic heatmap system with four components:
+This solution tracks where people walk in your store and shows it as a heatmap.
 
-1. **Database** - Stores location data detected by reCamera
-2. **reCamera** - Runs person detection on the camera, auto-blurs people and only transmits coordinates
-3. **Dashboard** - Displays traffic statistics and trends with charts
-4. **Heatmap** - Shows crowd gathering areas visually on your floor plan
+**How it works:**
+1. reCamera watches the area and detects people (faces are automatically blurred)
+2. Location data is sent to your computer
+3. You see a visual map of busy vs quiet areas
 
 ## Network Requirements
 
-Ensure reCamera and your computer are on the **same WiFi network**. This allows:
-- reCamera to send data to your computer
-- Dashboard to display live feed from reCamera
-- Heatmap to query location data from the database
+Make sure reCamera and your computer are on the **same WiFi network**.
 
-## Preset: Simple Preview {#simple}
+## Preset: Quick Preview {#simple}
 
-Deploy heatmap application to reCamera for real-time person detection and heat visualization. No backend server required.
+See heatmap directly on reCamera's web interface - no extra computer or dashboard needed.
 
-## Connection Options
+| Device | Purpose |
+|--------|---------|
+| reCamera | AI camera with person detection |
+
+**What you'll get:**
+- Live video with heatmap overlay
+- See busy vs quiet areas in real-time
+- Privacy-preserving (faces automatically blurred)
+
+**Requirements:** reCamera and your computer on the same network
+
+## How to Connect
 
 | Method | IP Address | Notes |
 |--------|------------|-------|
-| USB Connection | 192.168.42.1 | Direct USB-C connection |
-| Wired Network | Check router | Most reliable |
-| WiFi | Check router | May need initial USB setup |
+| USB Cable | 192.168.42.1 | Plug USB-C directly into computer |
+| Network Cable | Check router | Most reliable |
+| WiFi | Check router | May need USB setup first |
 
-## Default Credentials
+## Login Credentials
 
 - **Username**: `recamera`
 - **Password**: `recamera` or `recamera.2`
 
-## Step 1: Deploy Detector {#deploy_detector type=recamera_cpp required=true config=devices/recamera_yolo11.yaml}
+## Step 1: Enable People Detection {#deploy_detector type=recamera_cpp required=true config=devices/recamera_yolo11.yaml}
 
-### Target: YOLO11 (~8 FPS) {#deploy_detector_yolo11 config=devices/recamera_yolo11.yaml default=true}
+Install the person detection program on reCamera so it can identify people in the video.
 
-YOLO11 uses DFL (Distribution Focal Loss) for more accurate bounding box regression, achieving **~8 FPS** on reCamera.
+### Target: High Accuracy (~8 FPS) {#deploy_detector_yolo11 config=devices/recamera_yolo11.yaml default=true}
 
-### Note
-
-After deployment, use MQTT topic `recamera/yolo11/detections` in the preview step.
+More accurate detection, suitable for most scenarios.
 
 ### Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Connection refused | Check IP address and network connectivity |
-| Authentication failed | Try password `recamera` or `recamera.2` |
-| Package install failed | Reboot device and retry |
-| Conflict with YOLO26 | YOLO11 deployment will automatically stop YOLO26 service |
+| Cannot connect | Check IP address and network |
+| Wrong password | Try `recamera` or `recamera.2` |
+| Install failed | Restart the camera and try again |
 
-### Target: YOLO26 (~3 FPS) {#deploy_detector_yolo26 config=devices/recamera_yolo26.yaml}
+### Target: Fast Mode (~3 FPS) {#deploy_detector_yolo26 config=devices/recamera_yolo26.yaml}
 
-The service will automatically start on device boot. You can verify it's working by checking the preview in the next step.
+Lower accuracy but uses less resources. Choose this if camera runs slow.
 
 ### Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Connection refused | Check IP address and network connectivity |
-| Authentication failed | Try password `recamera` or `recamera.2` |
-| Package install failed | Reboot device and retry |
+| Cannot connect | Check IP address and network |
+| Wrong password | Try `recamera` or `recamera.2` |
+| Install failed | Restart the camera and try again |
 
 ---
 
-## Step 2: Live Preview with Heatmap {#preview type=preview required=false config=devices/preview.yaml}
+## Step 2: View Live Heatmap {#preview type=preview required=false config=devices/preview.yaml}
 
-Click **Connect** to view the live video with heatmap overlay.
+Click **Connect** to see the live video with heatmap overlay.
 
-**Tips:** The heatmap accumulates over time - give it a few minutes to build up.
+**Tip:** The heatmap builds up over time - wait a few minutes to see the effect.
 
 ---
 
-## Preset: Grafana Dashboard {#grafana}
+## Preset: Data Dashboard {#grafana}
 
-This solution deploys a real-time traffic heatmap system with four components:
+Save historical data and view traffic trends with charts over time.
 
-1. **Database** - Stores location data detected by reCamera
-2. **reCamera** - Runs person detection on the camera, auto-blurs people and only transmits coordinates
-3. **Dashboard** - Displays traffic statistics and trends with charts
-4. **Heatmap** - Shows crowd gathering areas visually on your floor plan
+| Device | Purpose |
+|--------|---------|
+| reCamera | AI camera with person detection |
+| Computer/Server | Runs Grafana dashboard + InfluxDB |
+
+**What you'll get:**
+- Historical people flow data with time-series charts
+- Customizable Grafana dashboards
+- Data export for further analysis
+
+**Requirements:** Docker installed · Same network for all devices
 
 ## Network Requirements
 
-Ensure reCamera and your computer are on the **same WiFi network**. This allows:
-- reCamera to send data to your computer
-- Dashboard to display live feed from reCamera
-- Heatmap to query location data from the database
+Make sure reCamera and your computer are on the **same WiFi network**.
 
-## Step 1: Deploy InfluxDB + Grafana {#backend type=docker_deploy required=true config=devices/backend.yaml}
+## Step 1: Start Data Dashboard {#backend type=docker_deploy required=true config=devices/backend.yaml}
 
-### Target: Local Deployment {#backend_local config=devices/backend.yaml default=true}
+Start the data storage and chart display services on your computer (or a dedicated server).
 
-## Local Deployment
+### Target: Run on This Computer {#backend_local config=devices/backend.yaml default=true}
 
-Deploy the database and dashboard services on your computer.
+Run the dashboard on your current computer.
 
 ### Prerequisites
 
 - Docker Desktop installed and running
 - At least 2GB free disk space
-- Ports 8086 and 3000 available
 
 ![Wiring](intro/gallery/architecture.svg)
 
 ### Troubleshooting
 
-| Issue | Possible Cause | Solution |
-|-------|---------------|----------|
-| Deployment fails with port conflict | Port 8086 or 3000 in use | Close the program using the port, or change the port in configuration |
-| Docker won't start | Docker Desktop not running | Open the Docker Desktop application |
-| Container stops after starting | Insufficient memory | Ensure at least 4GB RAM available |
+| Issue | Solution |
+|-------|----------|
+| Port conflict error | Close the program using port 8086 or 3000 |
+| Docker not starting | Open Docker Desktop application |
+| Stops after starting | Make sure you have at least 4GB RAM |
 
-### Target: Remote Deployment {#backend_remote config=devices/backend_remote.yaml}
+### Target: Run on Another Device {#backend_remote config=devices/backend_remote.yaml}
 
-# Remote Deployment
+Run the dashboard on a dedicated device like reComputer or Raspberry Pi.
 
-Deploy InfluxDB and Grafana to a remote device (reComputer, Raspberry Pi, etc.).
+### Before You Begin
 
-## Before You Begin
+1. Connect the target device to your network
+2. Get the device's IP address
+3. Get the login credentials (username and password)
 
-1. **Connect target device to the network**
-   - Ensure the device is on the same network as your computer
-   - Note down the device's IP address
+### Connection Settings
 
-2. **Get device credentials**
-   - SSH username (usually `root`, `pi`, or `recomputer`)
-   - SSH password
-
-## Connection Settings
-
-Enter the following information:
-
-| Field | Description | Example |
-|-------|-------------|---------|
-| Device IP | Target device IP address | 192.168.1.100 |
-| SSH Username | Login username | root |
-| SSH Password | Login password | your-password |
-| SSH Port | SSH port (default 22) | 22 |
-
-## After Deployment
-
-Access InfluxDB: `http://<device-ip>:8086`
-- Credentials: admin / adminpassword
-- Organization: seeed, Bucket: recamera
-
-Go to **API Tokens** and copy the token for later configuration.
-
-Access Grafana: `http://<device-ip>:3000`
-- Default credentials: admin / admin
+| Field | Example |
+|-------|---------|
+| Device IP | 192.168.1.100 |
+| Username | recomputer |
+| Password | 12345678 |
 
 ![Wiring](intro/gallery/architecture.svg)
 
 ---
 
-## Step 2: Configure reCamera {#recamera type=recamera_nodered required=true config=devices/recamera.yaml}
+## Step 2: Connect Camera to Dashboard {#recamera type=recamera_nodered required=true config=devices/recamera.yaml}
 
-## Configure reCamera
+Tell reCamera where to send the traffic data.
 
-Set up reCamera to send detected traffic data to the database.
+Enter:
+- **reCamera IP**: Your camera's IP address
+- **Dashboard Server IP**: The computer running the dashboard (from Step 1)
 
-### Steps
-
-1. Visit [SenseCraft reCamera](https://sensecraft.seeed.cc/ai/recamera) and deploy the heatmap app to your reCamera
-2. Open reCamera's Node-RED interface and install the `node-red-contrib-influxdb` node
-3. Configure the database node:
-   - URL: `http://<your-computer-ip>:8086`
-   - Paste the API token from the previous step
-4. Click Deploy to activate the flow
+Other settings are pre-configured, no need to change.
 
 ### Troubleshooting
 
-| Issue | Possible Cause | Solution |
-|-------|---------------|----------|
-| Node installation fails | Network issue | Check if reCamera can access the internet |
-| Database connection fails | Wrong IP address | Verify your computer's IP; ensure reCamera and computer are on the same network |
-| No data in database | Invalid token | Get a new API token from the database |
+| Issue | Solution |
+|-------|----------|
+| Cannot connect | Check that camera and server are on the same network |
+| No data showing | Make sure Step 1 completed successfully |
 
 ---
 
-## Step 3: Configure Grafana Dashboard {#grafana_config type=manual required=true}
+## Step 3: Show Heatmap on Floor Plan (Optional) {#heatmap type=manual required=false}
 
-## Configure Dashboard
+Overlay the heatmap on your store's floor plan image.
 
-Connect the database to Grafana and import the pre-built chart templates.
+### How to Do It
 
-### Steps
+1. **Prepare Images**
+   - Take a screenshot from reCamera
+   - Get your store's floor plan image
 
-1. Open your browser and go to `http://localhost:3000`
-2. Log in with default credentials: admin / admin
-3. Add data source:
-   - Go to **Connections** > **Data sources** > click **Add data source**
-   - Select **InfluxDB**
-   - Set Query Language to **Flux**
-   - URL: `http://influxdb:8086`
-   - Paste your API token
-   - Click **Save & Test**
-4. Import chart templates:
-   - Go to **Dashboards** > **Import**
-   - Upload the dashboard JSON file provided with this solution
+2. **Run the Calibration Tool**
+   - Run: `python calibration_tool.py`
+   - Click 4 reference points on the camera image
+   - Click the same 4 spots on your floor plan
 
-### Troubleshooting
-
-| Issue | Possible Cause | Solution |
-|-------|---------------|----------|
-| Cannot access localhost:3000 | Service not running | Go back and check deployment status |
-| Data source test fails | Incorrect token | Copy the complete API token again from the database |
-| Charts show no data | reCamera not sending data | Check if reCamera's Node-RED is running properly |
-
----
-
-## Step 4: Calibrate and Configure Heatmap {#heatmap type=manual required=true}
-
-## Configure Heatmap
-
-Calibrate the camera view to match your floor plan, so traffic data displays correctly on the map.
-
-### Steps
-
-1. **Prepare Materials**
-   - Export a screenshot from your reCamera
-   - Prepare your store/venue floor plan image
-
-2. **Calibrate Reference Points**
-   - Run the calibration tool: `python calibration_tool.py`
-   - Click 4 corner reference points on the camera screenshot
-   - Click the corresponding 4 points on the floor plan
-   - The tool will generate calibration code
-
-3. **Configure the Page**
-   - Paste the generated calibration code into `index.html`
-   - Fill in database connection info (IP, Token)
-
-4. **Start the Service**
+3. **View the Result**
    - Run `python -m http.server 8080`
-   - Open `http://localhost:8080` in your browser to view the result
+   - Open `http://localhost:8080` in browser
 
-### Troubleshooting
+### Skip This If
 
-| Issue | Possible Cause | Solution |
-|-------|---------------|----------|
-| Traffic positions appear offset | Inaccurate calibration points | Re-run calibration tool, choose more visible reference points |
-| Page shows blank | Database connection failed | Verify Token and IP address are correct |
-| Data appears delayed | Network issue | Check network connection stability |
+You only want to see the camera-view heatmap in the dashboard.
 
 ---
 
 # Deployment Complete
 
-## Deployment Complete!
+## All Done!
 
 Your real-time heatmap system is now running.
 
@@ -254,23 +194,16 @@ Your real-time heatmap system is now running.
 
 | Service | URL |
 |---------|-----|
-| Grafana Dashboard | http://localhost:3000 |
-| Heatmap Page | http://localhost:8080/index.html |
-| InfluxDB UI | http://localhost:8086 |
+| Data Dashboard | http://\<server-ip\>:3000 |
 
-### Grafana Login
+### Login
 
 - Username: `admin`
-- Password: `admin` (change on first login)
+- Password: `admin`
 
-### What's Next?
+Dashboard is pre-configured. Just open it to see your data.
 
-1. **Calibrate the Heatmap** - Run the Python calibration tool to map camera coordinates to your floor plan
-2. **Customize the Dashboard** - Add or modify Grafana panels to suit your needs
-3. **Adjust Heatmap Settings** - Configure refresh interval and accumulation mode in index.html
+### Having Issues?
 
-### Troubleshooting
-
-- **No data in Grafana**: Check that reCamera is connected and Node-RED flow is deployed
-- **Heatmap not loading**: Verify InfluxDB credentials in index.html
-- **Video feed disconnected**: This is normal due to reCamera resource limits; it will reconnect automatically
+- **No data showing**: Check that reCamera is connected
+- **Can't open dashboard**: Run `docker ps` to check if services are running

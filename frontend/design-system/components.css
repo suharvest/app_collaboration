@@ -1141,7 +1141,7 @@
 
   /* Preset Section Content (Level 1 deployment guide) */
   .deploy-preset-section {
-    @apply bg-card rounded-lg shadow-sm border border-border mb-6 p-5;
+    @apply bg-gray-50/50 rounded-lg border border-dashed border-gray-300 mb-6 p-5;
   }
 
   .deploy-preset-section-title {
@@ -1149,8 +1149,16 @@
   }
 
   .deploy-preset-section-content {
-    @apply text-sm leading-relaxed;
+    @apply text-sm leading-relaxed text-text-secondary;
     transition: opacity 0.2s;
+  }
+
+  .deploy-preset-section-content strong {
+    @apply text-text-primary font-medium;
+  }
+
+  .deploy-preset-section-content table {
+    @apply text-text-primary;
   }
 
   .deploy-preset-section-content.loading {
@@ -2753,6 +2761,54 @@ button.spinning {
   @apply bg-gray-100 text-text-primary;
 }
 
+/* Disabled Row Style */
+.management-table tbody tr.row-disabled {
+  @apply opacity-50;
+}
+
+.management-table tbody tr.row-disabled td {
+  @apply text-text-muted;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  @apply relative inline-block cursor-pointer;
+  width: 40px;
+  height: 22px;
+}
+
+.toggle-switch input {
+  @apply opacity-0 w-0 h-0;
+}
+
+.toggle-slider {
+  @apply absolute inset-0 rounded-full;
+  background-color: #ccc;
+  transition: 0.3s;
+}
+
+.toggle-slider:before {
+  @apply absolute rounded-full bg-white;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  transition: 0.3s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  @apply bg-primary;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(18px);
+}
+
+.toggle-switch input:focus + .toggle-slider {
+  box-shadow: 0 0 0 2px rgba(140, 198, 63, 0.2);
+}
+
 .btn-icon.btn-icon-danger:hover {
   @apply bg-red-50 text-red-500;
 }
@@ -3494,18 +3550,20 @@ button.spinning {
 }
 
 /* ============================================
-   PREVIEW TAB
+   PREVIEW TAB (Solution Management)
    ============================================ */
 
-.preview-container {
-  @apply py-2;
+/* Use modal-body selector to avoid conflict with video preview's bg-black */
+.modal-body .preview-container {
+  @apply py-2 bg-transparent;
 }
 
-.preview-header {
-  @apply flex items-center justify-between mb-6 flex-wrap gap-2;
+/* Override video preview header's dark background in modal context */
+.modal-body .preview-header {
+  @apply flex items-center justify-between mb-6 flex-wrap gap-2 bg-gray-50 rounded-lg px-4 py-3;
 }
 
-.preview-header h4 {
+.modal-body .preview-header h4 {
   @apply text-base font-semibold text-text-primary m-0;
 }
 
@@ -3542,15 +3600,19 @@ button.spinning {
 }
 
 .preview-step {
-  @apply flex items-start gap-3 px-4 py-3;
+  @apply flex items-start gap-3 px-4 py-4;
 }
 
 .preview-step .step-index {
-  @apply w-5 h-5 rounded bg-primary text-white text-xs font-medium flex items-center justify-center flex-shrink-0 mt-0.5;
+  @apply w-6 h-6 rounded bg-primary text-white text-xs font-medium flex items-center justify-center flex-shrink-0;
 }
 
 .preview-step .step-info {
-  @apply flex items-center gap-2 flex-wrap flex-1 min-w-0;
+  @apply flex flex-col gap-1.5 flex-1 min-w-0;
+}
+
+.preview-step .step-main {
+  @apply flex items-center gap-2 flex-wrap;
 }
 
 .preview-step .step-name {
@@ -3558,11 +3620,15 @@ button.spinning {
 }
 
 .preview-step .step-type {
-  @apply bg-gray-100 text-text-secondary;
+  @apply bg-gray-100 text-text-secondary whitespace-nowrap;
+}
+
+.preview-step .step-required {
+  @apply whitespace-nowrap;
 }
 
 .preview-step .step-targets {
-  @apply flex flex-wrap gap-1 mt-1 w-full;
+  @apply flex flex-wrap gap-1;
 }
 
 .target-badge {
@@ -3575,6 +3641,11 @@ button.spinning {
 
 .preview-section {
   @apply mt-6 p-4 border border-border rounded-lg;
+}
+
+/* Validation box in preview tab - match preset card styling */
+.preview-content > .validation-box {
+  @apply border;
 }
 
 .preview-section h5 {

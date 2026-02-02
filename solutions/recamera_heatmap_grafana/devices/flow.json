@@ -9,7 +9,7 @@
     {
         "id": "069087e0ad1b172e",
         "type": "influxdb",
-        "hostname": "127.0.0.1",
+        "hostname": "{{influxdb_host}}",
         "port": "8086",
         "protocol": "http",
         "database": "recamera",
@@ -17,10 +17,11 @@
         "usetls": false,
         "tls": "",
         "influxdbVersion": "2.0",
-        "url": "http://10.228.172.98:8086",
+        "url": "http://{{influxdb_host}}:8086",
         "rejectUnauthorized": true,
         "org": "seeed",
-        "bucket": "recamera"
+        "bucket": "recamera",
+        "token": "recamera-heatmap-token"
     },
     {
         "id": "camera-node",

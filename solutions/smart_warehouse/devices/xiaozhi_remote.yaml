@@ -51,22 +51,20 @@ docker_remote:
 user_inputs:
   # SSH 连接配置
   - id: host
-    name: R1100 IP Address
-    name_zh: R1100 IP 地址
+    name: Host / IP
+    name_zh: 主机 / IP 地址
     type: text
     required: true
-    placeholder: "192.168.1.100"
-    description: IP address of the reComputer R1100 device
-    description_zh: reComputer R1100 设备的 IP 地址
-    validation:
-      pattern: "^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$"
-      message: Please enter a valid IP address
+    default: "reComputer-R110x.local"
+    placeholder: "reComputer-R110x.local"
+    description: Hostname or IP address of the reComputer R1100 device
+    description_zh: reComputer R1100 设备的主机名或 IP 地址
 
   - id: username
     name: SSH Username
     name_zh: SSH 用户名
     type: text
-    default: root
+    default: recomputer
     required: true
     description: SSH login username
     description_zh: SSH 登录用户名
@@ -75,6 +73,7 @@ user_inputs:
     name: SSH Password
     name_zh: SSH 密码
     type: password
+    default: "12345678"
     required: true
     description: SSH login password
     description_zh: SSH 登录密码

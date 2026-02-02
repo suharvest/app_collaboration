@@ -38,6 +38,18 @@ After connecting Watcher to computer via USB-C, two serial ports will appear:
 
 Add face recognition to your Xiaozhi, letting it recognize family and friends.
 
+| Device | Purpose |
+|--------|---------|
+| SenseCAP Watcher | AI voice assistant with camera |
+| USB-C data cable | For firmware flashing |
+
+**What you'll get:**
+- Automatic greeting when recognized face appears
+- Voice-based face enrollment ("Remember my face, I'm John")
+- Stores up to 20 people
+
+**Requirements:** WiFi network · [Xiaozhi App](https://github.com/78/xiaozhi-esp32) for device binding
+
 ## What You Need
 
 | Item | Description |
@@ -179,6 +191,19 @@ Wake up the device by saying "Xiaozhi Xiaozhi", then say "Remember my face, my n
 ## Preset: Display Cast {#display_cast}
 
 Cast Xiaozhi conversations to TV or large display, ideal for exhibition halls, meeting rooms and multi-person scenarios.
+
+| Device | Purpose |
+|--------|---------|
+| SenseCAP Watcher | AI voice assistant |
+| Computer/Raspberry Pi | Runs display service (Docker required) |
+| HDMI Display | Shows cast content |
+
+**What you'll get:**
+- Real-time conversation display on big screen
+- Fullscreen mode for presentations
+- Works over local network
+
+**Requirements:** All devices on same network · Docker installed
 
 ## What You Need
 

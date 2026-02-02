@@ -20,13 +20,18 @@ Guide for preparing ESP32 device firmware and configuration files.
 
 ```
 solutions/[solution_id]/
+├── solution.yaml              # Solution configuration
+├── guide.md                   # English deployment guide (defines steps)
+├── guide_zh.md                # Chinese deployment guide
+├── gallery/                   # Images
+│   └── watcher_connect.png
 ├── assets/
-│   └── watcher_firmware/      # or device name
+│   └── watcher_firmware/      # Firmware files
 │       ├── firmware.bin
 │       ├── bootloader.bin     # optional
 │       └── partition-table.bin # optional
 └── devices/
-    └── [device_id].yaml       # device config
+    └── [device_id].yaml       # Device config
 ```
 
 ## Device Configuration Template
@@ -42,9 +47,12 @@ type: esp32_usb
 
 detection:
   method: usb_serial
-  usb_vendor_id: "0x10c4"      # actual VID
-  usb_product_id: "0xea60"     # actual PID
+  # Watcher uses WCH USB-UART chip
+  usb_vendor_id: "0x1a86"
+  usb_product_id: "0x55d2"
   fallback_ports:
+    - /dev/tty.wchusbserial*
+    - /dev/cu.wchusbserial*
     - /dev/ttyUSB*
     - /dev/ttyACM*
 
@@ -125,12 +133,13 @@ flash_size: 4MB
 
 ## Common USB VID/PID
 
-| Device | VID | PID |
-|--------|-----|-----|
-| CP210x (Watcher) | 0x10c4 | 0xea60 |
-| CH340 | 0x1a86 | 0x7523 |
-| FTDI | 0x0403 | 0x6001 |
-| ESP32-S3 USB | 0x303a | 0x1001 |
+| Device | VID | PID | Notes |
+|--------|-----|-----|-------|
+| WCH USB-UART (Watcher) | 0x1a86 | 0x55d2 | SenseCAP Watcher uses WCH chip |
+| CP210x | 0x10c4 | 0xea60 | Silicon Labs USB-UART |
+| CH340 | 0x1a86 | 0x7523 | Common USB-UART chip |
+| FTDI | 0x0403 | 0x6001 | FTDI USB-UART |
+| ESP32-S3 USB | 0x303a | 0x1001 | Native USB mode |
 
 ## Get USB VID/PID
 
@@ -141,23 +150,32 @@ lsusb
 system_profiler SPUSBDataType
 ```
 
-## Update solution.yaml
+## Update guide.md
 
-Add device reference:
+Add deployment step in `guide.md`:
 
-```yaml
-deployment:
-  devices:
-    - id: watcher
-      name: SenseCAP Watcher
-      type: esp32_usb
-      config_file: devices/watcher.yaml
-      section:
-        title: Flash Firmware
-        title_zh: 烧录固件
-        description_file: deploy/sections/watcher.md
-        description_file_zh: deploy/sections/watcher_zh.md
+```markdown
+## Step 1: Flash Watcher Firmware {#flash_watcher type=esp32_usb required=true config=devices/watcher.yaml}
+
+Flash the firmware to SenseCAP Watcher device.
+
+### Wiring
+
+![Connect Watcher](gallery/watcher_connect.png)
+
+1. Connect Watcher to computer via USB-C cable
+2. Select the serial port
+3. Click Deploy button
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Serial port not found | Try a different USB cable or port |
+| Flash failed | Unplug and replug the device, then try again |
 ```
+
+> **Note**: Device step configuration is now defined in `guide.md` / `guide_zh.md` using markdown format. The `config_file` path points to the device YAML configuration.
 
 ## Manual Test
 

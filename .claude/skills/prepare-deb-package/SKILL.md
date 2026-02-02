@@ -1,246 +1,342 @@
 ---
 name: prepare-deb-package
-description: Build Debian package for Provisioning Station. Use when packaging the application as .deb, configuring systemd service, creating desktop shortcuts, or setting up debian control files.
+description: Prepare Debian packages for reCamera C++ deployment. Use when creating .deb packages for reCamera devices, configuring init scripts, or setting up binary deployment files.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
-# Prepare Deb Package
+# Prepare Debian Packages for reCamera
 
-Guide for packaging Provisioning Station as a Debian installation package.
+Guide for creating .deb packages that deploy C++ applications to reCamera devices.
 
-## Target Installation Structure
+## Overview
 
-```
-/opt/provisioning-station/
-├── provisioning_station/     # Backend Python code
-├── frontend/dist/            # Frontend build
-├── solutions/                # Solution configs
-├── .venv/                    # Python venv (bundled)
-├── data/                     # Runtime data
-│   ├── cache/
-│   └── logs/
-└── run.sh
+reCamera devices run a BusyBox-based Linux system that uses:
+- `opkg` for package management (not apt/dpkg)
+- SysVinit for service management (not systemd)
+- RISCV64 architecture (cv181x chip)
 
-/etc/systemd/system/
-└── provisioning-station.service
-
-/usr/share/applications/
-└── provisioning-station.desktop
-```
-
-## Debian Directory Structure
+## Directory Structure
 
 ```
-debian/
-├── control                   # Package metadata
-├── changelog                 # Version history
-├── rules                     # Build rules
-├── compat                    # debhelper level
-├── postinst                  # Post-install script
-├── prerm                     # Pre-remove script
-├── postrm                    # Post-remove script
-├── provisioning-station.service    # systemd unit
-└── provisioning-station.desktop    # Desktop entry
+solutions/[solution_id]/
+├── solution.yaml
+├── guide.md
+├── guide_zh.md
+├── gallery/
+├── packages/                      # Deb packages and models
+│   ├── [app]-detector_x.x.x_riscv64.deb
+│   └── [model].cvimodel
+└── devices/
+    └── recamera_[variant].yaml    # Device config
 ```
 
-## debian/control
+## Device Configuration Template
+
+Create `devices/recamera_[variant].yaml`:
+
+```yaml
+version: "1.0"
+id: recamera_yolo11
+name: reCamera YOLO11 Detector
+name_zh: reCamera YOLO11 检测器
+type: recamera_cpp
+
+detection:
+  method: network_scan
+  manual_entry: true
+  requirements: []
+
+# SSH connection config
+ssh:
+  port: 22
+  default_user: recamera
+  default_host: 192.168.42.1
+  connection_timeout: 30
+  command_timeout: 300
+
+# C++ application deployment config
+binary:
+  # .deb package (includes init script)
+  deb_package:
+    path: packages/yolo11-detector_0.1.1_riscv64.deb
+    name: yolo11-detector
+    includes_init_script: true    # deb contains /etc/init.d/S*
+
+  # Model files
+  models:
+    - path: packages/model.cvimodel
+      target_path: /userdata/local/models
+      filename: model.cvimodel
+
+  # Service configuration
+  service_name: yolo11-detector
+  service_priority: 92            # S92yolo11-detector
+
+  # MQTT external access (optional)
+  mqtt_config:
+    enable: true
+    port: 1883
+    allow_anonymous: true
+
+  # Conflict service handling
+  conflict_services:
+    stop:                         # Stop before deployment
+      - S03node-red
+      - S91sscma-node
+      - S93sscma-supervisor
+    disable:                      # Disable autostart (S* -> K*)
+      - node-red
+      - sscma-node
+      - sscma-supervisor
+
+  auto_start: true
+
+# User inputs
+user_inputs:
+  - id: host
+    name: Device IP Address
+    name_zh: 设备 IP 地址
+    type: text
+    default: "192.168.42.1"
+    required: true
+    validation:
+      pattern: "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"
+
+  - id: password
+    name: SSH Password
+    name_zh: SSH 密码
+    type: password
+    default: "recamera"
+    required: true
+
+# Deployment steps (shown to user)
+steps:
+  - id: connect
+    name: SSH Connect
+    name_zh: SSH 连接
+  - id: precheck
+    name: Check Device State
+    name_zh: 检查设备状态
+  - id: prepare
+    name: Stop Conflicting Services
+    name_zh: 停止冲突服务
+  - id: transfer
+    name: Transfer Files
+    name_zh: 传输文件
+  - id: install
+    name: Install Package
+    name_zh: 安装软件包
+  - id: models
+    name: Deploy Model
+    name_zh: 部署模型
+  - id: mqtt
+    name: Configure MQTT
+    name_zh: 配置 MQTT
+  - id: disable
+    name: Disable Conflicts
+    name_zh: 禁用冲突服务
+  - id: start
+    name: Start Service
+    name_zh: 启动服务
+  - id: verify
+    name: Verify
+    name_zh: 验证
+
+post_deployment:
+  open_browser: false
+```
+
+## Creating the .deb Package
+
+### Package Structure
 
 ```
-Source: provisioning-station
-Section: utils
-Priority: optional
+yolo11-detector_0.1.1_riscv64/
+├── DEBIAN/
+│   ├── control
+│   └── postinst
+├── usr/
+│   └── bin/
+│       └── yolo11-detector       # The compiled binary
+└── etc/
+    └── init.d/
+        └── S92yolo11-detector    # SysVinit script
+```
+
+### DEBIAN/control
+
+```
+Package: yolo11-detector
+Version: 0.1.1
+Architecture: riscv64
 Maintainer: Seeed Studio <support@seeed.cc>
-Build-Depends: debhelper (>= 12)
-Standards-Version: 4.5.0
-
-Package: provisioning-station
-Architecture: arm64
-Depends: docker.io | docker-ce,
-         docker-compose-v2 | docker-compose-plugin,
-         python3 (>= 3.10),
-         libusb-1.0-0,
-         ${misc:Depends}
-Recommends: chromium-browser | firefox-esr
-Description: SenseCraft Solution Deployment Tool
- IoT solution deployment platform for Seeed Studio hardware.
+Description: YOLO11 object detector for reCamera
+ Detects objects using YOLO11 model and publishes to MQTT.
 ```
 
-## debian/changelog
-
-```
-provisioning-station (1.0.0) stable; urgency=medium
-
-  * Initial release
-
- -- Seeed Studio <support@seeed.cc>  Tue, 07 Jan 2025 10:00:00 +0800
-```
-
-## debian/compat
-
-```
-12
-```
-
-## debian/postinst
+### DEBIAN/postinst
 
 ```bash
-#!/bin/bash
-set -e
-
-case "$1" in
-    configure)
-        chmod +x /opt/provisioning-station/run.sh
-
-        # Add user to dialout group (serial port)
-        if [ -n "$SUDO_USER" ]; then
-            usermod -aG dialout "$SUDO_USER" 2>/dev/null || true
-            usermod -aG docker "$SUDO_USER" 2>/dev/null || true
-        fi
-
-        systemctl daemon-reload
-        systemctl enable provisioning-station.service
-        systemctl start provisioning-station.service
-
-        echo "Provisioning Station installed!"
-        echo "Access: http://127.0.0.1:3260"
-        ;;
-esac
+#!/bin/sh
+chmod +x /usr/bin/yolo11-detector
+chmod +x /etc/init.d/S92yolo11-detector
 exit 0
 ```
 
-## debian/prerm
+### SysVinit Script Template
+
+Create `etc/init.d/S92yolo11-detector`:
 
 ```bash
-#!/bin/bash
-set -e
+#!/bin/sh
+
+NAME="yolo11-detector"
+DAEMON="/usr/bin/yolo11-detector"
+PIDFILE="/var/run/${NAME}.pid"
+LOGFILE="/var/log/${NAME}.log"
+
+# Model and config paths
+MODEL_PATH="/userdata/local/models/yolo11n_detection_cv181x_int8.cvimodel"
+MQTT_HOST="localhost"
+MQTT_PORT="1883"
+
+start() {
+    echo "Starting $NAME..."
+    if [ -f "$PIDFILE" ] && kill -0 $(cat "$PIDFILE") 2>/dev/null; then
+        echo "$NAME already running"
+        return 0
+    fi
+
+    $DAEMON \
+        --model "$MODEL_PATH" \
+        --mqtt-host "$MQTT_HOST" \
+        --mqtt-port "$MQTT_PORT" \
+        > "$LOGFILE" 2>&1 &
+
+    echo $! > "$PIDFILE"
+    echo "$NAME started (PID: $(cat $PIDFILE))"
+}
+
+stop() {
+    echo "Stopping $NAME..."
+    if [ -f "$PIDFILE" ]; then
+        kill $(cat "$PIDFILE") 2>/dev/null
+        rm -f "$PIDFILE"
+    fi
+    killall $NAME 2>/dev/null || true
+    echo "$NAME stopped"
+}
+
+status() {
+    if [ -f "$PIDFILE" ] && kill -0 $(cat "$PIDFILE") 2>/dev/null; then
+        echo "$NAME is running (PID: $(cat $PIDFILE))"
+    else
+        echo "$NAME is not running"
+        return 1
+    fi
+}
 
 case "$1" in
-    remove|upgrade|deconfigure)
-        systemctl stop provisioning-station.service 2>/dev/null || true
-        systemctl disable provisioning-station.service 2>/dev/null || true
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart)
+        stop
+        sleep 1
+        start
+        ;;
+    status)
+        status
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
+        exit 1
         ;;
 esac
+
 exit 0
 ```
 
-## debian/postrm
+### Build Commands
 
 ```bash
-#!/bin/bash
-set -e
+# Set permissions
+chmod +x yolo11-detector_0.1.1_riscv64/DEBIAN/postinst
+chmod +x yolo11-detector_0.1.1_riscv64/etc/init.d/S92yolo11-detector
 
-case "$1" in
-    purge)
-        rm -rf /opt/provisioning-station/data
-        ;;
-esac
-exit 0
+# Build package
+dpkg-deb --build yolo11-detector_0.1.1_riscv64
 ```
 
-## debian/provisioning-station.service
+## Service Priority Reference
 
-```ini
-[Unit]
-Description=Provisioning Station Service
-After=network.target docker.service
-Wants=docker.service
+| Priority | Service | Description |
+|----------|---------|-------------|
+| 03 | node-red | Node-RED (default app) |
+| 91 | sscma-node | SSCMA Node service |
+| 92 | yolo*-detector | YOLO detectors |
+| 93 | sscma-supervisor | SSCMA supervisor |
 
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/provisioning-station
-Environment="PATH=/opt/provisioning-station/.venv/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/opt/provisioning-station/.venv/bin/python -m uvicorn provisioning_station.main:app --host 127.0.0.1 --port 3260
-Restart=on-failure
-RestartSec=5
-StandardOutput=append:/opt/provisioning-station/data/logs/service.log
-StandardError=append:/opt/provisioning-station/data/logs/service.log
+## Deployment Flow
 
-[Install]
-WantedBy=multi-user.target
+1. **Pre-check**: Detect current device state (Node-RED/C++/Clean)
+2. **Cleanup**: Stop and disable conflicting services
+3. **Transfer**: Upload .deb and model files via SCP
+4. **Install**: `opkg install --force-reinstall /tmp/package.deb`
+5. **Deploy models**: Copy to `/userdata/local/models/`
+6. **Configure MQTT**: Enable external access if needed
+7. **Start service**: Run init script
+8. **Verify**: Check service status
+
+## Update guide.md
+
+Add deployment step:
+
+```markdown
+## Step 2: Deploy YOLO Detector {#deploy_yolo type=recamera_cpp required=true config=devices/recamera_yolo11.yaml}
+
+Deploy the YOLO11 object detector to reCamera.
+
+### Wiring
+
+![Connect reCamera](gallery/recamera_connect.png)
+
+1. Connect reCamera to computer via USB or ensure on same network
+2. Enter reCamera IP address (default: 192.168.42.1 for USB)
+3. Enter SSH password (default: recamera)
+4. Click Deploy button
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| SSH connection failed | Check IP and password, try 'recamera' or 'recamera.2' |
+| Package install failed | Device may have incompatible version, contact support |
+| Service won't start | Check logs: `cat /var/log/yolo11-detector.log` |
 ```
 
-## debian/provisioning-station.desktop
-
-```ini
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=Provisioning Station
-Name[zh_CN]=部署工作站
-Comment=IoT Solution Deployment Tool
-Exec=xdg-open http://127.0.0.1:3260
-Icon=/opt/provisioning-station/frontend/dist/assets/icon.png
-Terminal=false
-Categories=Development;Utility;
-StartupNotify=true
-```
-
-## Build Steps
-
-### 1. Setup Build Environment (arm64)
+## Testing on Device
 
 ```bash
-sudo apt install build-essential devscripts debhelper
-curl -LsSf https://astral.sh/uv/install.sh | sh
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt install nodejs
+# SSH into reCamera
+ssh recamera@192.168.42.1
+
+# Check installed packages
+opkg list-installed | grep yolo
+
+# Check service status
+/etc/init.d/S92yolo11-detector status
+
+# View logs
+cat /var/log/yolo11-detector.log
+
+# Check MQTT output
+mosquitto_sub -h localhost -t "sscma/v0/#" -v
 ```
 
-### 2. Build Frontend
+## Reference Solutions
 
-```bash
-cd frontend && npm ci && npm run build
-```
-
-### 3. Create Python venv
-
-```bash
-uv venv .venv
-uv pip install -p .venv -r requirements.txt
-```
-
-### 4. Build Package
-
-```bash
-dpkg-buildpackage -us -uc -b
-```
-
-### 5. Test Installation
-
-```bash
-sudo dpkg -i provisioning-station_1.0.0_arm64.deb
-sudo apt install -f  # fix dependencies
-systemctl status provisioning-station
-```
-
-## Cross-compile with Docker
-
-```bash
-docker run --rm --platform linux/arm64 \
-  -v $(pwd):/src \
-  arm64v8/debian:bookworm \
-  bash -c "cd /src && dpkg-buildpackage -us -uc -b"
-```
-
-## Version Update Checklist
-
-1. `debian/changelog` - Add version entry
-2. `pyproject.toml` - Update version
-3. `frontend/package.json` - Update version
-
-```bash
-dch -i  # increment version
-dch -v 2.0.0  # specific version
-```
-
-## Verification Checklist
-
-- [ ] Package installs on clean system
-- [ ] systemd service starts automatically
-- [ ] Web UI accessible at 127.0.0.1:3260
-- [ ] Desktop shortcut works
-- [ ] Serial port accessible (dialout group)
-- [ ] Docker commands work (docker group)
-- [ ] Service stops on uninstall
-- [ ] Data cleaned on purge
+- `solutions/recamera_heatmap_grafana/` - Example with YOLO11/YOLO26 variants

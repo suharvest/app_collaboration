@@ -9,6 +9,20 @@ This solution deploys a complete edge-based voice AI system for retail environme
 
 ## Preset: Standard Deployment {#default}
 
+Deploy an edge-based voice collection and analysis system for your retail store.
+
+| Device | Purpose |
+|--------|---------|
+| reRouter CM4 | Edge computing device, runs voice services |
+| reSpeaker XVF3800 | 4-mic array for capturing store conversations |
+
+**What you'll get:**
+- Real-time voice transcription from store conversations
+- [SenseCraft Voice](https://voice.sensecraft.seeed.cc/) cloud platform for multi-store analytics
+- Privacy-first design - audio processing happens on-device
+
+**Requirements:** USB-C data cable · Network cables
+
 ## Step 1: Flash OpenWrt Firmware {#firmware type=manual required=true config=devices/firmware.yaml}
 
 ### Flash Firmware

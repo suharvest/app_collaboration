@@ -271,13 +271,17 @@ class DockerDeviceManager:
         """Remove all containers for an app, optionally removing images and volumes"""
         results = []
         images_to_remove = []
+        project_names = set()
 
-        # Get container info before removing (to get image references)
-        if remove_images:
-            containers = await self.list_local_containers()
-            for c in containers:
-                if c.name in container_names:
+        # Get container info before removing (to get image references and project name)
+        containers = await self.list_local_containers()
+        for c in containers:
+            if c.name in container_names:
+                if remove_images:
                     images_to_remove.append(f"{c.image}:{c.current_tag}")
+                # Get compose project name from container labels
+                if c.labels.get("com.docker.compose.project"):
+                    project_names.add(c.labels["com.docker.compose.project"])
 
         # Remove containers
         for container_name in container_names:
@@ -345,8 +349,9 @@ class DockerDeviceManager:
         volumes_removed = []
         volumes_skipped = []
         if remove_volumes:
-            # Find volumes associated with the solution
-            # Convention: volumes are named like {solution_id}_{volume_name}
+            # Find volumes associated with the compose project
+            # Volumes are named like {project_name}_{volume_name}
+            # project_name comes from container labels, fallback to solution_id
             try:
                 result = await asyncio.to_thread(
                     subprocess.run,
@@ -356,10 +361,16 @@ class DockerDeviceManager:
                     timeout=10,
                 )
                 all_volumes = [v for v in result.stdout.strip().split("\n") if v]
-                # Filter volumes that match the solution_id pattern
+
+                # Build list of prefixes to match
+                prefixes = list(project_names) if project_names else []
+                # Fallback to solution_id patterns if no project_name found
+                if not prefixes:
+                    prefixes = [solution_id, solution_id.replace("-", "_")]
+
                 solution_volumes = [
                     v for v in all_volumes
-                    if v.startswith(f"{solution_id}_") or v.startswith(solution_id.replace("-", "_") + "_")
+                    if any(v.startswith(f"{prefix}_") for prefix in prefixes)
                 ]
 
                 for volume in solution_volumes:
@@ -698,16 +709,20 @@ class DockerDeviceManager:
         """Remove all containers for an app on remote device, optionally removing images and volumes"""
         results = []
         images_to_remove = []
+        project_names = set()
 
         try:
             client = self._get_ssh_client(connection)
             try:
-                # Get container info before removing (to get image references)
-                if remove_images:
-                    containers = await self.list_containers(connection)
-                    for c in containers:
-                        if c.name in container_names:
+                # Get container info before removing (to get image references and project name)
+                containers = await self.list_containers(connection)
+                for c in containers:
+                    if c.name in container_names:
+                        if remove_images:
                             images_to_remove.append(f"{c.image}:{c.current_tag}")
+                        # Get compose project name from container labels
+                        if c.labels.get("com.docker.compose.project"):
+                            project_names.add(c.labels["com.docker.compose.project"])
 
                 # Remove containers
                 for container_name in container_names:
@@ -767,14 +782,21 @@ class DockerDeviceManager:
                 volumes_skipped = []
                 if remove_volumes:
                     try:
-                        # List all volumes and filter by solution_id pattern
+                        # List all volumes and filter by project_name pattern
                         output = self._exec_command(
                             client, "docker volume ls --format '{{.Name}}'", timeout=10
                         )
                         all_volumes = [v for v in output.strip().split("\n") if v]
+
+                        # Build list of prefixes to match
+                        prefixes = list(project_names) if project_names else []
+                        # Fallback to solution_id patterns if no project_name found
+                        if not prefixes:
+                            prefixes = [solution_id, solution_id.replace("-", "_")]
+
                         solution_volumes = [
                             v for v in all_volumes
-                            if v.startswith(f"{solution_id}_") or v.startswith(solution_id.replace("-", "_") + "_")
+                            if any(v.startswith(f"{prefix}_") for prefix in prefixes)
                         ]
 
                         for volume in solution_volumes:
