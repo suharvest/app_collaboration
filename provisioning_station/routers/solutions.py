@@ -932,13 +932,24 @@ async def get_preset_section(
 ):
     """Get preset section content with template variable replacement.
 
-    Selections are built from the preset's device_groups defaults.
+    First tries to get section from guide.md parsing (preferred),
+    then falls back to solution.yaml section definition.
     """
     solution = solution_manager.get_solution(solution_id)
     if not solution:
         raise HTTPException(status_code=404, detail="Solution not found")
 
-    # Find the preset
+    # First, try to get preset description from guide.md
+    deployment_data = await solution_manager.get_deployment_from_guide(solution_id, lang)
+    if deployment_data:
+        presets = deployment_data.get("presets", [])
+        for p in presets:
+            if p.get("id") == preset_id:
+                section = p.get("section")
+                if section and section.get("description"):
+                    return {"section": section}
+
+    # Fall back to solution.yaml section definition
     preset = None
     for p in solution.intro.presets:
         if p.id == preset_id:
