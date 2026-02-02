@@ -322,6 +322,7 @@ class DockerRemoteDeployer(BaseDeployer):
                                 service.port,
                                 service.health_check_endpoint,
                                 timeout=90,  # Increased from 30s for slower services
+                                progress_callback=progress_callback,
                             )
                             if not healthy:
                                 if service.required:
@@ -677,7 +678,7 @@ class DockerRemoteDeployer(BaseDeployer):
             return -1, "", str(e)
 
     async def _check_remote_service_health(
-        self, host: str, port: int, endpoint: str, timeout: int = 30
+        self, host: str, port: int, endpoint: str, timeout: int = 30, progress_callback=None
     ) -> bool:
         """Check remote service health via HTTP"""
         try:
@@ -685,15 +686,25 @@ class DockerRemoteDeployer(BaseDeployer):
 
             url = f"http://{host}:{port}{endpoint}"
             start_time = asyncio.get_event_loop().time()
+            attempt = 0
 
             while asyncio.get_event_loop().time() - start_time < timeout:
+                attempt += 1
                 try:
                     async with httpx.AsyncClient() as http_client:
                         response = await http_client.get(url, timeout=5)
                         if response.status_code < 500:
                             return True
-                except Exception:
-                    pass
+                except Exception as e:
+                    if progress_callback:
+                        elapsed = int(asyncio.get_event_loop().time() - start_time)
+                        await self._report_progress(
+                            progress_callback,
+                            "health_check",
+                            min(50, elapsed * 100 // timeout),
+                            f"Waiting for service at {host}:{port} (attempt {attempt}, {elapsed}s/{timeout}s)...",
+                        )
+                    logger.debug(f"Health check attempt {attempt} failed: {e}")
                 await asyncio.sleep(2)
 
             return False
