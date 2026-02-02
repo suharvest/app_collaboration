@@ -194,7 +194,7 @@ export async function renderDevicesPage() {
             </div>
             <div class="form-group mb-0">
               <label>${t('devices.restore.username')}</label>
-              <input type="text" id="restore-username" class="input" value="root">
+              <input type="text" id="restore-username" class="input" value="recamera">
             </div>
             <div class="form-group mb-0">
               <label>${t('devices.restore.password')}</label>
