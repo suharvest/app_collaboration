@@ -281,9 +281,9 @@ export async function startDeployment(deviceId) {
     params.options.config_file = selectedTarget.config_file;
   }
 
-  // Collect user inputs
+  // Collect user inputs (for script type)
   if (device.type === 'script') {
-    const inputs = state.details?.user_inputs || [];
+    const inputs = device.user_inputs || [];
     params.options.user_inputs = {};
     inputs.forEach(input => {
       const el = document.getElementById(`input-${deviceId}-${input.id}`);
@@ -313,6 +313,26 @@ export async function startDeployment(deviceId) {
       username: document.getElementById(`ssh-user-${deviceId}`)?.value,
       password: document.getElementById(`ssh-pass-${deviceId}`)?.value,
     };
+
+    // Add additional user inputs to connection (for docker_remote)
+    // Backend docker_remote_deployer expects these in connection, not options
+    // Use selectedTarget.user_inputs for docker_deploy type (user_inputs are in target config)
+    const targetUserInputs = selectedTarget?.user_inputs || device.user_inputs;
+    if (effectiveType === 'docker_remote' && targetUserInputs) {
+      const sshFields = ['host', 'username', 'password', 'port'];
+      const additionalInputs = targetUserInputs.filter(input => !sshFields.includes(input.id));
+      additionalInputs.forEach(input => {
+        const el = document.getElementById(`input-${deviceId}-${input.id}`);
+        if (el) {
+          // Handle checkbox type
+          if (input.type === 'checkbox') {
+            params.device_connections[deviceId][input.id] = el.checked ? 'true' : 'false';
+          } else {
+            params.device_connections[deviceId][input.id] = el.value;
+          }
+        }
+      });
+    }
   } else if (effectiveType === 'recamera_nodered') {
     // reCamera Node-RED deployment - need IP for Node-RED API and optional SSH for service cleanup
     const host = document.getElementById(`ssh-host-${deviceId}`)?.value;
@@ -337,6 +357,21 @@ export async function startDeployment(deviceId) {
       target: selectedTarget?.id,
       target_type: selectedTarget?.target_type || 'local',
     };
+
+    // Add user inputs for docker_local (e.g., device_name)
+    const targetUserInputs = selectedTarget?.user_inputs;
+    if (effectiveType === 'docker_local' && targetUserInputs) {
+      targetUserInputs.forEach(input => {
+        const el = document.getElementById(`input-${deviceId}-${input.id}`);
+        if (el) {
+          if (input.type === 'checkbox') {
+            params.device_connections[deviceId][input.id] = el.checked ? 'true' : 'false';
+          } else {
+            params.device_connections[deviceId][input.id] = el.value;
+          }
+        }
+      });
+    }
   }
 
   try {
