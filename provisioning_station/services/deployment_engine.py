@@ -30,6 +30,7 @@ from ..models.deployment import (
 from ..models.solution import Solution
 from ..models.version import DeploymentRecord, StepRecord
 from .deployment_history import deployment_history
+from .mdns_scanner import is_mdns_hostname, resolve_mdns_hostname
 from .pre_check_validator import pre_check_validator
 from .solution_manager import solution_manager
 
@@ -134,13 +135,11 @@ class DeploymentEngine:
                 f"Device {device_id}: type={device_type}, config_file={config_file}"
             )
 
-            # Check for target override from device_connections (e.g., target: warehouse_remote)
+            # Check for target override from device_connections (e.g., target: display_service_remote)
             connection_info = device_connections.get(device_id, {})
             target_override = connection_info.get("target")
 
             if target_override:
-                # Target specifies a device config file directly (e.g., warehouse_remote -> devices/warehouse_remote.yaml)
-                config_file = f"devices/{target_override}.yaml"
                 # Determine effective type from explicit target_type or fallback to name-based detection
                 target_type = connection_info.get("target_type")
                 if target_type == "remote":
@@ -152,6 +151,24 @@ class DeploymentEngine:
                     effective_type = "docker_remote"
                 else:
                     effective_type = "docker_local"
+
+                # Use config_file from options first (passed from frontend with correct path)
+                # Fallback to looking up from device_ref.targets, then legacy naming convention
+                if options and options.get("config_file"):
+                    config_file = options["config_file"]
+                elif (
+                    device_ref.get("targets")
+                    and target_override in device_ref["targets"]
+                ):
+                    target_info = device_ref["targets"][target_override]
+                    config_file = (
+                        target_info.get("config_file")
+                        or f"devices/{target_override}.yaml"
+                    )
+                else:
+                    # Legacy fallback: target ID as filename
+                    config_file = f"devices/{target_override}.yaml"
+
                 logger.info(
                     f"Device {device_id}: using target override config_file={config_file}, effective_type={effective_type}"
                 )
@@ -279,6 +296,37 @@ class DeploymentEngine:
                     device_deployment.status = DeploymentStatus.FAILED
                     device_deployment.error = "Device config not found"
                     continue
+
+                # Resolve mDNS .local hostnames to IP addresses
+                # This is needed because Docker containers on Windows cannot resolve .local
+                connection = device_deployment.connection or {}
+                host_fields = ["host", "recamera_ip", "nodered_host"]
+                for field in host_fields:
+                    host_value = connection.get(field)
+                    if host_value and is_mdns_hostname(host_value):
+                        await self._broadcast_log(
+                            deployment_id,
+                            f"Resolving mDNS hostname: {host_value}",
+                            level="info",
+                            device_id=device_deployment.device_id,
+                        )
+                        resolved_ip = await resolve_mdns_hostname(host_value)
+                        if resolved_ip:
+                            connection[field] = resolved_ip
+                            device_deployment.connection = connection
+                            await self._broadcast_log(
+                                deployment_id,
+                                f"Resolved {host_value} → {resolved_ip}",
+                                level="info",
+                                device_id=device_deployment.device_id,
+                            )
+                        else:
+                            await self._broadcast_log(
+                                deployment_id,
+                                f"Warning: Could not resolve {host_value}, using as-is",
+                                level="warning",
+                                device_id=device_deployment.device_id,
+                            )
 
                 # Get the appropriate deployer
                 deployer = self.deployers.get(config.type)
