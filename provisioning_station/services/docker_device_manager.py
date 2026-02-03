@@ -5,6 +5,7 @@ Docker device management service - Local and SSH-based container management
 import asyncio
 import json
 import logging
+import platform
 import socket
 import subprocess
 from typing import Any, Dict, List
@@ -20,6 +21,14 @@ from ..models.docker_device import (
 from ..utils.compose_labels import parse_container_labels
 
 logger = logging.getLogger(__name__)
+
+
+def _get_subprocess_kwargs() -> Dict[str, Any]:
+    """Get subprocess kwargs with hidden window on Windows"""
+    kwargs: Dict[str, Any] = {}
+    if platform.system() == "Windows":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    return kwargs
 
 
 class DockerDeviceManager:
@@ -39,6 +48,7 @@ class DockerDeviceManager:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                **_get_subprocess_kwargs(),
             )
             if result.returncode != 0:
                 raise RuntimeError("Docker not available")
@@ -76,6 +86,7 @@ class DockerDeviceManager:
                 capture_output=True,
                 text=True,
                 timeout=30,
+                **_get_subprocess_kwargs(),
             )
 
             if result.returncode != 0:
@@ -231,6 +242,7 @@ class DockerDeviceManager:
                     capture_output=True,
                     text=True,
                     timeout=30,
+                    **_get_subprocess_kwargs(),
                 )
                 result = await asyncio.to_thread(
                     subprocess.run,
@@ -238,6 +250,7 @@ class DockerDeviceManager:
                     capture_output=True,
                     text=True,
                     timeout=30,
+                    **_get_subprocess_kwargs(),
                 )
             else:
                 result = await asyncio.to_thread(
@@ -246,6 +259,7 @@ class DockerDeviceManager:
                     capture_output=True,
                     text=True,
                     timeout=30,
+                    **_get_subprocess_kwargs(),
                 )
 
             if result.returncode != 0:
@@ -314,6 +328,7 @@ class DockerDeviceManager:
                         capture_output=True,
                         text=True,
                         timeout=10,
+                        **_get_subprocess_kwargs(),
                     )
                     remaining_containers = [
                         n for n in check_result.stdout.strip().split("\n") if n
@@ -335,6 +350,7 @@ class DockerDeviceManager:
                         capture_output=True,
                         text=True,
                         timeout=60,
+                        **_get_subprocess_kwargs(),
                     )
                     if result.returncode == 0:
                         images_removed.append(image)
@@ -359,6 +375,7 @@ class DockerDeviceManager:
                     capture_output=True,
                     text=True,
                     timeout=10,
+                    **_get_subprocess_kwargs(),
                 )
                 all_volumes = [v for v in result.stdout.strip().split("\n") if v]
 
@@ -382,6 +399,7 @@ class DockerDeviceManager:
                             capture_output=True,
                             text=True,
                             timeout=30,
+                            **_get_subprocess_kwargs(),
                         )
                         if vol_result.returncode == 0:
                             volumes_removed.append(volume)
@@ -412,6 +430,7 @@ class DockerDeviceManager:
                 capture_output=True,
                 text=True,
                 timeout=120,
+                **_get_subprocess_kwargs(),
             )
 
             if result.returncode != 0:

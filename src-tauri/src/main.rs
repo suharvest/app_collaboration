@@ -27,6 +27,19 @@ static SIDECAR_CHILD: Mutex<Option<CommandChild>> = Mutex::new(None);
 /// Graceful shutdown timeout in seconds
 const GRACEFUL_SHUTDOWN_TIMEOUT_SECS: u64 = 5;
 
+/// Windows: CREATE_NO_WINDOW flag to hide console windows
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+/// Create a Command with hidden window on Windows
+#[cfg(windows)]
+fn hidden_command(program: &str) -> std::process::Command {
+    use std::os::windows::process::CommandExt;
+    let mut cmd = std::process::Command::new(program);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
 /// Get an available port for the backend server
 fn get_available_port() -> u16 {
     portpicker::pick_unused_port().expect("No available ports")
@@ -46,9 +59,8 @@ fn is_process_running(pid: u32) -> bool {
     }
     #[cfg(windows)]
     {
-        use std::process::Command;
         // Use tasklist to check if process exists
-        Command::new("tasklist")
+        hidden_command("tasklist")
             .args(["/FI", &format!("PID eq {}", pid), "/NH"])
             .output()
             .map(|o| {
@@ -78,9 +90,8 @@ fn send_terminate_signal(pid: u32) -> bool {
     }
     #[cfg(windows)]
     {
-        use std::process::Command;
         // taskkill /T terminates child processes as well
-        Command::new("taskkill")
+        hidden_command("taskkill")
             .args(["/PID", &pid.to_string(), "/T"])
             .output()
             .map(|o| o.status.success())
@@ -107,9 +118,8 @@ fn force_kill_process(pid: u32) -> bool {
     }
     #[cfg(windows)]
     {
-        use std::process::Command;
         // taskkill with /F /T forces termination including child processes
-        Command::new("taskkill")
+        hidden_command("taskkill")
             .args(["/F", "/PID", &pid.to_string(), "/T"])
             .output()
             .map(|o| o.status.success())
@@ -155,10 +165,9 @@ fn kill_child_processes(parent_pid: u32) {
     }
     #[cfg(windows)]
     {
-        use std::process::Command;
         // On Windows, taskkill /T already handles child processes
         // This is a fallback using wmic
-        let _ = Command::new("wmic")
+        let _ = hidden_command("wmic")
             .args([
                 "process",
                 "where",
@@ -180,8 +189,7 @@ fn force_kill_by_name() {
     }
     #[cfg(windows)]
     {
-        use std::process::Command;
-        let _ = Command::new("taskkill")
+        let _ = hidden_command("taskkill")
             .args(["/F", "/IM", "provisioning-station.exe"])
             .output();
     }
@@ -230,10 +238,8 @@ fn cleanup_leftover_processes() -> u32 {
 
     #[cfg(windows)]
     {
-        use std::process::Command;
-
         // Use wmic to find provisioning-station processes
-        let output = Command::new("wmic")
+        let output = hidden_command("wmic")
             .args([
                 "process",
                 "where",
@@ -251,7 +257,7 @@ fn cleanup_leftover_processes() -> u32 {
                     println!("Found leftover provisioning-station process: PID {}", pid);
 
                     // On Windows, just force terminate
-                    let _ = Command::new("taskkill")
+                    let _ = hidden_command("taskkill")
                         .args(["/F", "/PID", &pid.to_string(), "/T"])
                         .output();
 
@@ -739,6 +745,13 @@ async fn start_sidecar(
             cmd.args(&args)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped());
+
+            // Hide console window on Windows
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd.creation_flags(CREATE_NO_WINDOW);
+            }
 
             let mut process = cmd.spawn()?;
             let pid = process.id();

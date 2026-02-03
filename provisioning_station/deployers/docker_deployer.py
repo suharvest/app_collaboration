@@ -175,6 +175,7 @@ class DockerDeployer(BaseDeployer):
                         service.port,
                         service.health_check_endpoint,
                         timeout=30,
+                        progress_callback=progress_callback,
                     )
                     if not healthy and service.required:
                         all_healthy = False
@@ -285,22 +286,32 @@ class DockerDeployer(BaseDeployer):
             return {"success": False, "error": str(e)}
 
     async def _check_service_health(
-        self, port: int, endpoint: str, timeout: int = 30
+        self, port: int, endpoint: str, timeout: int = 30, progress_callback=None
     ) -> bool:
         """Check if a service is healthy"""
         import httpx
 
         url = f"http://localhost:{port}{endpoint}"
         start_time = asyncio.get_event_loop().time()
+        attempt = 0
 
         while asyncio.get_event_loop().time() - start_time < timeout:
+            attempt += 1
             try:
                 async with httpx.AsyncClient() as client:
                     response = await client.get(url, timeout=5)
                     if response.status_code < 500:
                         return True
-            except Exception:
-                pass
+            except Exception as e:
+                if progress_callback:
+                    elapsed = int(asyncio.get_event_loop().time() - start_time)
+                    await self._report_progress(
+                        progress_callback,
+                        "health_check",
+                        min(50, elapsed * 100 // timeout),
+                        f"Waiting for service (attempt {attempt}, {elapsed}s/{timeout}s)...",
+                    )
+                logger.debug(f"Health check attempt {attempt} failed: {e}")
 
             await asyncio.sleep(2)
 

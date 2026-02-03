@@ -267,11 +267,17 @@ class StreamProxy:
             stream_info.process = process
             stream_info._is_sync_process = True
         else:
-            stream_info.process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+            # On Windows, hide console window for async subprocess too
+            kwargs = {
+                "stdout": asyncio.subprocess.PIPE,
+                "stderr": asyncio.subprocess.PIPE,
+            }
+            if platform.system() == "Windows":
+                import subprocess
+
+                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+            stream_info.process = await asyncio.create_subprocess_exec(*cmd, **kwargs)
             stream_info._is_sync_process = False
 
         # Drain stderr concurrently to prevent pipe buffer deadlock.
@@ -594,11 +600,17 @@ class StreamProxy:
             str(hls_output),
         ]
 
-        stream_info.process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        # On Windows, hide console window
+        kwargs = {
+            "stdout": asyncio.subprocess.PIPE,
+            "stderr": asyncio.subprocess.PIPE,
+        }
+        if platform.system() == "Windows":
+            import subprocess
+
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+        stream_info.process = await asyncio.create_subprocess_exec(*cmd, **kwargs)
 
         asyncio.create_task(self._monitor_process(stream_info))
 

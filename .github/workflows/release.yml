@@ -104,7 +104,7 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             sidecar-target: x86_64-pc-windows-msvc
-            bundles: ''
+            bundles: 'nsis'
           - os: macos-latest
             target: aarch64-apple-darwin
             sidecar-target: aarch64-apple-darwin
@@ -194,14 +194,14 @@ jobs:
 
             | Platform | Download |
             |----------|----------|
-            | Windows (x64) | `.msi` or `.exe` installer |
+            | Windows (x64) | `.exe` installer |
             | macOS (Apple Silicon) | `.dmg` disk image |
             | Linux (ARM64) | `.deb` package |
 
             ## Installation Notes
 
             ### Windows
-            Download and run the `.msi` installer. You may see a SmartScreen warning - click "More info" then "Run anyway".
+            Download and run the `.exe` installer. You may see a SmartScreen warning - click "More info" then "Run anyway".
 
             ### macOS
             Download the `.dmg` file, open it, and drag the app to Applications.
