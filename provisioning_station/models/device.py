@@ -341,6 +341,7 @@ class UserInputConfig(BaseModel):
     required: bool = False
     validation: Optional[Dict[str, str]] = None
     options: List[Dict[str, str]] = []  # For select type
+    row: Optional[int] = None  # Group inputs with same row number on same line
 
 
 # Preview Configuration

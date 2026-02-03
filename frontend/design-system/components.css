@@ -2896,7 +2896,12 @@ button.spinning {
   @apply flex items-center gap-2 cursor-pointer text-sm text-text-secondary;
 }
 
-.checkbox-label input[type="checkbox"] {
+.checkbox-label-right {
+  @apply flex items-center justify-between gap-2 cursor-pointer text-sm text-text-secondary;
+}
+
+.checkbox-label input[type="checkbox"],
+.checkbox-label-right input[type="checkbox"] {
   @apply w-4 h-4 rounded border-border text-primary focus:ring-primary;
 }
 

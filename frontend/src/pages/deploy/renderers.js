@@ -610,7 +610,7 @@ function renderAutoSectionContent(device, state, sectionDescription, isScript) {
     ${renderServiceSwitchWarning(device.type)}
 
     <!-- User Inputs (for script type) -->
-    ${isScript && state.details?.user_inputs ? renderUserInputs(device, state.details.user_inputs) : ''}
+    ${isScript && device.user_inputs ? renderUserInputs(device, device.user_inputs) : ''}
 
     <!-- Markdown Content from section.description (pre-deployment instructions) -->
     ${sectionDescription ? `
@@ -625,7 +625,7 @@ function renderAutoSectionContent(device, state, sectionDescription, isScript) {
     ${device.type === 'ssh_deb' || device.type === 'docker_remote' || device.type === 'recamera_cpp' || device.type === 'recamera_nodered' ? renderSSHForm(device) : ''}
 
     <!-- Additional User Inputs (for docker_remote devices, excluding SSH fields) -->
-    ${device.type === 'docker_remote' && state.details?.user_inputs ? renderUserInputs(device, state.details.user_inputs, ['host', 'username', 'password', 'port']) : ''}
+    ${device.type === 'docker_remote' && device.user_inputs ? renderUserInputs(device, device.user_inputs, ['host', 'username', 'password', 'port']) : ''}
 
     <!-- Serial Port Selector (for ESP32/Himax USB devices) -->
     ${device.type === 'esp32_usb' || device.type === 'himax_usb' ? renderSerialPortSelector(device) : ''}
@@ -705,48 +705,81 @@ export function renderLogEntry(log) {
 // User Inputs
 // ============================================
 
-export function renderUserInputs(device, inputs, excludeIds = []) {
+export function renderUserInputs(device, inputs, excludeIds = [], noWrapper = false) {
   if (!inputs || !inputs.length) return '';
 
   // Filter out excluded inputs (e.g., those already handled by SSH form)
   const filteredInputs = inputs.filter(input => !excludeIds.includes(input.id));
   if (!filteredInputs.length) return '';
 
-  return `
-    <div class="deploy-user-inputs">
-      ${filteredInputs.map(input => {
-        if (input.type === 'checkbox') {
-          const isChecked = input.default === 'true' || input.default === true;
-          return `
-            <div class="form-group form-group-checkbox">
-              <label class="checkbox-label">
-                <input
-                  type="checkbox"
-                  id="input-${device.id}-${input.id}"
-                  ${isChecked ? 'checked' : ''}
-                />
-                <span>${getLocalizedField(input, 'name')}</span>
-              </label>
-              ${input.description ? `<p class="text-xs text-text-muted">${getLocalizedField(input, 'description')}</p>` : ''}
-            </div>
-          `;
-        }
-        return `
-          <div class="form-group">
-            <label>${getLocalizedField(input, 'name')}</label>
-            ${input.description ? `<p class="text-xs text-text-muted mb-1">${getLocalizedField(input, 'description')}</p>` : ''}
+  const renderSingleInput = (input, inRow = false) => {
+    if (input.type === 'checkbox') {
+      const isChecked = input.default === 'true' || input.default === true;
+      return `
+        <div class="form-group form-group-checkbox"${inRow ? ' style="min-width: 160px;"' : ''}>
+          <label class="checkbox-label">
             <input
-              type="${input.type === 'password' ? 'password' : 'text'}"
+              type="checkbox"
               id="input-${device.id}-${input.id}"
-              placeholder="${input.placeholder || ''}"
-              value="${input.default || ''}"
-              ${input.required ? 'required' : ''}
+              ${isChecked ? 'checked' : ''}
             />
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
+            <span>${getLocalizedField(input, 'name')}</span>
+          </label>
+          ${input.description ? `<p class="text-xs text-text-muted">${getLocalizedField(input, 'description')}</p>` : ''}
+        </div>
+      `;
+    }
+    return `
+      <div class="form-group${inRow ? ' flex-1' : ''}">
+        <label>${getLocalizedField(input, 'name')}</label>
+        ${input.description ? `<p class="text-xs text-text-muted mb-1">${getLocalizedField(input, 'description')}</p>` : ''}
+        <input
+          type="${input.type === 'password' ? 'password' : 'text'}"
+          id="input-${device.id}-${input.id}"
+          placeholder="${input.placeholder || ''}"
+          value="${input.default || ''}"
+          ${input.required ? 'required' : ''}
+        />
+      </div>
+    `;
+  };
+
+  // Group inputs by row property while preserving order
+  // Inputs with same row number go in same flex row
+  // Inputs without row property render as standalone
+  // Order is determined by first appearance of each row/standalone item
+  const rows = new Map(); // row number -> inputs[]
+  const renderOrder = []; // { type: 'row', row: number } or { type: 'standalone', input }
+
+  filteredInputs.forEach(input => {
+    if (input.row !== undefined) {
+      if (!rows.has(input.row)) {
+        rows.set(input.row, []);
+        renderOrder.push({ type: 'row', row: input.row });
+      }
+      rows.get(input.row).push(input);
+    } else {
+      renderOrder.push({ type: 'standalone', input });
+    }
+  });
+
+  let content = '';
+
+  // Render in original order
+  for (const item of renderOrder) {
+    if (item.type === 'row') {
+      const rowInputs = rows.get(item.row);
+      if (rowInputs.length > 1) {
+        content += `<div class="flex gap-4 items-start">${rowInputs.map(input => renderSingleInput(input, true)).join('')}</div>`;
+      } else {
+        content += renderSingleInput(rowInputs[0], false);
+      }
+    } else {
+      content += renderSingleInput(item.input, false);
+    }
+  }
+
+  return noWrapper ? content : `<div class="deploy-user-inputs">${content}</div>`;
 }
 
 // ============================================
@@ -864,9 +897,20 @@ export function renderDockerTargetContent(device) {
     `;
   }
 
-  // SSH form for remote target (placed after description, before deploy button)
+  // User inputs from target config (e.g., device_name, no_audio)
+  // For remote: merge with SSH form in same container
+  // For local: render as standalone container
+  const excludeIds = isRemote ? ['host', 'username', 'password', 'port'] : [];
+  const userInputsContent = target.user_inputs
+    ? renderUserInputs(device, target.user_inputs, excludeIds, true)  // noWrapper=true
+    : '';
+
   if (isRemote) {
-    html += renderSSHForm(device, target);
+    // SSH form with user_inputs merged inside
+    html += renderSSHForm(device, target, userInputsContent);
+  } else if (userInputsContent) {
+    // Local: wrap user_inputs in container
+    html += `<div class="deploy-user-inputs">${userInputsContent}</div>`;
   }
 
   return html;
@@ -898,7 +942,7 @@ export function renderRecameraCppTargetContent(device) {
 // SSH Form
 // ============================================
 
-export function renderSSHForm(device, mode = null) {
+export function renderSSHForm(device, mode = null, additionalContent = '') {
   const deviceStates = getDeviceStates();
   const state = deviceStates[device.id] || {};
   const conn = state.connection || {};
@@ -939,6 +983,7 @@ export function renderSSHForm(device, mode = null) {
           <input type="password" id="ssh-pass-${device.id}" value="${conn.password || ''}">
         </div>
       </div>
+      ${additionalContent}
       <button class="btn btn-secondary w-full" id="test-ssh-${device.id}" data-device-id="${device.id}">
         ${t('deploy.connection.test')}
       </button>
