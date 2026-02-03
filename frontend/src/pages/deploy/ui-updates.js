@@ -22,10 +22,11 @@ import {
 } from './utils.js';
 import {
   renderSelectedDeviceContent,
-  renderDockerTargetContent,
-  renderRecameraCppTargetContent,
+  renderContentArea,
+  renderDeployControls,
   renderPostDeploymentSection,
 } from './renderers.js';
+import { getSelectedTarget } from './utils.js';
 
 // ============================================
 // Section UI Updates
@@ -211,13 +212,21 @@ export function updateDockerTargetUI(deviceId, container, testSSHHandler = null,
     if (radio) radio.checked = isSelected;
   });
 
-  // Re-render target content based on device type
+  // Re-render target content using unified renderers
   const contentEl = document.getElementById(`target-content-${deviceId}`);
   if (contentEl) {
+    const target = getSelectedTarget(device);
+    const isRemote = target?.id === 'remote' || target?.id?.endsWith('_remote') || target?.id?.includes('remote');
+
+    // For recamera_cpp: only content area (SSH is outside target-content)
+    // For docker_deploy: content area + controls
     if (device.type === 'recamera_cpp') {
-      contentEl.innerHTML = renderRecameraCppTargetContent(device);
+      contentEl.innerHTML = renderContentArea(device);
     } else {
-      contentEl.innerHTML = renderDockerTargetContent(device);
+      contentEl.innerHTML = `
+        ${renderContentArea(device)}
+        ${renderDeployControls(device, { isRemote, target })}
+      `;
     }
 
     // Re-attach SSH test button handler if provided

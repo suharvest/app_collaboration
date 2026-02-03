@@ -17,6 +17,19 @@ function processMarkdown(html) {
   if (!currentSolution?.id) return html;
   return processMarkdownImages(html, currentSolution.id, getAssetUrl);
 }
+
+/**
+ * Convert basic inline markdown to HTML
+ * Supports: `code`, **bold**
+ * @param {string} text - Plain text with markdown
+ * @returns {string} HTML string
+ */
+function inlineMarkdown(text) {
+  if (!text) return '';
+  return escapeHtml(text)
+    .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+}
 import {
   getCurrentSolution,
   getDeviceStates,
@@ -366,35 +379,43 @@ export function renderDeployOption(device) {
 export function renderSelectedDeviceContent(device) {
   if (!device) return '';
 
+  const currentSolution = getCurrentSolution();
   const deviceStates = getDeviceStates();
   const state = deviceStates[device.id] || {};
   const section = device.section || {};
-  const sectionDescription = section.description || '';
   const sectionTroubleshoot = section.troubleshoot || '';
-  const isCompleted = state.deploymentStatus === 'completed';
+
+  // Build controls based on device type using unified function
+  let controls = '';
+
+  // Serial port selector for USB devices
+  if (SERIAL_DEVICE_TYPES.includes(device.type)) {
+    controls += renderSerialPortSelector(device);
+  }
+
+  // Model selection for Himax devices
+  if (device.type === 'himax_usb') {
+    controls += renderModelSelection(device);
+  }
+
+  // SSH form for SSH-based devices
+  if (SSH_DEVICE_TYPES.includes(device.type)) {
+    controls += renderSSHForm(device);
+  }
 
   return `
     <div class="deploy-selected-card" data-device-id="${device.id}">
       <!-- Service Switch Warning -->
       ${renderServiceSwitchWarning(device.type)}
 
-      <!-- Pre-deployment Instructions -->
-      ${sectionDescription ? `
-        <div class="deploy-pre-instructions">
-          <div class="markdown-content">${processMarkdown(sectionDescription)}</div>
-        </div>
-      ` : ''}
+      <!-- Content area: wiring + description -->
+      ${renderWiringSection(section.wiring, currentSolution?.id)}
+      ${renderDescriptionSection(section.description)}
 
-      <!-- Serial Port Selector (for ESP32/Himax devices) -->
-      ${device.type === 'esp32_usb' || device.type === 'himax_usb' ? renderSerialPortSelector(device) : ''}
+      <!-- Deploy controls -->
+      ${controls}
 
-      <!-- Model Selection (for Himax devices with models) -->
-      ${device.type === 'himax_usb' ? renderModelSelection(device) : ''}
-
-      <!-- Connection Settings (placed after instructions, before deploy button) -->
-      ${device.type === 'ssh_deb' || device.type === 'docker_remote' || device.type === 'recamera_cpp' || device.type === 'recamera_nodered' ? renderSSHForm(device) : ''}
-
-      <!-- Deploy Action Area -->
+      <!-- Deploy Action Area (simplified button for single_choice mode) -->
       <div class="deploy-action-area">
         <button class="deploy-action-btn ${getButtonClass(state)}"
                 id="deploy-btn-${device.id}"
@@ -466,8 +487,7 @@ export function renderDeploySection(device, stepNumber) {
       <div class="deploy-section-content ${state.sectionExpanded ? 'expanded' : ''}" id="content-${device.id}">
         ${isManual ? renderManualSectionContent(device, state, sectionDescription) :
           isPreview ? renderPreviewSectionContent(device, sectionDescription) :
-          isDockerDeploy ? renderDockerDeploySectionContent(device, state) :
-          isRecameraCppWithTargets ? renderRecameraCppSectionContent(device, state) :
+          (isDockerDeploy || isRecameraCppWithTargets) ? renderTargetSectionContent(device, state) :
           renderAutoSectionContent(device, state, sectionDescription, isScript)}
 
         <!-- Troubleshoot Section (shown below deploy button) -->
@@ -485,169 +505,270 @@ export function renderDeploySection(device, stepNumber) {
 }
 
 // ============================================
-// Section Content Helpers
+// Unified Rendering Architecture
 // ============================================
 
-function renderManualSectionContent(device, state, sectionDescription) {
-  return `
-    <!-- Manual: Instructions first, then mark done button -->
-    ${sectionDescription ? `
-      <div class="markdown-content">
-        ${processMarkdown(sectionDescription)}
-      </div>
-    ` : ''}
+// Device types that require SSH connection form
+const SSH_DEVICE_TYPES = ['ssh_deb', 'docker_remote', 'recamera_cpp', 'recamera_nodered'];
 
-    <!-- Deploy Action Area -->
+// Device types that require serial port selector
+const SERIAL_DEVICE_TYPES = ['esp32_usb', 'himax_usb'];
+
+/**
+ * Render wiring section (diagram + steps)
+ * Unified wiring renderer for all device types
+ * @param {Object} wiring - Wiring config with image and steps
+ * @param {string} solutionId - Solution ID for asset URL
+ * @returns {string} HTML string
+ */
+export function renderWiringSection(wiring, solutionId) {
+  if (!wiring) return '';
+
+  const wiringSteps = getLocalizedField(wiring, 'steps') || [];
+  if (wiringSteps.length === 0 && !wiring.image) return '';
+
+  return `
+    <div class="deploy-wiring-section">
+      ${wiring.image ? `
+        <div class="deploy-wiring-image">
+          <img src="${getAssetUrl(solutionId, wiring.image)}" alt="Wiring diagram">
+        </div>
+      ` : ''}
+      ${wiringSteps.length > 0 ? `
+        <div class="deploy-wiring-steps">
+          <ol>
+            ${wiringSteps.map(step => `<li>${inlineMarkdown(step)}</li>`).join('')}
+          </ol>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+/**
+ * Render description section (markdown content)
+ * Unified description renderer for all device types
+ * @param {string} description - Markdown description content
+ * @returns {string} HTML string
+ */
+export function renderDescriptionSection(description) {
+  if (!description) return '';
+
+  return `
+    <div class="deploy-pre-instructions">
+      <div class="markdown-content">
+        ${processMarkdown(description)}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Render content area (wiring + description)
+ * Used for all device types with targets
+ * @param {Object} device - Device config
+ * @param {Object} targetOverride - Optional target to use instead of selected target
+ * @returns {string} HTML string
+ */
+export function renderContentArea(device, targetOverride = null) {
+  const currentSolution = getCurrentSolution();
+  const target = targetOverride || getSelectedTarget(device);
+
+  // For devices with targets, use target section
+  if (target) {
+    const targetSection = target.section || {};
+    return `
+      ${renderWiringSection(targetSection.wiring, currentSolution?.id)}
+      ${renderDescriptionSection(targetSection.description)}
+    `;
+  }
+
+  // For devices without targets, use device section
+  const section = device.section || {};
+  return `
+    ${renderWiringSection(section.wiring, currentSolution?.id)}
+    ${renderDescriptionSection(section.description)}
+  `;
+}
+
+/**
+ * Render deploy controls (SSH form, serial port, model selection, user inputs)
+ * Unified control renderer - device type only affects which controls are shown
+ * @param {Object} device - Device config
+ * @param {Object} options - Additional options
+ * @returns {string} HTML string
+ */
+export function renderDeployControls(device, options = {}) {
+  const { isRemote = false, target = null } = options;
+  const controls = [];
+
+  // SSH form for SSH-based devices
+  if (SSH_DEVICE_TYPES.includes(device.type)) {
+    // For docker_remote or when isRemote, render SSH form with user_inputs merged
+    if (device.type === 'docker_remote' || isRemote) {
+      const excludeIds = ['host', 'username', 'password', 'port'];
+      const userInputsContent = target?.user_inputs
+        ? renderUserInputs(device, target.user_inputs, excludeIds, true)
+        : (device.user_inputs ? renderUserInputs(device, device.user_inputs, excludeIds, true) : '');
+      controls.push(renderSSHForm(device, target, userInputsContent));
+    } else {
+      controls.push(renderSSHForm(device));
+    }
+  }
+
+  // SSH form for docker_deploy with remote target (docker_deploy is not in SSH_DEVICE_TYPES)
+  if (device.type === 'docker_deploy' && isRemote) {
+    const excludeIds = ['host', 'username', 'password', 'port'];
+    const userInputsContent = target?.user_inputs
+      ? renderUserInputs(device, target.user_inputs, excludeIds, true)
+      : '';
+    controls.push(renderSSHForm(device, target, userInputsContent));
+  }
+
+  // Serial port selector for USB devices
+  if (SERIAL_DEVICE_TYPES.includes(device.type)) {
+    controls.push(renderSerialPortSelector(device));
+  }
+
+  // Model selection for Himax devices
+  if (device.type === 'himax_usb') {
+    controls.push(renderModelSelection(device));
+  }
+
+  // User inputs for script type
+  if (device.type === 'script' && device.user_inputs) {
+    controls.push(renderUserInputs(device, device.user_inputs));
+  }
+
+  // User inputs for local docker_deploy target (non-SSH inputs)
+  if (device.type === 'docker_deploy' && !isRemote && target?.user_inputs) {
+    controls.push(renderUserInputs(device, target.user_inputs));
+  }
+
+  return controls.join('');
+}
+
+/**
+ * Render deploy action area (button with title and description)
+ * Unified button renderer for all device types
+ * @param {Object} device - Device config
+ * @param {Object} state - Device state
+ * @param {boolean} isManual - Whether this is a manual step
+ * @returns {string} HTML string
+ */
+export function renderDeployActionArea(device, state, isManual = false) {
+  const icon = isManual
+    ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="9 11 12 14 22 4"/>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>`
+    : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>`;
+
+  const title = isManual ? t('deploy.actions.manual') : t('deploy.actions.auto');
+  const desc = isManual ? t('deploy.actions.manualDesc') : t('deploy.actions.autoDesc');
+
+  return `
     <div class="deploy-action-area">
       <div class="deploy-action-title">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="9 11 12 14 22 4"/>
-          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-        </svg>
-        ${t('deploy.actions.manual')}
+        ${icon}
+        ${title}
       </div>
-      <p class="deploy-action-desc">${t('deploy.actions.manualDesc')}</p>
+      <p class="deploy-action-desc">${desc}</p>
       <button class="deploy-action-btn ${getButtonClass(state)}"
               id="deploy-btn-${device.id}"
-              data-device-id="${device.id}">
-        ${getDeployButtonContent(state, true)}
+              data-device-id="${device.id}"
+              ${state.deploymentStatus === 'running' ? 'disabled' : ''}>
+        ${getDeployButtonContent(state, isManual)}
       </button>
     </div>
   `;
 }
 
+// ============================================
+// Section Content Renderers (Unified Structure)
+// ============================================
+
+/**
+ * Render section content for devices with targets (docker_deploy, recamera_cpp)
+ * Unified structure: target selector -> warnings -> content -> controls -> action
+ */
+function renderTargetSectionContent(device, state) {
+  const target = getSelectedTarget(device);
+  const isRemote = target?.id === 'remote' || target?.id?.endsWith('_remote') || target?.id?.includes('remote');
+
+  return `
+    <!-- Target selector -->
+    ${renderDockerTargetSelector(device)}
+
+    <!-- Service Switch Warning (for recamera types) -->
+    ${renderServiceSwitchWarning(device.type)}
+
+    <!-- Connection settings before content for recamera_cpp -->
+    ${device.type === 'recamera_cpp' ? renderSSHForm(device) : ''}
+
+    <!-- Content area (wiring + description) -->
+    <div class="deploy-target-content" id="target-content-${device.id}">
+      ${renderContentArea(device)}
+      ${device.type !== 'recamera_cpp' ? renderDeployControls(device, { isRemote, target }) : ''}
+    </div>
+
+    <!-- Deploy button -->
+    ${renderDeployActionArea(device, state)}
+  `;
+}
+
+/**
+ * Render manual section content
+ * Simple structure: description -> mark done button
+ */
+function renderManualSectionContent(device, state, sectionDescription) {
+  return `
+    ${renderDescriptionSection(sectionDescription)}
+    ${renderDeployActionArea(device, state, true)}
+  `;
+}
+
+/**
+ * Render preview section content
+ * Structure: description -> preview inputs -> preview container
+ */
 function renderPreviewSectionContent(device, sectionDescription) {
   return `
-    <!-- Preview: Live video + MQTT inference display -->
-    ${sectionDescription ? `
-      <div class="deploy-pre-instructions">
-        <div class="markdown-content">
-          ${processMarkdown(sectionDescription)}
-        </div>
-      </div>
-    ` : ''}
-
-    <!-- Preview User Inputs (auto-filled from previous steps) -->
+    ${renderDescriptionSection(sectionDescription)}
     ${renderPreviewInputs(device)}
-
-    <!-- Preview Window Container -->
     <div class="preview-container-wrapper" id="preview-container-${device.id}"></div>
   `;
 }
 
-function renderDockerDeploySectionContent(device, state) {
-  return `
-    <!-- Docker Deploy: local/remote target selector -->
-    ${renderDockerTargetSelector(device)}
-
-    <!-- Target-specific content (description, wiring, SSH form for remote) -->
-    <div class="deploy-target-content" id="target-content-${device.id}">
-      ${renderDockerTargetContent(device)}
-    </div>
-
-    <!-- Deploy Action Area -->
-    <div class="deploy-action-area">
-      <div class="deploy-action-title">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5"/>
-          <path d="M2 12l10 5 10-5"/>
-        </svg>
-        ${t('deploy.actions.auto')}
-      </div>
-      <p class="deploy-action-desc">${t('deploy.actions.autoDesc')}</p>
-      <button class="deploy-action-btn ${getButtonClass(state)}"
-              id="deploy-btn-${device.id}"
-              data-device-id="${device.id}"
-              ${state.deploymentStatus === 'running' ? 'disabled' : ''}>
-        ${getDeployButtonContent(state, false)}
-      </button>
-    </div>
-  `;
-}
-
-function renderRecameraCppSectionContent(device, state) {
-  return `
-    <!-- reCamera C++ with model targets: model selector + SSH + deploy -->
-    ${renderDockerTargetSelector(device)}
-
-    <!-- Service Switch Warning -->
-    ${renderServiceSwitchWarning(device.type)}
-
-    <!-- Connection Settings (SSH) -->
-    ${renderSSHForm(device)}
-
-    <!-- Target-specific content -->
-    <div class="deploy-target-content" id="target-content-${device.id}">
-      ${renderRecameraCppTargetContent(device)}
-    </div>
-
-    <!-- Deploy Action Area -->
-    <div class="deploy-action-area">
-      <div class="deploy-action-title">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5"/>
-          <path d="M2 12l10 5 10-5"/>
-        </svg>
-        ${t('deploy.actions.auto')}
-      </div>
-      <p class="deploy-action-desc">${t('deploy.actions.autoDesc')}</p>
-      <button class="deploy-action-btn ${getButtonClass(state)}"
-              id="deploy-btn-${device.id}"
-              data-device-id="${device.id}"
-              ${state.deploymentStatus === 'running' ? 'disabled' : ''}>
-        ${getDeployButtonContent(state, false)}
-      </button>
-    </div>
-  `;
-}
-
+/**
+ * Render auto section content (for devices without targets)
+ * Unified structure: warning -> user inputs -> description -> controls -> action
+ */
 function renderAutoSectionContent(device, state, sectionDescription, isScript) {
+  const section = device.section || {};
+
   return `
-    <!-- Auto: Deploy button first, then instructions -->
     <!-- Service Switch Warning -->
     ${renderServiceSwitchWarning(device.type)}
 
-    <!-- User Inputs (for script type) -->
+    <!-- User Inputs (for script type, placed before description) -->
     ${isScript && device.user_inputs ? renderUserInputs(device, device.user_inputs) : ''}
 
-    <!-- Markdown Content from section.description (pre-deployment instructions) -->
-    ${sectionDescription ? `
-      <div class="deploy-pre-instructions">
-        <div class="markdown-content">
-          ${processMarkdown(sectionDescription)}
-        </div>
-      </div>
-    ` : ''}
+    <!-- Content area: wiring + description -->
+    ${renderWiringSection(section.wiring, getCurrentSolution()?.id)}
+    ${renderDescriptionSection(sectionDescription)}
 
-    <!-- Connection Settings (for SSH-based devices) - placed after instructions, before deploy button -->
-    ${device.type === 'ssh_deb' || device.type === 'docker_remote' || device.type === 'recamera_cpp' || device.type === 'recamera_nodered' ? renderSSHForm(device) : ''}
-
-    <!-- Additional User Inputs (for docker_remote devices, excluding SSH fields) -->
+    <!-- Deploy controls (SSH form, serial port, etc.) -->
+    ${SSH_DEVICE_TYPES.includes(device.type) ? renderSSHForm(device) : ''}
     ${device.type === 'docker_remote' && device.user_inputs ? renderUserInputs(device, device.user_inputs, ['host', 'username', 'password', 'port']) : ''}
+    ${SERIAL_DEVICE_TYPES.includes(device.type) ? renderSerialPortSelector(device) : ''}
 
-    <!-- Serial Port Selector (for ESP32/Himax USB devices) -->
-    ${device.type === 'esp32_usb' || device.type === 'himax_usb' ? renderSerialPortSelector(device) : ''}
-
-    <!-- Deploy Action Area -->
-    <div class="deploy-action-area">
-      <div class="deploy-action-title">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5"/>
-          <path d="M2 12l10 5 10-5"/>
-        </svg>
-        ${t('deploy.actions.auto')}
-      </div>
-      <p class="deploy-action-desc">${t('deploy.actions.autoDesc')}</p>
-      <button class="deploy-action-btn ${getButtonClass(state)}"
-              id="deploy-btn-${device.id}"
-              data-device-id="${device.id}"
-              ${state.deploymentStatus === 'running' ? 'disabled' : ''}>
-        ${getDeployButtonContent(state, false)}
-      </button>
-    </div>
+    <!-- Deploy button -->
+    ${renderDeployActionArea(device, state)}
   `;
 }
 
@@ -851,91 +972,26 @@ export function renderDockerTargetSelector(device) {
 
 /**
  * Render content based on selected docker target
- * Includes: description, wiring instructions, SSH form for remote
+ * Uses unified content and control renderers
  */
 export function renderDockerTargetContent(device) {
-  const currentSolution = getCurrentSolution();
   const target = getSelectedTarget(device);
-
   if (!target) return '';
 
-  const targetSection = target.section || {};
-  const description = targetSection.description || '';
-  const wiring = targetSection.wiring || {};
-  const wiringSteps = getLocalizedField(wiring, 'steps') || [];
-  // Check if target is remote: supports 'remote', 'xxx_remote', or id containing 'remote'
   const isRemote = target.id === 'remote' || target.id?.endsWith('_remote') || target.id?.includes('remote');
 
-  let html = '';
-
-  // Wiring instructions
-  if (wiringSteps.length > 0) {
-    html += `
-      <div class="deploy-wiring-section">
-        ${wiring.image ? `
-          <div class="deploy-wiring-image">
-            <img src="${getAssetUrl(currentSolution.id, wiring.image)}" alt="Wiring diagram">
-          </div>
-        ` : ''}
-        <div class="deploy-wiring-steps">
-          <ol>
-            ${wiringSteps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}
-          </ol>
-        </div>
-      </div>
-    `;
-  }
-
-  // Description content (placed before SSH form)
-  if (description) {
-    html += `
-      <div class="deploy-pre-instructions">
-        <div class="markdown-content">
-          ${processMarkdown(description)}
-        </div>
-      </div>
-    `;
-  }
-
-  // User inputs from target config (e.g., device_name, no_audio)
-  // For remote: merge with SSH form in same container
-  // For local: render as standalone container
-  const excludeIds = isRemote ? ['host', 'username', 'password', 'port'] : [];
-  const userInputsContent = target.user_inputs
-    ? renderUserInputs(device, target.user_inputs, excludeIds, true)  // noWrapper=true
-    : '';
-
-  if (isRemote) {
-    // SSH form with user_inputs merged inside
-    html += renderSSHForm(device, target, userInputsContent);
-  } else if (userInputsContent) {
-    // Local: wrap user_inputs in container
-    html += `<div class="deploy-user-inputs">${userInputsContent}</div>`;
-  }
-
-  return html;
+  return `
+    ${renderContentArea(device)}
+    ${renderDeployControls(device, { isRemote, target })}
+  `;
 }
 
 /**
  * Render content based on selected recamera_cpp target
- * Shows target-specific description (e.g., model performance info)
+ * Uses unified content renderer (wiring + description)
  */
 export function renderRecameraCppTargetContent(device) {
-  const target = getSelectedTarget(device);
-  if (!target) return '';
-
-  const targetSection = target.section || {};
-  const description = targetSection.description || '';
-
-  if (!description) return '';
-
-  return `
-    <div class="deploy-pre-instructions">
-      <div class="markdown-content">
-        ${processMarkdown(description)}
-      </div>
-    </div>
-  `;
+  return renderContentArea(device);
 }
 
 // ============================================
