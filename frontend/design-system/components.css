@@ -1602,11 +1602,16 @@
   }
 
   .deploy-wiring-image img {
-    @apply max-w-full h-auto rounded-lg;
+    @apply h-auto rounded-lg;
+    max-width: min(100%, 400px);
   }
 
   .deploy-wiring-steps ol {
     @apply list-decimal list-inside text-sm text-text-secondary space-y-1;
+  }
+
+  .deploy-wiring-steps .inline-code {
+    @apply bg-gray-100 text-red-600 px-1.5 py-0.5 rounded text-13 font-mono;
   }
 
   /* Selected Device Section */
