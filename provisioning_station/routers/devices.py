@@ -34,13 +34,23 @@ async def scan_mdns_devices(
     Returns devices that advertise SSH services (_ssh._tcp.local).
     By default, filters to known IoT device patterns (Raspberry Pi, Jetson, etc.).
 
+    If no devices are found, also returns suggested_hosts from the device catalog.
+
     Returns:
         List of devices with hostname, IP address, and port
+        List of suggested_hosts when no devices found
     """
     devices = await mdns_scanner.scan_ssh_devices(
         timeout=timeout, filter_known=filter_known
     )
-    return {"devices": devices}
+
+    result = {"devices": devices}
+
+    # If no devices found, include suggested hosts from device catalog
+    if not devices:
+        result["suggested_hosts"] = solution_manager.get_suggested_mdns_hosts()
+
+    return result
 
 
 @router.get("/detect/{solution_id}", response_model=List[DetectedDevice])

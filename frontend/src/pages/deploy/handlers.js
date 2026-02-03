@@ -596,26 +596,73 @@ async function scanMdnsDevices(deviceId, btn) {
   try {
     const result = await devicesApi.scanMdns({ timeout: 3, filterKnown: true });
     const devices = result.devices || [];
+    const suggestedHosts = result.suggested_hosts || [];
 
     if (!dropdown) return;
 
     if (devices.length === 0) {
-      dropdown.innerHTML = `
-        <div class="mdns-empty">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <span>${t('deploy.connection.noDevicesFound')}</span>
-        </div>
-      `;
-      dropdown.style.display = 'block';
+      // No devices found - show suggested hosts if available
+      if (suggestedHosts.length > 0) {
+        dropdown.innerHTML = `
+          <div class="mdns-empty" style="border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 8px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span>${t('deploy.connection.noDevicesFound')}</span>
+          </div>
+          <div class="mdns-header">${t('deploy.connection.suggestedHosts')}</div>
+          <div class="mdns-hint" style="font-size: 12px; color: var(--text-secondary); padding: 4px 12px 8px;">${t('deploy.connection.suggestedHostsHint')}</div>
+          ${suggestedHosts.map(host => `
+            <div class="mdns-device mdns-suggested" data-hostname="${host.hostname}">
+              <span class="mdns-device-icon">${getMdnsDeviceIcon(host.device_id)}</span>
+              <span class="mdns-device-name">${host.hostname}</span>
+              <span class="mdns-device-ip" style="color: var(--text-tertiary);">${i18n.locale === 'zh' ? host.device_name_zh : host.device_name}</span>
+            </div>
+          `).join('')}
+        `;
+        dropdown.style.display = 'block';
 
-      // Auto-hide after 3 seconds
-      setTimeout(() => {
-        dropdown.style.display = 'none';
-      }, 3000);
+        // Setup click handlers for suggested hosts
+        dropdown.querySelectorAll('.mdns-suggested').forEach(el => {
+          el.addEventListener('click', () => {
+            const hostname = el.dataset.hostname;
+            if (hostInput) {
+              hostInput.value = hostname;
+              hostInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            dropdown.style.display = 'none';
+          });
+        });
+
+        // Close dropdown when clicking outside
+        const closeDropdown = (e) => {
+          if (!dropdown.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+            dropdown.style.display = 'none';
+            document.removeEventListener('click', closeDropdown);
+          }
+        };
+        setTimeout(() => document.addEventListener('click', closeDropdown), 100);
+      } else {
+        // No devices and no suggestions
+        dropdown.innerHTML = `
+          <div class="mdns-empty">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span>${t('deploy.connection.noDevicesFound')}</span>
+          </div>
+        `;
+        dropdown.style.display = 'block';
+
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+          dropdown.style.display = 'none';
+        }, 3000);
+      }
     } else {
       dropdown.innerHTML = `
         <div class="mdns-header">${t('deploy.connection.discoveredDevices')}</div>
@@ -662,17 +709,30 @@ async function scanMdnsDevices(deviceId, btn) {
 
 /**
  * Get icon for mDNS device type
+ * Supports both short types (raspberry, jetson) and full device IDs (recomputer_r1100)
  */
 function getMdnsDeviceIcon(deviceType) {
-  switch (deviceType) {
-    case 'raspberry':
-      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="9" cy="15" r="1"/><circle cx="15" cy="15" r="1"/></svg>';
-    case 'jetson':
-      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M9 2v2M9 20v2M2 15h2M20 15h2M2 9h2M20 9h2"/></svg>';
-    case 'recomputer':
-    case 'recamera':
-      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>';
-    default:
-      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>';
+  if (!deviceType) {
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>';
   }
+
+  const type = deviceType.toLowerCase();
+
+  // Raspberry Pi
+  if (type === 'raspberry' || type.startsWith('raspberry_')) {
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="9" cy="15" r="1"/><circle cx="15" cy="15" r="1"/></svg>';
+  }
+
+  // Jetson / reComputer J-series
+  if (type === 'jetson' || type.startsWith('recomputer_j')) {
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M9 2v2M9 20v2M2 15h2M20 15h2M2 9h2M20 9h2"/></svg>';
+  }
+
+  // reComputer / reTerminal / reCamera
+  if (type === 'recomputer' || type === 'recamera' || type.startsWith('recomputer_') || type.startsWith('reterminal') || type.startsWith('recamera')) {
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>';
+  }
+
+  // Default server icon
+  return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>';
 }

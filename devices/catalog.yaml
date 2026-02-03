@@ -84,6 +84,8 @@ recomputer_j4012:
   wiki_url: https://wiki.seeedstudio.com/reComputer_J4012_Flash_Jetpack/
   description: NVIDIA Jetson Orin NX 16GB edge AI computer
   description_zh: NVIDIA Jetson Orin NX 16GB 边缘 AI 计算机
+  mdns_hostnames:
+    - jetson.local
 
 recomputer_r1000:
   name: reComputer R1000
@@ -94,6 +96,32 @@ recomputer_r1000:
   wiki_url: https://wiki.seeedstudio.com/recomputer_r/
   description: Industrial edge controller with CM4 for IoT applications
   description_zh: 基于 CM4 的工业边缘控制器，适用于物联网应用
+  mdns_hostnames:
+    - reComputer-R100x.local
+
+recomputer_r1100:
+  name: reComputer R1100
+  name_zh: reComputer R1100
+  category: edge_computer
+  image: https://files.seeedstudio.com/wiki/reComputer-R1000/recomputer-r1000.png
+  product_url: https://www.seeedstudio.com/reComputer-R1100-Series.html
+  wiki_url: https://wiki.seeedstudio.com/recomputer_r/
+  description: Industrial edge controller with CM4 and GPIO expansion
+  description_zh: 基于 CM4 的工业边缘控制器，带 GPIO 扩展
+  mdns_hostnames:
+    - reComputer-R110x.local
+
+reterminal:
+  name: reTerminal
+  name_zh: reTerminal
+  category: edge_computer
+  image: https://files.seeedstudio.com/wiki/ReTerminal/reTerminal.png
+  product_url: https://www.seeedstudio.com/ReTerminal-with-CM4-p-4904.html
+  wiki_url: https://wiki.seeedstudio.com/reTerminal/
+  description: Compact industrial terminal with touchscreen and CM4
+  description_zh: 紧凑型工业终端，带触摸屏和 CM4
+  mdns_hostnames:
+    - reTerminal.local
 
 raspberry_pi:
   name: Raspberry Pi
@@ -104,6 +132,8 @@ raspberry_pi:
   wiki_url: https://www.raspberrypi.com/documentation/
   description: Popular single-board computer for various projects
   description_zh: 流行的单板计算机，适用于各种项目
+  mdns_hostnames:
+    - raspberrypi.local
 
 # ============================================
 # reCamera Series
@@ -118,6 +148,8 @@ recamera:
   wiki_url: https://wiki.seeedstudio.com/recamera/
   description: AI camera with edge computing capabilities for computer vision
   description_zh: 具有边缘计算能力的 AI 摄像头，用于计算机视觉
+  mdns_hostnames:
+    - recamera.local
 
 # ============================================
 # reSpeaker Series
