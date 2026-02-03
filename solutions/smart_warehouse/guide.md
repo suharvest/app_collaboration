@@ -87,7 +87,7 @@ Connect your Watcher to SenseCraft cloud platform:
 
 ---
 
-## Step 4: Connect to Agent {#mcp_bridge type=script required=true config=devices/mcp_bridge.yaml}
+## Step 4: Connect to Agent {#mcp_bridge type=manual required=true}
 
 ![MCP Endpoint](gallery/mcp-endpoint.png)
 
