@@ -8,7 +8,11 @@ from fastapi import APIRouter, HTTPException, Query
 
 from ..models.api import DetectedDevice, DeviceConnectionRequest
 from ..services.device_detector import device_detector
-from ..services.mdns_scanner import mdns_scanner
+from ..services.mdns_scanner import (
+    is_mdns_hostname,
+    mdns_scanner,
+    resolve_mdns_hostname,
+)
 from ..services.solution_manager import solution_manager
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])

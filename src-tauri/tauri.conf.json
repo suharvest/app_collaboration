@@ -71,18 +71,7 @@
     "security": {
       "csp": null
     },
-    "windows": [
-      {
-        "title": "SenseCraft Solution",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 800,
-        "minHeight": 600,
-        "resizable": true,
-        "fullscreen": false,
-        "center": true
-      }
-    ]
+    "windows": []
   },
   "plugins": {
     "shell": {

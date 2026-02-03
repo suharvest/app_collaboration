@@ -147,5 +147,78 @@ class MDNSScanner:
                 self._zeroconf = None
 
 
+async def resolve_mdns_hostname(hostname: str, timeout: float = 3.0) -> str | None:
+    """Resolve a .local mDNS hostname to an IP address.
+
+    This is useful for Windows where Docker containers cannot resolve .local addresses.
+    If the hostname doesn't end with .local or resolution fails, returns None.
+
+    Args:
+        hostname: The hostname to resolve (e.g., 'recomputer.local')
+        timeout: Resolution timeout in seconds
+
+    Returns:
+        IP address string if resolved, None otherwise
+    """
+    if not hostname or not hostname.lower().endswith(".local"):
+        return None
+
+    # Strip .local suffix for service lookup
+    device_name = hostname[:-6]  # Remove '.local'
+
+    try:
+        zeroconf = Zeroconf()
+        resolved_ip = None
+
+        def on_service_state_change(
+            zc: Zeroconf,
+            service_type: str,
+            name: str,
+            state_change: ServiceStateChange,
+        ) -> None:
+            nonlocal resolved_ip
+            if state_change == ServiceStateChange.Added:
+                info = zc.get_service_info(service_type, name)
+                if info:
+                    # Check if hostname matches
+                    service_hostname = name.replace(f".{service_type}", "").strip()
+                    if service_hostname.lower() == device_name.lower():
+                        if info.addresses:
+                            for addr in info.addresses:
+                                if len(addr) == 4:  # IPv4
+                                    resolved_ip = ".".join(str(b) for b in addr)
+                                    return
+
+        # Browse for SSH services to find the device
+        browser = ServiceBrowser(
+            zeroconf,
+            "_ssh._tcp.local.",
+            handlers=[on_service_state_change],
+        )
+
+        # Wait for resolution
+        await asyncio.sleep(timeout)
+
+        # Cleanup
+        browser.cancel()
+        zeroconf.close()
+
+        if resolved_ip:
+            logger.info(f"Resolved mDNS hostname {hostname} to {resolved_ip}")
+        else:
+            logger.warning(f"Could not resolve mDNS hostname: {hostname}")
+
+        return resolved_ip
+
+    except Exception as e:
+        logger.error(f"mDNS resolution failed for {hostname}: {e}")
+        return None
+
+
+def is_mdns_hostname(hostname: str) -> bool:
+    """Check if a hostname is an mDNS .local address."""
+    return hostname and hostname.lower().endswith(".local")
+
+
 # Singleton instance
 mdns_scanner = MDNSScanner()

@@ -4,7 +4,8 @@
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::Manager;
+use tauri::{Manager, Emitter, WebviewUrl, WebviewWindowBuilder};
+use tauri::webview::DownloadEvent;
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 
@@ -408,17 +409,78 @@ fn main() {
                 }
             });
 
-            // Inject backend port into frontend
-            // The frontend can also call get_backend_port command as a fallback
-            let main_window = app.get_webview_window("main")
-                .expect("Main window not found");
+            // Create main window with download and navigation handlers
+            let nav_handle = app.handle().clone();
+            let download_handle = app.handle().clone();
 
+            let main_window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                .title("SenseCraft Solution")
+                .inner_size(1280.0, 800.0)
+                .min_inner_size(800.0, 600.0)
+                .resizable(true)
+                .center()
+                // Handle file downloads (e.g., Excel files)
+                .on_download(move |_webview, event| {
+                    match event {
+                        DownloadEvent::Requested { url, destination } => {
+                            log::info!("Download requested: {}", url);
+                            // Allow the download and set default destination
+                            if let Some(downloads_dir) = dirs::download_dir() {
+                                // Extract filename from URL
+                                let url_str = url.as_str();
+                                let filename = url_str.split('/').last()
+                                    .and_then(|s| s.split('?').next())
+                                    .unwrap_or("download");
+                                let dest_path = downloads_dir.join(filename);
+                                *destination = dest_path.clone();
+                                log::info!("Download destination: {:?}", dest_path);
+                            }
+                            true // Allow the download
+                        }
+                        DownloadEvent::Finished { url, path, success } => {
+                            log::info!("Download finished: {} (success: {})", url, success);
+                            if success {
+                                if let Some(path) = path {
+                                    // Notify frontend about successful download
+                                    if let Some(win) = download_handle.get_webview_window("main") {
+                                        let _ = win.emit("download-complete", path.to_string_lossy().to_string());
+                                    }
+                                }
+                            }
+                            true
+                        }
+                        _ => true
+                    }
+                })
+                // Handle navigation - open external links in default browser
+                .on_navigation(move |url| {
+                    let url_str = url.as_str();
+                    log::info!("Navigation: {}", url_str);
+
+                    // Check if this is an external link
+                    let is_external = !url_str.starts_with("http://localhost")
+                        && !url_str.starts_with("http://127.0.0.1")
+                        && !url_str.starts_with("tauri://")
+                        && (url_str.starts_with("http://") || url_str.starts_with("https://"));
+
+                    if is_external {
+                        log::info!("Opening external URL in browser: {}", url_str);
+                        // Open in default browser
+                        let shell = nav_handle.shell();
+                        let _ = shell.open(url_str, None);
+                        false // Prevent navigation in webview
+                    } else {
+                        true // Allow internal navigation
+                    }
+                })
+                .build()
+                .expect("Failed to create main window");
+
+            // Inject backend port into frontend
             let init_script = format!(
                 "window.__BACKEND_PORT__ = {};",
                 backend_port
             );
-
-            // Inject immediately
             let _ = main_window.eval(&init_script);
 
             Ok(())
