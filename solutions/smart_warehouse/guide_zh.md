@@ -87,7 +87,7 @@
 
 ---
 
-## 步骤 4: 联动智能体 {#mcp_bridge type=script required=true config=devices/mcp_bridge.yaml}
+## 步骤 4: 联动智能体 {#mcp_bridge type=manual required=true}
 
 ![MCP 端点](gallery/mcp-endpoint.png)
 
