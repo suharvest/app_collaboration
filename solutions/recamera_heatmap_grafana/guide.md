@@ -1,41 +1,17 @@
-This solution tracks where people walk in your store and shows it as a heatmap.
-
-**How it works:**
-1. reCamera watches the area and detects people (faces are automatically blurred)
-2. Location data is sent to your computer
-3. You see a visual map of busy vs quiet areas
-
-## Network Requirements
-
-Make sure reCamera and your computer are on the **same WiFi network**.
-
 ## Preset: Quick Preview {#simple}
 
-See heatmap directly on reCamera's web interface - no extra computer or dashboard needed.
+Just one reCamera - view heatmap directly in its web interface.
 
 | Device | Purpose |
 |--------|---------|
-| reCamera | AI camera with person detection |
+| reCamera | AI camera that detects people in the video |
 
 **What you'll get:**
-- Live video with heatmap overlay
+- Live video with heatmap overlay (heatmap generated in real-time by the web interface)
 - See busy vs quiet areas in real-time
-- Privacy-preserving (faces automatically blurred)
+- Privacy protection (faces auto-blurred)
 
-**Requirements:** reCamera and your computer on the same network
-
-## How to Connect
-
-| Method | IP Address | Notes |
-|--------|------------|-------|
-| USB Cable | 192.168.42.1 | Plug USB-C directly into computer |
-| Network Cable | Check router | Most reliable |
-| WiFi | Check router | May need USB setup first |
-
-## Login Credentials
-
-- **Username**: `recamera`
-- **Password**: `recamera` or `recamera.2`
+**Requirements:** New devices need remote access enabled first — connect via USB, wait for boot (~2 min), visit [192.168.42.1/#/setting](http://192.168.42.1/#/setting), login with `recamera` / `recamera`, enable "Remote Access"
 
 ## Step 1: Enable People Detection {#deploy_detector type=recamera_cpp required=true config=devices/recamera_yolo11.yaml}
 
@@ -43,17 +19,29 @@ Install the person detection program on reCamera so it can identify people in th
 
 ### Target: YOLO11 (~8 FPS) {#deploy_detector_yolo11 config=devices/recamera_yolo11.yaml default=true}
 
+### Wiring
+
+1. USB connection: IP address `192.168.42.1`, plug and play
+2. Network/WiFi: Find reCamera's IP in your router admin page
+3. Enter username `recamera`, password `recamera`
+
 Recommended for most scenarios.
 
 ### Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Cannot connect | Check IP address and network |
-| Wrong password | Try `recamera` or `recamera.2` |
+| Cannot connect | USB: use `192.168.42.1`; Network: check router for IP |
+| Wrong password | Default is `recamera`, use your new password if changed |
 | Install failed | Restart the camera and try again |
 
 ### Target: YOLOv26 (~3 FPS) {#deploy_detector_yolo26 config=devices/recamera_yolo26.yaml}
+
+### Wiring
+
+1. USB connection: IP address `192.168.42.1`, plug and play
+2. Network/WiFi: Find reCamera's IP in your router admin page
+3. Enter username `recamera`, password `recamera`
 
 Alternative model, try if needed.
 
@@ -61,8 +49,8 @@ Alternative model, try if needed.
 
 | Issue | Solution |
 |-------|----------|
-| Cannot connect | Check IP address and network |
-| Wrong password | Try `recamera` or `recamera.2` |
+| Cannot connect | USB: use `192.168.42.1`; Network: check router for IP |
+| Wrong password | Default is `recamera`, use your new password if changed |
 | Install failed | Restart the camera and try again |
 
 ---
@@ -77,23 +65,19 @@ Click **Connect** to see the live video with heatmap overlay.
 
 ## Preset: Data Dashboard {#grafana}
 
-Save historical data and view traffic trends with charts over time.
+Add a computer to run the dashboard - save history and view traffic trends over time.
 
 | Device | Purpose |
 |--------|---------|
-| reCamera | AI camera with person detection |
-| reComputer R1100 | Runs Grafana dashboard + InfluxDB |
+| reCamera | AI camera that detects people and sends location data |
+| Computer or reComputer R1100 | Runs Grafana dashboard + InfluxDB |
 
 **What you'll get:**
-- Historical people flow data with time-series charts
-- Customizable Grafana dashboards
-- Data export for further analysis
+- View daily/weekly traffic trends with charts
+- Customize dashboard layout
+- Export data for analysis
 
 **Requirements:** Docker installed · Same network for all devices
-
-## Network Requirements
-
-Make sure reCamera and your computer are on the **same WiFi network**.
 
 ## Step 1: Start Data Dashboard {#backend type=docker_deploy required=true config=devices/backend.yaml}
 
@@ -101,14 +85,11 @@ Start the data storage and chart display services on your computer (or a dedicat
 
 ### Target: Run on This Computer {#backend_local type=local config=devices/backend.yaml default=true}
 
-Run the dashboard on your current computer.
-
-### Prerequisites
-
-- Docker Desktop installed and running
-- At least 2GB free disk space
+### Wiring
 
 ![Wiring](gallery/architecture.svg)
+
+Make sure Docker Desktop is installed and running, with at least 2GB free disk space.
 
 ### Troubleshooting
 
@@ -120,23 +101,22 @@ Run the dashboard on your current computer.
 
 ### Target: Run on Another Device {#backend_remote type=remote config=devices/backend_remote.yaml}
 
-Run the dashboard on a reComputer R1100 for dedicated edge deployment.
+### Wiring
 
-### Before You Begin
-
-1. Connect the target device to your network
-2. Get the device's IP address
-3. Get the login credentials (username and password)
-
-### Connection Settings
+![Wiring](gallery/architecture.svg)
 
 | Field | Example |
 |-------|---------|
-| Device IP | 192.168.1.100 |
+| Device IP | 192.168.1.100 or reComputer-R110x.local |
 | Username | recomputer |
 | Password | 12345678 |
 
-![Wiring](gallery/architecture.svg)
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Connection timeout | Check network cable, test with ping |
+| SSH authentication failed | Verify username and password |
 
 ---
 
@@ -144,18 +124,18 @@ Run the dashboard on a reComputer R1100 for dedicated edge deployment.
 
 Tell reCamera where to send the traffic data.
 
-Enter:
-- **reCamera IP**: Your camera's IP address
-- **Dashboard Server IP**: The computer running the dashboard (from Step 1)
+### Wiring
 
-Other settings are pre-configured, no need to change.
+1. USB connection: IP address `192.168.42.1`, plug and play
+2. Network/WiFi: Find reCamera's IP in your router admin page
+3. Enter reCamera IP and Dashboard Server IP (from Step 1)
 
 ### Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Cannot connect | Check that camera and server are on the same network |
-| No data showing | Make sure Step 1 completed successfully |
+| Cannot connect | USB: use `192.168.42.1`; Network: check router for IP |
+| No data showing | Make sure Step 1 completed; camera and server on same network |
 
 ---
 
