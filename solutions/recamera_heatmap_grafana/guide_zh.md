@@ -1,41 +1,17 @@
-这个方案帮你看清店里哪里人多、哪里人少，用热力图直观展示。
-
-**工作原理：**
-1. reCamera 识别画面中的人（自动打码保护隐私）
-2. 位置数据发送到你的电脑
-3. 你能看到一张「热力地图」，红色代表人多，蓝色代表人少
-
-## 网络要求
-
-确保 reCamera 和电脑在**同一个 WiFi 网络**中。
-
 ## 套餐: 快速预览 {#simple}
 
-直接在 reCamera 的网页界面查看热力图，无需额外电脑或后台服务。
+只用一台 reCamera，在网页上直接看热力图。
 
 | 设备 | 用途 |
 |------|------|
-| reCamera | 带人员识别功能的 AI 摄像头 |
+| reCamera | AI 摄像头，识别画面中的人 |
 
 **部署完成后你可以：**
-- 观看叠加热力图的实时视频
+- 看到叠加热力图的实时视频（热力图在网页端实时生成）
 - 直观看出哪里人多哪里人少
-- 隐私保护（自动模糊人脸）
+- 隐私保护（人脸自动打码）
 
-**前提条件：** reCamera 和电脑在同一网络
-
-## 连接方式
-
-| 方式 | IP 地址 | 说明 |
-|------|---------|------|
-| USB 线 | 192.168.42.1 | 用 USB-C 线直接连电脑 |
-| 网线 | 查看路由器 | 最稳定 |
-| WiFi | 查看路由器 | 可能需要先用 USB 配置 |
-
-## 登录信息
-
-- **用户名**: `recamera`
-- **密码**: `recamera` 或 `recamera.2`
+**前提条件：** 新设备需先开启远程访问——用 USB 连接电脑，等设备开机（约 2 分钟），访问 [192.168.42.1/#/setting](http://192.168.42.1/#/setting)，输入初始账号 `recamera` / `recamera`，勾选「开启远程访问」
 
 ## 步骤 1: 让摄像头能识别人 {#deploy_detector type=recamera_cpp required=true config=devices/recamera_yolo11.yaml}
 
@@ -43,17 +19,29 @@
 
 ### 部署目标: YOLO11 (~8 FPS) {#deploy_detector_yolo11 config=devices/recamera_yolo11.yaml default=true}
 
+### 接线
+
+1. USB 连接：IP 地址 `192.168.42.1`，即插即用
+2. 网线/WiFi：在路由器管理页面查找 reCamera 的 IP
+3. 输入用户名 `recamera`，密码 `recamera`
+
 推荐大多数场景使用。
 
 ### 故障排查
 
 | 问题 | 解决方法 |
 |------|----------|
-| 连不上 | 检查 IP 地址和网络 |
-| 密码错误 | 试试 `recamera` 或 `recamera.2` |
+| 连不上 | USB 连接用 `192.168.42.1`；网络连接去路由器查 IP |
+| 密码错误 | 初始密码 `recamera`，若改过请用新密码 |
 | 安装失败 | 重启摄像头再试一次 |
 
 ### 部署目标: YOLOv26 (~3 FPS) {#deploy_detector_yolo26 config=devices/recamera_yolo26.yaml}
+
+### 接线
+
+1. USB 连接：IP 地址 `192.168.42.1`，即插即用
+2. 网线/WiFi：在路由器管理页面查找 reCamera 的 IP
+3. 输入用户名 `recamera`，密码 `recamera`
 
 备选模型，可自行尝试。
 
@@ -61,8 +49,8 @@
 
 | 问题 | 解决方法 |
 |------|----------|
-| 连不上 | 检查 IP 地址和网络 |
-| 密码错误 | 试试 `recamera` 或 `recamera.2` |
+| 连不上 | USB 连接用 `192.168.42.1`；网络连接去路由器查 IP |
+| 密码错误 | 初始密码 `recamera`，若改过请用新密码 |
 | 安装失败 | 重启摄像头再试一次 |
 
 ---
@@ -77,23 +65,19 @@
 
 ## 套餐: 数据看板 {#grafana}
 
-保存历史数据，用图表查看一段时间内的人流趋势。
+加一台电脑跑看板，保存历史数据，随时回看人流变化。
 
 | 设备 | 用途 |
 |------|------|
-| reCamera | 带人员识别功能的 AI 摄像头 |
-| reComputer R1100 | 运行 Grafana 看板 + InfluxDB |
+| reCamera | AI 摄像头，识别人并发送位置数据 |
+| 电脑 或 reComputer R1100 | 运行 Grafana 看板 + InfluxDB |
 
 **部署完成后你可以：**
-- 查看历史人流数据的时序图表
-- 自定义 Grafana 看板
-- 导出数据做进一步分析
+- 用图表看一天、一周的人流变化
+- 自定义看板布局
+- 导出数据做分析
 
 **前提条件：** Docker 已安装 · 所有设备在同一网络
-
-## 网络要求
-
-确保 reCamera 和电脑在**同一个 WiFi 网络**中。
 
 ## 步骤 1: 启动数据看板 {#backend type=docker_deploy required=true config=devices/backend.yaml}
 
@@ -101,14 +85,11 @@
 
 ### 部署目标: 在本机运行 {#backend_local type=local config=devices/backend.yaml default=true}
 
-在当前电脑上运行看板。
-
-### 前提条件
-
-- Docker Desktop 已安装并运行
-- 至少 2GB 可用磁盘空间
+### 接线
 
 ![接线图](gallery/architecture.svg)
+
+确保 Docker Desktop 已安装并运行，至少 2GB 可用磁盘空间。
 
 ### 故障排查
 
@@ -120,23 +101,22 @@
 
 ### 部署目标: 在其他设备运行 {#backend_remote type=remote config=devices/backend_remote.yaml}
 
-在 reComputer R1100 上运行看板，作为专用的边缘部署方案。
+### 接线
 
-### 开始之前
-
-1. 把目标设备连到网络
-2. 记下设备的 IP 地址
-3. 准备好登录账号密码
-
-### 连接设置
+![接线图](gallery/architecture.svg)
 
 | 字段 | 示例 |
 |------|------|
-| 设备 IP | 192.168.1.100 |
+| 设备 IP | 192.168.1.100 或 reComputer-R110x.local |
 | 用户名 | recomputer |
 | 密码 | 12345678 |
 
-![接线图](gallery/architecture.svg)
+### 故障排查
+
+| 问题 | 解决方法 |
+|------|----------|
+| 连接超时 | 检查网线是否插好，用 ping 测试 |
+| SSH 认证失败 | 确认用户名密码正确 |
 
 ---
 
@@ -144,18 +124,18 @@
 
 告诉 reCamera 把人流数据发到哪里。
 
-输入：
-- **reCamera IP**：摄像头的 IP 地址
-- **看板服务器 IP**：运行看板的电脑 IP（来自步骤 1）
+### 接线
 
-其他设置已经配好，不用改。
+1. USB 连接：IP 地址 `192.168.42.1`，即插即用
+2. 网线/WiFi：在路由器管理页面查找 reCamera 的 IP
+3. 输入 reCamera IP 和看板服务器 IP（来自步骤 1）
 
 ### 故障排查
 
 | 问题 | 解决方法 |
 |------|----------|
-| 连不上 | 检查摄像头和服务器是否在同一网络 |
-| 看不到数据 | 确认步骤 1 已完成 |
+| 连不上 | USB 连接用 `192.168.42.1`；网络连接去路由器查 IP |
+| 看不到数据 | 确认步骤 1 已完成，reCamera 和服务器在同一网络 |
 
 ---
 

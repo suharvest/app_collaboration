@@ -33,8 +33,8 @@
 ![接线图](gallery/R1100_connected.png)
 
 1. 将 R1100 接上电源和网线，确保与电脑在同一网络
-2. 输入 IP 地址 reComputer-R110x.local（或从路由器查询）
-3. 输入用户名 recomputer，密码 12345678
+2. 输入 IP 地址 `reComputer-R110x.local`（或从路由器查询）
+3. 输入用户名 `recomputer`，密码 `12345678`
 4. 点击部署，等待安装完成
 
 ### 故障排除
@@ -166,8 +166,8 @@
 ![接线图](gallery/R1100_connected.png)
 
 1. 将 R1100 接上电源和网线，确保与电脑在同一网络
-2. 输入 IP 地址 reComputer-R110x.local（或从路由器查询）
-3. 输入用户名 recomputer，密码 12345678
+2. 输入 IP 地址 `reComputer-R110x.local`（或从路由器查询）
+3. 输入用户名 `recomputer`，密码 `12345678`
 4. 点击部署，等待安装完成
 
 ### 故障排除
@@ -341,8 +341,8 @@ TTS 默认使用免费的 Edge TTS，无需额外配置。
 ![接线图](gallery/R1100_connected.png)
 
 1. 将 R1100 接上电源和网线，确保与电脑在同一网络
-2. 输入 IP 地址 reComputer-R110x.local（或从路由器查询）
-3. 输入用户名 recomputer，密码 12345678
+2. 输入 IP 地址 `reComputer-R110x.local`（或从路由器查询）
+3. 输入用户名 `recomputer`，密码 `12345678`
 4. 点击部署，等待安装完成
 
 ### 故障排除
