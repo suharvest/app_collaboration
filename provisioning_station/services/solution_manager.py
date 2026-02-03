@@ -2234,6 +2234,29 @@ class SolutionManager:
             )
         return result
 
+    def get_suggested_mdns_hosts(self) -> List[Dict[str, Any]]:
+        """Get suggested mDNS hostnames from the device catalog.
+
+        Collects all mdns_hostnames from devices in the catalog for use
+        when mDNS scanning doesn't find any devices.
+
+        Returns:
+            List of dicts with hostname, device_name, device_name_zh, device_id
+        """
+        result = []
+        for device_id, device in self._global_device_catalog.items():
+            mdns_hostnames = device.get("mdns_hostnames", [])
+            for hostname in mdns_hostnames:
+                result.append(
+                    {
+                        "hostname": hostname,
+                        "device_name": device.get("name", device_id),
+                        "device_name_zh": device.get("name_zh", device.get("name", device_id)),
+                        "device_id": device_id,
+                    }
+                )
+        return result
+
     async def update_required_devices(
         self, solution_id: str, device_ids: List[str]
     ) -> List[Dict[str, Any]]:

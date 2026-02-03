@@ -89,6 +89,8 @@ const translations = {
         scanning: 'Scanning...',
         discoveredDevices: 'Discovered Devices',
         noDevicesFound: 'No devices found',
+        suggestedHosts: 'Suggested Addresses',
+        suggestedHostsHint: 'Common .local addresses you can try:',
         scanHint: 'Scan local network for devices',
       },
       progress: {
@@ -618,6 +620,8 @@ const translations = {
         scanning: '扫描中...',
         discoveredDevices: '发现的设备',
         noDevicesFound: '未发现设备',
+        suggestedHosts: '推荐地址',
+        suggestedHostsHint: '您可以尝试以下常用 .local 地址：',
         scanHint: '扫描局域网内的设备',
       },
       progress: {
