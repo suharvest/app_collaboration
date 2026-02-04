@@ -18,6 +18,10 @@
 
 ### 部署目标: 本机部署 {#warehouse_local type=local config=devices/recomputer.yaml}
 
+在本机运行仓库管理服务。
+
+### 接线
+
 1. 确保本机 Docker 已安装并运行
 2. 点击部署按钮启动服务
 
@@ -29,6 +33,10 @@
 | Docker 未运行 | 启动 Docker Desktop 后重试 |
 
 ### 部署目标: 远程部署 {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
+
+部署到 reComputer R1100 边缘计算设备。
+
+### 接线
 
 ![接线图](gallery/R1100_connected.png)
 
@@ -129,6 +137,16 @@
 | Watcher 没反应 | 确认 联动智能体正在运行 |
 | 库存没更新 | 刷新网页查看最新数据 |
 
+### 部署完成
+
+语音仓库管理系统已就绪！
+
+**访问入口：**
+- 仓库系统：http://\<服务器IP\>:2125
+- SenseCraft 平台：[sensecraft.seeed.cc](https://sensecraft.seeed.cc/ai/)
+
+试着说「入库 10 箱苹果」测试语音库存管理。
+
 ---
 
 ## 套餐: 私有云方案 {#private_cloud}
@@ -151,6 +169,10 @@
 
 ### 部署目标: 本机部署 {#warehouse_local type=local config=devices/recomputer.yaml}
 
+在本机运行仓库管理服务。
+
+### 接线
+
 1. 确保本机 Docker 已安装并运行
 2. 点击部署按钮启动服务
 
@@ -162,6 +184,10 @@
 | Docker 未运行 | 启动 Docker Desktop 后重试 |
 
 ### 部署目标: 远程部署 {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
+
+部署到 reComputer R1100 边缘计算设备。
+
+### 接线
 
 ![接线图](gallery/R1100_connected.png)
 
@@ -303,6 +329,16 @@ TTS 默认使用免费的 Edge TTS，无需额外配置。
 | Watcher 没反应 | 确认智能体已连接（状态显示 Connected） |
 | 库存没更新 | 刷新网页查看最新数据 |
 
+### 部署完成
+
+私有云仓管系统已就绪！
+
+**访问入口：**
+- 仓库系统：http://\<服务器IP\>:2125
+- 语音服务控制台：http://\<服务器IP\>:18003
+
+数据留在自己网络内。试着说「苹果还有多少」测试。
+
 ---
 
 ## 套餐: 边缘计算方案 {#edge_computing}
@@ -326,6 +362,10 @@ TTS 默认使用免费的 Edge TTS，无需额外配置。
 
 ### 部署目标: 本机部署 {#warehouse_local type=local config=devices/recomputer.yaml}
 
+在本机运行仓库管理服务。
+
+### 接线
+
 1. 确保本机 Docker 已安装并运行
 2. 点击部署按钮启动服务
 
@@ -337,6 +377,10 @@ TTS 默认使用免费的 Edge TTS，无需额外配置。
 | Docker 未运行 | 启动 Docker Desktop 后重试 |
 
 ### 部署目标: 远程部署 {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
+
+部署到 reComputer R1100 边缘计算设备。
+
+### 接线
 
 ![接线图](gallery/R1100_connected.png)
 
@@ -485,14 +529,13 @@ TTS 默认使用免费的 Edge TTS，无需额外配置。
 | Watcher 没反应 | 确认智能体已连接（状态显示 Connected） |
 | 库存没更新 | 刷新网页查看最新数据 |
 
----
+### 部署完成
 
-# 部署完成
+全离线仓管系统已就绪！
 
-恭喜！您的智慧仓管系统已部署完成，可以开始使用了。
+**访问入口：**
+- 仓库系统：http://\<服务器IP\>:2125
+- 语音服务控制台：http://\<服务器IP\>:18003
+- 大模型健康检查：http://\<Jetson-IP\>:8000/health
 
-## 后续步骤
-
-- [访问仓库管理系统](http://localhost:2125)
-- [查看文档](https://wiki.seeedstudio.com/cn/mcp_external_system_integration/)
-- [在 GitHub 上报告问题](https://github.com/suharvest/warehouse_system/issues)
+部署完成后 100% 离线运行，无需联网。

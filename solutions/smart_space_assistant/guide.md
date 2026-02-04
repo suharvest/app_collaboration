@@ -110,6 +110,16 @@ Wake up the device by saying "Xiaozhi Xiaozhi", then say "Remember my face, my n
 | Enrollment failed | Ensure good lighting, face the camera directly |
 | Recognition not working | Re-enroll with better lighting conditions |
 
+### Deployment Complete
+
+Face recognition is ready!
+
+**Test it:**
+- Say "Remember my face, my name is John" to enroll
+- Next time you appear, Xiaozhi will greet you
+
+**Voice commands:** "Who do you know", "Delete John's face"
+
 ---
 
 ## Preset: Display Cast {#display_cast}
@@ -190,46 +200,13 @@ Deploy the display service to reComputer R1100.
 | Docker pull failed | Check network connection, retry deployment |
 | Watcher can't find display | Ensure both devices on same network, check firewall |
 
----
+### Deployment Complete
 
-# Deployment Complete
+Display cast is ready!
 
-## Deployment Complete!
+**Test it:**
+1. Open `http://<device-ip>:8765` on display browser
+2. Press `F` for fullscreen mode
+3. Say "Cast to [Display Name]" to start
 
-Your Smart Space AI Assistant is now ready.
-
-### Face Recognition Feature
-
-**How to Test**:
-- Say "Remember my face, my name is John" to enroll
-- Next time you appear in front of the camera, Xiaozhi will greet you
-
-**Voice Commands**:
-| Action | Command |
-|--------|---------|
-| Enroll face | "Remember my face, my name is [name]" |
-| Delete face | "Delete [name]'s face" |
-| List people | "Who do you know" |
-
-### Display Cast Feature
-
-**How to Test**:
-1. Open `http://<device-ip>:8765` on your display browser
-2. Press `F` to enter fullscreen mode
-3. Say "Cast to [Display Name]" to start casting
-
-**Voice Commands**:
-| Action | Command |
-|--------|---------|
-| Start cast | "Start casting" or "Cast to [Display Name]" |
-| Stop cast | "Stop casting" |
-| Check status | "Cast status" |
-| Search devices | "Search cast devices" |
-
-### Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Face recognition not working | Ensure sufficient lighting, face the camera directly |
-| No audio on display | Check HDMI audio settings |
-| Watcher not connecting to display | Verify all devices on same network |
+**Voice commands:** "Start casting", "Stop casting", "Cast status"

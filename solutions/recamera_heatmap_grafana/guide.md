@@ -11,7 +11,7 @@ Just one reCamera - view heatmap directly in its web interface.
 - See busy vs quiet areas in real-time
 - Privacy protection (faces auto-blurred)
 
-**Requirements:** New devices need remote access enabled first — connect via USB, wait for boot (~2 min), visit [192.168.42.1/#/setting](http://192.168.42.1/#/setting), login with `recamera` / `recamera`, enable "Remote Access"
+**Requirements:** New devices need SSH enabled first — connect via USB, wait for boot (~2 min), visit [192.168.42.1/#/security](http://192.168.42.1/#/security), login with `recamera` / `recamera`, enable the SSH toggle
 
 ## Step 1: Enable People Detection {#deploy_detector type=recamera_cpp required=true config=devices/recamera_yolo11.yaml}
 
@@ -19,13 +19,13 @@ Install the person detection program on reCamera so it can identify people in th
 
 ### Target: YOLO11 (~8 FPS) {#deploy_detector_yolo11 config=devices/recamera_yolo11.yaml default=true}
 
+Recommended for most scenarios.
+
 ### Wiring
 
 1. USB connection: IP address `192.168.42.1`, plug and play
 2. Network/WiFi: Find reCamera's IP in your router admin page
 3. Enter username `recamera`, password `recamera`
-
-Recommended for most scenarios.
 
 ### Troubleshooting
 
@@ -37,13 +37,13 @@ Recommended for most scenarios.
 
 ### Target: YOLOv26 (~3 FPS) {#deploy_detector_yolo26 config=devices/recamera_yolo26.yaml}
 
+Alternative model, try if needed.
+
 ### Wiring
 
 1. USB connection: IP address `192.168.42.1`, plug and play
 2. Network/WiFi: Find reCamera's IP in your router admin page
 3. Enter username `recamera`, password `recamera`
-
-Alternative model, try if needed.
 
 ### Troubleshooting
 
@@ -60,6 +60,17 @@ Alternative model, try if needed.
 Click **Connect** to see the live video with heatmap overlay.
 
 **Tip:** The heatmap builds up over time - wait a few minutes to see the effect.
+
+**Note:** Heatmap rendering requires ffmpeg. Open a terminal and install it:
+- **Windows:** Open PowerShell, run `winget install ffmpeg`
+- **macOS:** Open Terminal, run `brew install ffmpeg`
+- **Linux:** Open Terminal, run `sudo apt install ffmpeg`
+
+### Deployment Complete
+
+Camera is ready! Click **Connect** above to view the live heatmap.
+
+The heatmap builds up over time - areas where people stay longer will glow brighter.
 
 ---
 
@@ -162,28 +173,16 @@ Overlay the heatmap on your store's floor plan image.
 
 You only want to see the camera-view heatmap in the dashboard.
 
----
+### Deployment Complete
 
-# Deployment Complete
+Your heatmap dashboard is ready!
 
-## All Done!
+**Access the dashboard:**
+- URL: http://\<server-ip\>:3000
+- Login: `admin` / `admin`
 
-Your real-time heatmap system is now running.
+Dashboard is pre-configured - just open it to see your data.
 
-### Access Points
-
-| Service | URL |
-|---------|-----|
-| Data Dashboard | http://\<server-ip\>:3000 |
-
-### Login
-
-- Username: `admin`
-- Password: `admin`
-
-Dashboard is pre-configured. Just open it to see your data.
-
-### Having Issues?
-
-- **No data showing**: Check that reCamera is connected
-- **Can't open dashboard**: Run `docker ps` to check if services are running
+**Having issues?**
+- No data? Check that reCamera is connected
+- Can't open dashboard? Run `docker ps` to check services
