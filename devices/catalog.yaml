@@ -149,7 +149,7 @@ recamera:
   description: AI camera with edge computing capabilities for computer vision
   description_zh: 具有边缘计算能力的 AI 摄像头，用于计算机视觉
   mdns_hostnames:
-    - recamera.local
+    - reCamera.local
 
 # ============================================
 # reSpeaker Series
