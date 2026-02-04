@@ -1,17 +1,19 @@
 """
-Unit tests for the bilingual markdown parser.
+Unit tests for the multilingual markdown parser.
 """
 
 import pytest
+
 from provisioning_station.services.markdown_parser import (
+    VALID_STEP_TYPES,
+    ParseErrorType,
+    extract_wiring,
+    extract_wiring_multilang,
     parse_bilingual_markdown,
     parse_deployment_guide,
     parse_step_attributes,
-    split_by_language,
     parse_subsections,
-    extract_wiring,
-    ParseErrorType,
-    VALID_STEP_TYPES,
+    split_by_language,
 )
 
 
@@ -206,8 +208,8 @@ class TestExtractWiring:
         wiring = extract_wiring(content)
         assert wiring is not None
         assert wiring.image == "gallery/wiring.png"
-        assert len(wiring.steps) == 3
-        assert "Connect USB cable" in wiring.steps[0]
+        assert len(wiring.steps.get("en")) == 3
+        assert "Connect USB cable" in wiring.steps.get("en")[0]
 
     def test_image_only(self):
         """Extract only image."""
@@ -218,7 +220,7 @@ Some text without numbered list.
         wiring = extract_wiring(content)
         assert wiring is not None
         assert wiring.image == "arch.png"
-        assert wiring.steps == []
+        assert wiring.steps.get("en") == []
 
     def test_no_wiring_content(self):
         """No wiring information returns None."""
@@ -227,18 +229,18 @@ Some text without numbered list.
         assert wiring is None
 
     def test_bilingual_steps(self):
-        """Extract steps from both languages."""
+        """Extract steps from both languages using multilang."""
         en = """1. Connect cable
 2. Check status
 """
         zh = """1. 连接线缆
 2. 检查状态
 """
-        wiring = extract_wiring(en, zh)
+        wiring = extract_wiring_multilang({"en": en, "zh": zh})
         assert wiring is not None
-        assert len(wiring.steps) == 2
-        assert len(wiring.steps_zh) == 2
-        assert "连接线缆" in wiring.steps_zh[0]
+        assert len(wiring.steps.get("en")) == 2
+        assert len(wiring.steps.get("zh")) == 2
+        assert "连接线缆" in wiring.steps.get("zh")[0]
 
 
 class TestParseBilingualMarkdown:
@@ -322,10 +324,10 @@ Deploy the backend service.
         assert step.id == "backend"
         assert step.type == "docker_deploy"
         assert step.required is True
-        assert "Deploy the backend" in step.section.description
-        assert "部署后端" in step.section.description_zh
-        assert "Port busy" in step.section.troubleshoot
-        assert "端口占用" in step.section.troubleshoot_zh
+        assert "Deploy the backend" in step.section.description.get("en")
+        assert "部署后端" in step.section.description.get("zh")
+        assert "Port busy" in step.section.troubleshoot.get("en")
+        assert "端口占用" in step.section.troubleshoot.get("zh")
 
     def test_multiple_steps(self):
         """Parse multiple deployment steps."""
@@ -461,8 +463,8 @@ Step content.
 步骤内容。
 """
         result = parse_deployment_guide(content)
-        assert "overview section" in result.overview_en
-        assert "概述部分" in result.overview_zh
+        assert "overview section" in result.overview.get("en")
+        assert "概述部分" in result.overview.get("zh")
 
     def test_with_success_section(self):
         """Parse success section at the end."""
@@ -498,8 +500,8 @@ Congratulations! All done.
 """
         result = parse_deployment_guide(content)
         assert result.success is not None
-        assert "Congratulations" in result.success.content_en
-        assert "恭喜" in result.success.content_zh
+        assert "Congratulations" in result.success.content.get("en")
+        assert "恭喜" in result.success.content.get("zh")
 
     def test_with_wiring_section(self):
         """Parse wiring information."""
@@ -534,8 +536,8 @@ Setup the device.
         step = result.steps[0]
         assert step.section.wiring is not None
         assert step.section.wiring.image == "gallery/wiring.png"
-        assert len(step.section.wiring.steps) == 2
-        assert "Connect USB" in step.section.wiring.steps[0]
+        assert len(step.section.wiring.steps.get("en")) == 2
+        assert "Connect USB" in step.section.wiring.steps.get("en")[0]
 
     def test_preset_sections(self):
         """Parse preset groupings."""
@@ -589,8 +591,8 @@ Edge step content.
 
         cloud = result.presets[0]
         assert cloud.id == "cloud"
-        assert cloud.name == "Cloud Solution"
-        assert cloud.name_zh == "云方案"
+        assert cloud.name.get("en") == "Cloud Solution"
+        assert cloud.name.get("zh") == "云方案"
         assert len(cloud.steps) == 1
         assert cloud.steps[0].id == "cloud_deploy"
 

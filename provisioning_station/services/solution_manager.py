@@ -21,6 +21,7 @@ from .markdown_parser import (
     StructureValidationResult,
     parse_bilingual_markdown,
     parse_deployment_guide,
+    parse_guide_multilang,
     parse_guide_pair,
     parse_single_language_guide,
 )
@@ -426,26 +427,26 @@ class SolutionManager:
             try:
                 async with aiofiles.open(en_file, "r", encoding="utf-8") as f:
                     en_content = await f.read()
-                en_result = parse_single_language_guide(en_content)
+                en_result = parse_single_language_guide(en_content, "en")
 
                 for preset in en_result.presets:
                     preset_data = {
                         "id": preset.id,
-                        "name": preset.name,
-                        "description": preset.description,
+                        "name": preset.name.get("en"),
+                        "description": preset.description.get("en"),
                         "is_default": preset.is_default,
                         "steps": [
                             {
                                 "id": s.id,
-                                "name": s.title_en or s.id,  # Use title_en as name
+                                "name": s.title.get("en") or s.id,
                                 "type": s.type,
                                 "required": s.required,
                                 "config_file": s.config_file,
                                 "targets": [
                                     {
                                         "id": t.id,
-                                        "name": t.name,
-                                        "is_default": t.is_default,
+                                        "name": t.name.get("en"),
+                                        "is_default": t.default,
                                     }
                                     for t in (s.targets or [])
                                 ],
@@ -618,18 +619,63 @@ class SolutionManager:
             logger.error(f"Failed to count steps from guide for {solution_id}: {e}")
             return 0
 
+    def _discover_guide_files(self, solution_id: str) -> Dict[str, Path]:
+        """Discover all language versions of guide files.
+
+        Args:
+            solution_id: The solution ID
+
+        Returns:
+            Dict mapping language code to file path
+            e.g., {"en": Path("guide.md"), "zh": Path("guide_zh.md")}
+        """
+        solution = self.get_solution(solution_id)
+        if not solution or not solution.base_path:
+            return {}
+
+        base_path = Path(solution.base_path)
+        guide_files = {}
+
+        # Get default guide file paths from solution config
+        guide_en_path = solution.deployment.guide_file or "guide.md"
+        guide_zh_path = solution.deployment.guide_file_zh or "guide_zh.md"
+
+        # Check for English (default) guide
+        en_file = base_path / guide_en_path
+        if en_file.exists():
+            guide_files["en"] = en_file
+
+        # Check for Chinese guide
+        zh_file = base_path / guide_zh_path
+        if zh_file.exists():
+            guide_files["zh"] = zh_file
+
+        # Discover additional language files: guide_<lang>.md pattern
+        import re
+
+        for path in base_path.glob("guide_*.md"):
+            match = re.match(r"guide_(\w+)\.md", path.name)
+            if match:
+                lang = match.group(1)
+                if (
+                    lang not in guide_files
+                ):  # Don't override explicitly configured files
+                    guide_files[lang] = path
+
+        return guide_files
+
     async def get_deployment_from_guide(
         self, solution_id: str, lang: str = "en"
     ) -> Optional[Dict[str, Any]]:
-        """Load deployment page data 100% from guide.md.
+        """Load deployment page data from guide files.
 
         This is the core method for the simplified structure. All deployment
-        information is parsed from guide.md and guide_zh.md, eliminating
+        information is parsed from multilingual guide files, eliminating
         redundancy with YAML.
 
         Args:
             solution_id: The solution ID
-            lang: Language code ('en' or 'zh')
+            lang: Language code for response content
 
         Returns:
             Dict with devices, presets, overview, and post_deployment
@@ -638,92 +684,80 @@ class SolutionManager:
         if not solution or not solution.base_path:
             return None
 
-        base_path = Path(solution.base_path)
-
         # Validate preset IDs consistency (logs warnings)
         await self.validate_preset_ids(solution_id)
 
-        # Get guide file paths
-        guide_en_path = solution.deployment.guide_file or "guide.md"
-        guide_zh_path = solution.deployment.guide_file_zh or "guide_zh.md"
-
-        en_file = base_path / guide_en_path
-        zh_file = base_path / guide_zh_path
-
-        # Parse both EN and ZH guide files
-        en_result = None
-        zh_result = None
-
-        if en_file.exists():
-            try:
-                async with aiofiles.open(en_file, "r", encoding="utf-8") as f:
-                    en_content = await f.read()
-                en_result = parse_single_language_guide(en_content)
-            except Exception as e:
-                logger.error(f"Failed to parse EN guide: {e}")
-
-        if zh_file.exists():
-            try:
-                async with aiofiles.open(zh_file, "r", encoding="utf-8") as f:
-                    zh_content = await f.read()
-                zh_result = parse_single_language_guide(zh_content)
-            except Exception as e:
-                logger.error(f"Failed to parse ZH guide: {e}")
-
-        if not en_result:
-            logger.warning(f"No EN guide found for {solution_id}")
+        # Discover and read all language guide files
+        guide_files = self._discover_guide_files(solution_id)
+        if not guide_files:
+            logger.warning(f"No guide files found for {solution_id}")
             return None
 
-        # Build merged result with translations
+        # Read all guide file contents
+        lang_contents: Dict[str, str] = {}
+        for file_lang, path in guide_files.items():
+            try:
+                async with aiofiles.open(path, "r", encoding="utf-8") as f:
+                    lang_contents[file_lang] = await f.read()
+            except Exception as e:
+                logger.error(f"Failed to read {file_lang} guide: {e}")
+
+        if not lang_contents:
+            logger.warning(f"No readable guide files for {solution_id}")
+            return None
+
+        # Parse all languages together
+        parsed_result, _ = parse_guide_multilang(lang_contents)
+
+        if not parsed_result.presets:
+            logger.warning(f"No presets found in guide files for {solution_id}")
+            return None
+
+        # Build result using Localized.get(lang) for all fields
         devices = []
         presets = []
         seen_device_ids = set()
 
-        for en_preset in en_result.presets:
-            # Find corresponding ZH preset
-            zh_preset = None
-            if zh_result:
-                zh_preset = next(
-                    (p for p in zh_result.presets if p.id == en_preset.id), None
-                )
-
+        for preset in parsed_result.presets:
             preset_device_ids = []
 
-            for en_step in en_preset.steps:
-                # Find corresponding ZH step
-                zh_step = None
-                if zh_preset:
-                    zh_step = next(
-                        (s for s in zh_preset.steps if s.id == en_step.id), None
-                    )
-
+            for step in preset.steps:
                 # Build device info (compatible with frontend)
-                device = await self._build_device_from_step(
-                    solution_id, en_step, zh_step, lang
+                device = await self._build_device_from_step_localized(
+                    solution_id, step, lang
                 )
 
                 # Only add unique devices to global list
-                if en_step.id not in seen_device_ids:
+                if step.id not in seen_device_ids:
                     devices.append(device)
-                    seen_device_ids.add(en_step.id)
+                    seen_device_ids.add(step.id)
 
-                preset_device_ids.append(en_step.id)
+                preset_device_ids.append(step.id)
 
-            # Build preset info with section for frontend compatibility
-            preset_description = (
-                zh_preset.description
-                if lang == "zh" and zh_preset
-                else en_preset.description
-            )
+            # Get preset description for current language
+            preset_description = preset.description.get(lang)
+
+            # Build preset completion content
+            preset_completion = None
+            if preset.completion:
+                completion_content = preset.completion.content.get(lang)
+                if completion_content:
+                    # Extract Next Steps links from markdown: [title](url)
+                    next_steps = []
+                    links = re.findall(r"\[([^\]]+)\]\(([^)]+)\)", completion_content)
+                    for title, url in links:
+                        next_steps.append({"title": title, "url": url})
+
+                    preset_completion = {
+                        "success_message": completion_content,
+                        "next_steps": next_steps,
+                    }
+
             presets.append(
                 {
-                    "id": en_preset.id,
-                    "name": (
-                        zh_preset.name if lang == "zh" and zh_preset else en_preset.name
-                    ),
-                    "name_zh": zh_preset.name if zh_preset else en_preset.name,
+                    "id": preset.id,
+                    "name": preset.name.get(lang),
                     "description": preset_description,
-                    "description_zh": zh_preset.description if zh_preset else "",
                     "devices": preset_device_ids,
                     # Section object for frontend renderPresetSectionContent()
                     "section": (
@@ -734,23 +768,19 @@ class SolutionManager:
                         if preset_description
                         else None
                     ),
+                    # Completion content for this preset
+                    "completion": preset_completion,
                 }
             )
 
         # Build post_deployment from success content
         post_deployment = None
-        if en_result.success:
-            success_content = (
-                zh_result.success.content_en
-                if lang == "zh" and zh_result and zh_result.success
-                else en_result.success.content_en
-            )
+        if parsed_result.success:
+            success_content = parsed_result.success.content.get(lang)
 
             # Extract Next Steps links from markdown: [title](url)
             next_steps = []
             if success_content:
-                import re
-
                 links = re.findall(r"\[([^\]]+)\]\(([^)]+)\)", success_content)
                 for title, url in links:
                     next_steps.append({"title": title, "url": url})
@@ -761,11 +791,7 @@ class SolutionManager:
             }
 
         # Build overview
-        overview = (
-            zh_result.overview_en
-            if lang == "zh" and zh_result
-            else en_result.overview_en
-        )
+        overview = parsed_result.overview.get(lang)
 
         return {
             "solution_id": solution_id,
@@ -778,78 +804,65 @@ class SolutionManager:
             "post_deployment": post_deployment,
         }
 
-    async def _build_device_from_step(
+    async def _build_device_from_step_localized(
         self,
         solution_id: str,
-        en_step: DeploymentStep,
-        zh_step: Optional[DeploymentStep],
+        step: DeploymentStep,
         lang: str,
     ) -> Dict[str, Any]:
-        """Build a device dict from a parsed step.
+        """Build a device dict from a parsed step with Localized fields.
 
         Args:
             solution_id: The solution ID
-            en_step: English step from markdown parser
-            zh_step: Chinese step (optional)
+            step: Parsed step with Localized fields
             lang: Target language
 
         Returns:
             Device dict compatible with frontend
         """
-        solution = self.get_solution(solution_id)
-
-        # Choose titles based on language
-        title = zh_step.title_en if lang == "zh" and zh_step else en_step.title_en
-        title_zh = zh_step.title_en if zh_step else en_step.title_en
+        # Get title for requested language
+        title = step.title.get(lang)
 
         device = {
-            "id": en_step.id,
+            "id": step.id,
             "name": title,
-            "name_zh": title_zh,
-            "type": en_step.type,
-            "required": en_step.required,
+            "type": step.type,
+            "required": step.required,
         }
 
         # Build section content
         section = {
             "title": title,
-            "title_zh": title_zh,
         }
 
         # Description (already HTML from parser)
-        if lang == "zh" and zh_step and zh_step.section.description:
-            section["description"] = zh_step.section.description
-        elif en_step.section.description:
-            section["description"] = en_step.section.description
+        description = step.section.description.get(lang)
+        if description:
+            section["description"] = description
 
         # Troubleshoot
-        if lang == "zh" and zh_step and zh_step.section.troubleshoot:
-            section["troubleshoot"] = zh_step.section.troubleshoot
-        elif en_step.section.troubleshoot:
-            section["troubleshoot"] = en_step.section.troubleshoot
+        troubleshoot = step.section.troubleshoot.get(lang)
+        if troubleshoot:
+            section["troubleshoot"] = troubleshoot
 
-        # Wiring - use Chinese step's wiring for Chinese language
-        wiring_source = (
-            zh_step.section.wiring
-            if lang == "zh" and zh_step and zh_step.section.wiring
-            else en_step.section.wiring
-        )
-        if wiring_source:
+        # Wiring
+        if step.section.wiring:
+            wiring_steps = step.section.wiring.steps.get(lang) or []
             section["wiring"] = {
                 "image": (
-                    f"/api/solutions/{solution_id}/assets/{wiring_source.image}"
-                    if wiring_source.image
+                    f"/api/solutions/{solution_id}/assets/{step.section.wiring.image}"
+                    if step.section.wiring.image
                     else None
                 ),
-                "steps": wiring_source.steps,
+                "steps": wiring_steps,
             }
 
         device["section"] = section
 
         # Load device config if specified
-        if en_step.config_file:
-            device["config_file"] = en_step.config_file
-            config = await self.load_device_config(solution_id, en_step.config_file)
+        if step.config_file:
+            device["config_file"] = step.config_file
+            config = await self.load_device_config(solution_id, step.config_file)
             if config:
                 if config.ssh:
                     device["ssh"] = config.ssh.model_dump()
@@ -857,7 +870,7 @@ class SolutionManager:
                     device["user_inputs"] = [
                         inp.model_dump() for inp in config.user_inputs
                     ]
-                if en_step.type == "preview":
+                if step.type == "preview":
                     device["preview"] = {
                         "user_inputs": (
                             [inp.model_dump() for inp in config.user_inputs]
@@ -875,28 +888,12 @@ class SolutionManager:
                     }
 
         # Build targets (for docker_deploy type)
-        if en_step.targets:
-            # Build a lookup for Chinese targets by ID
-            zh_targets_by_id = {}
-            if zh_step and zh_step.targets:
-                for zt in zh_step.targets:
-                    zh_targets_by_id[zt.id] = zt
-
+        if step.targets:
             targets_data = {}
-            for target in en_step.targets:
-                # Get corresponding Chinese target for translation
-                zh_target = zh_targets_by_id.get(target.id)
-                zh_name = zh_target.name if zh_target else target.name
-                zh_desc = zh_target.description if zh_target else target.description
-                zh_troubleshoot = (
-                    zh_target.troubleshoot if zh_target else target.troubleshoot
-                )
-
+            for target in step.targets:
                 target_info = {
-                    "name": target.name if lang == "en" else zh_name,
-                    "name_zh": zh_name,
-                    "description": (target.description if lang == "en" else zh_desc),
-                    "description_zh": zh_desc,
+                    "name": target.name.get(lang),
+                    "description": target.description.get(lang),
                     "default": target.default,
                     "config_file": target.config_file,
                 }
@@ -914,38 +911,30 @@ class SolutionManager:
                                 inp.model_dump() for inp in target_config.user_inputs
                             ]
 
-                # Build target section content (description, troubleshoot, wiring)
+                # Build target section content
                 target_section = {}
 
-                # Add description
-                if lang == "en" and target.description:
-                    target_section["description"] = target.description
-                elif lang == "zh" and zh_desc:
-                    target_section["description"] = zh_desc
+                # Add description HTML
+                desc_html = target.description_html.get(lang)
+                if desc_html:
+                    target_section["description"] = desc_html
 
                 # Add troubleshoot
-                if lang == "en" and target.troubleshoot:
-                    target_section["troubleshoot"] = target.troubleshoot
-                elif lang == "zh" and zh_troubleshoot:
-                    target_section["troubleshoot"] = zh_troubleshoot
+                troubleshoot = target.troubleshoot.get(lang)
+                if troubleshoot:
+                    target_section["troubleshoot"] = troubleshoot
 
-                # Add wiring (from target.wiring parsed from guide.md)
-                # For Chinese: use zh_target's wiring if available
-                wiring_source = (
-                    zh_target.wiring
-                    if lang == "zh" and zh_target and zh_target.wiring
-                    else target.wiring
-                )
-                if wiring_source:
-                    wiring_data = {
+                # Add wiring
+                if target.wiring:
+                    wiring_steps = target.wiring.steps.get(lang) or []
+                    target_section["wiring"] = {
                         "image": (
-                            f"/api/solutions/{solution_id}/assets/{wiring_source.image}"
-                            if wiring_source.image
+                            f"/api/solutions/{solution_id}/assets/{target.wiring.image}"
+                            if target.wiring.image
                             else None
                         ),
-                        "steps": wiring_source.steps,
+                        "steps": wiring_steps,
                     }
-                    target_section["wiring"] = wiring_data
 
                 if target_section:
                     target_info["section"] = target_section
@@ -2251,7 +2240,9 @@ class SolutionManager:
                     {
                         "hostname": hostname,
                         "device_name": device.get("name", device_id),
-                        "device_name_zh": device.get("name_zh", device.get("name", device_id)),
+                        "device_name_zh": device.get(
+                            "name_zh", device.get("name", device_id)
+                        ),
                         "device_id": device_id,
                     }
                 )
