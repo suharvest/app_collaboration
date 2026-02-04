@@ -41,8 +41,39 @@ fn hidden_command(program: &str) -> std::process::Command {
 }
 
 /// Get an available port for the backend server
+/// Uses TcpListener to verify the port is actually available
 fn get_available_port() -> u16 {
-    portpicker::pick_unused_port().expect("No available ports")
+    use std::net::TcpListener;
+
+    // Try portpicker first, then verify with actual bind
+    for attempt in 1..=10 {
+        if let Some(port) = portpicker::pick_unused_port() {
+            // Verify we can actually bind to this port
+            match TcpListener::bind(format!("127.0.0.1:{}", port)) {
+                Ok(listener) => {
+                    // Port is available, drop the listener to release it
+                    drop(listener);
+                    log::info!("Found available port {} (attempt {})", port, attempt);
+                    return port;
+                }
+                Err(e) => {
+                    log::warn!(
+                        "Port {} suggested by portpicker but bind failed: {} (attempt {})",
+                        port, e, attempt
+                    );
+                    continue;
+                }
+            }
+        }
+    }
+
+    // Fallback: let the OS assign a port
+    log::warn!("portpicker failed, letting OS assign port");
+    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind to any port");
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+    log::info!("OS assigned port {}", port);
+    port
 }
 
 /// Check if a process is still running (cross-platform)
@@ -392,12 +423,20 @@ fn get_backend_port() -> u16 {
 
 /// Main entry point
 fn main() {
-    // Initialize logger for debug builds
-    #[cfg(debug_assertions)]
-    env_logger::init();
+    // Initialize logger (for both debug and release builds)
+    // In release: RUST_LOG=info ./app to see logs
+    let _ = env_logger::try_init();
+
+    // IMPORTANT: Clean up any leftover processes BEFORE selecting port
+    // This ensures residual sidecar processes don't hold ports
+    let cleaned = cleanup_leftover_processes();
+    if cleaned > 0 {
+        println!("Pre-startup cleanup: removed {} leftover process(es)", cleaned);
+    }
 
     let backend_port = get_available_port();
     BACKEND_PORT.store(backend_port, Ordering::SeqCst);
+    println!("Selected backend port: {}", backend_port);
     log::info!("Selected backend port: {}", backend_port);
 
     tauri::Builder::default()
@@ -578,34 +617,46 @@ fn setup_sidecar_bundle(handle: &tauri::AppHandle) -> Result<std::path::PathBuf,
     let extracted_exe = cache_dir.join(get_sidecar_exe_name());
     let extracted_internal = cache_dir.join("_internal");
 
-    // Check if already extracted by verifying both exe and _internal exist
-    if extracted_exe.exists() && extracted_internal.exists() {
-        log::info!("Sidecar already extracted at {:?}", cache_dir);
-        return Ok(extracted_exe);
-    }
-
-    log::info!("Extracting sidecar bundle to {:?}", cache_dir);
-
-    // Create cache directory
-    std::fs::create_dir_all(&cache_dir)?;
-
-    // Find and copy the sidecar executable from resources
-    // The exe is bundled via externalBin in MacOS/ directory
-    // Tauri strips the target triple suffix when bundling
+    // Find the source sidecar executable
     let app_exe = std::env::current_exe()?;
     let macos_dir = app_exe.parent().unwrap();
-
-    // The sidecar is named "provisioning-station" (or .exe on Windows)
     #[cfg(windows)]
     let sidecar_name = "provisioning-station.exe";
     #[cfg(not(windows))]
     let sidecar_name = "provisioning-station";
-
     let sidecar_src = macos_dir.join(sidecar_name);
+
+    // Check if already extracted and version matches
+    // Compare file sizes to detect version mismatch (size change indicates new build)
+    let needs_extraction = if extracted_exe.exists() && extracted_internal.exists() {
+        // Check if source and extracted exe have same size (simple version check)
+        let src_size = std::fs::metadata(&sidecar_src).map(|m| m.len()).unwrap_or(0);
+        let dst_size = std::fs::metadata(&extracted_exe).map(|m| m.len()).unwrap_or(0);
+        if src_size != dst_size {
+            log::info!("Sidecar version mismatch detected (size: {} vs {}), re-extracting", src_size, dst_size);
+            true
+        } else {
+            log::info!("Sidecar already extracted at {:?} (version matches)", cache_dir);
+            false
+        }
+    } else {
+        true
+    };
+
+    if !needs_extraction {
+        return Ok(extracted_exe);
+    }
+
+    // Verify source sidecar exists
     if !sidecar_src.exists() {
         return Err(format!("Sidecar executable not found at {:?}", sidecar_src).into());
     }
+
+    log::info!("Extracting sidecar bundle to {:?}", cache_dir);
     log::info!("Found sidecar at: {:?}", sidecar_src);
+
+    // Create cache directory
+    std::fs::create_dir_all(&cache_dir)?;
 
     // Copy sidecar executable
     log::info!("Copying sidecar executable to: {:?}", extracted_exe);
@@ -701,12 +752,14 @@ async fn start_sidecar(
         return Ok(());
     }
 
-    // Clean up any leftover processes from previous runs
+    // Secondary cleanup check (primary is in main() before port selection)
+    // This catches any processes that may have started between port selection and here
     let cleaned = cleanup_leftover_processes();
     if cleaned > 0 {
-        log::info!("Cleaned up {} leftover process(es)", cleaned);
+        log::warn!("Late cleanup: removed {} process(es) spawned after initial cleanup", cleaned);
     }
 
+    println!("Starting provisioning-station sidecar on port {}", port);
     log::info!("Starting provisioning-station sidecar on port {}", port);
 
     // Get the resource directory where solutions are bundled
