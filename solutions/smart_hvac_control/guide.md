@@ -21,11 +21,15 @@ Deploy a KNN-based HVAC optimization system that learns from your historical dat
 
 **Requirements:** Docker installed · OPC-UA controller (or use built-in simulator)
 
-## Step 1: HVAC Control System {#hvac type=docker_deploy required=true}
+## Step 1: HVAC Control System {#hvac type=docker_deploy required=true config=devices/local.yaml}
+
+HVAC Control System
 
 ### Target: Local Deployment {#hvac_local type=local config=devices/local.yaml default=true}
 
 Click the "Deploy" button below to automatically start the HVAC control service on this machine.
+
+### Wiring
 
 ![Wiring](gallery/architecture.svg)
 
@@ -46,6 +50,8 @@ Click the "Deploy" button below to automatically start the HVAC control service 
 
 Click the "Deploy" button below to automatically deploy the HVAC control service to the remote device.
 
+### Wiring
+
 ![Wiring](gallery/recomputer.svg)
 
 1. Connect to remote device via SSH
@@ -61,12 +67,22 @@ Click the "Deploy" button below to automatically deploy the HVAC control service
 | Deployment timeout | Check remote device network, ensure it can access image registry |
 | Web page not loading | Check if firewall allows port 8280 |
 
-### Deployment Complete
+---
+
+# Deployment Complete
 
 HVAC control system is ready!
 
-**Access:** http://\<server-ip\>:8280
+## Access
 
-**Next:** Connect to OPC-UA server (or use built-in simulator), upload training data, then configure parameters.
+http://\<server-ip\>:8280
 
-**Useful:** `docker logs missionpack_knn` to view logs.
+## Next Steps
+
+1. Connect to OPC-UA server (or use built-in simulator)
+2. Upload training data
+3. Configure parameters
+
+## Useful Commands
+
+`docker logs missionpack_knn` to view logs

@@ -21,11 +21,15 @@
 
 **前提条件：** Docker 已安装 · OPC-UA 控制器（或用内置模拟器测试）
 
-## 步骤 1: 暖通控制系统 {#hvac type=docker_deploy required=true}
+## 步骤 1: 暖通控制系统 {#hvac type=docker_deploy required=true config=devices/local.yaml}
+
+暖通控制系统
 
 ### 部署目标: 本机部署 {#hvac_local type=local config=devices/local.yaml default=true}
 
 点击下方"部署"按钮，系统将自动在本机启动暖通控制服务。
+
+### 接线
 
 ![接线图](gallery/architecture.svg)
 
@@ -33,7 +37,7 @@
 2. 点击部署启动容器
 3. 通过 localhost:8280 访问 Web 界面
 
-### 故障排除
+### 故障排查
 
 | 问题 | 解决方法 |
 |------|----------|
@@ -46,13 +50,15 @@
 
 点击下方"部署"按钮，系统将自动把暖通控制服务部署到远程设备。
 
+### 接线
+
 ![接线图](gallery/recomputer.svg)
 
 1. 通过 SSH 连接远程设备
 2. 远程部署 Docker 容器
 3. 通过设备 IP:8280 访问 Web 界面
 
-### 故障排除
+### 故障排查
 
 | 问题 | 解决方法 |
 |------|----------|
@@ -61,12 +67,22 @@
 | 部署超时 | 检查远程设备网络，确保能访问镜像仓库 |
 | 网页打不开 | 检查防火墙是否开放 8280 端口 |
 
-### 部署完成
+---
+
+# 部署完成
 
 暖通控制系统已就绪！
 
-**访问地址：** http://\<服务器IP\>:8280
+## 访问地址
 
-**下一步：** 连接 OPC-UA 服务器（或使用内置模拟器），上传训练数据，配置参数。
+http://\<服务器IP\>:8280
 
-**常用命令：** `docker logs missionpack_knn` 查看日志。
+## 下一步
+
+1. 连接 OPC-UA 服务器（或使用内置模拟器）
+2. 上传训练数据
+3. 配置参数
+
+## 常用命令
+
+`docker logs missionpack_knn` 查看日志
