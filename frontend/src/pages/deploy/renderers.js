@@ -172,17 +172,24 @@ export function renderDeployContent(container) {
 /**
  * Render post-deployment success section
  * Only shown when all required devices are completed
+ * Uses preset-level completion content if available, falls back to global post_deployment
  */
 export function renderPostDeploymentSection(deployment) {
-  const postDeployment = deployment?.post_deployment;
-  if (!postDeployment) return '';
-
   const currentSolution = getCurrentSolution();
   const devices = deployment.devices || [];
 
   // Check if all required devices are completed
   const allCompleted = areAllRequiredDevicesCompleted(devices);
   if (!allCompleted) return '';
+
+  // Get current preset's completion content (preferred)
+  const selectedPresetId = getSelectedPresetId();
+  const presets = deployment?.presets || [];
+  const selectedPreset = presets.find(p => p.id === selectedPresetId);
+
+  // Use preset completion if available, otherwise fall back to global post_deployment
+  const postDeployment = selectedPreset?.completion || deployment?.post_deployment;
+  if (!postDeployment) return '';
 
   const successMessage = postDeployment.success_message || '';
   const nextSteps = postDeployment.next_steps || [];
@@ -449,12 +456,20 @@ export function renderDeploySection(device, stepNumber) {
   const section = device.section || {};
   const sectionTitle = getLocalizedField(section, 'title') || name;
   const sectionDescription = section.description || '';
-  const sectionTroubleshoot = section.troubleshoot || '';
   const isManual = device.type === 'manual';
   const isScript = device.type === 'script';
   const isPreview = device.type === 'preview';
   const isDockerDeploy = device.type === 'docker_deploy' && device.targets;
   const isRecameraCppWithTargets = device.type === 'recamera_cpp' && device.targets;
+
+  // For devices with targets, get troubleshoot from selected target's section
+  let sectionTroubleshoot = section.troubleshoot || '';
+  if ((isDockerDeploy || isRecameraCppWithTargets) && device.targets) {
+    const target = getSelectedTarget(device);
+    if (target?.section?.troubleshoot) {
+      sectionTroubleshoot = target.section.troubleshoot;
+    }
+  }
   const isCompleted = state.deploymentStatus === 'completed';
 
   return `
