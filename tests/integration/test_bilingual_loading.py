@@ -2,15 +2,15 @@
 Integration tests for bilingual markdown loading.
 """
 
-import pytest
-from pathlib import Path
-import tempfile
 import shutil
+import tempfile
+from pathlib import Path
+
+import pytest
 
 from provisioning_station.services.markdown_parser import (
     parse_bilingual_markdown,
     parse_deployment_guide,
-    ParseResult,
 )
 
 
@@ -165,10 +165,10 @@ Configure the system.
         assert docker_step.id == "docker"
         assert docker_step.type == "docker_local"
         assert docker_step.required is True
-        assert "Install Docker" in docker_step.section.description
-        assert "安装 Docker" in docker_step.section.description_zh
-        assert "Won't start" in docker_step.section.troubleshoot
-        assert "无法启动" in docker_step.section.troubleshoot_zh
+        assert "Install Docker" in docker_step.section.description.get("en")
+        assert "安装 Docker" in docker_step.section.description.get("zh")
+        assert "Won't start" in docker_step.section.troubleshoot.get("en")
+        assert "无法启动" in docker_step.section.troubleshoot.get("zh")
 
         config_step = result.steps[1]
         assert config_step.id == "configure"
@@ -211,9 +211,9 @@ Congratulations! All done.
 
         assert not result.has_errors
         assert result.success is not None
-        assert "Congratulations" in result.success.content_en
-        assert "恭喜" in result.success.content_zh
-        assert "Next Steps" in result.success.content_en
+        assert "Congratulations" in result.success.content.get("en")
+        assert "恭喜" in result.success.content.get("zh")
+        assert "Next Steps" in result.success.content.get("en")
 
     def test_parse_with_presets(self):
         """Parse a guide with preset groupings."""
@@ -268,8 +268,8 @@ Set up edge computing.
 
         cloud_preset = result.presets[0]
         assert cloud_preset.id == "cloud"
-        assert cloud_preset.name == "Cloud Solution"
-        assert cloud_preset.name_zh == "云方案"
+        assert cloud_preset.name.get("en") == "Cloud Solution"
+        assert cloud_preset.name.get("zh") == "云方案"
         assert len(cloud_preset.steps) == 1
         assert cloud_preset.steps[0].id == "backend"
         assert cloud_preset.steps[0].config_file == "devices/docker.yaml"
@@ -360,7 +360,7 @@ Connect the device.
         step = result.steps[0]
         assert step.section.wiring is not None
         assert step.section.wiring.image == "gallery/wiring.png"
-        assert len(step.section.wiring.steps) == 3
-        assert "USB cable" in step.section.wiring.steps[0]
-        assert len(step.section.wiring.steps_zh) == 3
-        assert "USB 线" in step.section.wiring.steps_zh[0]
+        assert len(step.section.wiring.steps.get("en")) == 3
+        assert "USB cable" in step.section.wiring.steps.get("en")[0]
+        assert len(step.section.wiring.steps.get("zh")) == 3
+        assert "USB 线" in step.section.wiring.steps.get("zh")[0]

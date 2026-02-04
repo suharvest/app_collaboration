@@ -5,9 +5,9 @@ These tests verify that the API response structure matches what the frontend exp
 This prevents regression when modifying either frontend or backend code.
 """
 
-import pytest
-from pathlib import Path
+
 import httpx
+import pytest
 
 # Base URL for the API (assumes dev server is running)
 BASE_URL = "http://localhost:3260"
@@ -42,8 +42,8 @@ class TestDeploymentAPIContract:
             assert "devices" in data, f"Missing 'devices' in {solution_id}"
             assert "presets" in data, f"Missing 'presets' in {solution_id}"
             assert "selection_mode" in data, f"Missing 'selection_mode' in {solution_id}"
-            assert isinstance(data["devices"], list), f"'devices' should be a list"
-            assert isinstance(data["presets"], list), f"'presets' should be a list"
+            assert isinstance(data["devices"], list), "'devices' should be a list"
+            assert isinstance(data["presets"], list), "'presets' should be a list"
 
     def test_device_structure(self, solutions):
         """Verify each device has required fields."""
@@ -124,7 +124,7 @@ class TestDeploymentAPIContract:
                                 if "wiring" in target_section:
                                     wiring = target_section["wiring"]
                                     assert "steps" in wiring or "image" in wiring, \
-                                        f"Target wiring should have steps or image"
+                                        "Target wiring should have steps or image"
 
     def test_targets_have_exactly_one_default(self, solutions):
         """Verify that targets have exactly one default (or none for backward compat)."""
@@ -166,7 +166,7 @@ class TestDeploymentAPIContract:
                     is_id_list = isinstance(first, str)
                     is_object_list = isinstance(first, dict)
                     assert is_id_list or is_object_list, \
-                        f"Preset devices should be ID strings or device objects"
+                        "Preset devices should be ID strings or device objects"
 
     def test_preset_device_ids_exist_in_global_devices(self, solutions):
         """Verify preset device IDs reference existing global devices."""
@@ -339,12 +339,22 @@ class TestSmartWarehouseSpecific:
         )
         assert has_content, "Manual device missing section content"
 
-    def test_post_deployment_exists(self, deployment_data):
-        """post_deployment should exist with success message."""
-        post = deployment_data.get("post_deployment")
-        assert post is not None, "Missing post_deployment"
-        assert "success_message" in post
-        assert len(post["success_message"]) > 0
+    def test_preset_completion_exists(self, deployment_data):
+        """Each preset should have completion content."""
+        presets = deployment_data.get("presets", [])
+        assert len(presets) > 0, "No presets found"
+
+        # At least one preset should have completion
+        presets_with_completion = [
+            p for p in presets if p.get("completion") is not None
+        ]
+        assert len(presets_with_completion) > 0, "No preset has completion content"
+
+        # Verify completion structure
+        for preset in presets_with_completion:
+            completion = preset["completion"]
+            assert "success_message" in completion
+            assert len(completion["success_message"]) > 0
 
 
 class TestDevicesAPIContract:
