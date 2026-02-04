@@ -117,7 +117,9 @@ class MqttBridge:
             return existing.subscription_id
 
         # Create new subscription
-        self._loop = asyncio.get_event_loop()
+        # Use get_running_loop() instead of get_event_loop() for Python 3.10+ compatibility
+        # This ensures we get the actual running loop, not a new one
+        self._loop = asyncio.get_running_loop()
         subscription = MqttSubscription(
             subscription_id=subscription_id,
             broker=broker,
