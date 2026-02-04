@@ -18,6 +18,10 @@ Use [SenseCraft](https://sensecraft.seeed.cc/ai/) cloud service for voice AI. Si
 
 ### Target: Local Deployment {#warehouse_local type=local config=devices/recomputer.yaml}
 
+Run the warehouse system on this computer.
+
+### Wiring
+
 1. Ensure Docker is installed and running
 2. Click Deploy button to start services
 
@@ -29,6 +33,10 @@ Use [SenseCraft](https://sensecraft.seeed.cc/ai/) cloud service for voice AI. Si
 | Docker not running | Start Docker Desktop and retry |
 
 ### Target: Remote Deployment (R1100) {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
+
+Deploy to reComputer R1100 edge device.
+
+### Wiring
 
 ![Wiring](gallery/R1100_connected.png)
 
@@ -128,6 +136,16 @@ Check the warehouse web interface to see inventory changes after speaking.
 |-------|----------|
 | Watcher not responding | Ensure MCP bridge service is running |
 | Inventory not updated | Refresh the web page to see latest data |
+
+### Deployment Complete
+
+Your voice-controlled warehouse system is ready!
+
+**Access points:**
+- Warehouse System: http://\<server-ip\>:2125
+- SenseCraft Platform: [sensecraft.seeed.cc](https://sensecraft.seeed.cc/ai/)
+
+Try saying "Stock in 10 boxes of apples" to test voice inventory management.
 
 ---
 
@@ -302,6 +320,16 @@ Check the warehouse web interface to see inventory changes after speaking.
 |-------|----------|
 | Watcher not responding | Ensure agent is connected (status shows Connected) |
 | Inventory not updated | Refresh the web page to see latest data |
+
+### Deployment Complete
+
+Your private cloud warehouse system is ready!
+
+**Access points:**
+- Warehouse System: http://\<server-ip\>:2125
+- Voice Service Console: http://\<server-ip\>:18003
+
+Your data stays on your network. Try saying "How many apples left?" to test.
 
 ---
 
@@ -485,14 +513,13 @@ Check the warehouse web interface to see inventory changes after speaking.
 | Watcher not responding | Ensure agent is connected (status shows Connected) |
 | Inventory not updated | Refresh the web page to see latest data |
 
----
+### Deployment Complete
 
-# Deployment Complete
+Your fully offline warehouse system is ready!
 
-Congratulations! Your Smart Warehouse Management system is now deployed and ready to use.
+**Access points:**
+- Warehouse System: http://\<server-ip\>:2125
+- Voice Service Console: http://\<server-ip\>:18003
+- LLM Health Check: http://\<jetson-ip\>:8000/health
 
-## Next Steps
-
-- [Access Warehouse System](http://localhost:2125)
-- [View Documentation](https://wiki.seeedstudio.com/cn/mcp_external_system_integration/)
-- [Report Issues on GitHub](https://github.com/suharvest/warehouse_system/issues)
+100% offline operation - no internet required after deployment.

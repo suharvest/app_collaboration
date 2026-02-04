@@ -137,42 +137,12 @@ Enter the following information:
 | Container startup failed | SSH in and run `docker logs` to view error messages |
 | Microphone not found | Run `arecord -l` to verify reSpeaker is recognized |
 
----
+### Deployment Complete
 
-# Deployment Complete
+Voice AI system is ready!
 
-## Deployment Successful!
+**Access:** http://\<device-ip\>:8090
 
-The Smart Retail Voice AI solution has been deployed successfully.
+**Recommended:** Reboot the device first (`reboot`), then test voice recognition by speaking near the reSpeaker.
 
-### Next Steps
-
-1. **Reboot the device** - Strongly recommended to ensure all settings take effect:
-   ```bash
-   reboot
-   ```
-
-2. **Access the Voice Client** - After reboot, navigate to:
-   - http://192.168.49.1:8090
-
-3. **Test Voice Recognition** - Speak near the reSpeaker and verify transcription appears in real-time
-
-4. **Configure Cloud Platform** (Optional) - Connect to SenseCraft Voice cloud platform for:
-   - Multi-store management
-   - AI-powered analytics
-   - Keyword hotspot analysis
-
-### Troubleshooting
-
-If services are not working:
-
-```bash
-# Check container status
-docker ps
-
-# View voice client logs
-docker logs sensecraft-voice-client
-
-# Check audio devices
-ls -l /dev/snd/
-```
+**Next:** Connect to [SenseCraft Voice](https://voice.sensecraft.seeed.cc/) for cloud analytics.

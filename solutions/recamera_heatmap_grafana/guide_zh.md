@@ -11,7 +11,7 @@
 - 直观看出哪里人多哪里人少
 - 隐私保护（人脸自动打码）
 
-**前提条件：** 新设备需先开启远程访问——用 USB 连接电脑，等设备开机（约 2 分钟），访问 [192.168.42.1/#/setting](http://192.168.42.1/#/setting)，输入初始账号 `recamera` / `recamera`，勾选「开启远程访问」
+**前提条件：** 新设备需先开启 SSH——用 USB 连接电脑，等设备开机（约 2 分钟），访问 [192.168.42.1/#/security](http://192.168.42.1/#/security)，输入初始账号 `recamera` / `recamera`，打开 SSH 开关
 
 ## 步骤 1: 让摄像头能识别人 {#deploy_detector type=recamera_cpp required=true config=devices/recamera_yolo11.yaml}
 
@@ -19,13 +19,13 @@
 
 ### 部署目标: YOLO11 (~8 FPS) {#deploy_detector_yolo11 config=devices/recamera_yolo11.yaml default=true}
 
+推荐大多数场景使用。
+
 ### 接线
 
 1. USB 连接：IP 地址 `192.168.42.1`，即插即用
 2. 网线/WiFi：在路由器管理页面查找 reCamera 的 IP
 3. 输入用户名 `recamera`，密码 `recamera`
-
-推荐大多数场景使用。
 
 ### 故障排查
 
@@ -37,13 +37,13 @@
 
 ### 部署目标: YOLOv26 (~3 FPS) {#deploy_detector_yolo26 config=devices/recamera_yolo26.yaml}
 
+备选模型，可自行尝试。
+
 ### 接线
 
 1. USB 连接：IP 地址 `192.168.42.1`，即插即用
 2. 网线/WiFi：在路由器管理页面查找 reCamera 的 IP
 3. 输入用户名 `recamera`，密码 `recamera`
-
-备选模型，可自行尝试。
 
 ### 故障排查
 
@@ -60,6 +60,17 @@
 点击 **连接** 查看带热力图叠加的实时视频。
 
 **提示：** 热力图会随时间累积，等几分钟效果更明显。
+
+**注意：** 热力图渲染需要 ffmpeg，打开终端安装：
+- **Windows:** 打开 PowerShell，运行 `winget install ffmpeg`
+- **macOS:** 打开终端，运行 `brew install ffmpeg`
+- **Linux:** 打开终端，运行 `sudo apt install ffmpeg`
+
+### 部署完成
+
+摄像头已就绪！点击上方 **连接** 查看实时热力图。
+
+热力图会随时间累积——人停留越久的区域会越亮。
 
 ---
 
@@ -162,28 +173,16 @@
 
 如果只想在看板里看摄像头视角的热力图，可以跳过这步。
 
----
+### 部署完成
 
-# 部署完成
+热力图看板已就绪！
 
-## 部署完成！
+**访问看板：**
+- 地址：http://\<服务器IP\>:3000
+- 登录：`admin` / `admin`
 
-你的实时热力图系统已经在运行了。
+看板已配好，打开就能看数据。
 
-### 访问入口
-
-| 服务 | 地址 |
-|------|------|
-| 数据看板 | http://\<服务器IP\>:3000 |
-
-### 登录信息
-
-- 用户名：`admin`
-- 密码：`admin`
-
-看板和数据连接都已配好，打开就能看数据。
-
-### 遇到问题？
-
-- **看不到数据**：检查摄像头是否连上了
-- **打不开看板**：用 `docker ps` 看看服务有没有在跑
+**遇到问题？**
+- 看不到数据？检查摄像头是否连上了
+- 打不开看板？用 `docker ps` 看看服务有没有在跑

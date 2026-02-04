@@ -133,6 +133,15 @@ Deploy the indoor positioning application to a remote server via SSH.
 | Position not updating | Tracker in sleep mode | Press button to trigger report, or adjust reporting interval |
 | Position displayed incorrectly | Beacon coordinates misconfigured | Check if beacon position markers on webpage are correct |
 
+### Deployment Complete
+
+Indoor positioning is ready!
+
+**Access:** http://\<server-ip\>:5173
+**Login:** admin / 83EtWJUbGrPnQjdCqyKq
+
+Upload your floor map, mark beacon positions, then activate trackers.
+
 ---
 
 ## Preset: Standard Setup {#standard}
@@ -262,6 +271,15 @@ Deploy the indoor positioning application to a remote server via SSH.
 | Tracker not visible on webpage | Webhook not configured | Check if network server webhook points to positioning app |
 | Position not updating | Tracker in sleep mode | Press button to trigger report, or adjust reporting interval |
 | Position displayed incorrectly | Beacon coordinates misconfigured | Check if beacon position markers on webpage are correct |
+
+### Deployment Complete
+
+Indoor positioning is ready!
+
+**Access:** http://\<server-ip\>:5173
+**Login:** admin / 83EtWJUbGrPnQjdCqyKq
+
+Upload your floor map, mark beacon positions, then activate trackers.
 
 ---
 
@@ -393,33 +411,11 @@ Deploy the indoor positioning application to a remote server via SSH.
 | Position not updating | Tracker in sleep mode | Press button to trigger report, or adjust reporting interval |
 | Position displayed incorrectly | Beacon coordinates misconfigured | Check if beacon position markers on webpage are correct |
 
----
+### Deployment Complete
 
-# Deployment Complete
+Indoor positioning is ready!
 
-## Deployment Successful!
+**Access:** http://\<server-ip\>:5173
+**Login:** admin / 83EtWJUbGrPnQjdCqyKq
 
-The Indoor Positioning Application is now running.
-
-### Access Your Dashboard
-
-Open your browser and navigate to: **http://localhost:5173**
-
-### Default Login Credentials
-
-- **Username:** admin
-- **Password:** 83EtWJUbGrPnQjdCqyKq
-
-> **Important:** Change the default password after your first login for security.
-
-### Next Steps
-
-1. Upload your floor map image in the Map settings
-2. Add beacon positions by clicking on the map
-3. Configure your LoRaWAN network server connection
-4. Activate your T1000 tracker and start tracking!
-
-### Need Help?
-
-- [Wiki Documentation](https://wiki.seeedstudio.com/solutions/indoor-positioning-bluetooth-lorawan-tracker/)
-- [GitHub Repository](https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5)
+Upload your floor map, mark beacon positions, then activate trackers.
