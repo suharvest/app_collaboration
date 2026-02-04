@@ -1,24 +1,33 @@
 """
-Bilingual Markdown Parser for Solution Documentation.
+Multilingual Markdown Parser for Solution Documentation.
 
-This module provides parsing utilities for bilingual markdown format.
+This module provides parsing utilities for multilingual markdown format.
 Supports both:
 1. Combined format: Single file with `<!-- @lang:xx -->` markers
-2. Separate format: Two files (guide.md + guide_zh.md) with structure validation
+2. Separate format: Multiple files (guide.md, guide_zh.md, guide_ja.md, ...) with structure validation
 
 Format specification:
 - Deployment steps use H2 headers with metadata: `## Step N: Title {#step_id type=xxx required=true}`
 - Preset sections: `## Preset: Name {#preset_id}` / `## 套餐: 名称 {#preset_id}`
 - Sub-sections: `### Prerequisites`, `### Wiring`, `### Troubleshooting`
 - Success section starts with `# Deployment Complete` / `# 部署完成`
+
+Language file naming convention:
+- guide.md       -> English (default)
+- guide_zh.md    -> Chinese
+- guide_ja.md    -> Japanese
+- guide_fr.md    -> French
+- etc.
 """
 
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import Dict, Optional
 
 import markdown
+
+from .localized import Localized
 
 
 class ParseErrorType(Enum):
@@ -68,8 +77,7 @@ class WiringInfo:
     """Wiring diagram information extracted from markdown."""
 
     image: Optional[str] = None
-    steps: list[str] = field(default_factory=list)
-    steps_zh: list[str] = field(default_factory=list)
+    steps: Localized[list[str]] = field(default_factory=lambda: Localized())
 
 
 @dataclass
@@ -77,15 +85,17 @@ class TargetInfo:
     """Target information for docker_deploy type devices."""
 
     id: str
-    name: str
-    name_zh: str
+    name: Localized[str] = field(default_factory=lambda: Localized())
     config_file: Optional[str] = None
     default: bool = False
     target_type: str = "local"  # "local" or "remote"
-    description: str = ""
-    description_zh: str = ""
-    troubleshoot: str = ""
-    troubleshoot_zh: str = ""
+    description: Localized[str] = field(
+        default_factory=lambda: Localized()
+    )  # Plain text for selector
+    description_html: Localized[str] = field(
+        default_factory=lambda: Localized()
+    )  # HTML for content area
+    troubleshoot: Localized[str] = field(default_factory=lambda: Localized())  # HTML
     wiring: Optional["WiringInfo"] = None
 
 
@@ -93,12 +103,13 @@ class TargetInfo:
 class SectionContent:
     """Section content compatible with existing frontend structure."""
 
-    title: str = ""
-    title_zh: str = ""
-    description: str = ""
-    description_zh: str = ""
-    troubleshoot: str = ""
-    troubleshoot_zh: str = ""
+    title: Localized[str] = field(default_factory=lambda: Localized())
+    description: Localized[str] = field(
+        default_factory=lambda: Localized()
+    )  # HTML content
+    troubleshoot: Localized[str] = field(
+        default_factory=lambda: Localized()
+    )  # HTML content
     wiring: Optional[WiringInfo] = None
 
 
@@ -107,9 +118,8 @@ class DeploymentStep:
     """A parsed deployment step from the markdown."""
 
     id: str
-    title_en: str
-    title_zh: str
-    type: str
+    title: Localized[str] = field(default_factory=lambda: Localized())
+    type: str = ""
     required: bool = True
     config_file: Optional[str] = None
     section: SectionContent = field(default_factory=SectionContent)
@@ -121,27 +131,29 @@ class PresetGuide:
     """A parsed preset guide section."""
 
     id: str
-    name: str
-    name_zh: str
-    description: str = ""
-    description_zh: str = ""
+    name: Localized[str] = field(default_factory=lambda: Localized())
+    description: Localized[str] = field(
+        default_factory=lambda: Localized()
+    )  # HTML content
     steps: list[DeploymentStep] = field(default_factory=list)
+    completion: Optional["SuccessContent"] = None
+    is_default: bool = False
 
 
 @dataclass
 class SuccessContent:
     """Parsed success/completion content."""
 
-    content_en: str = ""
-    content_zh: str = ""
+    content: Localized[str] = field(default_factory=lambda: Localized())  # HTML content
 
 
 @dataclass
 class ParseResult:
     """Result of parsing a deployment guide markdown file."""
 
-    overview_en: str = ""
-    overview_zh: str = ""
+    overview: Localized[str] = field(
+        default_factory=lambda: Localized()
+    )  # HTML content
     presets: list[PresetGuide] = field(default_factory=list)
     steps: list[DeploymentStep] = field(
         default_factory=list
@@ -202,6 +214,9 @@ TARGET_HEADER_PATTERN = re.compile(
 )
 SUCCESS_HEADER_PATTERN = re.compile(
     r"^#\s+(Deployment\s+Complete|部署完成)\s*$", re.IGNORECASE
+)
+PRESET_COMPLETION_PATTERN = re.compile(
+    r"^###\s+(Deployment\s+Complete|部署完成)\s*$", re.IGNORECASE
 )
 SUBSECTION_PATTERNS = {
     "prerequisites": re.compile(r"^###\s+(Prerequisites|前置条件)\s*$", re.IGNORECASE),
@@ -269,31 +284,82 @@ def split_by_language(content: str) -> tuple[str, str]:
     return english, chinese
 
 
-def extract_wiring(content: str, content_zh: str = "") -> Optional[WiringInfo]:
-    """Extract wiring information from content."""
-    wiring = WiringInfo()
+def extract_wiring_for_lang(content: str) -> tuple[Optional[str], list[str]]:
+    """Extract wiring image and steps from content for a single language.
+
+    Args:
+        content: Markdown content for one language
+
+    Returns:
+        Tuple of (image_path, steps_list)
+    """
+    image = None
+    steps = []
 
     # Extract image
     img_match = IMAGE_PATTERN.search(content)
     if img_match:
-        wiring.image = img_match.group(2)
+        image = img_match.group(2)
 
     # Extract ordered list steps
     for line in content.split("\n"):
         match = ORDERED_LIST_PATTERN.match(line.strip())
         if match:
-            wiring.steps.append(match.group(1))
+            steps.append(match.group(1))
 
-    # Extract Chinese steps
+    return image, steps
+
+
+def extract_wiring(content: str, content_zh: str = "") -> Optional[WiringInfo]:
+    """Extract wiring information from content (legacy bilingual interface).
+
+    Args:
+        content: English content
+        content_zh: Chinese content (optional)
+
+    Returns:
+        WiringInfo with Localized steps, or None if no wiring content
+    """
+    image, steps_en = extract_wiring_for_lang(content)
+
+    if not image and not steps_en:
+        return None
+
+    wiring = WiringInfo(image=image, steps=Localized({"en": steps_en}))
+
+    # Extract Chinese steps if provided
     if content_zh:
-        for line in content_zh.split("\n"):
-            match = ORDERED_LIST_PATTERN.match(line.strip())
-            if match:
-                wiring.steps_zh.append(match.group(1))
+        _, steps_zh = extract_wiring_for_lang(content_zh)
+        if steps_zh:
+            wiring.steps.set("zh", steps_zh)
 
-    if wiring.image or wiring.steps:
-        return wiring
-    return None
+    return wiring
+
+
+def extract_wiring_multilang(lang_contents: Dict[str, str]) -> Optional[WiringInfo]:
+    """Extract wiring information from multiple language contents.
+
+    Args:
+        lang_contents: Dict mapping language code to content
+
+    Returns:
+        WiringInfo with Localized steps for all languages
+    """
+    # Use first available content to get image
+    image = None
+    all_steps: Dict[str, list[str]] = {}
+
+    for lang, content in lang_contents.items():
+        lang_image, lang_steps = extract_wiring_for_lang(content)
+        if lang_image and image is None:
+            image = lang_image
+        if lang_steps:
+            all_steps[lang] = lang_steps
+
+    if not image and not all_steps:
+        return None
+
+    return WiringInfo(image=image, steps=Localized(all_steps))
 
 
 def md_to_html(content: str) -> str:
@@ -339,7 +405,7 @@ def parse_subsections(content: str) -> dict[str, str]:
 def parse_deployment_step(
     header_line: str, content_en: str, content_zh: str, line_number: int
 ) -> tuple[Optional[DeploymentStep], list[ParseError], list[ParseWarning]]:
-    """Parse a single deployment step from header and content.
+    """Parse a single deployment step from header and content (legacy bilingual).
 
     Returns (step, errors, warnings).
     """
@@ -392,10 +458,6 @@ def parse_deployment_step(
     subsections_en = parse_subsections(content_en)
     subsections_zh = parse_subsections(content_zh)
 
-    # Extract Chinese title from Chinese content header
-    title_zh = title  # Default to English title
-    zh_lines = content_zh.strip().split("\n") if content_zh else []
-
     # Check for translation warning
     if not content_zh.strip():
         warnings.append(
@@ -405,15 +467,26 @@ def parse_deployment_step(
             )
         )
 
-    # Build section content
+    # Build section content with Localized fields
     section = SectionContent(
-        title=title,
-        title_zh=title_zh,
-        description=md_to_html(subsections_en["main"]),
-        description_zh=md_to_html(subsections_zh.get("main", "")),
-        troubleshoot=md_to_html(subsections_en.get("troubleshoot", "")),
-        troubleshoot_zh=md_to_html(subsections_zh.get("troubleshoot", "")),
+        title=Localized({"en": title}),
+        description=Localized(
+            {
+                "en": md_to_html(subsections_en["main"]),
+            }
+        ),
+        troubleshoot=Localized(
+            {
+                "en": md_to_html(subsections_en.get("troubleshoot", "")),
+            }
+        ),
     )
+
+    # Add Chinese content if available
+    if subsections_zh.get("main"):
+        section.description.set("zh", md_to_html(subsections_zh["main"]))
+    if subsections_zh.get("troubleshoot"):
+        section.troubleshoot.set("zh", md_to_html(subsections_zh["troubleshoot"]))
 
     # Extract wiring if present
     if subsections_en.get("wiring"):
@@ -423,8 +496,7 @@ def parse_deployment_step(
 
     step = DeploymentStep(
         id=step_id,
-        title_en=title,
-        title_zh=title_zh,
+        title=Localized({"en": title}),
         type=step_type,
         required=attrs.get("required", True),
         config_file=attrs.get("config"),
@@ -440,89 +512,96 @@ def parse_deployment_step(
     return step, errors, warnings
 
 
-def parse_targets(content_en: str, content_zh: str) -> list[TargetInfo]:
-    """Parse target sections from step content (for docker_deploy and recamera_cpp types).
+def _parse_target_content(
+    content_lines: list[str],
+) -> tuple[str, list[str], Optional[str], str]:
+    """Parse target content into description, wiring steps, wiring image, and troubleshoot.
 
-    Target format: ### Target: Name {#id config=xxx default=true}
-    Content below each target header is the description + wiring steps.
+    Returns: (description, wiring_steps, wiring_image, troubleshoot)
+    """
+    # Join lines and use parse_subsections for consistent parsing
+    content = "\n".join(content_lines)
+
+    # Truncate at separator or next target
+    for i, line in enumerate(content_lines):
+        stripped = line.strip()
+        if stripped == "---" or TARGET_HEADER_PATTERN.match(stripped):
+            content = "\n".join(content_lines[:i])
+            break
+
+    subsections = parse_subsections(content)
+
+    # Extract wiring info
+    wiring_steps = []
+    wiring_image = None
+    wiring_content = subsections.get("wiring", "")
+    if wiring_content:
+        for line in wiring_content.split("\n"):
+            stripped = line.strip()
+            # Extract image
+            img_match = IMAGE_PATTERN.match(stripped)
+            if img_match:
+                wiring_image = img_match.group(2)
+                continue
+            # Extract ordered list steps
+            list_match = ORDERED_LIST_PATTERN.match(stripped)
+            if list_match:
+                wiring_steps.append(list_match.group(1))
+
+    # Main content is description
+    description = subsections.get("main", "").strip()
+
+    # Troubleshoot content (as markdown, will be converted to HTML later)
+    troubleshoot = subsections.get("troubleshoot", "").strip()
+
+    return description, wiring_steps, wiring_image, troubleshoot
+
+
+def _parse_targets_single_lang(content: str, lang: str) -> list[TargetInfo]:
+    """Parse targets from single-language content.
+
+    Args:
+        content: Markdown content for one language
+        lang: Language code
+
+    Returns:
+        List of TargetInfo with single-language Localized fields
     """
     targets = []
-
-    def parse_target_content(
-        content_lines: list[str],
-    ) -> tuple[str, list[str], Optional[str]]:
-        """Parse target content into description, wiring steps, and wiring image."""
-        description_lines = []
-        wiring_steps = []
-        wiring_image = None
-        in_wiring = False
-
-        for line in content_lines:
-            stripped = line.strip()
-            # Check for separator (end of target)
-            if stripped == "---":
-                break
-            # Check for next subsection header that's not a target
-            if stripped.startswith("###") and not TARGET_HEADER_PATTERN.match(stripped):
-                in_wiring = True
-                continue
-            # Parse wiring content
-            if in_wiring:
-                # Extract image
-                img_match = IMAGE_PATTERN.match(stripped)
-                if img_match:
-                    wiring_image = img_match.group(2)
-                    continue
-                # Extract ordered list steps
-                list_match = ORDERED_LIST_PATTERN.match(stripped)
-                if list_match:
-                    wiring_steps.append(list_match.group(1))
-                    continue
-            else:
-                # Check for inline image (wiring diagram)
-                img_match = IMAGE_PATTERN.match(stripped)
-                if img_match:
-                    wiring_image = img_match.group(2)
-                    continue
-                # Check for ordered list (wiring steps)
-                list_match = ORDERED_LIST_PATTERN.match(stripped)
-                if list_match:
-                    wiring_steps.append(list_match.group(1))
-                    continue
-                # Regular description content
-                description_lines.append(line)
-
-        return "\n".join(description_lines).strip(), wiring_steps, wiring_image
-
-    # Split EN content by target headers
-    en_lines = content_en.split("\n")
+    lines = content.split("\n")
     current_target_id = None
     current_target_name = ""
     current_attrs = {}
     current_content: list[str] = []
 
-    for line in en_lines:
+    for line in lines:
         match = TARGET_HEADER_PATTERN.match(line.strip())
         if match:
             # Save previous target if exists
             if current_target_id:
-                desc, wiring_steps, wiring_image = parse_target_content(current_content)
+                desc, wiring_steps, wiring_image, troubleshoot = _parse_target_content(
+                    current_content
+                )
                 wiring = None
                 if wiring_image or wiring_steps:
                     wiring = WiringInfo(
                         image=wiring_image,
-                        steps=wiring_steps,
-                        steps_zh=[],  # Will be updated from zh content
+                        steps=Localized({lang: wiring_steps}),
                     )
                 target = TargetInfo(
                     id=current_target_id,
-                    name=current_target_name,
-                    name_zh=current_target_name,  # Will be updated from zh content
+                    name=Localized({lang: current_target_name}),
                     config_file=current_attrs.get("config"),
                     default=current_attrs.get("default", False),
                     target_type=current_attrs.get("type", "local"),
-                    description=desc.strip() if desc else "",  # Plain text for selector
+                    description=Localized({lang: desc.strip() if desc else ""}),
+                    description_html=Localized(
+                        {lang: md_to_html(desc) if desc else ""}
+                    ),
                     wiring=wiring,
+                    troubleshoot=Localized(
+                        {lang: md_to_html(troubleshoot) if troubleshoot else ""}
+                    ),
                 )
                 targets.append(target)
 
@@ -537,63 +616,63 @@ def parse_targets(content_en: str, content_zh: str) -> list[TargetInfo]:
 
     # Save last target
     if current_target_id:
-        desc, wiring_steps, wiring_image = parse_target_content(current_content)
+        desc, wiring_steps, wiring_image, troubleshoot = _parse_target_content(
+            current_content
+        )
         wiring = None
         if wiring_image or wiring_steps:
             wiring = WiringInfo(
                 image=wiring_image,
-                steps=wiring_steps,
-                steps_zh=[],
+                steps=Localized({lang: wiring_steps}),
             )
         target = TargetInfo(
             id=current_target_id,
-            name=current_target_name,
-            name_zh=current_target_name,
+            name=Localized({lang: current_target_name}),
             config_file=current_attrs.get("config"),
             default=current_attrs.get("default", False),
             target_type=current_attrs.get("type", "local"),
-            description=desc.strip() if desc else "",  # Plain text for selector
+            description=Localized({lang: desc.strip() if desc else ""}),
+            description_html=Localized({lang: md_to_html(desc) if desc else ""}),
             wiring=wiring,
+            troubleshoot=Localized(
+                {lang: md_to_html(troubleshoot) if troubleshoot else ""}
+            ),
         )
         targets.append(target)
 
-    # Parse Chinese content to update translations
+    return targets
+
+
+def parse_targets(content_en: str, content_zh: str) -> list[TargetInfo]:
+    """Parse target sections from step content (legacy bilingual interface).
+
+    Target format: ### Target: Name {#id config=xxx default=true}
+    Content below each target header is the description + wiring steps.
+    """
+    # Parse English targets
+    targets = _parse_targets_single_lang(content_en, "en")
+
+    # Parse Chinese content and merge translations
     if content_zh and targets:
-        zh_lines = content_zh.split("\n")
-        zh_target_idx = 0
-        current_zh_content: list[str] = []
-        current_zh_name = ""
+        zh_targets = _parse_targets_single_lang(content_zh, "zh")
 
-        for line in zh_lines:
-            match = TARGET_HEADER_PATTERN.match(line.strip())
-            if match:
-                # Update previous target with ZH content
-                if zh_target_idx > 0 and zh_target_idx <= len(targets):
-                    target = targets[zh_target_idx - 1]
-                    target.name_zh = current_zh_name
-                    desc, wiring_steps_zh, _ = parse_target_content(current_zh_content)
-                    if desc:
-                        target.description_zh = desc.strip()  # Plain text for selector
-                    # Update wiring steps_zh if target has wiring
-                    if target.wiring and wiring_steps_zh:
-                        target.wiring.steps_zh = wiring_steps_zh
+        # Create a lookup by ID
+        zh_by_id = {t.id: t for t in zh_targets}
 
-                current_zh_name = match.group(1).strip()
-                current_zh_content = []
-                zh_target_idx += 1
-            else:
-                if zh_target_idx > 0:
-                    current_zh_content.append(line)
-
-        # Update last target
-        if zh_target_idx > 0 and zh_target_idx <= len(targets):
-            target = targets[zh_target_idx - 1]
-            target.name_zh = current_zh_name
-            desc, wiring_steps_zh, _ = parse_target_content(current_zh_content)
-            if desc:
-                target.description_zh = desc.strip()  # Plain text for selector
-            if target.wiring and wiring_steps_zh:
-                target.wiring.steps_zh = wiring_steps_zh
+        # Merge Chinese into English targets
+        for target in targets:
+            zh_target = zh_by_id.get(target.id)
+            if zh_target:
+                # Merge name
+                target.name.set("zh", zh_target.name.get("zh"))
+                # Merge description
+                target.description.set("zh", zh_target.description.get("zh"))
+                target.description_html.set("zh", zh_target.description_html.get("zh"))
+                # Merge troubleshoot
+                target.troubleshoot.set("zh", zh_target.troubleshoot.get("zh"))
+                # Merge wiring steps
+                if target.wiring and zh_target.wiring:
+                    target.wiring.steps.set("zh", zh_target.wiring.steps.get("zh"))
 
     return targets
 
@@ -655,6 +734,7 @@ def _parse_guide_content(content: str, lang: str, result: ParseResult) -> None:
     current_step_content: list[str] = []
     current_step_line: int = 0
     seen_step_ids: set[str] = set()
+    preset_description_lines: list[str] = []
 
     overview_lines: list[str] = []
     success_lines: list[str] = []
@@ -689,41 +769,51 @@ def _parse_guide_content(content: str, lang: str, result: ParseResult) -> None:
                         else:
                             result.steps.append(step)
             else:
-                # Update existing step with Chinese content
+                # Update existing step with non-English content
                 step_id_match = STEP_HEADER_PATTERN.match(current_step_header)
                 if step_id_match:
                     step_id = step_id_match.group(2)
-                    # Find step in result and update zh fields
+                    # Find step in result and update Localized fields
                     steps_list = (
                         current_preset.steps if current_preset else result.steps
                     )
                     for step in steps_list:
                         if step.id == step_id:
                             subsections = parse_subsections(content_text)
-                            step.section.description_zh = md_to_html(
-                                subsections["main"]
+                            step.section.description.set(
+                                lang, md_to_html(subsections["main"])
                             )
-                            step.section.troubleshoot_zh = md_to_html(
-                                subsections.get("troubleshoot", "")
+                            step.section.troubleshoot.set(
+                                lang, md_to_html(subsections.get("troubleshoot", ""))
                             )
-                            # Try to extract Chinese title from header
+                            # Try to extract title from header
                             title_match = STEP_HEADER_PATTERN.match(current_step_header)
                             if title_match:
-                                step.title_zh = title_match.group(1).strip()
-                                step.section.title_zh = step.title_zh
-                            # Update wiring Chinese steps if present
+                                title = title_match.group(1).strip()
+                                step.title.set(lang, title)
+                                step.section.title.set(lang, title)
+                            # Update wiring steps if present
                             if step.section.wiring and subsections.get("wiring"):
                                 wiring_content = subsections["wiring"]
+                                wiring_steps = []
                                 for line in wiring_content.split("\n"):
                                     match = ORDERED_LIST_PATTERN.match(line.strip())
                                     if match:
-                                        step.section.wiring.steps_zh.append(
-                                            match.group(1)
-                                        )
+                                        wiring_steps.append(match.group(1))
+                                if wiring_steps:
+                                    step.section.wiring.steps.set(lang, wiring_steps)
                             break
 
             current_step_header = None
             current_step_content = []
+
+    def flush_preset_description():
+        """Flush accumulated preset description."""
+        nonlocal preset_description_lines
+        if preset_description_lines and current_preset:
+            desc_html = md_to_html("\n".join(preset_description_lines).strip())
+            current_preset.description.set(lang, desc_html)
+        preset_description_lines = []
 
     for line in lines:
         line_num += 1
@@ -732,6 +822,7 @@ def _parse_guide_content(content: str, lang: str, result: ParseResult) -> None:
         # Check for success section
         if SUCCESS_HEADER_PATTERN.match(stripped):
             flush_step()
+            flush_preset_description()
             current_section = "success"
             continue
 
@@ -741,30 +832,34 @@ def _parse_guide_content(content: str, lang: str, result: ParseResult) -> None:
         ) or PRESET_HEADER_ZH_PATTERN.match(stripped)
         if preset_match:
             flush_step()
+            flush_preset_description()
             if lang == "en":
                 # Reset seen_step_ids for new preset (step IDs unique within preset)
                 seen_step_ids.clear()
+                preset_name = preset_match.group(1).strip()
                 current_preset = PresetGuide(
                     id=preset_match.group(2),
-                    name=preset_match.group(1).strip(),
-                    name_zh=preset_match.group(1).strip(),
+                    name=Localized({"en": preset_name}),
+                    description=Localized(),
                 )
                 result.presets.append(current_preset)
             else:
-                # Update existing preset with Chinese name
+                # Update existing preset with new language name
                 preset_id = preset_match.group(2)
                 for p in result.presets:
                     if p.id == preset_id:
-                        p.name_zh = preset_match.group(1).strip()
+                        p.name.set(lang, preset_match.group(1).strip())
                         current_preset = p
                         break
             current_section = "preset"
+            preset_description_lines = []
             continue
 
         # Check for step header
         step_match = STEP_HEADER_PATTERN.match(stripped)
         if step_match:
             flush_step()
+            flush_preset_description()
             current_step_header = stripped
             current_step_line = line_num
             current_section = "step"
@@ -779,35 +874,18 @@ def _parse_guide_content(content: str, lang: str, result: ParseResult) -> None:
             success_lines.append(line)
         elif current_section == "preset" and not current_step_header:
             # Preset description before first step
-            if current_preset and lang == "en":
-                current_preset.description += line + "\n"
-            elif current_preset:
-                current_preset.description_zh += line + "\n"
+            preset_description_lines.append(line)
 
-    # Flush final step
+    # Flush final step and description
     flush_step()
+    flush_preset_description()
 
     # Set overview and success content
-    if lang == "en":
-        result.overview_en = md_to_html("\n".join(overview_lines).strip())
-        if success_lines:
-            if not result.success:
-                result.success = SuccessContent()
-            result.success.content_en = md_to_html("\n".join(success_lines).strip())
-        # Convert preset descriptions to HTML
-        for preset in result.presets:
-            if preset.description:
-                preset.description = md_to_html(preset.description.strip())
-    else:
-        result.overview_zh = md_to_html("\n".join(overview_lines).strip())
-        if success_lines:
-            if not result.success:
-                result.success = SuccessContent()
-            result.success.content_zh = md_to_html("\n".join(success_lines).strip())
-        # Convert preset descriptions to HTML
-        for preset in result.presets:
-            if preset.description_zh:
-                preset.description_zh = md_to_html(preset.description_zh.strip())
+    result.overview.set(lang, md_to_html("\n".join(overview_lines).strip()))
+    if success_lines:
+        if not result.success:
+            result.success = SuccessContent()
+        result.success.content.set(lang, md_to_html("\n".join(success_lines).strip()))
 
 
 def parse_bilingual_markdown(content: str, lang: str = "en") -> str:
@@ -836,10 +914,17 @@ def validate_deployment_guide(content: str) -> list[ParseError]:
     return result.errors
 
 
-def parse_single_language_guide(content: str) -> ParseResult:
+def parse_single_language_guide(content: str, lang: str = "en") -> ParseResult:
     """Parse a single-language guide file (no language markers expected).
 
     This is used for parsing separate EN and ZH files.
+
+    Args:
+        content: Markdown content
+        lang: Language code for this content (default: "en")
+
+    Returns:
+        ParseResult with Localized fields populated for the given language
     """
     result = ParseResult()
 
@@ -858,6 +943,8 @@ def parse_single_language_guide(content: str) -> ParseResult:
 
     overview_lines: list[str] = []
     success_lines: list[str] = []
+    preset_completion_lines: list[str] = []
+    preset_description_lines: list[str] = []
 
     def flush_step():
         """Process accumulated step content."""
@@ -867,7 +954,7 @@ def parse_single_language_guide(content: str) -> ParseResult:
             step, errors, warnings = parse_deployment_step(
                 current_step_header,
                 content_text,
-                "",  # No zh content for single-language parse
+                "",  # No additional language content
                 current_step_line,
             )
             result.errors.extend(errors)
@@ -891,14 +978,41 @@ def parse_single_language_guide(content: str) -> ParseResult:
             current_step_header = None
             current_step_content = []
 
+    def flush_preset_completion():
+        """Process accumulated preset completion content."""
+        nonlocal preset_completion_lines
+        if preset_completion_lines and current_preset:
+            completion_html = md_to_html("\n".join(preset_completion_lines).strip())
+            current_preset.completion = SuccessContent(
+                content=Localized({lang: completion_html})
+            )
+        preset_completion_lines = []
+
+    def flush_preset_description():
+        """Flush accumulated preset description."""
+        nonlocal preset_description_lines
+        if preset_description_lines and current_preset:
+            desc_html = md_to_html("\n".join(preset_description_lines).strip())
+            current_preset.description.set(lang, desc_html)
+        preset_description_lines = []
+
     for line in lines:
         line_num += 1
         stripped = line.strip()
 
-        # Check for success section
+        # Check for global success section (deprecated but kept for backward compatibility)
         if SUCCESS_HEADER_PATTERN.match(stripped):
             flush_step()
+            flush_preset_description()
+            flush_preset_completion()
             current_section = "success"
+            continue
+
+        # Check for preset completion section (### Deployment Complete / ### 部署完成)
+        if PRESET_COMPLETION_PATTERN.match(stripped):
+            flush_step()
+            flush_preset_description()
+            current_section = "preset_completion"
             continue
 
         # Check for preset header (both EN and ZH patterns)
@@ -907,21 +1021,26 @@ def parse_single_language_guide(content: str) -> ParseResult:
         ) or PRESET_HEADER_ZH_PATTERN.match(stripped)
         if preset_match:
             flush_step()
+            flush_preset_description()
+            flush_preset_completion()
             # Reset seen_step_ids for new preset
             seen_step_ids.clear()
+            preset_name = preset_match.group(1).strip()
             current_preset = PresetGuide(
                 id=preset_match.group(2),
-                name=preset_match.group(1).strip(),
-                name_zh=preset_match.group(1).strip(),
+                name=Localized({lang: preset_name}),
+                description=Localized(),
             )
             result.presets.append(current_preset)
             current_section = "preset"
+            preset_description_lines = []
             continue
 
         # Check for step header
         step_match = STEP_HEADER_PATTERN.match(stripped)
         if step_match:
             flush_step()
+            flush_preset_description()
             current_step_header = stripped
             current_step_line = line_num
             current_section = "step"
@@ -934,24 +1053,22 @@ def parse_single_language_guide(content: str) -> ParseResult:
             current_step_content.append(line)
         elif current_section == "success":
             success_lines.append(line)
+        elif current_section == "preset_completion":
+            preset_completion_lines.append(line)
         elif current_section == "preset" and not current_step_header:
-            if current_preset:
-                current_preset.description += line + "\n"
+            preset_description_lines.append(line)
 
-    # Flush final step
+    # Flush final step and preset completion
     flush_step()
+    flush_preset_description()
+    flush_preset_completion()
 
     # Set overview and success content
-    result.overview_en = md_to_html("\n".join(overview_lines).strip())
+    result.overview.set(lang, md_to_html("\n".join(overview_lines).strip()))
     if success_lines:
         result.success = SuccessContent(
-            content_en=md_to_html("\n".join(success_lines).strip())
+            content=Localized({lang: md_to_html("\n".join(success_lines).strip())})
         )
-
-    # Convert preset descriptions to HTML
-    for preset in result.presets:
-        if preset.description:
-            preset.description = md_to_html(preset.description.strip())
 
     return result
 
@@ -1076,10 +1193,240 @@ def validate_structure_consistency(
     return validation
 
 
+def _merge_localized(base: Localized, other: Localized, lang: str) -> None:
+    """Merge content from other Localized into base for the specified language."""
+    value = other.get(lang)
+    if value is not None:
+        base.set(lang, value)
+
+
+def parse_guide_multilang(
+    lang_contents: Dict[str, str]
+) -> tuple[ParseResult, StructureValidationResult]:
+    """Parse multiple language guide files and validate structure consistency.
+
+    Args:
+        lang_contents: Dict mapping language code to file content
+                      e.g., {"en": content_en, "zh": content_zh, "ja": content_ja}
+
+    Returns:
+        Tuple of (merged ParseResult, StructureValidationResult)
+    """
+    if not lang_contents:
+        return ParseResult(), StructureValidationResult()
+
+    # Parse each language file separately
+    results: Dict[str, ParseResult] = {}
+    for lang, content in lang_contents.items():
+        results[lang] = parse_single_language_guide(content, lang)
+
+    # Select base language (prefer "en", otherwise first available)
+    base_lang = "en" if "en" in results else list(results.keys())[0]
+    base_result = results[base_lang]
+
+    # Validate structure consistency (compare all against base)
+    validation = StructureValidationResult(valid=True)
+    for lang, result in results.items():
+        if lang != base_lang:
+            lang_validation = validate_structure_consistency(base_result, result)
+            if not lang_validation.valid:
+                validation.valid = False
+                validation.errors.extend(lang_validation.errors)
+            validation.warnings.extend(lang_validation.warnings)
+
+    # Create merged result
+    merged = ParseResult(
+        overview=Localized(),
+        errors=sum((r.errors for r in results.values()), []),
+        warnings=sum((r.warnings for r in results.values()), []),
+    )
+
+    # Merge overview from all languages
+    for lang, result in results.items():
+        overview_content = result.overview.get(lang)
+        if overview_content:
+            merged.overview.set(lang, overview_content)
+
+    # Merge presets
+    for base_preset in base_result.presets:
+        merged_preset = PresetGuide(
+            id=base_preset.id,
+            name=Localized(),
+            description=Localized(),
+            is_default=base_preset.is_default,
+        )
+
+        # Merge preset names and descriptions from all languages
+        for lang, result in results.items():
+            lang_preset = next(
+                (p for p in result.presets if p.id == base_preset.id), None
+            )
+            if lang_preset:
+                name = lang_preset.name.get(lang)
+                if name:
+                    merged_preset.name.set(lang, name)
+                desc = lang_preset.description.get(lang)
+                if desc:
+                    merged_preset.description.set(lang, desc)
+
+        # Merge steps
+        for base_step in base_preset.steps:
+            merged_step = DeploymentStep(
+                id=base_step.id,
+                title=Localized(),
+                type=base_step.type,
+                required=base_step.required,
+                config_file=base_step.config_file,
+                section=SectionContent(
+                    title=Localized(),
+                    description=Localized(),
+                    troubleshoot=Localized(),
+                    wiring=None,
+                ),
+            )
+
+            # Merge step content from all languages
+            for lang, result in results.items():
+                lang_preset = next(
+                    (p for p in result.presets if p.id == base_preset.id), None
+                )
+                if lang_preset:
+                    lang_step = next(
+                        (s for s in lang_preset.steps if s.id == base_step.id), None
+                    )
+                    if lang_step:
+                        # Merge title
+                        title = lang_step.title.get(lang)
+                        if title:
+                            merged_step.title.set(lang, title)
+                            merged_step.section.title.set(lang, title)
+                        # Merge description
+                        desc = lang_step.section.description.get(lang)
+                        if desc:
+                            merged_step.section.description.set(lang, desc)
+                        # Merge troubleshoot
+                        troubleshoot = lang_step.section.troubleshoot.get(lang)
+                        if troubleshoot:
+                            merged_step.section.troubleshoot.set(lang, troubleshoot)
+                        # Merge wiring (image from base, steps from all languages)
+                        if lang_step.section.wiring:
+                            if merged_step.section.wiring is None:
+                                merged_step.section.wiring = WiringInfo(
+                                    image=lang_step.section.wiring.image,
+                                    steps=Localized(),
+                                )
+                            wiring_steps = lang_step.section.wiring.steps.get(lang)
+                            if wiring_steps:
+                                merged_step.section.wiring.steps.set(lang, wiring_steps)
+
+            # Merge targets
+            if base_step.targets:
+                merged_targets = []
+                for base_target in base_step.targets:
+                    merged_target = TargetInfo(
+                        id=base_target.id,
+                        name=Localized(),
+                        config_file=base_target.config_file,
+                        default=base_target.default,
+                        target_type=base_target.target_type,
+                        description=Localized(),
+                        description_html=Localized(),
+                        troubleshoot=Localized(),
+                        wiring=None,
+                    )
+
+                    # Merge target content from all languages
+                    for lang, result in results.items():
+                        lang_preset = next(
+                            (p for p in result.presets if p.id == base_preset.id), None
+                        )
+                        if lang_preset:
+                            lang_step = next(
+                                (s for s in lang_preset.steps if s.id == base_step.id),
+                                None,
+                            )
+                            if lang_step:
+                                lang_target = next(
+                                    (
+                                        t
+                                        for t in lang_step.targets
+                                        if t.id == base_target.id
+                                    ),
+                                    None,
+                                )
+                                if lang_target:
+                                    # Merge name
+                                    name = lang_target.name.get(lang)
+                                    if name:
+                                        merged_target.name.set(lang, name)
+                                    # Merge descriptions
+                                    desc = lang_target.description.get(lang)
+                                    if desc:
+                                        merged_target.description.set(lang, desc)
+                                    desc_html = lang_target.description_html.get(lang)
+                                    if desc_html:
+                                        merged_target.description_html.set(
+                                            lang, desc_html
+                                        )
+                                    # Merge troubleshoot
+                                    troubleshoot = lang_target.troubleshoot.get(lang)
+                                    if troubleshoot:
+                                        merged_target.troubleshoot.set(
+                                            lang, troubleshoot
+                                        )
+                                    # Merge wiring
+                                    if lang_target.wiring:
+                                        if merged_target.wiring is None:
+                                            merged_target.wiring = WiringInfo(
+                                                image=lang_target.wiring.image,
+                                                steps=Localized(),
+                                            )
+                                        wiring_steps = lang_target.wiring.steps.get(
+                                            lang
+                                        )
+                                        if wiring_steps:
+                                            merged_target.wiring.steps.set(
+                                                lang, wiring_steps
+                                            )
+
+                    merged_targets.append(merged_target)
+                merged_step.targets = merged_targets
+
+            merged_preset.steps.append(merged_step)
+
+        # Merge preset completion
+        for lang, result in results.items():
+            lang_preset = next(
+                (p for p in result.presets if p.id == base_preset.id), None
+            )
+            if lang_preset and lang_preset.completion:
+                if merged_preset.completion is None:
+                    merged_preset.completion = SuccessContent(content=Localized())
+                content = lang_preset.completion.content.get(lang)
+                if content:
+                    merged_preset.completion.content.set(lang, content)
+
+        merged.presets.append(merged_preset)
+
+    # Merge success content
+    for lang, result in results.items():
+        if result.success:
+            if merged.success is None:
+                merged.success = SuccessContent(content=Localized())
+            content = result.success.content.get(lang)
+            if content:
+                merged.success.content.set(lang, content)
+
+    return merged, validation
+
+
 def parse_guide_pair(
     en_content: str, zh_content: str
 ) -> tuple[ParseResult, StructureValidationResult]:
     """Parse a pair of EN and ZH guide files and validate structure consistency.
+
+    This is a convenience wrapper around parse_guide_multilang for the common
+    bilingual (English/Chinese) case.
 
     Args:
         en_content: Content of guide.md (English)
@@ -1088,69 +1435,4 @@ def parse_guide_pair(
     Returns:
         Tuple of (merged ParseResult, StructureValidationResult)
     """
-    # Parse each file separately
-    en_result = parse_single_language_guide(en_content)
-    zh_result = parse_single_language_guide(zh_content)
-
-    # Validate structure consistency
-    validation = validate_structure_consistency(en_result, zh_result)
-
-    # Merge results - use EN as base, add ZH translations
-    merged = ParseResult(
-        overview_en=en_result.overview_en,
-        overview_zh=zh_result.overview_en,  # zh_result.overview_en contains the ZH overview
-        errors=en_result.errors + zh_result.errors,
-        warnings=en_result.warnings + zh_result.warnings,
-    )
-
-    # Merge presets
-    for en_preset in en_result.presets:
-        # Find corresponding ZH preset
-        zh_preset = next((p for p in zh_result.presets if p.id == en_preset.id), None)
-
-        merged_preset = PresetGuide(
-            id=en_preset.id,
-            name=en_preset.name,
-            name_zh=zh_preset.name if zh_preset else en_preset.name,
-            description=en_preset.description,
-            description_zh=zh_preset.description if zh_preset else "",
-        )
-
-        # Merge steps
-        for en_step in en_preset.steps:
-            # Find corresponding ZH step
-            zh_step = None
-            if zh_preset:
-                zh_step = next((s for s in zh_preset.steps if s.id == en_step.id), None)
-
-            merged_step = DeploymentStep(
-                id=en_step.id,
-                title_en=en_step.title_en,
-                title_zh=zh_step.title_en if zh_step else en_step.title_en,
-                type=en_step.type,
-                required=en_step.required,
-                config_file=en_step.config_file,
-                section=SectionContent(
-                    title=en_step.section.title,
-                    title_zh=(
-                        zh_step.section.title if zh_step else en_step.section.title
-                    ),
-                    description=en_step.section.description,
-                    description_zh=zh_step.section.description if zh_step else "",
-                    troubleshoot=en_step.section.troubleshoot,
-                    troubleshoot_zh=zh_step.section.troubleshoot if zh_step else "",
-                    wiring=en_step.section.wiring,
-                ),
-            )
-            merged_preset.steps.append(merged_step)
-
-        merged.presets.append(merged_preset)
-
-    # Merge success content
-    if en_result.success or zh_result.success:
-        merged.success = SuccessContent(
-            content_en=en_result.success.content_en if en_result.success else "",
-            content_zh=zh_result.success.content_en if zh_result.success else "",
-        )
-
-    return merged, validation
+    return parse_guide_multilang({"en": en_content, "zh": zh_content})
