@@ -180,6 +180,7 @@ jobs:
         working-directory: src-tauri
 
       - name: Update version from tag
+        shell: bash
         run: |
           # Extract version from tag (v0.1.4 -> 0.1.4)
           VERSION="${GITHUB_REF_NAME#v}"
