@@ -1201,7 +1201,7 @@ def _merge_localized(base: Localized, other: Localized, lang: str) -> None:
 
 
 def parse_guide_multilang(
-    lang_contents: Dict[str, str]
+    lang_contents: Dict[str, str],
 ) -> tuple[ParseResult, StructureValidationResult]:
     """Parse multiple language guide files and validate structure consistency.
 
