@@ -773,7 +773,7 @@ class SolutionManager:
                 }
             )
 
-        # Build post_deployment from success content
+        # Build post_deployment from global success content (deprecated, use preset completion)
         post_deployment = None
         if parsed_result.success:
             success_content = parsed_result.success.content.get(lang)
@@ -1996,10 +1996,18 @@ class SolutionManager:
 
                 preset_data = {
                     "id": en_preset.id,
-                    "name": en_preset.name,
-                    "name_zh": zh_preset.name if zh_preset else en_preset.name,
-                    "description": en_preset.description or "",
-                    "description_zh": zh_preset.description if zh_preset else "",
+                    "name": en_preset.name.get("en") or "",
+                    "name_zh": (
+                        zh_preset.name.get("zh")
+                        if zh_preset
+                        else en_preset.name.get("en")
+                    )
+                    or "",
+                    "description": en_preset.description.get("en") or "",
+                    "description_zh": (
+                        zh_preset.description.get("zh") if zh_preset else ""
+                    )
+                    or "",
                 }
                 presets.append(preset_data)
 
@@ -2139,10 +2147,18 @@ class SolutionManager:
 
                 preset_data = {
                     "id": en_preset.id,
-                    "name": en_preset.name,
-                    "name_zh": zh_preset.name if zh_preset else en_preset.name,
-                    "description": en_preset.description or "",
-                    "description_zh": zh_preset.description if zh_preset else "",
+                    "name": en_preset.name.get("en") or "",
+                    "name_zh": (
+                        zh_preset.name.get("zh")
+                        if zh_preset
+                        else en_preset.name.get("en")
+                    )
+                    or "",
+                    "description": en_preset.description.get("en") or "",
+                    "description_zh": (
+                        zh_preset.description.get("zh") if zh_preset else ""
+                    )
+                    or "",
                     "steps": [],
                 }
 
@@ -2155,8 +2171,13 @@ class SolutionManager:
 
                     step_data = {
                         "id": en_step.id,
-                        "title": en_step.title_en,
-                        "title_zh": zh_step.title_en if zh_step else en_step.title_en,
+                        "title": en_step.title.get("en") or "",
+                        "title_zh": (
+                            zh_step.title.get("zh")
+                            if zh_step
+                            else en_step.title.get("en")
+                        )
+                        or "",
                         "type": en_step.type,
                         "required": en_step.required,
                         "config_file": en_step.config_file,
@@ -2170,7 +2191,7 @@ class SolutionManager:
                             step_data["targets"].append(
                                 {
                                     "id": target.id,
-                                    "name": target.name,
+                                    "name": target.name.get("en") or "",
                                     "default": target.default,
                                 }
                             )
