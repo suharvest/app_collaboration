@@ -49,39 +49,6 @@ pre_checks:
   - type: esptool_available
     description: Check if esptool is installed
 
-steps:
-  - id: detect_chip
-    name: Detect Chip
-    name_zh: 检测芯片
-    description: Verify ESP32-S3 chip is detected
-    description_zh: 验证 ESP32-S3 芯片已检测到
-    optional: false
-    default: true
-
-  - id: flash_firmware
-    name: Flash Firmware
-    name_zh: 烧录固件
-    description: Write Xiaozhi firmware to flash memory
-    description_zh: 将小智固件写入闪存
-    optional: false
-    default: true
-
-  - id: verify_flash
-    name: Verify Flash
-    name_zh: 验证烧录
-    description: Verify firmware was written correctly
-    description_zh: 验证固件写入正确
-    optional: true
-    default: true
-
-  - id: reset_device
-    name: Reset Device
-    name_zh: 重启设备
-    description: Reset device to boot new firmware
-    description_zh: 重启设备以启动新固件
-    optional: false
-    default: true
-
 post_deployment:
   reset_device: true
   wait_for_ready: 3
