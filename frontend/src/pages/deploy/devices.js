@@ -343,6 +343,20 @@ export async function startDeployment(deviceId) {
       ssh_password: document.getElementById(`ssh-pass-${deviceId}`)?.value,
       ssh_port: parseInt(document.getElementById(`ssh-port-${deviceId}`)?.value || '22'),
     };
+
+    // Collect additional user_inputs (e.g., influxdb_host)
+    const sshFields = ['host', 'username', 'password', 'port'];
+    const recameraUserInputs = device.user_inputs || [];
+    recameraUserInputs.filter(input => !sshFields.includes(input.id)).forEach(input => {
+      const el = document.getElementById(`input-${deviceId}-${input.id}`);
+      if (el) {
+        if (input.type === 'checkbox') {
+          params.device_connections[deviceId][input.id] = el.checked ? 'true' : 'false';
+        } else {
+          params.device_connections[deviceId][input.id] = el.value;
+        }
+      }
+    });
   } else if (device.type === 'recamera_cpp') {
     // reCamera C++ deployment - need SSH credentials
     params.device_connections[deviceId] = {
