@@ -2087,6 +2087,150 @@ button.spinning {
 }
 
 /* ============================================
+   SERIAL CAMERA STYLES
+   ============================================ */
+
+.serial-camera-window {
+  @apply bg-gray-900 rounded-lg overflow-hidden;
+}
+
+.serial-camera-header {
+  @apply flex items-center justify-between px-4 py-2 bg-gray-800;
+}
+
+.serial-camera-status {
+  @apply flex items-center gap-1.5 text-xs text-gray-300;
+}
+
+.serial-camera-status .status-dot {
+  @apply w-2 h-2 rounded-full bg-gray-500;
+}
+
+.serial-camera-status.connecting .status-dot {
+  @apply bg-yellow-400;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.serial-camera-status.connected .status-dot {
+  @apply bg-green-400;
+}
+
+.serial-camera-status.error .status-dot {
+  @apply bg-red-400;
+}
+
+.serial-camera-stats {
+  @apply text-xs text-gray-400 font-mono;
+}
+
+.serial-camera-container {
+  @apply relative w-full bg-black overflow-hidden;
+}
+
+.serial-camera-canvas {
+  @apply absolute inset-0 w-full h-full;
+}
+
+.serial-camera-placeholder {
+  @apply absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-500;
+}
+
+.serial-camera-controls {
+  @apply flex items-center gap-2 px-4 py-3 bg-gray-800;
+}
+
+.serial-camera-connect-btn {
+  @apply flex-1;
+}
+
+.serial-camera-container-wrapper {
+  @apply mb-4;
+}
+
+.serial-camera-panel-wrapper {
+  @apply mb-4;
+}
+
+/* Port Status */
+.port-status-warning {
+  @apply text-sm rounded-lg p-3 mb-4;
+  color: #e67e22;
+  background: #fef9e7;
+}
+
+.port-status-ready {
+  @apply text-sm text-green-600 mb-4;
+}
+
+/* Face Database Panel */
+.face-database-panel {
+  @apply bg-white rounded-lg border border-gray-200 p-4;
+}
+
+.face-database-header {
+  @apply flex items-center justify-between mb-3;
+}
+
+.face-database-title {
+  @apply text-sm font-semibold text-gray-700 m-0;
+}
+
+.face-database-table {
+  @apply w-full text-sm;
+  border-collapse: collapse;
+}
+
+.face-database-table th {
+  @apply text-left text-xs text-gray-500 font-medium py-2 px-3 border-b border-gray-200;
+}
+
+.face-database-table td {
+  @apply py-2 px-3 border-b border-gray-100;
+}
+
+.face-database-actions {
+  @apply flex gap-2;
+}
+
+.face-database-count {
+  @apply text-xs text-gray-400 mt-2;
+}
+
+.face-database-empty {
+  @apply text-sm text-gray-400 py-4 text-center;
+}
+
+/* Enrollment Panel */
+.enrollment-panel {
+  @apply bg-gray-50 rounded-lg p-4 mt-3;
+}
+
+.enrollment-input-row {
+  @apply flex items-center gap-2 flex-wrap;
+}
+
+.enrollment-input-row label {
+  @apply text-sm text-gray-600 whitespace-nowrap;
+}
+
+.enrollment-input-row input {
+  @apply flex-1 min-w-0;
+}
+
+.enrollment-progress {
+  @apply h-1.5 bg-gray-200 rounded-full overflow-hidden mt-3;
+}
+
+.enrollment-progress-bar {
+  @apply h-full rounded-full transition-all duration-300;
+  background: #8CC63F;
+}
+
+.enrollment-status {
+  @apply text-xs text-gray-500 mt-1;
+}
+
+/* ============================================
    18. DEVICE CONFIGURATOR
    ============================================ */
 

@@ -33,6 +33,7 @@ import {
 } from './renderers.js';
 import { toggleLogs, refreshAllLogViewers } from './websocket.js';
 import { initPreviewWindow, handlePreviewButtonClick } from './preview.js';
+import { initSerialCameraStep, handleSerialCameraButtonClick } from './serial-camera-handler.js';
 import { startDeployment, testSSHConnection, refreshSerialPorts, markDeviceComplete } from './devices.js';
 import {
   updateSectionUI,
@@ -124,6 +125,8 @@ export function setupEventHandlers(container) {
         markDeviceComplete(deviceId, expandNextSection);
       } else if (device?.type === 'preview') {
         handlePreviewButtonClick(deviceId);
+      } else if (device?.type === 'serial_camera') {
+        handleSerialCameraButtonClick(deviceId);
       } else {
         startDeployment(deviceId);
       }
@@ -137,6 +140,8 @@ export function setupEventHandlers(container) {
   filteredDevices.forEach(device => {
     if (device.type === 'preview') {
       initPreviewWindow(device.id);
+    } else if (device.type === 'serial_camera') {
+      initSerialCameraStep(device.id);
     }
   });
 
@@ -330,6 +335,8 @@ export function attachSectionEventHandlers(container) {
         markDeviceComplete(deviceId, expandNextSection);
       } else if (device?.type === 'preview') {
         handlePreviewButtonClick(deviceId);
+      } else if (device?.type === 'serial_camera') {
+        handleSerialCameraButtonClick(deviceId);
       } else {
         startDeployment(deviceId);
       }
@@ -406,6 +413,8 @@ export function attachSectionEventHandlers(container) {
   filteredDevices.forEach(device => {
     if (device.type === 'preview') {
       initPreviewWindow(device.id);
+    } else if (device.type === 'serial_camera') {
+      initSerialCameraStep(device.id);
     }
   });
 }

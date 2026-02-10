@@ -1276,6 +1276,89 @@ export function buildQueryString(params) {
 }
 
 // ============================================
+// Serial Camera API
+// Serial camera preview and face database management
+// ============================================
+
+export const serialCameraApi = {
+  /**
+   * Create a serial camera session
+   */
+  createSession(cameraPort, cameraBaudrate = 921600, crudPort = null, crudBaudrate = 115200) {
+    const body = {
+      camera_port: cameraPort,
+      camera_baudrate: cameraBaudrate,
+    };
+    if (crudPort) {
+      body.crud_port = crudPort;
+      body.crud_baudrate = crudBaudrate;
+    }
+    return request('/serial-camera/sessions', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  /**
+   * Delete (close) a serial camera session
+   */
+  deleteSession(sessionId) {
+    return request(`/serial-camera/sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * List enrolled faces
+   */
+  listFaces(sessionId) {
+    return request(`/serial-camera/sessions/${sessionId}/faces`);
+  },
+
+  /**
+   * Delete a face
+   */
+  deleteFace(sessionId, name) {
+    return request(`/serial-camera/sessions/${sessionId}/faces/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Rename a face
+   */
+  renameFace(sessionId, name, newName) {
+    return request(`/serial-camera/sessions/${sessionId}/faces/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ new_name: newName }),
+    });
+  },
+
+  /**
+   * Start face enrollment
+   */
+  startEnrollment(sessionId, name, duration = 5.0, minSamples = 3) {
+    return request(`/serial-camera/sessions/${sessionId}/enroll/start`, {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        duration,
+        min_samples: minSamples,
+      }),
+    });
+  },
+
+  /**
+   * Cancel active enrollment
+   */
+  cancelEnrollment(sessionId) {
+    return request(`/serial-camera/sessions/${sessionId}/enroll/cancel`, {
+      method: 'POST',
+    });
+  },
+};
+
+// ============================================
 // Exports
 // ============================================
 
