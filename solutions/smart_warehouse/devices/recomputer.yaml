@@ -57,39 +57,6 @@ pre_checks:
     min_gb: 2
     description: Check available disk space
 
-steps:
-  - id: pull_images
-    name: Pull Docker Images
-    name_zh: 拉取Docker镜像
-    description: Download required container images from registry
-    description_zh: 从镜像仓库下载所需的容器镜像
-    optional: false
-    default: true
-
-  - id: create_volumes
-    name: Create Data Volumes
-    name_zh: 创建数据卷
-    description: Set up persistent storage for database
-    description_zh: 设置数据库持久化存储
-    optional: false
-    default: true
-
-  - id: start_services
-    name: Start Services
-    name_zh: 启动服务
-    description: Launch Docker containers
-    description_zh: 启动Docker容器
-    optional: false
-    default: true
-
-  - id: health_check
-    name: Health Check
-    name_zh: 健康检查
-    description: Verify all services are running correctly
-    description_zh: 验证所有服务运行正常
-    optional: false
-    default: true
-
 post_deployment:
   open_browser: true
   url: "http://localhost:2125"

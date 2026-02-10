@@ -1,10 +1,3 @@
-## Hardware Required
-
-- **SenseCAP T1000 Tracker** - At least one unit for testing
-- **BC01 BLE Beacons** - 3+ beacons for triangulation, or 1+ for proximity mode
-- **SenseCAP M2 Gateway** - Or any compatible LoRaWAN gateway
-- **A computer** with Docker installed for running the positioning server
-
 ## Preset: Starter Kit {#starter}
 
 Best for small offices or single rooms up to 500 sqm. Quick to set up, minimal hardware required.
@@ -24,7 +17,9 @@ Best for small offices or single rooms up to 500 sqm. Quick to set up, minimal h
 
 ## Step 1: Deploy BLE Beacons {#beacons type=manual required=true}
 
-### Install Beacons
+Place BLE beacons at fixed locations around your space as position reference points.
+
+### Wiring
 
 1. Place at least 3 beacons per area (triangulation) or 1 beacon (proximity)
 2. Install at 2.5-3m height, 10-15m spacing
@@ -32,17 +27,19 @@ Best for small offices or single rooms up to 500 sqm. Quick to set up, minimal h
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| Beacon light not on | Battery depleted | Replace CR2477 battery |
-| Inaccurate positioning | Too few beacons or spacing too large | Increase beacon density |
-| Tracker can't scan beacons | Beacon installed too high or obstructed | Adjust installation position |
+| Issue | Solution |
+|-------|----------|
+| Beacon light not on | Battery depleted - replace CR2477 battery |
+| Inaccurate positioning | Too few beacons or spacing too large - increase beacon density |
+| Tracker can't scan beacons | Beacon installed too high or obstructed - adjust installation position |
 
 ---
 
 ## Step 2: Setup LoRaWAN Gateway {#gateway type=manual required=true}
 
-### Gateway Setup
+Connect the gateway to enable wireless communication between tracker and positioning app.
+
+### Wiring
 
 1. Power on gateway, connect to network (Ethernet or WiFi)
 2. Use SenseCraft App to scan QR code and bind gateway
@@ -50,12 +47,12 @@ Best for small offices or single rooms up to 500 sqm. Quick to set up, minimal h
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| LED not on | Power issue | Check power adapter and cable |
-| LED blinking red | Network not connected | Check Ethernet cable or WiFi configuration |
-| App QR scan failed | Gateway not connected to internet | Ensure gateway is connected to the internet |
-| Tracker data not reporting | Frequency band mismatch | Confirm gateway and tracker use the same frequency band (e.g., CN470) |
+| Issue | Solution |
+|-------|----------|
+| LED not on | Power issue - check power adapter and cable |
+| LED blinking red | Network not connected - check Ethernet cable or WiFi configuration |
+| App QR scan failed | Gateway not connected to internet - ensure gateway is online |
+| Tracker data not reporting | Frequency band mismatch - confirm gateway and tracker use same band (e.g., CN470) |
 
 ---
 
@@ -63,61 +60,55 @@ Best for small offices or single rooms up to 500 sqm. Quick to set up, minimal h
 
 ### Target: Local Deployment {#app_server_local type=local config=devices/app_local.yaml default=true}
 
-## Local Deployment
-
 Deploy the indoor positioning application on your local computer.
 
-### Requirements
-
+**Prerequisites:**
 - Docker Desktop installed and running
 - Port 5173 available
 
-### After Deployment
-
+**After Deployment:**
 1. Visit `http://localhost:5173`, login with `admin` / `83EtWJUbGrPnQjdCqyKq`
 2. Upload floor map, mark beacon positions on map (enter MAC addresses)
 3. Configure LoRaWAN network server webhook to `http://your-local-ip:5173/api/webhook`
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| Deployment failed | Docker not running | Start Docker Desktop |
-| Port occupied | Other program using port 5173 | Close the program or change port |
-| Webpage won't open | Service not fully started | Wait a few minutes and refresh the page |
+| Issue | Solution |
+|-------|----------|
+| Deployment failed | Docker not running - start Docker Desktop |
+| Port occupied | Other program using port 5173 - close the program or change port |
+| Webpage won't open | Service not fully started - wait a few minutes and refresh |
 
 ### Target: Remote Deployment {#app_server_remote type=remote config=devices/app_remote.yaml}
 
-## Remote Deployment
-
 Deploy the indoor positioning application to a remote server via SSH.
 
-### Before You Begin
-
+**Before You Begin:**
 1. Connect target device to network
 2. Get device IP address
 3. Get SSH credentials (username/password)
 4. Ensure Docker is installed on the remote server
 
-### After Deployment
-
+**After Deployment:**
 1. Visit `http://<device-ip>:5173`, login with `admin` / `83EtWJUbGrPnQjdCqyKq`
 2. Upload floor map, mark beacon positions on map (enter MAC addresses)
 3. Configure LoRaWAN network server webhook to `http://<device-ip>:5173/api/webhook`
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| SSH connection failed | IP or credentials incorrect | Check IP address and username/password |
-| Deployment failed | Remote server has no Docker | Install Docker on the remote server |
-| Webpage won't open | Firewall blocking | Open port 5173 on the remote server |
+| Issue | Solution |
+|-------|----------|
+| SSH connection failed | IP or credentials incorrect - check IP address and username/password |
+| Deployment failed | Remote server has no Docker - install Docker on the remote server |
+| Webpage won't open | Firewall blocking - open port 5173 on the remote server |
 
 ---
 
 ## Step 4: Configure and Activate Tracker {#tracker type=manual required=true}
 
-### Configure Tracker
+Set up the tracker and test positioning accuracy by walking near the installed beacons.
+
+### Wiring
 
 1. Press power button 3s to turn on, blinking green = joining network
 2. Use SenseCraft App to connect to tracker
@@ -126,21 +117,12 @@ Deploy the indoor positioning application to a remote server via SSH.
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| Keeps blinking after power on | Failed to join network | Check if gateway is online and frequency band matches |
-| Tracker not visible on webpage | Webhook not configured | Check if network server webhook points to positioning app |
-| Position not updating | Tracker in sleep mode | Press button to trigger report, or adjust reporting interval |
-| Position displayed incorrectly | Beacon coordinates misconfigured | Check if beacon position markers on webpage are correct |
-
-### Deployment Complete
-
-Indoor positioning is ready!
-
-**Access:** http://\<server-ip\>:5173
-**Login:** admin / 83EtWJUbGrPnQjdCqyKq
-
-Upload your floor map, mark beacon positions, then activate trackers.
+| Issue | Solution |
+|-------|----------|
+| Keeps blinking after power on | Failed to join network - check if gateway is online and frequency band matches |
+| Tracker not visible on webpage | Webhook not configured - check if network server webhook points to positioning app |
+| Position not updating | Tracker in sleep mode - press button to trigger report, or adjust reporting interval |
+| Position displayed incorrectly | Beacon coordinates misconfigured - check if beacon position markers on webpage are correct |
 
 ---
 
@@ -163,7 +145,9 @@ Best for medium facilities (500-2000 sqm) like warehouses, offices, or retail st
 
 ## Step 1: Deploy BLE Beacons {#beacons type=manual required=true}
 
-### Install Beacons
+Place BLE beacons at fixed locations around your space as position reference points.
+
+### Wiring
 
 1. Place at least 3 beacons per area (triangulation) or 1 beacon (proximity)
 2. Install at 2.5-3m height, 10-15m spacing
@@ -171,17 +155,19 @@ Best for medium facilities (500-2000 sqm) like warehouses, offices, or retail st
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| Beacon light not on | Battery depleted | Replace CR2477 battery |
-| Inaccurate positioning | Too few beacons or spacing too large | Increase beacon density |
-| Tracker can't scan beacons | Beacon installed too high or obstructed | Adjust installation position |
+| Issue | Solution |
+|-------|----------|
+| Beacon light not on | Battery depleted - replace CR2477 battery |
+| Inaccurate positioning | Too few beacons or spacing too large - increase beacon density |
+| Tracker can't scan beacons | Beacon installed too high or obstructed - adjust installation position |
 
 ---
 
 ## Step 2: Setup LoRaWAN Gateway {#gateway type=manual required=true}
 
-### Gateway Setup
+Connect the gateway to enable wireless communication between tracker and positioning app.
+
+### Wiring
 
 1. Power on gateway, connect to network (Ethernet or WiFi)
 2. Use SenseCraft App to scan QR code and bind gateway
@@ -189,12 +175,12 @@ Best for medium facilities (500-2000 sqm) like warehouses, offices, or retail st
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| LED not on | Power issue | Check power adapter and cable |
-| LED blinking red | Network not connected | Check Ethernet cable or WiFi configuration |
-| App QR scan failed | Gateway not connected to internet | Ensure gateway is connected to the internet |
-| Tracker data not reporting | Frequency band mismatch | Confirm gateway and tracker use the same frequency band (e.g., CN470) |
+| Issue | Solution |
+|-------|----------|
+| LED not on | Power issue - check power adapter and cable |
+| LED blinking red | Network not connected - check Ethernet cable or WiFi configuration |
+| App QR scan failed | Gateway not connected to internet - ensure gateway is online |
+| Tracker data not reporting | Frequency band mismatch - confirm gateway and tracker use same band (e.g., CN470) |
 
 ---
 
@@ -202,61 +188,55 @@ Best for medium facilities (500-2000 sqm) like warehouses, offices, or retail st
 
 ### Target: Local Deployment {#app_server_local type=local config=devices/app_local.yaml default=true}
 
-## Local Deployment
-
 Deploy the indoor positioning application on your local computer.
 
-### Requirements
-
+**Prerequisites:**
 - Docker Desktop installed and running
 - Port 5173 available
 
-### After Deployment
-
+**After Deployment:**
 1. Visit `http://localhost:5173`, login with `admin` / `83EtWJUbGrPnQjdCqyKq`
 2. Upload floor map, mark beacon positions on map (enter MAC addresses)
 3. Configure LoRaWAN network server webhook to `http://your-local-ip:5173/api/webhook`
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| Deployment failed | Docker not running | Start Docker Desktop |
-| Port occupied | Other program using port 5173 | Close the program or change port |
-| Webpage won't open | Service not fully started | Wait a few minutes and refresh the page |
+| Issue | Solution |
+|-------|----------|
+| Deployment failed | Docker not running - start Docker Desktop |
+| Port occupied | Other program using port 5173 - close the program or change port |
+| Webpage won't open | Service not fully started - wait a few minutes and refresh |
 
 ### Target: Remote Deployment {#app_server_remote type=remote config=devices/app_remote.yaml}
 
-## Remote Deployment
-
 Deploy the indoor positioning application to a remote server via SSH.
 
-### Before You Begin
-
+**Before You Begin:**
 1. Connect target device to network
 2. Get device IP address
 3. Get SSH credentials (username/password)
 4. Ensure Docker is installed on the remote server
 
-### After Deployment
-
+**After Deployment:**
 1. Visit `http://<device-ip>:5173`, login with `admin` / `83EtWJUbGrPnQjdCqyKq`
 2. Upload floor map, mark beacon positions on map (enter MAC addresses)
 3. Configure LoRaWAN network server webhook to `http://<device-ip>:5173/api/webhook`
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| SSH connection failed | IP or credentials incorrect | Check IP address and username/password |
-| Deployment failed | Remote server has no Docker | Install Docker on the remote server |
-| Webpage won't open | Firewall blocking | Open port 5173 on the remote server |
+| Issue | Solution |
+|-------|----------|
+| SSH connection failed | IP or credentials incorrect - check IP address and username/password |
+| Deployment failed | Remote server has no Docker - install Docker on the remote server |
+| Webpage won't open | Firewall blocking - open port 5173 on the remote server |
 
 ---
 
 ## Step 4: Configure and Activate Tracker {#tracker type=manual required=true}
 
-### Configure Tracker
+Set up the tracker and test positioning accuracy by walking near the installed beacons.
+
+### Wiring
 
 1. Press power button 3s to turn on, blinking green = joining network
 2. Use SenseCraft App to connect to tracker
@@ -265,21 +245,12 @@ Deploy the indoor positioning application to a remote server via SSH.
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| Keeps blinking after power on | Failed to join network | Check if gateway is online and frequency band matches |
-| Tracker not visible on webpage | Webhook not configured | Check if network server webhook points to positioning app |
-| Position not updating | Tracker in sleep mode | Press button to trigger report, or adjust reporting interval |
-| Position displayed incorrectly | Beacon coordinates misconfigured | Check if beacon position markers on webpage are correct |
-
-### Deployment Complete
-
-Indoor positioning is ready!
-
-**Access:** http://\<server-ip\>:5173
-**Login:** admin / 83EtWJUbGrPnQjdCqyKq
-
-Upload your floor map, mark beacon positions, then activate trackers.
+| Issue | Solution |
+|-------|----------|
+| Keeps blinking after power on | Failed to join network - check if gateway is online and frequency band matches |
+| Tracker not visible on webpage | Webhook not configured - check if network server webhook points to positioning app |
+| Position not updating | Tracker in sleep mode - press button to trigger report, or adjust reporting interval |
+| Position displayed incorrectly | Beacon coordinates misconfigured - check if beacon position markers on webpage are correct |
 
 ---
 
@@ -302,7 +273,9 @@ Best for large facilities (2000+ sqm) like factories, hospitals, or campus build
 
 ## Step 1: Deploy BLE Beacons {#beacons type=manual required=true}
 
-### Install Beacons
+Place BLE beacons at fixed locations around your space as position reference points.
+
+### Wiring
 
 1. Place at least 3 beacons per area (triangulation) or 1 beacon (proximity)
 2. Install at 2.5-3m height, 10-15m spacing
@@ -310,17 +283,19 @@ Best for large facilities (2000+ sqm) like factories, hospitals, or campus build
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| Beacon light not on | Battery depleted | Replace CR2477 battery |
-| Inaccurate positioning | Too few beacons or spacing too large | Increase beacon density |
-| Tracker can't scan beacons | Beacon installed too high or obstructed | Adjust installation position |
+| Issue | Solution |
+|-------|----------|
+| Beacon light not on | Battery depleted - replace CR2477 battery |
+| Inaccurate positioning | Too few beacons or spacing too large - increase beacon density |
+| Tracker can't scan beacons | Beacon installed too high or obstructed - adjust installation position |
 
 ---
 
 ## Step 2: Setup LoRaWAN Gateway {#gateway type=manual required=true}
 
-### Gateway Setup
+Connect the gateway to enable wireless communication between tracker and positioning app.
+
+### Wiring
 
 1. Power on gateway, connect to network (Ethernet or WiFi)
 2. Use SenseCraft App to scan QR code and bind gateway
@@ -328,12 +303,12 @@ Best for large facilities (2000+ sqm) like factories, hospitals, or campus build
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| LED not on | Power issue | Check power adapter and cable |
-| LED blinking red | Network not connected | Check Ethernet cable or WiFi configuration |
-| App QR scan failed | Gateway not connected to internet | Ensure gateway is connected to the internet |
-| Tracker data not reporting | Frequency band mismatch | Confirm gateway and tracker use the same frequency band (e.g., CN470) |
+| Issue | Solution |
+|-------|----------|
+| LED not on | Power issue - check power adapter and cable |
+| LED blinking red | Network not connected - check Ethernet cable or WiFi configuration |
+| App QR scan failed | Gateway not connected to internet - ensure gateway is online |
+| Tracker data not reporting | Frequency band mismatch - confirm gateway and tracker use same band (e.g., CN470) |
 
 ---
 
@@ -341,61 +316,55 @@ Best for large facilities (2000+ sqm) like factories, hospitals, or campus build
 
 ### Target: Local Deployment {#app_server_local type=local config=devices/app_local.yaml default=true}
 
-## Local Deployment
-
 Deploy the indoor positioning application on your local computer.
 
-### Requirements
-
+**Prerequisites:**
 - Docker Desktop installed and running
 - Port 5173 available
 
-### After Deployment
-
+**After Deployment:**
 1. Visit `http://localhost:5173`, login with `admin` / `83EtWJUbGrPnQjdCqyKq`
 2. Upload floor map, mark beacon positions on map (enter MAC addresses)
 3. Configure LoRaWAN network server webhook to `http://your-local-ip:5173/api/webhook`
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| Deployment failed | Docker not running | Start Docker Desktop |
-| Port occupied | Other program using port 5173 | Close the program or change port |
-| Webpage won't open | Service not fully started | Wait a few minutes and refresh the page |
+| Issue | Solution |
+|-------|----------|
+| Deployment failed | Docker not running - start Docker Desktop |
+| Port occupied | Other program using port 5173 - close the program or change port |
+| Webpage won't open | Service not fully started - wait a few minutes and refresh |
 
 ### Target: Remote Deployment {#app_server_remote type=remote config=devices/app_remote.yaml}
 
-## Remote Deployment
-
 Deploy the indoor positioning application to a remote server via SSH.
 
-### Before You Begin
-
+**Before You Begin:**
 1. Connect target device to network
 2. Get device IP address
 3. Get SSH credentials (username/password)
 4. Ensure Docker is installed on the remote server
 
-### After Deployment
-
+**After Deployment:**
 1. Visit `http://<device-ip>:5173`, login with `admin` / `83EtWJUbGrPnQjdCqyKq`
 2. Upload floor map, mark beacon positions on map (enter MAC addresses)
 3. Configure LoRaWAN network server webhook to `http://<device-ip>:5173/api/webhook`
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| SSH connection failed | IP or credentials incorrect | Check IP address and username/password |
-| Deployment failed | Remote server has no Docker | Install Docker on the remote server |
-| Webpage won't open | Firewall blocking | Open port 5173 on the remote server |
+| Issue | Solution |
+|-------|----------|
+| SSH connection failed | IP or credentials incorrect - check IP address and username/password |
+| Deployment failed | Remote server has no Docker - install Docker on the remote server |
+| Webpage won't open | Firewall blocking - open port 5173 on the remote server |
 
 ---
 
 ## Step 4: Configure and Activate Tracker {#tracker type=manual required=true}
 
-### Configure Tracker
+Set up the tracker and test positioning accuracy by walking near the installed beacons.
+
+### Wiring
 
 1. Press power button 3s to turn on, blinking green = joining network
 2. Use SenseCraft App to connect to tracker
@@ -404,18 +373,38 @@ Deploy the indoor positioning application to a remote server via SSH.
 
 ### Troubleshooting
 
-| Problem | Possible Cause | Solution |
-|---------|---------------|----------|
-| Keeps blinking after power on | Failed to join network | Check if gateway is online and frequency band matches |
-| Tracker not visible on webpage | Webhook not configured | Check if network server webhook points to positioning app |
-| Position not updating | Tracker in sleep mode | Press button to trigger report, or adjust reporting interval |
-| Position displayed incorrectly | Beacon coordinates misconfigured | Check if beacon position markers on webpage are correct |
+| Issue | Solution |
+|-------|----------|
+| Keeps blinking after power on | Failed to join network - check if gateway is online and frequency band matches |
+| Tracker not visible on webpage | Webhook not configured - check if network server webhook points to positioning app |
+| Position not updating | Tracker in sleep mode - press button to trigger report, or adjust reporting interval |
+| Position displayed incorrectly | Beacon coordinates misconfigured - check if beacon position markers on webpage are correct |
 
-### Deployment Complete
+---
 
-Indoor positioning is ready!
+# Deployment Complete
 
-**Access:** http://\<server-ip\>:5173
-**Login:** admin / 83EtWJUbGrPnQjdCqyKq
+Indoor positioning system is ready!
 
-Upload your floor map, mark beacon positions, then activate trackers.
+## Access Your System
+
+- **URL:** http://\<server-ip\>:5173
+- **Login:** admin / 83EtWJUbGrPnQjdCqyKq
+
+## Initial Setup
+
+1. Upload your floor map image
+2. Mark beacon positions on the map (enter MAC addresses)
+3. Configure LoRaWAN network server webhook
+
+## Quick Verification
+
+- Walk near beacons with tracker
+- Press tracker button to trigger position report
+- Check web dashboard for real-time location updates
+
+## Next Steps
+
+- [View Wiki Documentation](https://wiki.seeedstudio.com/solutions/indoor-positioning-bluetooth-lorawan-tracker/)
+- [GitHub Repository](https://github.com/Seeed-Solution/Solution_IndoorPositioning_H5)
+- [Try Online Demo](https://indoorpositioning-demo.seeed.cc/)

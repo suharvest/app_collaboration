@@ -66,6 +66,14 @@ Click **Connect** to see the live video with heatmap overlay.
 - **macOS:** Open Terminal, run `brew install ffmpeg`
 - **Linux:** Open Terminal, run `sudo apt install ffmpeg`
 
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Black screen | Wait 10 seconds for the stream to load; check camera IP is correct |
+| No heatmap overlay | Wait a few minutes for data to accumulate; make sure Step 1 completed |
+| ffmpeg error | Install ffmpeg using the commands above for your OS |
+
 ### Deployment Complete
 
 Camera is ready! Click **Connect** above to view the live heatmap.
@@ -150,39 +158,41 @@ Tell reCamera where to send the traffic data.
 
 ---
 
-## Step 3: Show Heatmap on Floor Plan (Optional) {#heatmap type=manual required=false}
+## Step 3: Map Heatmap to Floor Plan (Optional) {#heatmap type=manual required=false}
 
-Overlay the heatmap on your store's floor plan image.
+By default, the heatmap shows the camera's perspective. To display it on your store's actual floor plan, use the built-in calibration tool.
 
 ### How to Do It
 
-1. **Prepare Images**
-   - Take a screenshot from reCamera
-   - Get your store's floor plan image
+1. Open **http://\<server-ip\>:8080** in your browser
+2. Click the **gear icon** (top-right corner) to open calibration settings
+3. Upload a **camera screenshot** (left side) and your **floor plan image** (right side)
+4. Click **4 matching reference points** on the camera view, then the same 4 spots on the floor plan
+5. Click **Save** — calibration is applied immediately
 
-2. **Run the Calibration Tool**
-   - Run: `python calibration_tool.py`
-   - Click 4 reference points on the camera image
-   - Click the same 4 spots on your floor plan
+**Tips:** Choose widely-spaced landmarks like corners, pillars, or doorways as reference points.
 
-3. **View the Result**
-   - Run `python -m http.server 8080`
-   - Open `http://localhost:8080` in browser
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Heatmap doesn't align well | Re-open settings, click Reset, and recalibrate with better reference points |
+| Calibration lost after clearing browser data | Open settings and recalibrate — settings are stored in your browser |
 
 ### Skip This If
 
-You only want to see the camera-view heatmap in the dashboard.
+You only want to see the camera-view heatmap without mapping to a floor plan.
 
 ### Deployment Complete
 
 Your heatmap dashboard is ready!
 
-**Access the dashboard:**
-- URL: http://\<server-ip\>:3000
-- Login: `admin` / `admin`
+**Access your services:**
+- **Data Dashboard**: http://\<server-ip\>:3000 — login `admin` / `admin`, view traffic charts and trends
+- **Live Heatmap**: http://\<server-ip\>:8080 — real-time heatmap overlay (calibrate via gear icon)
 
-Dashboard is pre-configured - just open it to see your data.
+Both services start automatically with Step 1.
 
 **Having issues?**
-- No data? Check that reCamera is connected
-- Can't open dashboard? Run `docker ps` to check services
+- No data? Check that reCamera is connected (Step 2)
+- Can't open pages? Run `docker ps` to check services are running

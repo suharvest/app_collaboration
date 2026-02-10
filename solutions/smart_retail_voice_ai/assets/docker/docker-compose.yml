@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   sensecraft-asr-server:
     image: sensecraft-missionpack.seeed.cn/respeaker/sensecraft-asr-server:latest

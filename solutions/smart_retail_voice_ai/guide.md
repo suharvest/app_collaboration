@@ -1,12 +1,3 @@
-This solution deploys a complete edge-based voice AI system for retail environments.
-
-## Prerequisites
-
-- reRouter CM4 with at least 4GB RAM and 32GB storage
-- reSpeaker XVF3800 4-mic array
-- USB-C cable for reSpeaker configuration
-- Network cable for reRouter connection
-
 ## Preset: Standard Deployment {#default}
 
 Deploy an edge-based voice collection and analysis system for your retail store.
@@ -18,6 +9,7 @@ Deploy an edge-based voice collection and analysis system for your retail store.
 
 **What you'll get:**
 - Real-time voice transcription from store conversations
+- Speaker recognition - identify who is speaking
 - [SenseCraft Voice](https://voice.sensecraft.seeed.cc/) cloud platform for multi-store analytics
 - Privacy-first design - audio processing happens on-device
 
@@ -25,12 +17,29 @@ Deploy an edge-based voice collection and analysis system for your retail store.
 
 ## Step 1: Flash OpenWrt Firmware {#firmware type=manual required=true config=devices/firmware.yaml}
 
-### Flash Firmware
+Write the operating system to the reRouter, then connect it to your network.
 
-1. Download: [Global](https://files.seeedstudio.com/wiki/solution/ai-sound/reRouter-firmware-backup/openwrt-bcm27xx-bcm2711-rpi-4-ext4-factory-global.img.gz) | [China](https://files.seeedstudio.com/wiki/solution/ai-sound/reRouter-firmware-backup/openwrt-bcm27xx-bcm2711-rpi-4-ext4-factory-cn.img.gz)
-2. Flash to reRouter using Raspberry Pi Imager
-3. Connect WAN to router, LAN to computer
-4. Visit `http://192.168.49.1`, login with root (empty password)
+| Device | Connection | Notes |
+|--------|------------|-------|
+| reRouter CM4 | Remove SD card or eMMC module | For flashing firmware |
+| SD card/eMMC | Insert into card reader, connect to computer | USB 3.0 card reader recommended |
+
+**Flashing Steps:**
+
+1. Download firmware: [Global](https://files.seeedstudio.com/wiki/solution/ai-sound/reRouter-firmware-backup/OpenWRT-24.10.3-RPi-4-Factory.img.gz) | [China](https://files.seeedstudio.com/wiki/solution/ai-sound/reRouter-firmware-backup/OpenWRT-24.10.3-RPi-4-Factory-Chinese.img.gz)
+2. Download [Raspberry Pi Imager](https://www.raspberrypi.com/software/) flashing tool
+3. Select "Use custom" and choose the downloaded firmware file
+4. Select target storage device (SD card or eMMC)
+5. Click "Write" and wait for completion
+6. Put storage device back into reRouter, connect cables and power on
+
+**First Connection:**
+
+1. Connect computer to reRouter's **LAN port** with network cable
+2. Connect **WAN port** to your router with another network cable
+3. Wait 1-2 minutes for boot
+4. Visit `http://192.168.49.1` in browser
+5. Login: username `root`, password empty
 
 ### Troubleshooting
 
@@ -45,17 +54,35 @@ Deploy an edge-based voice collection and analysis system for your retail store.
 
 ## Step 2: Configure reSpeaker {#respeaker type=manual required=true config=devices/respeaker.yaml}
 
-### Configure Microphone Array
+Connect the microphone to your computer and adjust audio settings for best voice quality.
 
-1. Connect reSpeaker XVF3800 via USB to **your computer** (not reRouter)
-2. Clone repo: `git clone https://github.com/respeaker/reSpeaker_XVF3800_USB_4MIC_ARRAY.git`
-3. Navigate to your OS folder and run:
+| Device | Connection | Notes |
+|--------|------------|-------|
+| reSpeaker XVF3800 | USB-C to **computer** | Must connect to computer for configuration, not reRouter |
+| Computer | Terminal/command line required | Windows: PowerShell, Mac/Linux: Terminal |
+
+**Why Configuration is Needed:**
+
+reSpeaker has echo cancellation enabled by default, which affects recording quality for this solution. We need to disable it.
+
+**Configuration Steps:**
+
+1. Connect reSpeaker to **computer** via USB-C (not reRouter)
+2. Verify computer recognizes the device (Windows Device Manager / Mac System Info)
+3. Download configuration tool:
    ```bash
+   git clone https://github.com/respeaker/reSpeaker_XVF3800_USB_4MIC_ARRAY.git
+   cd reSpeaker_XVF3800_USB_4MIC_ARRAY
+   ```
+4. Navigate to your OS directory (`windows` / `macos` / `linux`)
+5. Run configuration commands:
+   ```bash
+   # Mac/Linux requires sudo
    sudo ./xvf_host clear_configuration 1
    sudo ./xvf_host audio_mgr_op_r 8 0
    sudo ./xvf_host save_configuration 1
    ```
-4. Disconnect from computer, connect reSpeaker to **reRouter USB port**
+6. After configuration, **disconnect from computer** and connect reSpeaker to **reRouter USB port**
 
 ### Troubleshooting
 
@@ -70,22 +97,28 @@ Deploy an edge-based voice collection and analysis system for your retail store.
 
 ## Step 3: Deploy Voice Services {#voice_services type=docker_deploy required=true config=devices/rerouter.yaml}
 
+Start the voice recognition and analysis services on the device.
+
 ### Target: Local Deployment {#voice_services_local type=local config=devices/voice_local.yaml}
 
 Deploy voice services on your local computer.
 
-### Prerequisites
+| Device | Connection | Notes |
+|--------|------------|-------|
+| reSpeaker XVF3800 | USB to computer | Must complete Step 2 configuration first |
+| Computer | Docker Desktop installed | Download for Windows/Mac |
 
+**Prerequisites:**
 - Docker Desktop installed and running
 - reSpeaker XVF3800 connected via USB
 - At least 2GB free disk space
 - Port 8090 available
 
-### After Deployment
-
-1. Run `docker ps` to verify containers are running
-2. Open `http://localhost:8090` to access edge client
-3. Start real-time voice transcription testing
+**Verify Connection:**
+Before deployment, confirm reSpeaker is recognized:
+- **Windows**: Device Manager > Sound, video and game controllers
+- **Mac**: System Preferences > Sound > Input, select XVF3800
+- **Linux**: Run `arecord -l` to list recording devices
 
 ### Troubleshooting
 
@@ -94,36 +127,44 @@ Deploy voice services on your local computer.
 | Docker not running | Start the Docker Desktop application |
 | Port 8090 is occupied | Close the program using that port, or modify the configuration to use a different port |
 | Microphone device not found | Unplug and replug USB, verify it appears in Device Manager |
-| Container startup failed | Check Docker logs: `docker logs <container_name>` |
+| Container startup failed | Check Docker logs: `docker logs sensecraft-voice-client` |
 
 ### Target: Remote Deployment {#voice_services_remote type=remote config=devices/rerouter.yaml default=true}
 
 Deploy voice services to a remote device (reRouter, Raspberry Pi, etc.).
 
-### Before You Begin
+| Device | Connection | Notes |
+|--------|------------|-------|
+| reSpeaker XVF3800 | USB to reRouter | Must complete Step 2 configuration first |
+| reRouter CM4 | WAN port to router | Internet required for downloading container images |
+| reRouter CM4 | LAN port to computer | For SSH access and deployment |
+| Computer | Same network as reRouter | For running remote deployment |
 
-1. **Connect target device to the network**
-   - Ensure the device is on the same network as your computer
-   - Note down the device's IP address (default: 192.168.49.1 for OpenWrt)
+**Before You Begin:**
 
-2. **Get device credentials**
-   - SSH username (usually `root` for OpenWrt)
-   - SSH password (empty by default on OpenWrt)
+1. **Confirm device is online**
+   - reRouter WAN port connected to router
+   - Verify internet connection in reRouter admin panel
 
-### Connection Settings
+2. **Record connection info**
 
-Enter the following information:
+| Field | Default Value | Notes |
+|-------|---------------|-------|
+| Device IP | 192.168.49.1 | Access from LAN port |
+| SSH Username | root | OpenWrt default user |
+| SSH Password | (empty) | No password by default |
 
-| Field | Description | Example |
-|-------|-------------|---------|
-| Device IP | Target device IP address | 192.168.49.1 |
-| SSH Password | Login password (optional) | your-password |
+**Connection Diagram:**
 
-### After Deployment
-
-1. SSH and run `docker ps` to verify three containers are running
-2. Visit `http://192.168.49.1:8090` to open edge client
-3. Start real-time voice transcription testing
+```
+┌────────┐     WAN      ┌──────────┐     LAN      ┌────────┐
+│ Router │ ──────────── │ reRouter │ ──────────── │Computer│
+└────────┘              └────┬─────┘              └────────┘
+                             │ USB
+                        ┌────┴─────┐
+                        │ reSpeaker│
+                        └──────────┘
+```
 
 ![Wiring](gallery/wan_lan.png)
 
@@ -134,15 +175,70 @@ Enter the following information:
 | SSH connection refused | Make sure the cable is plugged into the LAN port and the IP is correct |
 | Authentication failed | OpenWrt default password is empty, just press Enter |
 | Image download timeout | Check the WAN port network connection, make sure you can access the internet |
-| Container startup failed | SSH in and run `docker logs` to view error messages |
+| Container startup failed | SSH in and run `docker logs sensecraft-voice-client` to view error messages |
 | Microphone not found | Run `arecord -l` to verify reSpeaker is recognized |
+| "Health check failed" warning in logs | Normal during startup - the voice client starts before the ASR server is ready. Wait 30 seconds and check again |
 
-### Deployment Complete
+---
+
+# Deployment Complete
 
 Voice AI system is ready!
 
-**Access:** http://\<device-ip\>:8090
+## Service Access
 
-**Recommended:** Reboot the device first (`reboot`), then test voice recognition by speaking near the reSpeaker.
+After deployment, you can access the following services:
 
-**Next:** Connect to [SenseCraft Voice](https://voice.sensecraft.seeed.cc/) for cloud analytics.
+| Service | URL | Purpose |
+|---------|-----|---------|
+| Edge Client | http://\<device-ip\>:8090 | Real-time transcription, speaker management, device settings |
+| OpenWrt Admin | http://\<device-ip\> | Network configuration, system management |
+| SenseCraft Voice | https://voice.sensecraft.seeed.cc/ | Cloud platform - multi-store analytics, AI analysis, data export |
+
+## Initial Setup
+
+1. **Reboot the device** — run `reboot` command via SSH, then wait 2 minutes
+2. **Open Edge Client** — visit `http://<device-ip>:8090` in your browser
+3. **Test voice recognition** — speak near the reSpeaker and watch real-time transcription appear
+
+## Edge Client (http://\<device-ip\>:8090)
+
+The edge client provides local voice processing and device management:
+
+![Edge Client](gallery/edge-client-asr.png)
+
+| Feature | Description |
+|---------|-------------|
+| Real-time ASR | Live speech-to-text transcription - verify audio input and recognition accuracy |
+| Speaker Recognition | Register voiceprints to automatically identify who is speaking |
+| Device Configuration | Change network settings (WiFi) and upstream server address for cloud sync |
+
+## Cloud Platform (https://voice.sensecraft.seeed.cc/)
+
+Connect your edge device to the SenseCraft Voice cloud platform for advanced analytics:
+
+| Module | Description |
+|--------|-------------|
+| **Dashboard** | Overview with store filtering, daily collection trends, and keyword hotspot analysis |
+| **Record Management** | Search, filter, and export voice records. Switch between conversation view and timeline view with audio playback |
+| **AI Analysis** | Submit voice records to AI for custom processing based on your prompts |
+| **Store Management** | Organize devices by store, location, and device name |
+| **Backend Settings** | Configure keywords & synonyms for event detection, AI prompts, and user permissions |
+
+**To connect to the cloud platform:**
+1. Open Edge Client > Device Status page
+2. The upstream server address is pre-configured
+3. Your device will automatically register and appear in the cloud platform
+
+## Quick Verification
+
+- Speak near the reSpeaker microphone
+- Check edge client for real-time transcription
+- Verify text appears on the web dashboard
+- Check speaker recognition identifies different speakers
+
+## Next Steps
+
+- [View Wiki Documentation](https://wiki.seeedstudio.com/cn/solutions/smart-retail-voice-ai-solution-1/)
+- [SenseCraft Voice Platform](https://voice.sensecraft.seeed.cc/)
+- [Purchase Hardware](https://www.seeedstudio.com.cn/solutions/voicecollectionanalysis-zh-hans)

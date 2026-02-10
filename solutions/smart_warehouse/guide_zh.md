@@ -16,6 +16,8 @@
 
 ## 步骤 1: 仓库管理系统 {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
 
+部署库存管理服务，支持语音操控和网页看板。
+
 ### 部署目标: 本机部署 {#warehouse_local type=local config=devices/recomputer.yaml}
 
 在本机运行仓库管理服务。
@@ -166,6 +168,8 @@
 **前提条件：** 需要联网（调用 LLM/TTS API） · 需要 AI 服务商的 API 密钥（推荐 [DeepSeek](https://platform.deepseek.com/)，注册送免费额度）
 
 ## 步骤 1: 仓库管理系统 {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
+
+部署库存管理服务，支持语音操控和网页看板。
 
 ### 部署目标: 本机部署 {#warehouse_local type=local config=devices/recomputer.yaml}
 
@@ -359,6 +363,8 @@ TTS 默认使用免费的 Edge TTS，无需额外配置。
 **前提条件：** 需要 reComputer J4012 或同等 Jetson 设备 · 首次部署需要网络下载镜像
 
 ## 步骤 1: 仓库管理系统 {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
+
+部署库存管理服务，支持语音操控和网页看板。
 
 ### 部署目标: 本机部署 {#warehouse_local type=local config=devices/recomputer.yaml}
 

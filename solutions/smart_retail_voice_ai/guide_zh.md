@@ -1,48 +1,3 @@
-本方案部署一套完整的边缘语音采集分析系统，专为零售环境设计。
-
-## 硬件连接总览
-
-| 设备 | 连接到 | 接口 | 用途 |
-|------|--------|------|------|
-| reRouter CM4 | 路由器 | WAN 口（网线） | 联网上传数据 |
-| reRouter CM4 | 电脑 | LAN 口（网线） | 配置和访问管理界面 |
-| reSpeaker XVF3800 | 电脑 | USB-C | 初次配置麦克风参数 |
-| reSpeaker XVF3800 | reRouter CM4 | USB-A | 正式使用时的连接方式 |
-
-## 连接示意图
-
-```
-┌─────────────┐                    ┌─────────────┐
-│   路由器    │ ───── WAN 口 ───── │  reRouter   │
-│  (互联网)   │                    │    CM4      │
-└─────────────┘                    └──────┬──────┘
-                                          │
-                                     LAN 口 / USB 口
-                                          │
-                    ┌─────────────────────┼─────────────────────┐
-                    │                     │                     │
-              ┌─────┴─────┐         ┌─────┴─────┐         ┌─────┴─────┐
-              │   电脑    │         │ reSpeaker │         │  其他设备  │
-              │(配置管理) │         │ XVF3800   │         │  (可选)   │
-              └───────────┘         └───────────┘         └───────────┘
-```
-
-## 前置条件
-
-| 物品 | 说明 |
-|------|------|
-| reRouter CM4 | 至少 4GB 内存和 32GB 存储 |
-| reSpeaker XVF3800 | 四麦克风阵列 |
-| USB-C 数据线 | 用于配置 reSpeaker（步骤二） |
-| 网线 x2 | 一根接 WAN 口联网，一根接 LAN 口连电脑 |
-| 电脑 | Windows/Mac/Linux，用于刷固件和配置 |
-
-## 部署步骤概览
-
-1. **刷写固件** - 给 reRouter 刷入 OpenWrt 系统
-2. **配置麦克风** - 设置 reSpeaker 的音频参数
-3. **部署服务** - 一键部署语音采集和分析容器
-
 ## 套餐: 标准部署 {#default}
 
 为你的门店部署一套边缘语音采集分析系统。
@@ -54,6 +9,7 @@
 
 **部署完成后你可以：**
 - 实时转录门店内的顾客对话
+- 声纹识别——自动分辨不同说话人
 - 对接 [SenseCraft Voice](https://voice.sensecraft.seeed.cc/) 云平台，多门店数据汇总分析
 - 隐私优先——音频在本地处理，不上传原始录音
 
@@ -61,23 +17,23 @@
 
 ## 步骤 1: 刷写 OpenWrt 固件 {#firmware type=manual required=true config=devices/firmware.yaml}
 
-### 硬件连接
+将操作系统写入 reRouter，然后连接到网络。
 
 | 设备 | 连接方式 | 注意事项 |
 |------|---------|---------|
 | reRouter CM4 | 取出 SD 卡或 eMMC 模块 | 用于刷写固件 |
 | SD 卡/eMMC | 插入读卡器连接电脑 | 建议使用 USB 3.0 读卡器 |
 
-### 刷写步骤
+**刷写步骤**：
 
-1. 下载固件：[全球版](https://files.seeedstudio.com/wiki/solution/ai-sound/reRouter-firmware-backup/openwrt-bcm27xx-bcm2711-rpi-4-ext4-factory-global.img.gz) | [中国版](https://files.seeedstudio.com/wiki/solution/ai-sound/reRouter-firmware-backup/openwrt-bcm27xx-bcm2711-rpi-4-ext4-factory-cn.img.gz)
+1. 下载固件：[全球版](https://files.seeedstudio.com/wiki/solution/ai-sound/reRouter-firmware-backup/OpenWRT-24.10.3-RPi-4-Factory.img.gz) | [中国版](https://files.seeedstudio.com/wiki/solution/ai-sound/reRouter-firmware-backup/OpenWRT-24.10.3-RPi-4-Factory-Chinese.img.gz)
 2. 下载 [Raspberry Pi Imager](https://www.raspberrypi.com/software/) 刷机工具
 3. 选择"自定义镜像"，选择下载的固件文件
 4. 选择目标存储设备（SD 卡或 eMMC）
 5. 点击"写入"，等待完成
 6. 将存储设备装回 reRouter，接线上电
 
-### 首次连接
+**首次连接**：
 
 1. 用网线将电脑连接到 reRouter 的 **LAN 口**
 2. 用另一根网线将 **WAN 口** 连接到路由器
@@ -87,7 +43,7 @@
 
 ### 故障排查
 
-| 问题 | 解决方案 |
+| 问题 | 解决方法 |
 |------|----------|
 | 无法访问 192.168.49.1 | 确认网线插在 LAN 口而非 WAN 口 |
 | 页面加载缓慢 | 等待 2 分钟让系统完全启动 |
@@ -98,18 +54,18 @@
 
 ## 步骤 2: 配置 reSpeaker 麦克风 {#respeaker type=manual required=true config=devices/respeaker.yaml}
 
-### 硬件连接
+将麦克风连接到电脑，调整音频设置以获得最佳语音质量。
 
 | 设备 | 连接方式 | 注意事项 |
 |------|---------|---------|
 | reSpeaker XVF3800 | USB-C 连接**电脑** | 配置阶段必须连电脑，不要连 reRouter |
 | 电脑 | 需要终端/命令行 | Windows 用 PowerShell，Mac/Linux 用终端 |
 
-### 为什么要配置
+**为什么要配置**：
 
 reSpeaker 出厂默认启用了回声消除功能，会影响本方案的录音效果。需要关闭这个功能。
 
-### 配置步骤
+**配置步骤**：
 
 1. 用 USB-C 线将 reSpeaker 连接到**电脑**（注意：不是 reRouter）
 2. 确认电脑识别到设备（Windows 设备管理器 / Mac 系统信息）
@@ -130,7 +86,7 @@ reSpeaker 出厂默认启用了回声消除功能，会影响本方案的录音�
 
 ### 故障排查
 
-| 问题 | 解决方案 |
+| 问题 | 解决方法 |
 |------|----------|
 | 电脑未识别设备 | 换一根 USB 线，确保是数据线不是充电线 |
 | 命令执行报错 | 确认进入了正确的系统目录 |
@@ -141,26 +97,24 @@ reSpeaker 出厂默认启用了回声消除功能，会影响本方案的录音�
 
 ## 步骤 3: 部署语音服务 {#voice_services type=docker_deploy required=true config=devices/rerouter.yaml}
 
+在设备上启动语音识别和分析服务。
+
 ### 部署目标: 本机部署 {#voice_services_local type=local config=devices/voice_local.yaml}
 
 在本地电脑上部署语音服务。
-
-### 硬件连接
 
 | 设备 | 连接方式 | 注意事项 |
 |------|---------|---------|
 | reSpeaker XVF3800 | USB 连接到电脑 | 确保已完成步骤二的配置 |
 | 电脑 | 需安装 Docker Desktop | Windows/Mac 需下载安装 |
 
-### 前提条件
-
+**前提条件**：
 - Docker Desktop 已安装并运行
 - reSpeaker XVF3800 已通过 USB 连接
 - 至少 2GB 可用磁盘空间
 - 端口 8090 未被占用
 
-### 验证连接
-
+**验证连接**：
 部署前，确认 reSpeaker 被识别：
 - **Windows**: 设备管理器 > 声音、视频和游戏控制器
 - **Mac**: 系统偏好设置 > 声音 > 输入，选择 XVF3800
@@ -168,16 +122,16 @@ reSpeaker 出厂默认启用了回声消除功能，会影响本方案的录音�
 
 ### 故障排查
 
-| 问题 | 解决方案 |
+| 问题 | 解决方法 |
 |------|----------|
 | Docker 未运行 | 启动 Docker Desktop 应用 |
 | 端口 8090 被占用 | 关闭占用该端口的程序，或修改配置使用其他端口 |
 | 找不到麦克风设备 | 重新插拔 USB，确认设备管理器中有显示 |
-| 容器启动失败 | 检查 Docker 日志：`docker logs <容器名>` |
+| 容器启动失败 | 检查 Docker 日志：`docker logs sensecraft-voice-client` |
 
 ### 部署目标: 远程部署 {#voice_services_remote type=remote config=devices/rerouter.yaml default=true}
 
-### 硬件连接
+将语音服务部署到远程设备（reRouter、树莓派等）。
 
 | 设备 | 连接方式 | 注意事项 |
 |------|---------|---------|
@@ -186,7 +140,7 @@ reSpeaker 出厂默认启用了回声消除功能，会影响本方案的录音�
 | reRouter CM4 | LAN 口接电脑 | 用于 SSH 访问和部署操作 |
 | 电脑 | 与 reRouter 在同一网络 | 用于执行远程部署 |
 
-### 开始之前
+**开始之前**：
 
 1. **确认设备联网**
    - reRouter WAN 口已连接路由器
@@ -200,7 +154,7 @@ reSpeaker 出厂默认启用了回声消除功能，会影响本方案的录音�
 | SSH 用户名 | root | OpenWrt 默认用户 |
 | SSH 密码 | （空） | 默认无密码 |
 
-### 连接示意
+**连接示意**：
 
 ```
 ┌────────┐     WAN      ┌──────────┐     LAN      ┌────────┐
@@ -216,20 +170,75 @@ reSpeaker 出厂默认启用了回声消除功能，会影响本方案的录音�
 
 ### 故障排查
 
-| 问题 | 解决方案 |
+| 问题 | 解决方法 |
 |------|----------|
 | SSH 连接被拒绝 | 确认网线插在 LAN 口，IP 是否正确 |
 | 认证失败 | OpenWrt 默认密码为空，直接回车 |
 | 镜像下载超时 | 检查 WAN 口网络连接，确认能访问互联网 |
-| 容器启动失败 | SSH 登录后执行 `docker logs` 查看错误信息 |
+| 容器启动失败 | SSH 登录后执行 `docker logs sensecraft-voice-client` 查看错误信息 |
 | 找不到麦克风 | 执行 `arecord -l`，确认 reSpeaker 被识别 |
+| 日志中出现 "Health check failed" | 启动时正常现象——语音客户端先于 ASR 服务就绪，等待 30 秒后自动恢复 |
 
-### 部署完成
+---
+
+# 部署完成
 
 语音 AI 系统已就绪！
 
-**访问地址：** http://\<设备IP\>:8090
+## 服务访问
 
-**建议：** 先重启设备（执行 `reboot`），然后在 reSpeaker 附近说话测试语音识别。
+部署完成后，可访问以下服务：
 
-**下一步：** 连接 [SenseCraft Voice](https://voice.sensecraft.seeed.cc/) 云平台进行数据分析。
+| 服务 | 访问地址 | 用途 |
+|------|---------|------|
+| 边缘客户端 | http://\<设备IP\>:8090 | 实时转录、声纹管理、设备配置 |
+| OpenWrt 管理 | http://\<设备IP\> | 网络配置、系统管理 |
+| SenseCraft Voice 云平台 | https://voice.sensecraft.seeed.cc/ | 多门店分析、AI 分析、数据导出 |
+
+## 初始设置
+
+1. **重启设备** — SSH 执行 `reboot` 命令，等待 2 分钟
+2. **打开边缘客户端** — 浏览器访问 `http://<设备IP>:8090`
+3. **测试语音识别** — 在 reSpeaker 附近说话，观察实时转录结果
+
+## 边缘客户端 (http://\<设备IP\>:8090)
+
+边缘客户端提供本地语音处理和设备管理功能：
+
+![边缘客户端](gallery/edge-client-asr.png)
+
+| 功能 | 说明 |
+|------|------|
+| 实时语音对话 | 实时语音转文字——验证音频输入和识别准确性 |
+| 说话人管理 | 注册声纹，自动识别不同说话人 |
+| 设备配置 | 修改网络设置（WiFi）和上游服务器地址，用于云端同步 |
+
+## 云端管理平台 (https://voice.sensecraft.seeed.cc/)
+
+将边缘设备连接到 SenseCraft Voice 云平台，获取高级分析功能：
+
+| 模块 | 说明 |
+|------|------|
+| **仪表板** | 数据总览，支持门店筛选、每日采集趋势、关键词热点分析 |
+| **记录管理** | 搜索、筛选和导出语音记录，支持对话模式和时间线模式（含音频回放） |
+| **AI 分析** | 将语音记录提交给 AI 进行自定义处理，基于你设定的提示词 |
+| **门店管理** | 按门店、位置、设备名称组织设备，支持层级管理 |
+| **后端配置** | 配置关键词和同义词进行事件检测，管理 AI 提示词和用户权限 |
+
+**连接云平台的方法：**
+1. 打开边缘客户端 > 设备状态页面
+2. 上游服务器地址已预先配置
+3. 设备会自动注册并出现在云平台中
+
+## 快速验证
+
+- 在 reSpeaker 麦克风附近说话
+- 查看边缘客户端的实时转录
+- 确认文字出现在网页看板上
+- 检查声纹识别是否能区分不同说话人
+
+## 后续步骤
+
+- [查看 Wiki 文档](https://wiki.seeedstudio.com/cn/solutions/smart-retail-voice-ai-solution-1/)
+- [SenseCraft Voice 平台](https://voice.sensecraft.seeed.cc/)
+- [购买硬件](https://www.seeedstudio.com.cn/solutions/voicecollectionanalysis-zh-hans)

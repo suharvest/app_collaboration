@@ -38,39 +38,6 @@ pre_checks:
   - type: port_available
     description: Check if serial port is accessible
 
-steps:
-  - id: detect
-    name: Detect Device
-    name_zh: 检测设备
-    description: Scan USB ports for Watcher device
-    description_zh: 扫描USB端口查找Watcher设备
-    optional: false
-    default: true
-
-  - id: erase
-    name: Erase Flash (Optional)
-    name_zh: 擦除闪存 (可选)
-    description: Erase flash memory before writing new firmware
-    description_zh: 写入新固件前擦除闪存
-    optional: true
-    default: false
-
-  - id: flash
-    name: Flash Firmware
-    name_zh: 烧录固件
-    description: Write firmware to device flash memory
-    description_zh: 将固件写入设备闪存
-    optional: false
-    default: true
-
-  - id: verify
-    name: Verify
-    name_zh: 验证
-    description: Verify firmware was written correctly
-    description_zh: 验证固件写入正确
-    optional: false
-    default: true
-
 post_deployment:
   reset_device: true
   wait_for_ready: 5

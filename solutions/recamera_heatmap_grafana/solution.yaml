@@ -10,13 +10,17 @@ intro:
   cover_image: gallery/cover.svg
   gallery:
   - type: image
+    src: gallery/grafana-dashboard.png
+    caption: Grafana Dashboard with Live Feed
+    caption_zh: Grafana 数据看板（含实时画面）
+  - type: image
+    src: gallery/heatmap-demo.png
+    caption: Spatial Heatmap Visualization
+    caption_zh: 空间热力图可视化
+  - type: image
     src: gallery/architecture.svg
     caption: System Architecture
     caption_zh: 系统架构
-  - type: image
-    src: gallery/recamera.svg
-    caption: reCamera Device
-    caption_zh: reCamera 设备
   category: sensing
   tags:
   - recamera
