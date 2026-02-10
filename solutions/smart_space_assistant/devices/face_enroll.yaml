@@ -6,7 +6,7 @@ type: serial_camera
 
 serial_camera:
   camera_port:
-    port_from_device: watcher_himax
+    port_from_device: face_himax
     baudrate: 921600
     protocol: sscma_json
   display:
@@ -16,7 +16,7 @@ serial_camera:
   panels:
     - type: face_database
       database_port:
-        port_from_device: watcher_esp32
+        port_from_device: face_esp32
         baudrate: 115200
         protocol: jsonlines
       enrollment_duration: 5.0

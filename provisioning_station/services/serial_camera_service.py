@@ -67,17 +67,18 @@ class SSCMAParser:
         self._buffer = b""
 
 
-def parse_face_result(msg: dict) -> Optional[dict]:
-    """Extract face data from SSCMA INVOKE message (face mode).
+_logged_sscma_keys = False
 
-    Firmware format (unified):
-      name="INVOKE", type=1, data={
-        mode: "face", image: "<b64 jpeg>", resolution: [w,h],
-        faces: [{box, score, quality, landmarks, embedding}, ...]
-      }
+
+def parse_face_result(msg: dict) -> Optional[dict]:
+    """Extract face data from SSCMA INVOKE message.
+
+    Supports two formats:
+    1. Custom face firmware: data.faces = [{box, score, landmarks, embedding}, ...]
+    2. Standard SSCMA:       data.boxes = [[x,y,w,h,score], ...],
+                             data.keypoints = [[x1,y1,s1,x2,y2,s2,...], ...]
 
     - score is integer 0-100 → normalized to 0-1
-    - embedding is JSON float array [f1, ..., f128]
     """
     if msg.get("type") != 1:
         return None
@@ -88,21 +89,61 @@ def parse_face_result(msg: dict) -> Optional[dict]:
     image = data.get("image")
     resolution = data.get("resolution", [240, 240])
 
+    # Log data keys once for debugging
+    global _logged_sscma_keys
+    if not _logged_sscma_keys:
+        keys = [k for k in data.keys() if k != "image"]
+        img_len = len(image) if image else 0
+        logger.info(
+            "SSCMA first frame: keys=%s, image=%s (%d chars), resolution=%s",
+            keys,
+            bool(image),
+            img_len,
+            resolution,
+        )
+        _logged_sscma_keys = True
+
     faces = []
-    for f in data.get("faces", []):
-        score = f.get("score", 0)
-        face = {
-            "bbox": f.get("box", [0, 0, 0, 0]),
-            "confidence": score / 100 if score > 1 else score,
-            "quality": f.get("quality", 0),
-            "landmarks": f.get("landmarks", []),
-            "embedding": f.get("embedding", []),  # JSON float array
-        }
-        if "recognized_name" in f:
-            face["recognized_name"] = f["recognized_name"]
-        if "similarity" in f:
-            face["similarity"] = f["similarity"]
-        faces.append(face)
+
+    # Format 1: Custom face firmware (data.faces is array of dicts)
+    raw_faces = data.get("faces", [])
+    if raw_faces:
+        for f in raw_faces:
+            score = f.get("score", 0)
+            face = {
+                "bbox": f.get("box", [0, 0, 0, 0]),
+                "confidence": score / 100 if score > 1 else score,
+                "quality": f.get("quality", 0),
+                "landmarks": f.get("landmarks", []),
+                "embedding": f.get("embedding", []),
+            }
+            if "recognized_name" in f:
+                face["recognized_name"] = f["recognized_name"]
+            if "similarity" in f:
+                face["similarity"] = f["similarity"]
+            faces.append(face)
+    else:
+        # Format 2: Standard SSCMA (boxes + keypoints arrays)
+        # SSCMA boxes = [[cx, cy, w, h, score, target], ...] — center-point coords
+        boxes = data.get("boxes", [])
+        keypoints = data.get("keypoints", [])
+        for i, box in enumerate(boxes):
+            if len(box) < 4:
+                continue
+            cx, cy, bw, bh = box[:4]
+            score = box[4] if len(box) > 4 else 0
+            face = {
+                "bbox": [cx - bw / 2, cy - bh / 2, bw, bh],
+                "confidence": score / 100 if score > 1 else score,
+                "landmarks": [],
+            }
+            # Convert keypoints triplets [x1,y1,s1,x2,y2,s2,...] → pairs [[x1,y1],[x2,y2],...]
+            if i < len(keypoints):
+                kp = keypoints[i]
+                face["landmarks"] = [
+                    [kp[j], kp[j + 1]] for j in range(0, len(kp) - 2, 3)
+                ]
+            faces.append(face)
 
     return {
         "type": "frame",
@@ -124,10 +165,12 @@ class SerialCameraSession:
         session_id: str,
         port: str,
         baudrate: int = 921600,
+        face_mode: bool = True,
     ):
         self.session_id = session_id
         self.port = port
         self.baudrate = baudrate
+        self.face_mode = face_mode
 
         self._serial: Optional[serial.Serial] = None
         self._thread: Optional[threading.Thread] = None
@@ -171,6 +214,12 @@ class SerialCameraSession:
         with self._clients_lock:
             if q in self._clients:
                 self._clients.remove(q)
+
+    @property
+    def client_count(self) -> int:
+        """Number of connected WebSocket clients."""
+        with self._clients_lock:
+            return len(self._clients)
 
     def add_frame_callback(self, cb: Callable):
         self._frame_callbacks.append(cb)
@@ -259,13 +308,18 @@ class SerialCameraSession:
         time.sleep(0.3)
         self._serial.reset_input_buffer()
 
-        # Start continuous inference
+        # Enable face mode (provides embeddings for enrollment) then start inference
         try:
+            if self.face_mode:
+                self._serial.write(b"AT+FACE=1\r")
+                self._serial.flush()
+                time.sleep(0.2)
+                logger.info("Sent AT+FACE=1 on session %s", self.session_id)
             self._serial.write(b"AT+INVOKE=-1,0,0\r")
             self._serial.flush()
             logger.info("Sent AT+INVOKE=-1,0,0 on session %s", self.session_id)
         except Exception as e:
-            logger.error("Failed to send AT+INVOKE: %s", e)
+            logger.error("Failed to send AT commands: %s", e)
             self._broadcast_status("error", f"Failed to start inference: {e}")
             return
 
@@ -387,6 +441,7 @@ class SerialCameraManager:
         self,
         port: str,
         baudrate: int = 921600,
+        face_mode: bool = True,
     ) -> SerialCameraSession:
         """Create a new camera session."""
         # Check port exclusivity
@@ -395,7 +450,7 @@ class SerialCameraManager:
             raise ValueError(f"Port {port} is already in use by session {existing_id}")
 
         session_id = str(uuid4())[:8]
-        session = SerialCameraSession(session_id, port, baudrate)
+        session = SerialCameraSession(session_id, port, baudrate, face_mode=face_mode)
         self._sessions[session_id] = session
         self._port_map[port] = session_id
         return session

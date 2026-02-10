@@ -189,6 +189,10 @@ async def websocket_frames(ws: WebSocket, session_id: str):
         logger.debug("WebSocket error for session %s: %s", session_id, e)
     finally:
         session.remove_client(q)
+        # Auto-close session when last client disconnects
+        if session.client_count == 0:
+            logger.info("Last WS client left session %s, auto-closing", session_id)
+            manager.close_session(session_id)
 
 
 # ============================================

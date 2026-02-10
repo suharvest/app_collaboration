@@ -805,7 +805,7 @@ function renderSerialCameraSectionContent(device, state, sectionDescription) {
 
   return `
     ${renderDescriptionSection(sectionDescription)}
-    ${portStatusHtml}
+    <div id="port-status-${device.id}">${portStatusHtml}</div>
     <div class="serial-camera-container-wrapper" id="serial-camera-container-${device.id}"></div>
     ${panels.length > 0 ? `<div class="serial-camera-panel-wrapper" id="serial-camera-panel-${device.id}"></div>` : ''}
   `;
