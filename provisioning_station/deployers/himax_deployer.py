@@ -20,6 +20,7 @@ import serial
 import serial.tools.list_ports
 
 from ..models.device import DeviceConfig, HimaxModelConfig
+from .action_executor import LocalActionExecutor
 from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
@@ -147,6 +148,13 @@ class HimaxDeployer(BaseDeployer):
                 progress_callback, "prepare", 100, "Ready for flashing"
             )
 
+            # Before actions
+            action_executor = LocalActionExecutor()
+            if not await self._execute_actions(
+                "before", config, connection, progress_callback, action_executor
+            ):
+                return False
+
             # Step 4: Flash firmware using xmodem
             await self._report_progress(
                 progress_callback, "flash", 0, "Starting firmware flash..."
@@ -197,6 +205,12 @@ class HimaxDeployer(BaseDeployer):
             await self._report_progress(
                 progress_callback, "verify", 100, "Deployment complete"
             )
+
+            # After actions
+            if not await self._execute_actions(
+                "after", config, connection, progress_callback, action_executor
+            ):
+                return False
 
             return True
 

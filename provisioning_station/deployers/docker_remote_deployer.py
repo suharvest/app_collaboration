@@ -13,6 +13,7 @@ from typing import Any, Callable, Dict, Optional
 from ..models.device import DeviceConfig, SSHConfig
 from ..services.remote_pre_check import remote_pre_check
 from ..utils.compose_labels import create_labels, inject_labels_to_compose
+from .action_executor import SSHActionExecutor
 from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
@@ -217,6 +218,13 @@ class DockerRemoteDeployer(BaseDeployer):
                     progress_callback, "prepare", 100, f"Directory ready: {remote_dir}"
                 )
 
+                # Before actions
+                ssh_executor = SSHActionExecutor(client, password)
+                if not await self._execute_actions(
+                    "before", config, connection, progress_callback, ssh_executor
+                ):
+                    return False
+
                 # Step 3: Upload compose files
                 await self._report_progress(
                     progress_callback, "upload", 0, "Uploading files..."
@@ -345,6 +353,12 @@ class DockerRemoteDeployer(BaseDeployer):
                 await self._report_progress(
                     progress_callback, "health_check", 100, "All services healthy"
                 )
+
+                # After actions
+                if not await self._execute_actions(
+                    "after", config, connection, progress_callback, ssh_executor
+                ):
+                    return False
 
                 # Open browser if configured (post_deployment)
                 if (
