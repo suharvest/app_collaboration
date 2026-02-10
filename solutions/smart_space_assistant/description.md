@@ -14,6 +14,7 @@ This solution gives your AI assistant "eyes" and a "big screen," turning it into
 | Personalized Service | Different people get different responses and actions |
 | Privacy in Your Hands | All face data stays on local device, never uploaded to cloud |
 | Large Display | Cast conversations to TV/monitor for everyone to see |
+| Narrate Mode | AI switches background images based on conversation — great for tours & demos |
 
 ## Application Scenarios
 

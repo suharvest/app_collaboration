@@ -135,6 +135,7 @@ Cast Xiaozhi conversations to TV or large display, ideal for exhibition halls, m
 - Real-time conversation display on big screen
 - Fullscreen mode for presentations
 - mDNS auto-discovery - connect by voice command
+- Narrate mode - AI controls background images for storytelling & guided tours
 
 **Requirements:** All devices on same network
 
@@ -213,3 +214,12 @@ Display cast is ready!
 3. Say "Cast to [Display Name]" to start
 
 **Voice commands:** "Start casting", "Stop casting", "Cast status"
+
+**Narrate Mode (New):**
+The display now supports a narrate mode where AI can control background images — ideal for presentations, storytelling, and guided tours.
+
+1. Click the gear icon (top-left) to open the config panel
+2. Toggle "Enable Narrate Mode"
+3. Enter your Xiaozhi WebSocket MCP URL to enable AI-driven image switching
+4. Add trigger rules: keyword + image URL pairs for automatic background changes
+5. Press `N` to toggle narrate mode, click the PiP window to resize it

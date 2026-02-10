@@ -12,7 +12,7 @@
 
 services:
   xiaozhi-display:
-    image: sensecraft-missionpack.seeed.cn/solution/xiaozhi-display:0.2.2
+    image: sensecraft-missionpack.seeed.cn/solution/xiaozhi-display:0.3.0
     container_name: xiaozhi-display
     restart: unless-stopped
 
