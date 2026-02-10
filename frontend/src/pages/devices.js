@@ -298,6 +298,27 @@ export async function renderDevicesPage() {
         </div>
       </div>
     </div>
+
+    <!-- Configure App Modal -->
+    <div id="configure-app-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content" style="max-width: 480px;">
+        <div class="flex items-center justify-between mb-4">
+          <h3 id="configure-app-title" class="text-lg font-semibold"></h3>
+          <button id="configure-close" class="btn-icon" style="background:none;border:none;cursor:pointer;padding:4px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <p class="text-text-secondary text-sm mb-4">${t('devices.configure.desc')}</p>
+        <div id="configure-form-fields"></div>
+        <div id="configure-error" class="text-red-500 text-sm mb-3" style="display:none"></div>
+        <div class="flex gap-3 justify-end mt-4">
+          <button id="configure-cancel" class="btn btn-secondary">${t('common.cancel')}</button>
+          <button id="configure-save" class="btn btn-primary">${t('common.save')}</button>
+        </div>
+      </div>
+    </div>
   `;
 
   // Setup handlers
@@ -443,6 +464,7 @@ function setupDockerConnectForm() {
   // Setup modals
   setupRemoveAppModal();
   setupPruneImagesModal();
+  setupConfigureModal();
 
   // Restore last connection from sessionStorage
   const saved = sessionStorage.getItem('docker_connection');
@@ -453,7 +475,7 @@ function setupDockerConnectForm() {
       const userInput = document.getElementById('docker-username');
       if (hostInput) hostInput.value = conn.host || '';
       if (userInput) userInput.value = conn.username || 'recomputer';
-    } catch (e) {}
+    } catch (_e) { /* ignore stored connection parse errors */ }
   }
 }
 
@@ -746,6 +768,17 @@ function renderManagedAppCard(app) {
             ${t('devices.actions.start')}
           </button>
         `}
+        ${app.config_fields && app.config_fields.length > 0 ? `
+          <button class="btn btn-sm btn-secondary managed-app-configure"
+                  data-solution-id="${app.solution_id}"
+                  data-solution-name="${app.solution_name || app.solution_id}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+            </svg>
+            ${t('devices.actions.configure')}
+          </button>
+        ` : ''}
         <button class="btn btn-sm btn-danger managed-app-remove"
                 data-solution-id="${app.solution_id}" data-containers="${containerNames}" data-solution-name="${app.solution_name || app.solution_id}">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -797,6 +830,15 @@ function setupManagedAppHandlers() {
     });
   });
 
+  // Configure app button handlers
+  document.querySelectorAll('.managed-app-configure').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const solutionId = btn.dataset.solutionId;
+      const solutionName = btn.dataset.solutionName;
+      showConfigureModal(solutionId, solutionName);
+    });
+  });
+
   // Remove app button handlers
   document.querySelectorAll('.managed-app-remove').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -808,8 +850,9 @@ function setupManagedAppHandlers() {
   });
 }
 
-// Store pending remove operation
+// Store pending operations
 let pendingRemoveApp = null;
+let pendingConfigSolutionId = null;
 
 function showRemoveAppModal(solutionId, containerNames, solutionName) {
   const modal = document.getElementById('remove-app-modal');
@@ -919,6 +962,124 @@ function setupPruneImagesModal() {
   modal?.addEventListener('click', (e) => {
     if (e.target === modal) {
       modal.style.display = 'none';
+    }
+  });
+}
+
+// ============================================
+// Configure App Modal
+// ============================================
+
+async function showConfigureModal(solutionId, solutionName) {
+  const modal = document.getElementById('configure-app-modal');
+  const titleEl = document.getElementById('configure-app-title');
+  const fieldsEl = document.getElementById('configure-form-fields');
+  const errorEl = document.getElementById('configure-error');
+
+  // Reset state
+  pendingConfigSolutionId = solutionId;
+  errorEl.style.display = 'none';
+  fieldsEl.innerHTML = `<div class="flex items-center justify-center py-4"><div class="spinner spinner-sm"></div></div>`;
+  titleEl.textContent = solutionName;
+  modal.style.display = 'flex';
+
+  try {
+    const data = currentConnection?._local
+      ? await dockerDevicesApi.getLocalConfig(solutionId)
+      : await dockerDevicesApi.getRemoteConfig(solutionId);
+
+    if (!data?.config?.fields?.length) {
+      toast.warning(t('devices.configure.noFields'));
+      modal.style.display = 'none';
+      pendingConfigSolutionId = null;
+      return;
+    }
+
+    const lang = i18n.locale;
+    fieldsEl.innerHTML = data.config.fields.map(field => `
+      <div class="mb-3">
+        <label class="block text-sm font-medium mb-1">
+          ${lang === 'zh' && field.name_zh ? field.name_zh : field.name}
+          ${field.required ? '<span class="text-red-500">*</span>' : ''}
+        </label>
+        <input type="${field.type || 'text'}"
+               class="input w-full"
+               data-field-id="${field.id}"
+               value="${field.current_value || ''}"
+               placeholder="${field.placeholder || ''}" />
+        ${field.description ? `<p class="text-xs text-text-secondary mt-1">${lang === 'zh' && field.description_zh ? field.description_zh : field.description}</p>` : ''}
+      </div>
+    `).join('');
+  } catch (error) {
+    fieldsEl.innerHTML = `<p class="text-text-secondary text-sm">${t('devices.configure.error')}: ${error.message}</p>`;
+  }
+}
+
+function setupConfigureModal() {
+  const modal = document.getElementById('configure-app-modal');
+  const closeBtn = document.getElementById('configure-close');
+  const cancelBtn = document.getElementById('configure-cancel');
+  const saveBtn = document.getElementById('configure-save');
+
+  const hideModal = () => {
+    modal.style.display = 'none';
+    pendingConfigSolutionId = null;
+  };
+
+  closeBtn?.addEventListener('click', hideModal);
+  cancelBtn?.addEventListener('click', hideModal);
+
+  modal?.addEventListener('click', (e) => {
+    if (e.target === modal) hideModal();
+  });
+
+  saveBtn?.addEventListener('click', async () => {
+    if (!pendingConfigSolutionId) return;
+
+    const errorEl = document.getElementById('configure-error');
+    errorEl.style.display = 'none';
+
+    // Collect field values
+    const fields = document.querySelectorAll('#configure-form-fields input');
+    const values = {};
+    let hasEmpty = false;
+    fields.forEach(f => {
+      values[f.dataset.fieldId] = f.value;
+      if (f.closest('.mb-3')?.querySelector('.text-red-500') && !f.value.trim()) {
+        hasEmpty = true;
+      }
+    });
+
+    if (hasEmpty) {
+      errorEl.textContent = t('deploy.validation.required');
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    // Show loading state
+    const originalText = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = t('devices.configure.saving');
+
+    try {
+      const result = currentConnection?._local
+        ? await dockerDevicesApi.updateLocalConfig(pendingConfigSolutionId, values)
+        : await dockerDevicesApi.updateRemoteConfig(pendingConfigSolutionId, values, currentConnection);
+
+      if (result.success) {
+        toast.success(t('devices.configure.saved'));
+        hideModal();
+        await loadDeployedApps();
+      } else {
+        errorEl.textContent = result.error || t('devices.configure.error');
+        errorEl.style.display = 'block';
+      }
+    } catch (error) {
+      errorEl.textContent = error.message || t('devices.configure.error');
+      errorEl.style.display = 'block';
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = originalText;
     }
   });
 }

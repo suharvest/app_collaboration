@@ -432,6 +432,7 @@ class DeploymentEngine:
                         "_solution_id": solution.id,
                         "_solution_name": solution.name,
                         "_device_id": device_deployment.device_id,
+                        "_config_file": device_deployment.config_file,
                     }
 
                     success = await deployer.deploy(
@@ -448,6 +449,22 @@ class DeploymentEngine:
                             if step.status != "completed":
                                 step.status = "completed"
                                 step.progress = 100
+
+                        # Save config manifest for reconfigurable user_inputs
+                        try:
+                            await self._save_config_manifest(
+                                solution_id=solution.id,
+                                device_id=device_deployment.device_id,
+                                device_type=device_deployment.type,
+                                config_file=device_deployment.config_file,
+                                config=config,
+                                connection=device_deployment.connection or {},
+                            )
+                        except Exception as manifest_error:
+                            logger.warning(
+                                f"Failed to save config manifest: {manifest_error}"
+                            )
+
                         await self._broadcast_log(
                             deployment_id,
                             f"Device {device_deployment.device_id} deployment completed successfully",
@@ -632,6 +649,64 @@ class DeploymentEngine:
         )
         all_deployments.sort(key=lambda d: d.started_at, reverse=True)
         return all_deployments[:limit]
+
+    async def _save_config_manifest(
+        self,
+        solution_id: str,
+        device_id: str,
+        device_type: str,
+        config_file: str,
+        config,
+        connection: Dict[str, Any],
+    ):
+        """Save a config manifest for reconfigurable user_inputs.
+
+        Only saves if there are reconfigurable fields. The manifest is used
+        by the Devices page to show a Configure button and form.
+        """
+        if not config.user_inputs:
+            return
+
+        reconfigurable_fields = [ui for ui in config.user_inputs if ui.reconfigurable]
+        if not reconfigurable_fields:
+            return
+
+        import json
+        from pathlib import Path
+
+        fields = []
+        for ui in reconfigurable_fields:
+            fields.append(
+                {
+                    "id": ui.id,
+                    "name": ui.name,
+                    "name_zh": ui.name_zh,
+                    "type": ui.type,
+                    "current_value": connection.get(ui.id, ui.default or ""),
+                    "default": ui.default,
+                    "required": ui.required,
+                    "placeholder": ui.placeholder,
+                    "description": ui.description,
+                    "description_zh": ui.description_zh,
+                    "validation": ui.validation,
+                    "options": ui.options,
+                }
+            )
+
+        manifest = {
+            "solution_id": solution_id,
+            "device_id": device_id,
+            "device_type": device_type,
+            "config_file": config_file,
+            "fields": fields,
+        }
+
+        # Save to ~/.sensecraft/deployments/{solution_id}/{device_id}.json
+        deploy_dir = Path.home() / ".sensecraft" / "deployments" / solution_id
+        deploy_dir.mkdir(parents=True, exist_ok=True)
+        manifest_path = deploy_dir / f"{device_id}.json"
+        manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
+        logger.info(f"Saved config manifest: {manifest_path}")
 
     async def _broadcast_update(self, deployment_id: str, message: dict):
         """Broadcast update to WebSocket clients"""

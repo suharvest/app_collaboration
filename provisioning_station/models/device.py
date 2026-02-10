@@ -87,7 +87,7 @@ class DockerService(BaseModel):
     """Docker service definition"""
 
     name: str
-    port: int
+    port: Optional[int] = None
     health_check_endpoint: Optional[str] = None
     required: bool = True
 
@@ -376,6 +376,7 @@ class UserInputConfig(BaseModel):
     validation: Optional[Dict[str, str]] = None
     options: List[Dict[str, str]] = []  # For select type
     row: Optional[int] = None  # Group inputs with same row number on same line
+    reconfigurable: bool = False  # Can be updated post-deploy from Devices page
 
 
 # Preview Configuration

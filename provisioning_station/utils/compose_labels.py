@@ -25,6 +25,7 @@ LABELS = {
     "device_id": f"{LABEL_PREFIX}.device_id",
     "deployed_at": f"{LABEL_PREFIX}.deployed_at",
     "deployed_by": f"{LABEL_PREFIX}.deployed_by",
+    "config_file": f"{LABEL_PREFIX}.config_file",
 }
 
 
@@ -32,9 +33,10 @@ def create_labels(
     solution_id: str,
     device_id: str,
     solution_name: Optional[str] = None,
+    config_file: Optional[str] = None,
 ) -> Dict[str, str]:
     """Create standard SenseCraft labels for a deployment"""
-    return {
+    labels = {
         LABELS["managed"]: "true",
         LABELS["solution_id"]: solution_id,
         LABELS["solution_name"]: solution_name or solution_id,
@@ -42,6 +44,9 @@ def create_labels(
         LABELS["deployed_at"]: datetime.utcnow().isoformat(),
         LABELS["deployed_by"]: "sensecraft-provisioning",
     }
+    if config_file:
+        labels[LABELS["config_file"]] = config_file
+    return labels
 
 
 def inject_labels_to_compose(
@@ -175,10 +180,14 @@ def parse_container_labels(labels: Dict[str, str]) -> Optional[Dict[str, Any]]:
     if labels.get(LABELS["managed"]) != "true":
         return None
 
-    return {
+    result = {
         "solution_id": labels.get(LABELS["solution_id"]),
         "solution_name": labels.get(LABELS["solution_name"]),
         "device_id": labels.get(LABELS["device_id"]),
         "deployed_at": labels.get(LABELS["deployed_at"]),
         "deployed_by": labels.get(LABELS["deployed_by"]),
     }
+    config_file = labels.get(LABELS["config_file"])
+    if config_file:
+        result["config_file"] = config_file
+    return result

@@ -55,6 +55,8 @@ class ManagedApp(BaseModel):
     containers: List[ManagedAppContainer] = []
     # Aggregated ports from all containers
     ports: List[str] = []
+    # Reconfigurable fields (populated from manifest if available)
+    config_fields: Optional[List[Dict]] = None
 
 
 class DeviceInfo(BaseModel):

@@ -69,10 +69,12 @@ class DockerDeployer(BaseDeployer):
             device_id = connection.get("_device_id")
 
             if solution_id and device_id:
+                config_file_label = connection.get("_config_file")
                 labels = create_labels(
                     solution_id=solution_id,
                     device_id=device_id,
                     solution_name=solution_name,
+                    config_file=config_file_label,
                 )
                 temp_compose_file = inject_labels_to_compose_file(compose_file, labels)
                 compose_file = temp_compose_file
@@ -132,8 +134,12 @@ class DockerDeployer(BaseDeployer):
                 progress_callback, "start_services", 0, "Starting services..."
             )
 
-            # Build environment
-            env = docker_config.environment.copy()
+            # Build environment with template substitution
+            from ..utils.template import substitute
+
+            env = {}
+            for k, v in docker_config.environment.items():
+                env[k] = substitute(str(v), connection) or ""
 
             up_args = ["up", "-d"]
             if docker_config.options.get("remove_orphans", False):
