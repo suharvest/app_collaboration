@@ -213,6 +213,7 @@ jobs:
           projectPath: src-tauri
           tagName: ${{ github.ref_name }}
           releaseName: 'SenseCraft Solution ${{ github.ref_name }}'
+          updaterJsonPreferNsis: true
           releaseBody: |
             ## Downloads
 
