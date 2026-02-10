@@ -530,6 +530,25 @@ Use [SenseCraft](https://sensecraft.seeed.cc/ai/) cloud services for AI capabili
 | `recamera_nodered` | reCamera Node-RED |
 | `ssh_deb` | SSH + Debian 包部署 |
 
+#### 步骤描述（自动提取为副标题）
+
+步骤标题下方的**第一段纯文本**会自动显示为卡片的副标题（header 区域）。
+
+**推荐写法**：用一句话说清这步做什么
+
+```markdown
+## Step 1: Deploy Backend {#backend type=docker_deploy ...}
+
+Deploy the data storage and chart display services on your computer.
+
+### Target: Local Deployment {#backend_local ...}
+```
+
+**注意**：
+- 图片行（`![...](...)` ）、列表、表格会被跳过
+- 如果步骤标题下方直接是 `### 接线` 等子节，则不显示副标题
+- 副标题应简洁（1 句话），详细说明放在内容区
+
 #### Target 头格式（用于 docker_deploy 类型）
 
 ```
