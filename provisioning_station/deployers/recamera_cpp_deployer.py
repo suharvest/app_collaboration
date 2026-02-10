@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from ..models.device import DeviceConfig
+from .action_executor import SSHActionExecutor
 from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
@@ -321,39 +322,12 @@ class ReCameraCppDeployer(BaseDeployer):
                         progress_callback, "configure", 100, "Service configured"
                     )
 
-                # Step 7: Configure MQTT (optional)
-                if binary_config.mqtt_config and binary_config.mqtt_config.enable:
-                    await self._report_progress(
-                        progress_callback, "mqtt", 0, "Configuring MQTT..."
-                    )
-
-                    await self._configure_mqtt(
-                        client, binary_config.mqtt_config, password
-                    )
-
-                    await self._report_progress(
-                        progress_callback, "mqtt", 100, "MQTT configured"
-                    )
-
-                # Step 8: Disable conflict services (optional)
-                if (
-                    binary_config.conflict_services
-                    and binary_config.conflict_services.disable
+                # After actions (replaces mqtt config and service disable)
+                ssh_executor = SSHActionExecutor(client, password)
+                if not await self._execute_actions(
+                    "after", config, connection, progress_callback, ssh_executor
                 ):
-                    await self._report_progress(
-                        progress_callback,
-                        "disable",
-                        0,
-                        "Disabling conflicting services...",
-                    )
-
-                    await self._disable_services(
-                        client, binary_config.conflict_services.disable, password
-                    )
-
-                    await self._report_progress(
-                        progress_callback, "disable", 100, "Services disabled"
-                    )
+                    return False
 
                 # Step 9: Start service
                 if binary_config.auto_start:
@@ -715,77 +689,6 @@ done"""
         # Make executable
         cmd = _build_sudo_cmd(password, f"chmod +x {shlex.quote(script_path)}")
         await self._exec_sudo(client, cmd, password, timeout=30)
-
-    async def _configure_mqtt(
-        self,
-        client,
-        mqtt_config,
-        password: str,
-    ) -> None:
-        """Configure Mosquitto for external access."""
-        # Check if already configured
-        check_cmd = "grep -q 'listener 1883 0.0.0.0' /etc/mosquitto/mosquitto.conf 2>/dev/null && echo 'configured'"
-        exit_code, stdout, _ = await self._exec_sudo(
-            client, check_cmd, password, timeout=10
-        )
-
-        if "configured" in stdout:
-            logger.info("MQTT already configured for external access")
-            return
-
-        # Add configuration
-        config_cmds = [
-            _build_sudo_cmd(
-                password,
-                f"sh -c 'echo \"listener {mqtt_config.port} 0.0.0.0\" >> /etc/mosquitto/mosquitto.conf'",
-            ),
-        ]
-
-        if mqtt_config.allow_anonymous:
-            config_cmds.append(
-                _build_sudo_cmd(
-                    password,
-                    "sh -c 'echo \"allow_anonymous true\" >> /etc/mosquitto/mosquitto.conf'",
-                )
-            )
-
-        for cmd in config_cmds:
-            await self._exec_sudo(client, cmd, password, timeout=30)
-
-        # Restart mosquitto (need two separate sudo commands)
-        await self._exec_sudo(
-            client,
-            _build_sudo_cmd(password, "killall mosquitto 2>/dev/null || true"),
-            password,
-            timeout=30,
-        )
-        await asyncio.sleep(1)
-        await self._exec_sudo(
-            client,
-            _build_sudo_cmd(
-                password, "/usr/sbin/mosquitto -c /etc/mosquitto/mosquitto.conf -d"
-            ),
-            password,
-            timeout=30,
-        )
-
-    async def _disable_services(
-        self,
-        client,
-        services: List[str],
-        password: str,
-    ) -> None:
-        """Disable services by renaming S* to K*."""
-        for service in services:
-            # Find and rename S* services
-            shell_script = f"""for svc in /etc/init.d/S*{service}*; do
-    if [ -f "$svc" ]; then
-        new_name=$(echo $svc | sed "s|/S|/K|")
-        mv "$svc" "$new_name" 2>/dev/null || true
-    fi
-done"""
-            cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(shell_script)}")
-            await self._exec_sudo(client, cmd, password, timeout=30)
 
     async def _start_service(
         self,

@@ -10,7 +10,8 @@ import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from ..models.device import DeviceConfig
+from ..models.device import DeviceConfig, NodeRedModuleConfig
+from .action_executor import LocalActionExecutor
 from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,13 @@ class NodeRedDeployer(BaseDeployer):
             await self._report_progress(
                 progress_callback, "prepare", 100, "Preparation complete"
             )
+
+            # Before actions
+            action_executor = LocalActionExecutor()
+            if not await self._execute_actions(
+                "before", config, connection, progress_callback, action_executor
+            ):
+                return False
 
             # Step 1: Load flow.json template
             await self._report_progress(
@@ -135,6 +143,17 @@ class NodeRedDeployer(BaseDeployer):
                 await self._report_progress(
                     progress_callback, "connect", 100, "Connected to Node-RED"
                 )
+
+                # Step 3.5: Ensure required modules are installed
+                if nodered_config.modules:
+                    await self._ensure_modules(
+                        client,
+                        base_url,
+                        nodered_config.modules,
+                        progress_callback,
+                        config,
+                        connection,
+                    )
 
                 # Step 4: Deploy flow
                 await self._report_progress(
@@ -235,6 +254,12 @@ class NodeRedDeployer(BaseDeployer):
             # Post-deploy hook
             await self._post_deploy_hook(config, connection, progress_callback)
 
+            # After actions
+            if not await self._execute_actions(
+                "after", config, connection, progress_callback, action_executor
+            ):
+                return False
+
             return True
 
         except ImportError:
@@ -305,6 +330,251 @@ class NodeRedDeployer(BaseDeployer):
         Subclasses can override to perform post-deployment tasks.
         """
         pass
+
+    async def _ensure_modules(
+        self,
+        client,
+        base_url: str,
+        modules: List[NodeRedModuleConfig],
+        progress_callback: Optional[Callable] = None,
+        config: Optional[DeviceConfig] = None,
+        connection: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Ensure required Node-RED modules are installed.
+
+        Three-level fallback per module:
+          1. Online install via POST /nodes (device has internet)
+          2. Proxy install: download on local machine, SCP to device (subclass hook)
+          3. Pre-packaged offline tarball (if offline_package is set)
+
+        If any module was installed via Level 2/3, restarts Node-RED at the end.
+        Failures are logged as warnings but do not abort deployment.
+        """
+        import httpx
+
+        await self._report_progress(
+            progress_callback,
+            "modules",
+            0,
+            f"Checking {len(modules)} required module(s)...",
+        )
+
+        # Get currently installed modules: GET /nodes returns a flat list of
+        # node-set objects, each with a "module" and "version" field.
+        try:
+            response = await client.get(
+                f"{base_url}/nodes",
+                headers={"Accept": "application/json"},
+            )
+            if response.status_code != 200:
+                logger.warning(
+                    f"Cannot query installed modules: HTTP {response.status_code}"
+                )
+                return
+            nodes_list = response.json()
+        except Exception as e:
+            logger.warning(f"Failed to query installed modules: {e}")
+            return
+
+        # Build {module_name: version} mapping from installed node-sets
+        installed: Dict[str, str] = {}
+        for node_set in nodes_list:
+            mod_name = node_set.get("module")
+            mod_ver = node_set.get("version")
+            if mod_name and mod_ver:
+                installed[mod_name] = mod_ver
+
+        needs_restart = False
+
+        for i, mod in enumerate(modules):
+            progress_pct = int((i / len(modules)) * 100)
+
+            current_ver = installed.get(mod.name)
+            if current_ver:
+                if mod.version and current_ver != mod.version:
+                    # Version mismatch → update
+                    await self._report_progress(
+                        progress_callback,
+                        "modules",
+                        progress_pct,
+                        f"Updating {mod.name} ({current_ver} → {mod.version})...",
+                    )
+                else:
+                    # Already installed, version OK
+                    logger.info(f"Module {mod.name}@{current_ver} already installed")
+                    continue
+            else:
+                ver_str = f"@{mod.version}" if mod.version else ""
+                await self._report_progress(
+                    progress_callback,
+                    "modules",
+                    progress_pct,
+                    f"Installing {mod.name}{ver_str}...",
+                )
+
+            # --- Level 1: Online install via POST /nodes ---
+            payload: Dict[str, str] = {"module": mod.name}
+            if mod.version:
+                payload["version"] = mod.version
+
+            level1_ok = False
+            try:
+                install_response = await client.post(
+                    f"{base_url}/nodes",
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=120.0,  # npm install can be slow on embedded devices
+                )
+                if install_response.status_code in [200, 204]:
+                    logger.info(f"Installed module {mod.name} (online)")
+                    level1_ok = True
+                else:
+                    logger.warning(
+                        f"Online install of {mod.name} failed: "
+                        f"HTTP {install_response.status_code} "
+                        f"{install_response.text[:200]}"
+                    )
+            except httpx.TimeoutException:
+                logger.warning(f"Timeout installing {mod.name} online (>120s)")
+            except Exception as e:
+                logger.warning(f"Online install of {mod.name} failed: {e}")
+
+            if level1_ok:
+                continue
+
+            # --- Level 2: Proxy install (local machine downloads, SCP to device) ---
+            if config and connection:
+                ver_str = f"@{mod.version}" if mod.version else ""
+                await self._report_progress(
+                    progress_callback,
+                    "modules",
+                    progress_pct,
+                    f"Proxy-installing {mod.name}{ver_str} from local machine...",
+                )
+                level2_ok = await self._proxy_install_module(
+                    mod, config, connection, progress_callback
+                )
+                if level2_ok:
+                    logger.info(f"Installed module {mod.name} (proxy)")
+                    needs_restart = True
+                    continue
+
+            # --- Level 3: Pre-packaged offline tarball ---
+            if mod.offline_package and config and connection:
+                await self._report_progress(
+                    progress_callback,
+                    "modules",
+                    progress_pct,
+                    f"Installing {mod.name} from offline package...",
+                )
+                level3_ok = await self._install_from_offline_package(
+                    mod, config, connection, progress_callback
+                )
+                if level3_ok:
+                    logger.info(f"Installed module {mod.name} (offline package)")
+                    needs_restart = True
+                    continue
+
+            # All levels failed
+            logger.warning(f"Failed to install {mod.name} via all methods")
+
+        # If any module was installed via filesystem (Level 2/3), restart Node-RED
+        if needs_restart:
+            await self._report_progress(
+                progress_callback,
+                "modules",
+                90,
+                "Restarting Node-RED to load new modules...",
+            )
+            restarted = await self._restart_nodered_service(
+                config, connection, progress_callback
+            )
+            if restarted:
+                await self._report_progress(
+                    progress_callback,
+                    "modules",
+                    95,
+                    "Node-RED restarted, waiting for ready...",
+                )
+                # Wait for Node-RED to be ready again
+                ready = await self._wait_for_nodered_ready(client, base_url)
+                if not ready:
+                    logger.warning(
+                        "Node-RED did not become ready after restart within timeout"
+                    )
+            else:
+                logger.warning("Failed to restart Node-RED after module install")
+
+        await self._report_progress(
+            progress_callback, "modules", 100, "Module check complete"
+        )
+
+    async def _proxy_install_module(
+        self,
+        module: NodeRedModuleConfig,
+        config: DeviceConfig,
+        connection: Dict[str, Any],
+        progress_callback: Optional[Callable] = None,
+    ) -> bool:
+        """Download module on local machine and push to device via SCP.
+
+        Subclasses should override this for device-specific implementation.
+        Returns True if the module was successfully installed.
+        """
+        return False
+
+    async def _install_from_offline_package(
+        self,
+        module: NodeRedModuleConfig,
+        config: DeviceConfig,
+        connection: Dict[str, Any],
+        progress_callback: Optional[Callable] = None,
+    ) -> bool:
+        """Install module from a pre-packaged offline tarball.
+
+        Subclasses should override this for device-specific implementation.
+        Returns True if the module was successfully installed.
+        """
+        return False
+
+    async def _restart_nodered_service(
+        self,
+        config: Optional[DeviceConfig],
+        connection: Optional[Dict[str, Any]],
+        progress_callback: Optional[Callable] = None,
+    ) -> bool:
+        """Restart Node-RED service to load filesystem-installed modules.
+
+        Subclasses should override this for device-specific implementation.
+        Returns True if Node-RED was successfully restarted.
+        """
+        return False
+
+    async def _wait_for_nodered_ready(
+        self,
+        client,
+        base_url: str,
+        timeout: int = 90,
+    ) -> bool:
+        """Poll GET /flows until Node-RED is ready after restart.
+
+        Default timeout is 90s — embedded devices with limited RAM (e.g. 180MB)
+        can take 40-70s to fully start Node-RED with new modules.
+        """
+        import httpx
+
+        for i in range(timeout):
+            try:
+                resp = await client.get(f"{base_url}/flows", timeout=5.0)
+                if resp.status_code == 200:
+                    logger.info(f"Node-RED ready after {i+1}s")
+                    return True
+            except (httpx.ConnectError, httpx.TimeoutException):
+                pass
+            except Exception:
+                pass
+            await asyncio.sleep(1)
+        return False
 
     async def get_current_flows(
         self,
