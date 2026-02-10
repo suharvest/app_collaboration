@@ -20,6 +20,7 @@ from ..deployers.manual_deployer import ManualDeployer
 from ..deployers.recamera_cpp_deployer import ReCameraCppDeployer
 from ..deployers.recamera_nodered_deployer import ReCameraNodeRedDeployer
 from ..deployers.script_deployer import ScriptDeployer
+from ..deployers.serial_camera_deployer import SerialCameraDeployer
 from ..deployers.ssh_deployer import SSHDeployer
 from ..models.deployment import (
     Deployment,
@@ -57,6 +58,7 @@ class DeploymentEngine:
             "manual": ManualDeployer(),
             "recamera_nodered": ReCameraNodeRedDeployer(),
             "recamera_cpp": ReCameraCppDeployer(),
+            "serial_camera": SerialCameraDeployer(),
         }
 
     def set_websocket_manager(self, manager):

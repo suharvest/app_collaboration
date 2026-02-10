@@ -495,6 +495,12 @@ class SolutionManager:
 
             config = DeviceConfig(**data)
 
+            # Auto-generate steps if not declared in YAML
+            if not config.steps:
+                from ..utils.step_registry import get_steps_for_config
+
+                config.steps = get_steps_for_config(config)
+
             # Cache it
             if solution_id not in self._device_configs:
                 self._device_configs[solution_id] = {}
@@ -835,6 +841,11 @@ class SolutionManager:
             "title": title,
         }
 
+        # Subtitle (plain text for header)
+        subtitle = step.section.subtitle.get(lang)
+        if subtitle:
+            section["subtitle"] = subtitle
+
         # Description (already HTML from parser)
         description = step.section.description.get(lang)
         if description:
@@ -886,6 +897,8 @@ class SolutionManager:
                             config.display.model_dump() if config.display else None
                         ),
                     }
+                if step.type == "serial_camera" and config.serial_camera:
+                    device["serial_camera"] = config.serial_camera.model_dump()
 
         # Build targets (for docker_deploy type)
         if step.targets:

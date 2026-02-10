@@ -236,12 +236,21 @@ class ScriptDeploymentConfig(BaseModel):
 
 
 # Node-RED Configuration
+class NodeRedModuleConfig(BaseModel):
+    """Node-RED module dependency"""
+
+    name: str  # e.g. "node-red-contrib-influxdb"
+    version: Optional[str] = None  # e.g. "0.7.0" or None (any version OK)
+    offline_package: Optional[str] = None  # Pre-packaged tarball path (fallback)
+
+
 class NodeRedConfig(BaseModel):
     """Node-RED deployment configuration for reCamera"""
 
     flow_file: str  # Path to flow.json template
     port: int = 1880  # Node-RED Admin API port
     influxdb_node_id: Optional[str] = None  # ID of InfluxDB config node to update
+    modules: List[NodeRedModuleConfig] = []  # Required Node-RED modules
 
 
 # Binary/Package Deployment Configuration for reCamera
@@ -278,19 +287,47 @@ class InitScriptConfig(BaseModel):
     config_file: Optional[str] = None  # Optional config file path (e.g., /etc/xxx.conf)
 
 
-class MqttExternalConfig(BaseModel):
-    """MQTT external access configuration"""
-
-    enable: bool = False  # Whether to configure external MQTT access
-    port: int = 1883
-    allow_anonymous: bool = True
-
-
 class ConflictServiceConfig(BaseModel):
-    """Conflicting services to stop/disable"""
+    """Conflicting services to stop"""
 
     stop: List[str] = []  # Services to stop (e.g., ["S03node-red", "S91sscma-node"])
-    disable: List[str] = []  # Services to disable (rename S* to K*)
+
+
+class ActionWhen(BaseModel):
+    """Conditional execution for an action"""
+
+    field: str  # user_input field id
+    value: Optional[str] = None  # Execute when field equals this value
+    not_value: Optional[str] = None  # Execute when field does NOT equal this value
+
+
+class ActionCopy(BaseModel):
+    """File copy action"""
+
+    src: str  # Source path (relative to solution directory)
+    dest: str  # Destination path
+    mode: str = "0644"
+
+
+class ActionConfig(BaseModel):
+    """Single action configuration"""
+
+    name: str
+    name_zh: Optional[str] = None
+    run: Optional[str] = None  # Shell command or script
+    copy: Optional[ActionCopy] = None  # File copy
+    sudo: bool = False  # Whether to run with sudo (SSH deployers)
+    when: Optional[ActionWhen] = None  # Conditional execution
+    env: Dict[str, str] = {}  # Extra environment variables
+    timeout: int = 300
+    ignore_error: bool = False
+
+
+class ActionsConfig(BaseModel):
+    """Unified before/after action hooks"""
+
+    before: List[ActionConfig] = []
+    after: List[ActionConfig] = []
 
 
 class BinaryConfig(BaseModel):
@@ -312,9 +349,6 @@ class BinaryConfig(BaseModel):
 
     # Init script configuration
     init_script: Optional[InitScriptConfig] = None
-
-    # MQTT configuration
-    mqtt_config: Optional[MqttExternalConfig] = None
 
     # Conflict service handling
     conflict_services: Optional[ConflictServiceConfig] = None
@@ -383,6 +417,52 @@ class PreviewDisplayConfig(BaseModel):
     show_stats: bool = True
 
 
+# Serial Camera Configuration
+class SerialPortRef(BaseModel):
+    """Reference to a serial port from another device step"""
+
+    port_from_device: Optional[str] = None  # Reference another device's selected port
+    baudrate: int = 115200
+    protocol: str = "sscma_json"  # sscma_json | jsonlines
+
+
+class SerialCameraDisplayConfig(BaseModel):
+    """Display settings for serial camera preview"""
+
+    aspect_ratio: str = "4:3"
+    show_stats: bool = True
+    show_landmarks: bool = True
+
+
+class FaceDatabasePanelConfig(BaseModel):
+    """Face database panel configuration"""
+
+    database_port: SerialPortRef
+    enrollment_duration: float = 5.0
+    min_samples: int = 3
+    min_confidence: float = 0.5
+
+
+class SerialCameraPanelConfig(BaseModel):
+    """A panel attached to the serial camera step"""
+
+    type: str  # "face_database" etc.
+    database_port: Optional[SerialPortRef] = None
+    enrollment_duration: float = 5.0
+    min_samples: int = 3
+    min_confidence: float = 0.5
+
+
+class SerialCameraConfig(BaseModel):
+    """Serial camera preview and panel configuration"""
+
+    camera_port: SerialPortRef
+    display: SerialCameraDisplayConfig = Field(
+        default_factory=SerialCameraDisplayConfig
+    )
+    panels: List[SerialCameraPanelConfig] = []
+
+
 # Main Device Configuration
 class DeviceConfig(BaseModel):
     """Complete device configuration"""
@@ -391,7 +471,7 @@ class DeviceConfig(BaseModel):
     id: str
     name: str
     name_zh: Optional[str] = None
-    type: str  # esp32_usb | docker_local | docker_remote | ssh_deb | script | manual | recamera_nodered | recamera_cpp
+    type: str  # esp32_usb | docker_local | docker_remote | ssh_deb | script | manual | recamera_nodered | recamera_cpp | serial_camera
 
     detection: Optional[DetectionConfig] = None  # Optional for preview type
 
@@ -414,6 +494,15 @@ class DeviceConfig(BaseModel):
     mqtt: Optional[PreviewMqttConfig] = None  # For preview type
     overlay: Optional[PreviewOverlayConfig] = None  # For preview type
     display: Optional[PreviewDisplayConfig] = None  # For preview type
+
+    # Serial camera type configurations
+    serial_camera: Optional["SerialCameraConfig"] = None  # For serial_camera type
+
+    # Unified action hooks (before/after deployment)
+    actions: Optional[ActionsConfig] = None
+
+    # Fixed configuration sections (merged into connection at deploy time)
+    influxdb: Optional[Dict[str, Any]] = None  # Fixed InfluxDB config
 
     # User inputs for interactive deployments
     user_inputs: List[UserInputConfig] = []
