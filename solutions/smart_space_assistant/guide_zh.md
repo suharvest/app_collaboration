@@ -16,6 +16,8 @@
 
 ## 步骤 1: 烧录小智固件 {#face_esp32 type=esp32_usb required=true config=devices/watcher_esp32.yaml}
 
+将语音助手程序写入 Watcher 以启用语音交互。
+
 ### 接线
 
 ![连接设备](gallery/watcher.svg)
@@ -35,6 +37,8 @@
 ---
 
 ## 步骤 2: 烧录人脸识别固件 {#face_himax type=himax_usb required=true config=devices/watcher_himax.yaml}
+
+将人脸识别程序写入 Watcher 的 AI 芯片。
 
 ### 接线
 
@@ -57,6 +61,8 @@
 ---
 
 ## 步骤 3: 配置小智 {#face_configure type=manual required=false}
+
+将 Watcher 连接 WiFi，通过手机 App 绑定账号。
 
 ### 连接 WiFi
 
@@ -81,44 +87,37 @@
 
 ---
 
-## 步骤 4: 人脸录入指南 {#face_enrollment type=manual required=false}
+## 步骤 4: 人脸数据库管理 {#face_enroll type=serial_camera config=devices/face_enroll.yaml required=false}
 
-### 录入人脸
+通过应用界面管理人脸识别数据库。
 
-1. 唤醒小智："小智小智"
-2. 说："记住我的脸，我叫**你的名字**"
-3. 正对摄像头，保持光线充足
-4. 听到"录入成功"即完成
+### 使用方法
 
-### 测试识别
+1. 点击**连接**启动摄像头预览
+2. 画面会显示实时的人脸检测框
+3. 使用下方的**人脸数据库**面板管理已注册的人脸
 
-1. 离开摄像头画面
-2. 再次出现在摄像头前
-3. 设备会说"检测到**你的名字**"
+### 注册新人脸
 
-### 管理人脸
-
-| 操作 | 语音命令 |
-|------|----------|
-| 查看已录入的人 | "你认识谁" |
-| 删除某人 | "删除小明的人脸" |
+1. 点击人脸数据库面板中的**注册**
+2. 输入姓名
+3. 点击**开始采集** — 正对摄像头，保持光线充足
+4. 等待采集完成（约 5 秒）
+5. 新人脸会出现在列表中
 
 ### 故障排查
 
 | 问题 | 解决方法 |
 |------|----------|
-| 录入失败 | 确保光线充足，正对摄像头 |
-| 识别不工作 | 在更好的光线条件下重新录入 |
+| 提示"请先完成第 X 步" | 返回对应步骤选择正确的串口 |
+| 摄像头无画面 | 检查 USB 连接，在步骤 2 中刷新端口 |
+| 注册失败 | 确保光线充足，正对摄像头，重新尝试 |
 
 ### 部署完成
 
-人脸识别已就绪！
+人脸识别数据库已就绪！
 
-**测试方法：**
-- 说「记住我的脸，我叫小明」录入人脸
-- 下次进入镜头范围时，小智会主动打招呼
-
-**语音命令：** 「你认识谁」、「删除小明的人脸」
+**管理人脸**可随时在面板中进行 — 注册、重命名或删除条目。
 
 ---
 
@@ -141,6 +140,8 @@
 
 ## 步骤 1: 烧录 Watcher 固件 {#display_watcher type=esp32_usb required=true config=devices/display_watcher.yaml}
 
+将语音助手程序写入 Watcher，为投屏功能做准备。
+
 ### 接线
 
 ![连接设备](gallery/watcher.svg)
@@ -159,6 +160,8 @@
 ---
 
 ## 步骤 2: 部署投屏服务 {#display_service type=docker_deploy required=true config=devices/display_local.yaml}
+
+启动投屏服务，将对话内容显示在屏幕上。
 
 ### 部署目标: 本机部署 {#display_service_local type=local config=devices/display_local.yaml}
 

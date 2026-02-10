@@ -16,6 +16,8 @@ Add face recognition to your Xiaozhi, letting it recognize family and friends.
 
 ## Step 1: Flash Xiaozhi Firmware {#face_esp32 type=esp32_usb required=true config=devices/watcher_esp32.yaml}
 
+Write the voice assistant program to the Watcher to enable voice interaction.
+
 ### Wiring
 
 ![Connect Device](gallery/watcher.svg)
@@ -35,6 +37,8 @@ Add face recognition to your Xiaozhi, letting it recognize family and friends.
 ---
 
 ## Step 2: Flash Face Recognition Firmware {#face_himax type=himax_usb required=true config=devices/watcher_himax.yaml}
+
+Write the face recognition program to the Watcher's AI chip.
 
 ### Wiring
 
@@ -57,6 +61,8 @@ Add face recognition to your Xiaozhi, letting it recognize family and friends.
 ---
 
 ## Step 3: Configure Xiaozhi {#face_configure type=manual required=false}
+
+Connect the Watcher to WiFi and bind it to your account using the mobile app.
 
 ### Connect to WiFi
 
@@ -81,44 +87,37 @@ Wake up the device by saying "Xiaozhi Xiaozhi", then say "Remember my face, my n
 
 ---
 
-## Step 4: Face Enrollment Guide {#face_enrollment type=manual required=false}
+## Step 4: Face Database Management {#face_enroll type=serial_camera config=devices/face_enroll.yaml required=false}
 
-### Enroll a Face
+Manage the face recognition database through the app interface.
 
-1. Wake up Xiaozhi: "Xiaozhi Xiaozhi"
-2. Say: "Remember my face, my name is **your name**"
-3. Face the camera directly with good lighting
-4. Wait for "Enrollment successful" confirmation
+### How to Use
 
-### Test Recognition
+1. Click **Connect** to start the camera preview
+2. You'll see a live feed with face detection boxes
+3. Use the **Face Database** panel below to manage enrolled faces
 
-1. Leave the camera view
-2. Reappear in front of the camera
-3. Device will say "Detected **your name**"
+### Register a New Face
 
-### Manage Faces
-
-| Action | Voice Command |
-|--------|---------------|
-| List enrolled people | "Who do you know" |
-| Delete someone | "Delete Mike's face" |
+1. Click **Register** in the Face Database panel
+2. Enter a name for the person
+3. Click **Start Capture** — face the camera with good lighting
+4. Wait for the capture to complete (5 seconds)
+5. The new face will appear in the table
 
 ### Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| Enrollment failed | Ensure good lighting, face the camera directly |
-| Recognition not working | Re-enroll with better lighting conditions |
+| "Please complete Step X first" | Go back and select the correct serial port in the indicated step |
+| Camera not showing | Check USB connection, try refreshing ports in Step 2 |
+| Enrollment failed | Ensure good lighting, face the camera directly, try again |
 
 ### Deployment Complete
 
-Face recognition is ready!
+Face recognition database is ready!
 
-**Test it:**
-- Say "Remember my face, my name is John" to enroll
-- Next time you appear, Xiaozhi will greet you
-
-**Voice commands:** "Who do you know", "Delete John's face"
+**Manage faces** directly from this panel — register, rename, or delete entries at any time.
 
 ---
 
@@ -141,6 +140,8 @@ Cast Xiaozhi conversations to TV or large display, ideal for exhibition halls, m
 
 ## Step 1: Flash Watcher Firmware {#display_watcher type=esp32_usb required=true config=devices/display_watcher.yaml}
 
+Write the voice assistant program to the Watcher for display casting.
+
 ### Wiring
 
 ![Connect Device](gallery/watcher.svg)
@@ -159,6 +160,8 @@ Cast Xiaozhi conversations to TV or large display, ideal for exhibition halls, m
 ---
 
 ## Step 2: Deploy Display Service {#display_service type=docker_deploy required=true config=devices/display_local.yaml}
+
+Start the display service that shows conversations on your screen.
 
 ### Target: Local Deployment {#display_service_local type=local config=devices/display_local.yaml}
 

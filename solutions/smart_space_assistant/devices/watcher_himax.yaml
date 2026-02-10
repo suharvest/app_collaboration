@@ -99,31 +99,6 @@ user_inputs:
     description: Select AI models to flash with the base firmware
     description_zh: 选择要与基础固件一起烧录的 AI 模型
 
-steps:
-  - id: detect
-    name: Detect Device
-    name_zh: 检测设备
-    description: Auto-scan USB ports for Himax WE2
-    description_zh: 自动扫描 USB 端口查找 Himax WE2
-    optional: false
-    default: true
-
-  - id: flash
-    name: Flash Firmware & Models
-    name_zh: 烧录固件和模型
-    description: Write base firmware and selected AI models
-    description_zh: 写入基础固件和选定的 AI 模型
-    optional: false
-    default: true
-
-  - id: verify
-    name: Verify
-    name_zh: 验证
-    description: Verify firmware installation
-    description_zh: 验证固件安装
-    optional: true
-    default: true
-
 post_deployment:
   reset_device: false
   wait_for_ready: 5
