@@ -110,7 +110,7 @@
   }
 
   .solution-card {
-    @apply bg-card rounded-lg overflow-hidden shadow-sm border border-transparent cursor-pointer;
+    @apply bg-card rounded-lg overflow-hidden shadow-sm border border-transparent cursor-pointer flex flex-col;
     transition: all 0.3s ease;
   }
 
@@ -124,7 +124,7 @@
   }
 
   .solution-card-content {
-    @apply p-5;
+    @apply p-5 flex flex-col flex-1;
   }
 
   .solution-card-title {
@@ -132,7 +132,7 @@
   }
 
   .solution-card-description {
-    @apply text-sm text-text-secondary mb-4 line-clamp-2;
+    @apply text-sm text-text-secondary mb-4 line-clamp-2 flex-1;
   }
 
   .solution-card-meta {
@@ -2169,6 +2169,10 @@ button.spinning {
 
 .face-database-header {
   @apply flex items-center justify-between mb-3;
+}
+
+.face-database-header-actions {
+  @apply flex items-center gap-2;
 }
 
 .face-database-title {

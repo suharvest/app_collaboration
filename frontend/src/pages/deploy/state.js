@@ -3,6 +3,8 @@
  * Centralized state for the deployment page
  */
 
+import { serialCameraApi } from '../../modules/api.js';
+
 // Current solution data
 let currentSolution = null;
 
@@ -195,8 +197,11 @@ export function cleanupState() {
   Object.values(previewInstances).forEach(preview => preview?.destroy());
   previewInstances = {};
 
-  // Cleanup serial camera instances
+  // Cleanup serial camera instances - release backend sessions first
   Object.values(serialCameraInstances).forEach(instance => {
+    if (instance?.sessionId) {
+      serialCameraApi.deleteSession(instance.sessionId).catch(() => {});
+    }
     instance?.canvas?.destroy();
     instance?.panel?.destroy();
   });

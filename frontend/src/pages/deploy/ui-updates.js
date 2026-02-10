@@ -13,6 +13,7 @@ import {
 } from './state.js';
 import {
   getDeviceById,
+  getFilteredDevices,
   getStatusClass,
   getStatusIcon,
   getStatusText,
@@ -20,6 +21,7 @@ import {
   getDeployButtonContent,
   areAllRequiredDevicesCompleted,
 } from './utils.js';
+import { escapeHtml } from '../../modules/utils.js';
 import {
   renderSelectedDeviceContent,
   renderContentArea,
@@ -70,6 +72,49 @@ export function updateSectionUI(deviceId) {
 
   // Update post-deployment section if all required devices are now complete
   updatePostDeploymentUI();
+
+  // Update port warnings in serial_camera sections that reference this device
+  updateDependentSerialCameraPortStatus(deviceId);
+}
+
+/**
+ * Update port warnings in serial_camera sections that depend on the changed device
+ */
+function updateDependentSerialCameraPortStatus(changedDeviceId) {
+  const currentSolution = getCurrentSolution();
+  const deployment = currentSolution?.deployment || {};
+  const devices = getFilteredDevices(deployment.devices || []);
+  const deviceStates = getDeviceStates();
+
+  for (const device of devices) {
+    if (device.type !== 'serial_camera') continue;
+
+    const serialCamera = device.serial_camera || {};
+    const cameraRef = serialCamera.camera_port?.port_from_device;
+    const panels = serialCamera.panels || [];
+    const dbRefs = panels.map(p => p.database_port?.port_from_device).filter(Boolean);
+
+    // Only update if this serial_camera references the changed device
+    if (cameraRef !== changedDeviceId && !dbRefs.includes(changedDeviceId)) continue;
+
+    // Re-evaluate port warnings
+    const portWarnings = [];
+    if (cameraRef && !deviceStates[cameraRef]?.port) {
+      portWarnings.push(t('serialCamera.portMissing', { step: cameraRef }));
+    }
+    for (const ref of dbRefs) {
+      if (!deviceStates[ref]?.port) {
+        portWarnings.push(t('serialCamera.portMissing', { step: ref }));
+      }
+    }
+
+    const container = document.getElementById(`port-status-${device.id}`);
+    if (container) {
+      container.innerHTML = portWarnings.length > 0
+        ? `<div class="port-status-warning">${portWarnings.map(w => `<div>${escapeHtml(w)}</div>`).join('')}</div>`
+        : `<div class="port-status-ready">${t('serialCamera.portsReady')}</div>`;
+    }
+  }
 }
 
 /**
