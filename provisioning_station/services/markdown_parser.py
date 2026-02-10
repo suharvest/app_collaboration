@@ -104,6 +104,9 @@ class SectionContent:
     """Section content compatible with existing frontend structure."""
 
     title: Localized[str] = field(default_factory=lambda: Localized())
+    subtitle: Localized[str] = field(
+        default_factory=lambda: Localized()
+    )  # Plain text extracted from first paragraph (for header subtitle)
     description: Localized[str] = field(
         default_factory=lambda: Localized()
     )  # HTML content
@@ -195,6 +198,7 @@ VALID_STEP_TYPES = {
     "preview",
     "recamera_cpp",
     "recamera_nodered",
+    "serial_camera",
 }
 
 # Regex patterns
@@ -369,6 +373,30 @@ def md_to_html(content: str) -> str:
     return markdown.markdown(content, extensions=["tables", "fenced_code", "nl2br"])
 
 
+def extract_subtitle(raw_markdown: str) -> str:
+    """Extract the first paragraph of plain text from raw markdown.
+
+    Scans lines, skipping blanks/images/headings/tables/lists, and returns
+    the first line that is regular prose text with inline markdown stripped.
+    Used as a short subtitle for deployment step headers.
+    """
+    for line in raw_markdown.strip().split("\n"):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        # Skip images, headings, table rows, unordered lists, ordered lists
+        if stripped.startswith(("![", "#", "|", "- ", "* ")) or re.match(
+            r"^\d+\.", stripped
+        ):
+            continue
+        # Strip inline markdown: [text](url) → text, **bold** → bold, `code` → code
+        text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", stripped)
+        text = re.sub(r"[*_`]+", "", text).strip()
+        if text:
+            return text
+    return ""
+
+
 def parse_subsections(content: str) -> dict[str, str]:
     """Parse subsections (Prerequisites, Wiring, Troubleshooting) from step content.
 
@@ -468,8 +496,10 @@ def parse_deployment_step(
         )
 
     # Build section content with Localized fields
+    en_subtitle = extract_subtitle(subsections_en["main"])
     section = SectionContent(
         title=Localized({"en": title}),
+        subtitle=Localized({"en": en_subtitle} if en_subtitle else {}),
         description=Localized(
             {
                 "en": md_to_html(subsections_en["main"]),
@@ -485,6 +515,9 @@ def parse_deployment_step(
     # Add Chinese content if available
     if subsections_zh.get("main"):
         section.description.set("zh", md_to_html(subsections_zh["main"]))
+        zh_subtitle = extract_subtitle(subsections_zh["main"])
+        if zh_subtitle:
+            section.subtitle.set("zh", zh_subtitle)
     if subsections_zh.get("troubleshoot"):
         section.troubleshoot.set("zh", md_to_html(subsections_zh["troubleshoot"]))
 
@@ -783,6 +816,9 @@ def _parse_guide_content(content: str, lang: str, result: ParseResult) -> None:
                             step.section.description.set(
                                 lang, md_to_html(subsections["main"])
                             )
+                            sub = extract_subtitle(subsections["main"])
+                            if sub:
+                                step.section.subtitle.set(lang, sub)
                             step.section.troubleshoot.set(
                                 lang, md_to_html(subsections.get("troubleshoot", ""))
                             )
@@ -1279,6 +1315,7 @@ def parse_guide_multilang(
                 config_file=base_step.config_file,
                 section=SectionContent(
                     title=Localized(),
+                    subtitle=Localized(),
                     description=Localized(),
                     troubleshoot=Localized(),
                     wiring=None,
@@ -1300,6 +1337,10 @@ def parse_guide_multilang(
                         if title:
                             merged_step.title.set(lang, title)
                             merged_step.section.title.set(lang, title)
+                        # Merge subtitle
+                        sub = lang_step.section.subtitle.get(lang)
+                        if sub:
+                            merged_step.section.subtitle.set(lang, sub)
                         # Merge description
                         desc = lang_step.section.description.get(lang)
                         if desc:

@@ -33,11 +33,13 @@ from .routers import (
     docker_devices,
     preview,
     restore,
+    serial_camera,
     solutions,
     versions,
     websocket,
 )
 from .services.mqtt_bridge import get_mqtt_bridge, is_mqtt_available
+from .services.serial_camera_service import get_serial_camera_manager
 from .services.solution_manager import solution_manager
 from .services.stream_proxy import get_stream_proxy
 
@@ -90,6 +92,12 @@ async def _async_cleanup():
             logger.debug("MQTT bridge stopped")
     except Exception as e:
         logger.debug(f"MQTT bridge cleanup error: {e}")
+
+    try:
+        get_serial_camera_manager().close_all()
+        logger.debug("Serial camera sessions closed")
+    except Exception as e:
+        logger.debug(f"Serial camera cleanup error: {e}")
 
     _cleanup_done = True
     logger.debug("Async cleanup completed")
@@ -154,6 +162,7 @@ app.include_router(device_management.router)
 app.include_router(preview.router)
 app.include_router(docker_devices.router)
 app.include_router(restore.router)
+app.include_router(serial_camera.router)
 
 # Serve static frontend files
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
