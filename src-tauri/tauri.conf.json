@@ -11,6 +11,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "category": "Utility",
     "copyright": "Copyright (c) 2024 Seeed Studio",
     "icon": [
@@ -76,6 +77,15 @@
   "plugins": {
     "shell": {
       "open": true
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ0MjYxNzVCMTFDOEE0N0QKUldSOXBNZ1JXeGNtMVBBZVk5WklzUDB5N0FlblYvdVQ4TnNEM2dWNWZhY2JsWU90VmpyS2ZqcnkK",
+      "endpoints": [
+        "https://github.com/suharvest/app_collaboration/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

@@ -7,6 +7,7 @@ import { router } from './modules/router.js';
 import { i18n, t } from './modules/i18n.js';
 import { toast } from './modules/toast.js';
 import { waitForBackendReady } from './modules/api.js';
+import { updater } from './modules/updater.js';
 
 // Import pages
 import { renderSolutionsPage } from './pages/solutions.js';
@@ -68,6 +69,14 @@ async function initApp() {
       app.style.display = '';
       // Remove splash from DOM after transition
       setTimeout(() => splash.remove(), 400);
+    }
+
+    // Check for updates silently after app is ready (Tauri only)
+    if (window.__TAURI__) {
+      // Delay update check to not interfere with startup
+      setTimeout(() => {
+        updater.checkForUpdates(true);
+      }, 3000);
     }
   } catch (error) {
     console.error('Application initialization failed:', error);
