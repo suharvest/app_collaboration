@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 from ..models.device import DeviceConfig
+from .action_executor import LocalActionExecutor
 from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,13 @@ class ESP32Deployer(BaseDeployer):
             await self._report_progress(
                 progress_callback, "detect", 100, "Device detected successfully"
             )
+
+            # Before actions
+            action_executor = LocalActionExecutor()
+            if not await self._execute_actions(
+                "before", config, connection, progress_callback, action_executor
+            ):
+                return False
 
             # Step 2: Optional erase
             if config.get_step_option("erase", default=False):
@@ -223,6 +231,12 @@ class ESP32Deployer(BaseDeployer):
             await self._report_progress(
                 progress_callback, "verify", 100, "Deployment complete"
             )
+
+            # After actions
+            if not await self._execute_actions(
+                "after", config, connection, progress_callback, action_executor
+            ):
+                return False
 
             # Reset device if configured
             if config.post_deployment.reset_device:

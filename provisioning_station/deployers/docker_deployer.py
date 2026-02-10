@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, Optional
 
 from ..models.device import DeviceConfig
 from ..utils.compose_labels import create_labels, inject_labels_to_compose_file
+from .action_executor import LocalActionExecutor
 from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,13 @@ class DockerDeployer(BaseDeployer):
                 temp_compose_file = inject_labels_to_compose_file(compose_file, labels)
                 compose_file = temp_compose_file
                 logger.info("Injected SenseCraft labels into compose file")
+
+            # Before actions
+            executor = LocalActionExecutor()
+            if not await self._execute_actions(
+                "before", config, connection, progress_callback, executor
+            ):
+                return False
 
             # Step 1: Pull images
             await self._report_progress(
@@ -200,6 +208,12 @@ class DockerDeployer(BaseDeployer):
             await self._report_progress(
                 progress_callback, "health_check", 100, "All services healthy"
             )
+
+            # After actions
+            if not await self._execute_actions(
+                "after", config, connection, progress_callback, executor
+            ):
+                return False
 
             # Open browser if configured
             if config.post_deployment.open_browser and config.post_deployment.url:

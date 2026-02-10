@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 from ..models.device import DeviceConfig
+from .action_executor import LocalActionExecutor
 from .base import BaseDeployer
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,13 @@ class ScriptDeployer(BaseDeployer):
             await self._report_progress(
                 progress_callback, "validate", 100, f"Working directory: {working_dir}"
             )
+
+            # Before actions
+            action_executor = LocalActionExecutor()
+            if not await self._execute_actions(
+                "before", config, connection, progress_callback, action_executor
+            ):
+                return False
 
             # Step 2: Execute setup commands
             if script_config.setup_commands:
@@ -201,6 +209,12 @@ class ScriptDeployer(BaseDeployer):
                 await self._report_progress(
                     progress_callback, "start", 100, "Service started successfully"
                 )
+
+            # After actions
+            if not await self._execute_actions(
+                "after", config, connection, progress_callback, action_executor
+            ):
+                return False
 
             return True
 
