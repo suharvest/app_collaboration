@@ -16,11 +16,16 @@ Pre-deployment state check:
 import asyncio
 import logging
 import shlex
+import shutil
+import subprocess
+import tempfile
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from ..models.device import DeviceConfig
+from ..models.device import DeviceConfig, NodeRedModuleConfig
 from .nodered_deployer import NodeRedDeployer
 
 logger = logging.getLogger(__name__)
@@ -95,6 +100,9 @@ NODERED_SERVICES = [
 ]
 
 
+DEFAULT_SSCMA_CLIENT_ID = "d4edfe2d22b78af8"
+
+
 class ReCameraNodeRedDeployer(NodeRedDeployer):
     """Deploy Node-RED flows to reCamera via Admin HTTP API.
 
@@ -104,7 +112,10 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
     - Restores and enables Node-RED related services
     - Updates InfluxDB configuration in the flow
     - Sets InfluxDB credentials via Node-RED API
+    - Template variable replacement ({{influxdb_host}}, {{sscma_client_id}})
     """
+
+    _sscma_client_id: str = DEFAULT_SSCMA_CLIENT_ID
 
     async def _pre_deploy_hook(
         self,
@@ -191,6 +202,11 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
                     await self._restore_nodered_services(client, ssh_password)
                     await self._kill_cpp_processes(client, ssh_password)
 
+                # Step 3: Sync device clock if needed
+                # reCamera via USB has no internet → NTP fails → clock stuck at 1970
+                # InfluxDB rejects writes outside its retention window
+                await self._sync_device_clock(client, ssh_password, progress_callback)
+
                 await self._report_progress(
                     progress_callback, "prepare", 90, "Device ready for Node-RED"
                 )
@@ -202,6 +218,9 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
             logger.warning("paramiko not available, skipping service management")
         except Exception as e:
             logger.warning(f"Service management failed (non-fatal): {e}")
+
+        # Discover SSCMA client ID from current flows
+        await self._discover_sscma_client_id(config, connection)
 
         return True
 
@@ -458,6 +477,58 @@ done"""
         for cmd in kill_cmds:
             await self._exec_cmd(client, cmd)
 
+    async def _sync_device_clock(
+        self,
+        client,
+        password: str,
+        progress_callback: Optional[Callable] = None,
+    ) -> None:
+        """Sync device clock from host machine if device time is stale.
+
+        reCamera connected via USB has no internet, so NTP cannot sync.
+        The clock may be stuck at 1970-01-01 (epoch). InfluxDB rejects
+        writes with timestamps outside its retention window (e.g. 7 days),
+        so we must fix the clock before deploying flows that write data.
+
+        Uses the host machine's UTC time as the reference.
+        """
+        import datetime
+
+        # Read device's current year
+        result = await self._exec_cmd(client, "date +%Y")
+        if not result:
+            return
+
+        try:
+            device_year = int(result.strip())
+        except ValueError:
+            return
+
+        current_year = datetime.datetime.now(datetime.timezone.utc).year
+
+        if device_year >= current_year - 1:
+            # Clock is reasonably current (within 1 year), skip sync
+            logger.info(f"Device clock OK (year={device_year})")
+            return
+
+        # Device clock is stale — sync from host
+        await self._report_progress(
+            progress_callback,
+            "prepare",
+            85,
+            f"Syncing device clock (stuck at {device_year})...",
+        )
+
+        utc_now = datetime.datetime.now(datetime.timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        cmd = _build_sudo_cmd(password, f"date -s {shlex.quote(utc_now)}")
+        result = await self._exec_cmd(client, cmd)
+        if result:
+            logger.info(f"Device clock synced to: {utc_now} UTC")
+        else:
+            logger.warning("Failed to sync device clock")
+
     async def _exec_cmd(
         self,
         client,
@@ -475,13 +546,51 @@ done"""
             logger.debug(f"Command failed: {e}")
             return None
 
+    async def _discover_sscma_client_id(
+        self,
+        config: DeviceConfig,
+        connection: Dict[str, Any],
+    ) -> None:
+        """Discover the SSCMA config node ID from the current Node-RED flows.
+
+        The SSCMA config node (type "sscma") is created by the reCamera system
+        and has a unique ID. Our flow template references it via {{sscma_client_id}}.
+        """
+        recamera_ip = connection.get("recamera_ip")
+        if not recamera_ip:
+            return
+
+        nodered_port = config.nodered.port if config.nodered else 1880
+        flows = await self.get_current_flows(recamera_ip, nodered_port)
+        if not flows:
+            logger.info(
+                f"Could not fetch current flows, using default SSCMA client ID: "
+                f"{self._sscma_client_id}"
+            )
+            return
+
+        for node in flows:
+            if node.get("type") == "sscma":
+                self._sscma_client_id = node["id"]
+                logger.info(f"Discovered SSCMA client ID: {self._sscma_client_id}")
+                return
+
+        logger.info(
+            f"No SSCMA config node found in current flows, "
+            f"using default: {self._sscma_client_id}"
+        )
+
     async def _update_flow_config(
         self,
         flow_data: List[Dict],
         config: DeviceConfig,
         connection: Dict[str, Any],
     ) -> tuple[List[Dict], Dict[str, Dict]]:
-        """Update InfluxDB configuration in the flow.
+        """Update flow configuration with template variables and InfluxDB settings.
+
+        Template variables replaced in JSON text:
+        - {{influxdb_host}}: InfluxDB server IP
+        - {{sscma_client_id}}: SSCMA config node ID (discovered or default)
 
         Expected connection parameters:
         - influxdb_url: InfluxDB URL (e.g., "http://192.168.1.100:8086")
@@ -489,15 +598,34 @@ done"""
         - influxdb_org: InfluxDB Organization
         - influxdb_bucket: InfluxDB Bucket name
         """
+        import json
+
         nodered_config = config.nodered
         credentials = {}
 
-        # Get InfluxDB connection parameters
+        # Get InfluxDB parameters from config (YAML fixed values) + connection (user input)
+        influxdb_cfg = config.influxdb or {}
+        influxdb_host = connection.get("influxdb_host", "")
+        influxdb_port = influxdb_cfg.get("port", 8086)
+        influxdb_token = influxdb_cfg.get("token") or connection.get("influxdb_token")
+        influxdb_org = influxdb_cfg.get("org") or connection.get(
+            "influxdb_org", "seeed"
+        )
+        influxdb_bucket = influxdb_cfg.get("bucket") or connection.get(
+            "influxdb_bucket", "recamera"
+        )
         influxdb_url = connection.get("influxdb_url")
-        influxdb_token = connection.get("influxdb_token")
-        influxdb_org = connection.get("influxdb_org", "seeed")
-        influxdb_bucket = connection.get("influxdb_bucket", "recamera")
+        if not influxdb_url and influxdb_host:
+            influxdb_url = f"http://{influxdb_host}:{influxdb_port}"
 
+        # Step 1: Template variable replacement on serialized JSON
+        flow_text = json.dumps(flow_data)
+        if influxdb_host:
+            flow_text = flow_text.replace("{{influxdb_host}}", influxdb_host)
+        flow_text = flow_text.replace("{{sscma_client_id}}", self._sscma_client_id)
+        flow_data = json.loads(flow_text)
+
+        # Step 2: Structured InfluxDB config node updates
         influxdb_node_id = nodered_config.influxdb_node_id if nodered_config else None
         updated = False
 
@@ -535,6 +663,251 @@ done"""
             logger.warning("No InfluxDB config node found in flow")
 
         return flow_data, credentials
+
+    # --- Module proxy install / offline fallback hooks ---
+
+    @asynccontextmanager
+    async def _ssh_connect(self, connection: Dict[str, Any]):
+        """Create a temporary SSH connection from connection parameters."""
+        import paramiko
+
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        recamera_ip = connection.get("recamera_ip")
+        await asyncio.to_thread(
+            client.connect,
+            hostname=recamera_ip,
+            port=connection.get("ssh_port", 22),
+            username=connection.get("ssh_username", "recamera"),
+            password=connection.get("ssh_password"),
+            timeout=10,
+        )
+        try:
+            yield client
+        finally:
+            client.close()
+
+    async def _proxy_install_module(
+        self,
+        module: NodeRedModuleConfig,
+        config: DeviceConfig,
+        connection: Dict[str, Any],
+        progress_callback=None,
+    ) -> bool:
+        """Download module on local machine, then SCP to reCamera.
+
+        Steps:
+        1. npm install in a temp dir on the local machine
+        2. Check for native dependencies (binding.gyp) — abort if found
+        3. tar + SCP to device ~/.node-red/
+        4. Extract and update package.json on device
+        """
+        recamera_ip = connection.get("recamera_ip")
+        ssh_password = connection.get("ssh_password")
+        if not recamera_ip or not ssh_password:
+            logger.warning("Proxy install: missing SSH credentials")
+            return False
+
+        # Check npm is available locally
+        if not shutil.which("npm"):
+            logger.warning("Proxy install: npm not found on local machine")
+            return False
+
+        tmpdir = None
+        try:
+            tmpdir = tempfile.mkdtemp(prefix="nodered-proxy-")
+            pkg_spec = (
+                f"{module.name}@{module.version}" if module.version else module.name
+            )
+
+            # Step 1: npm install locally
+            logger.info(f"Proxy: downloading {pkg_spec} on local machine...")
+            result = await asyncio.to_thread(
+                subprocess.run,
+                [
+                    "npm",
+                    "install",
+                    pkg_spec,
+                    "--production",
+                    "--ignore-scripts",
+                    "--no-optional",
+                ],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if result.returncode != 0:
+                logger.warning(
+                    f"Proxy: npm install failed for {pkg_spec}: {result.stderr[:300]}"
+                )
+                return False
+
+            node_modules = Path(tmpdir) / "node_modules"
+            if not node_modules.exists():
+                logger.warning("Proxy: node_modules not created after npm install")
+                return False
+
+            # Step 2: Check for native dependencies (binding.gyp)
+            binding_files = list(node_modules.rglob("binding.gyp"))
+            if binding_files:
+                logger.warning(
+                    f"Module {module.name} has native dependencies "
+                    f"({len(binding_files)} binding.gyp found), "
+                    f"cannot proxy install for different architecture"
+                )
+                return False
+
+            # Step 3: Create tarball
+            tarball = Path(tmpdir) / "module.tar.gz"
+            tar_result = await asyncio.to_thread(
+                subprocess.run,
+                ["tar", "czf", str(tarball), "-C", str(tmpdir), "node_modules"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if tar_result.returncode != 0:
+                logger.warning(f"Proxy: tar failed: {tar_result.stderr[:200]}")
+                return False
+
+            # Step 4: SCP to device + extract into userDir
+            return await self._push_tarball_to_device(
+                tarball, module, connection, progress_callback
+            )
+
+        except subprocess.TimeoutExpired:
+            logger.warning(f"Proxy: npm install timed out for {module.name}")
+            return False
+        except Exception as e:
+            logger.warning(f"Proxy install failed for {module.name}: {e}")
+            return False
+        finally:
+            if tmpdir:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+
+    async def _install_from_offline_package(
+        self,
+        module: NodeRedModuleConfig,
+        config: DeviceConfig,
+        connection: Dict[str, Any],
+        progress_callback=None,
+    ) -> bool:
+        """Install module from a pre-packaged offline tarball."""
+        if not connection.get("ssh_password"):
+            return False
+
+        tarball_path = config.get_asset_path(module.offline_package)
+        if not tarball_path or not Path(tarball_path).exists():
+            logger.warning(f"Offline package not found: {module.offline_package}")
+            return False
+
+        return await self._push_tarball_to_device(
+            Path(tarball_path), module, connection, progress_callback
+        )
+
+    async def _push_tarball_to_device(
+        self,
+        tarball: Path,
+        module: NodeRedModuleConfig,
+        connection: Dict[str, Any],
+        progress_callback=None,
+    ) -> bool:
+        """SCP a tarball to device and extract into Node-RED userDir (~/.node-red/).
+
+        Also updates ~/.node-red/package.json to register the module so
+        Node-RED loads it on restart.
+        """
+        remote_tmp = "/tmp/_nodered_module.tar.gz"
+        # Node-RED userDir — owned by recamera user, no sudo needed
+        nodered_user_dir = "$HOME/.node-red"
+
+        try:
+            async with self._ssh_connect(connection) as client:
+                # SCP upload
+                sftp = await asyncio.to_thread(client.open_sftp)
+                try:
+                    await asyncio.to_thread(sftp.put, str(tarball), remote_tmp)
+                finally:
+                    sftp.close()
+
+                logger.info(
+                    f"Tarball uploaded to device ({tarball.stat().st_size} bytes)"
+                )
+
+                # Extract into userDir (no sudo needed, owned by recamera)
+                extract_cmd = f"tar xzf {remote_tmp} -C {nodered_user_dir}"
+                result = await self._exec_cmd(client, extract_cmd, timeout=60)
+
+                # Update package.json to register the module
+                version_spec = f"~{module.version}" if module.version else "*"
+                update_pkg_script = (
+                    f"cd {nodered_user_dir} && "
+                    f'python3 -c "'
+                    f"import json; "
+                    f"p = json.load(open('package.json')); "
+                    f"p.setdefault('dependencies', dict())"
+                    f"['{module.name}'] = '{version_spec}'; "
+                    f"json.dump(p, open('package.json', 'w'), indent=2)"
+                    f'" 2>/dev/null || '
+                    # Fallback: use sed if python3 not available
+                    f'sed -i \'"dependencies":/a\\    "{module.name}": "{version_spec}",\' '
+                    f"{nodered_user_dir}/package.json"
+                )
+                await self._exec_cmd(client, update_pkg_script, timeout=10)
+
+                # Verify extraction
+                check_cmd = (
+                    f"ls {nodered_user_dir}/node_modules/{module.name}/package.json "
+                    f"2>/dev/null && echo 'EXTRACTED_OK'"
+                )
+                check_result = await self._exec_cmd(client, check_cmd)
+                if check_result and "EXTRACTED_OK" in check_result:
+                    logger.info(f"Module {module.name} extracted to device userDir")
+                else:
+                    logger.warning(
+                        f"Module {module.name} extraction could not be verified"
+                    )
+
+                # Clean up remote tarball
+                await self._exec_cmd(client, f"rm -f {remote_tmp}")
+                return True
+
+        except Exception as e:
+            logger.warning(f"Push tarball to device failed: {e}")
+            return False
+
+    async def _restart_nodered_service(
+        self,
+        config=None,
+        connection=None,
+        progress_callback=None,
+    ) -> bool:
+        """Restart Node-RED on reCamera by killing the process.
+
+        The init script (S03node-red) will auto-restart it.
+        Node-RED runs as the 'recamera' user, so no sudo needed.
+        """
+        if not connection:
+            return False
+
+        try:
+            async with self._ssh_connect(connection) as client:
+                # Kill node-red process — init script auto-restarts it
+                kill_cmd = "kill $(pidof node-red) 2>/dev/null && echo 'KILLED'"
+                result = await self._exec_cmd(client, kill_cmd, timeout=10)
+                if result and "KILLED" in result:
+                    logger.info("Node-RED process killed, waiting for auto-restart...")
+                    # Wait for init script to respawn and Node-RED to begin startup.
+                    # On memory-constrained devices (180MB), startup can be slow.
+                    await asyncio.sleep(10)
+                    return True
+                else:
+                    logger.warning("Could not find node-red process to kill")
+                    return False
+        except Exception as e:
+            logger.warning(f"Node-RED restart failed: {e}")
+            return False
 
     async def get_current_flows(
         self,
