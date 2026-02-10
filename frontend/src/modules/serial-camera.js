@@ -217,6 +217,9 @@ export class SerialCameraCanvas {
           }
         });
       };
+      img.onerror = () => {
+        console.error('[serial-camera] Image decode failed, base64 length:', image?.length);
+      };
       img.src = `data:image/jpeg;base64,${image}`;
     } else {
       // No image: draw text-based status display

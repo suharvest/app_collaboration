@@ -94,12 +94,14 @@ def parse_face_result(msg: dict) -> Optional[dict]:
     if not _logged_sscma_keys:
         keys = [k for k in data.keys() if k != "image"]
         img_len = len(image) if image else 0
+        img_head = image[:60] if image else ""
         logger.info(
-            "SSCMA first frame: keys=%s, image=%s (%d chars), resolution=%s",
+            "SSCMA first frame: keys=%s, image=%s (%d chars), resolution=%s, head=%s",
             keys,
             bool(image),
             img_len,
             resolution,
+            repr(img_head),
         )
         _logged_sscma_keys = True
 
@@ -165,7 +167,7 @@ class SerialCameraSession:
         session_id: str,
         port: str,
         baudrate: int = 921600,
-        face_mode: bool = True,
+        face_mode: bool = False,
     ):
         self.session_id = session_id
         self.port = port
@@ -441,7 +443,7 @@ class SerialCameraManager:
         self,
         port: str,
         baudrate: int = 921600,
-        face_mode: bool = True,
+        face_mode: bool = False,
     ) -> SerialCameraSession:
         """Create a new camera session."""
         # Check port exclusivity
