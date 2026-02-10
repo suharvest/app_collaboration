@@ -8,7 +8,8 @@ import logging
 import platform
 import socket
 import subprocess
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from ..models.docker_device import (
     ConnectDeviceRequest,
@@ -18,7 +19,11 @@ from ..models.docker_device import (
     ManagedAppContainer,
     UpgradeRequest,
 )
-from ..utils.compose_labels import parse_container_labels
+from ..utils.compose_labels import (
+    create_labels,
+    inject_labels_to_compose_file,
+    parse_container_labels,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +217,9 @@ class DockerDeviceManager:
             else:
                 status = "stopped"
 
+            # Check for config manifest to populate config_fields
+            config_fields = self._load_config_fields(group["solution_id"])
+
             managed_apps.append(
                 ManagedApp(
                     solution_id=group["solution_id"],
@@ -221,6 +229,7 @@ class DockerDeviceManager:
                     status=status,
                     containers=group["containers"],
                     ports=list(set(group["ports"])),  # Deduplicate ports
+                    config_fields=config_fields,
                 )
             )
 
@@ -453,6 +462,236 @@ class DockerDeviceManager:
         except Exception as e:
             logger.error(f"Local image prune failed: {e}")
             raise RuntimeError(f"Prune failed: {str(e)}")
+
+    # ============================================
+    # Configuration Management
+    # ============================================
+
+    @staticmethod
+    def _get_manifests_dir(solution_id: str) -> Path:
+        """Get the manifest directory for a solution"""
+        return Path.home() / ".sensecraft" / "deployments" / solution_id
+
+    def _load_config_fields(self, solution_id: str) -> Optional[List[Dict[str, Any]]]:
+        """Load config fields from manifest files for a solution.
+
+        Returns aggregated fields from all device manifests, or None if no
+        reconfigurable fields exist.
+        """
+        manifests_dir = self._get_manifests_dir(solution_id)
+        if not manifests_dir.exists():
+            return None
+
+        all_fields = []
+        for manifest_file in manifests_dir.glob("*.json"):
+            try:
+                manifest = json.loads(manifest_file.read_text())
+                fields = manifest.get("fields", [])
+                if fields:
+                    all_fields.extend(fields)
+            except Exception as e:
+                logger.warning(f"Failed to read manifest {manifest_file}: {e}")
+
+        return all_fields if all_fields else None
+
+    async def get_app_config(self, solution_id: str) -> Optional[Dict[str, Any]]:
+        """Get the current configuration for a deployed app.
+
+        Returns config schema with current values from manifest files.
+        """
+        manifests_dir = self._get_manifests_dir(solution_id)
+        if not manifests_dir.exists():
+            return None
+
+        configs = []
+        for manifest_file in manifests_dir.glob("*.json"):
+            try:
+                manifest = json.loads(manifest_file.read_text())
+                configs.append(manifest)
+            except Exception as e:
+                logger.warning(f"Failed to read manifest {manifest_file}: {e}")
+
+        if not configs:
+            return None
+
+        # Aggregate fields from all device manifests
+        all_fields = []
+        for config in configs:
+            all_fields.extend(config.get("fields", []))
+
+        return {
+            "solution_id": solution_id,
+            "devices": configs,
+            "fields": all_fields,
+        }
+
+    async def update_app_config(
+        self,
+        solution_id: str,
+        values: Dict[str, str],
+    ) -> Dict[str, Any]:
+        """Update configuration for a locally deployed Docker app.
+
+        1. Read manifests to get config_file paths
+        2. Load device YAML → get docker.environment + compose settings
+        3. Substitute templates with new values → build new env
+        4. Inject labels → temp compose file
+        5. docker compose up -d with new env
+        6. Update manifest with new current_values
+        """
+        manifests_dir = self._get_manifests_dir(solution_id)
+        if not manifests_dir.exists():
+            raise RuntimeError(f"No config manifest found for {solution_id}")
+
+        results = []
+        for manifest_file in manifests_dir.glob("*.json"):
+            try:
+                manifest = json.loads(manifest_file.read_text())
+                device_type = manifest.get("device_type", "docker_local")
+
+                # Only handle local Docker configs here
+                if device_type not in ("docker_local",):
+                    continue
+
+                result = await self._reconfigure_local_device(
+                    manifest, values, manifest_file
+                )
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Failed to reconfigure {manifest_file.stem}: {e}")
+                results.append(
+                    {"device_id": manifest_file.stem, "success": False, "error": str(e)}
+                )
+
+        success = all(r.get("success") for r in results)
+        return {"success": success, "results": results}
+
+    async def _reconfigure_local_device(
+        self,
+        manifest: Dict[str, Any],
+        values: Dict[str, str],
+        manifest_path: Path,
+    ) -> Dict[str, Any]:
+        """Reconfigure a single local Docker device with new env values."""
+        from ..utils.template import substitute
+
+        config_file = manifest.get("config_file")
+        solution_id = manifest.get("solution_id")
+        device_id = manifest.get("device_id")
+
+        if not config_file or not solution_id:
+            raise RuntimeError("Manifest missing config_file or solution_id")
+
+        # Load device YAML to get docker config
+        from .solution_manager import solution_manager
+
+        config = await solution_manager.load_device_config(solution_id, config_file)
+        if not config or not config.docker:
+            raise RuntimeError(f"Cannot load docker config from {config_file}")
+
+        docker_config = config.docker
+        project_name = docker_config.options.get("project_name", "provisioning")
+
+        # Build new environment with substituted values
+        # Use values from the form, falling back to manifest current_value
+        context = {}
+        for field in manifest.get("fields", []):
+            field_id = field["id"]
+            context[field_id] = values.get(field_id, field.get("current_value", ""))
+
+        env = {}
+        for k, v in docker_config.environment.items():
+            env[k] = substitute(str(v), context) or ""
+
+        # Get compose file path and inject labels
+        compose_file = config.get_asset_path(docker_config.compose_file)
+        if not compose_file or not Path(compose_file).exists():
+            raise RuntimeError(f"Compose file not found: {docker_config.compose_file}")
+
+        compose_dir = Path(compose_file).parent
+
+        labels = create_labels(
+            solution_id=solution_id,
+            device_id=device_id,
+            solution_name=manifest.get("solution_name"),
+            config_file=config_file,
+        )
+        temp_compose_file = inject_labels_to_compose_file(compose_file, labels)
+
+        try:
+            # Run docker compose up -d with new env
+            result = await self._run_local_compose(
+                temp_compose_file,
+                ["up", "-d"],
+                project_name,
+                env=env,
+                working_dir=str(compose_dir),
+            )
+
+            if not result["success"]:
+                raise RuntimeError(f"docker compose up failed: {result.get('error')}")
+
+            # Update manifest with new current_values
+            for field in manifest.get("fields", []):
+                field_id = field["id"]
+                if field_id in values:
+                    field["current_value"] = values[field_id]
+
+            manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
+            logger.info(f"Updated config manifest: {manifest_path}")
+
+            return {"device_id": device_id, "success": True}
+
+        finally:
+            # Clean up temp compose file
+            if Path(temp_compose_file).exists():
+                try:
+                    import os
+
+                    os.remove(temp_compose_file)
+                except Exception:
+                    pass
+
+    async def _run_local_compose(
+        self,
+        compose_file: str,
+        args: list,
+        project_name: str = None,
+        env: Dict[str, str] = None,
+        working_dir: str = None,
+    ) -> Dict[str, Any]:
+        """Run a local docker compose command."""
+        import os
+
+        cmd = ["docker", "compose", "-f", compose_file]
+        if project_name:
+            cmd.extend(["-p", project_name])
+        cmd.extend(args)
+
+        full_env = os.environ.copy()
+        if env:
+            full_env.update(env)
+
+        cwd = working_dir or str(Path(compose_file).parent)
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=full_env,
+                cwd=cwd,
+            )
+            stdout, _ = await process.communicate()
+            output = stdout.decode() if stdout else ""
+
+            return {
+                "success": process.returncode == 0,
+                "output": output,
+                "error": output if process.returncode != 0 else None,
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     # ============================================
     # Remote Docker Management (SSH)
@@ -876,6 +1115,108 @@ class DockerDeviceManager:
         except Exception as e:
             logger.error(f"Remote image prune failed: {e}")
             raise RuntimeError(f"Prune failed: {str(e)}")
+
+    # ============================================
+    # Remote Configuration Management
+    # ============================================
+
+    async def update_remote_app_config(
+        self,
+        connection: ConnectDeviceRequest,
+        solution_id: str,
+        values: Dict[str, str],
+    ) -> Dict[str, Any]:
+        """Update configuration for a remotely deployed Docker app via SSH.
+
+        Similar to update_app_config but operates over SSH.
+        """
+        from ..utils.template import substitute
+
+        manifests_dir = self._get_manifests_dir(solution_id)
+        if not manifests_dir.exists():
+            raise RuntimeError(f"No config manifest found for {solution_id}")
+
+        results = []
+        for manifest_file in manifests_dir.glob("*.json"):
+            try:
+                manifest = json.loads(manifest_file.read_text())
+                device_type = manifest.get("device_type", "docker_remote")
+
+                if device_type not in ("docker_remote",):
+                    continue
+
+                config_file = manifest.get("config_file")
+                device_id = manifest.get("device_id")
+
+                if not config_file:
+                    continue
+
+                # Load device YAML
+                from .solution_manager import solution_manager
+
+                config = await solution_manager.load_device_config(
+                    solution_id, config_file
+                )
+                if not config:
+                    continue
+
+                docker_config = config.docker_remote or config.docker
+                if not docker_config:
+                    continue
+
+                project_name = docker_config.options.get("project_name", "provisioning")
+
+                # Build new env
+                context = {}
+                for field in manifest.get("fields", []):
+                    field_id = field["id"]
+                    context[field_id] = values.get(
+                        field_id, field.get("current_value", "")
+                    )
+
+                env_vars = {}
+                for k, v in docker_config.environment.items():
+                    env_vars[k] = substitute(str(v), context) or ""
+
+                # Build env string for SSH command
+                env_str = " ".join(f"{k}={v}" for k, v in env_vars.items())
+
+                # Determine remote compose path
+                remote_base = getattr(docker_config, "remote_path", "/opt/provisioning")
+                compose_filename = Path(docker_config.compose_file).name
+                remote_compose = f"{remote_base}/{compose_filename}"
+
+                client = self._get_ssh_client(connection)
+                try:
+                    cmd = f"cd {remote_base} && {env_str} docker compose -p {project_name} -f {remote_compose} up -d"
+                    output = self._exec_command(client, cmd, timeout=60)
+
+                    # Update manifest
+                    for field in manifest.get("fields", []):
+                        field_id = field["id"]
+                        if field_id in values:
+                            field["current_value"] = values[field_id]
+
+                    manifest_file.write_text(
+                        json.dumps(manifest, indent=2, ensure_ascii=False)
+                    )
+
+                    results.append({"device_id": device_id, "success": True})
+                finally:
+                    client.close()
+
+            except Exception as e:
+                logger.error(f"Failed to reconfigure remote {manifest_file.stem}: {e}")
+                results.append(
+                    {
+                        "device_id": manifest_file.stem,
+                        "success": False,
+                        "error": str(e),
+                    }
+                )
+
+        success = all(r.get("success") for r in results) if results else False
+        return {"success": success, "results": results}
 
 
 # Global instance

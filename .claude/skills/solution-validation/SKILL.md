@@ -215,6 +215,7 @@ solutions/<solution_id>/
 |------|------|----------|
 | 网络配置 | WiFi SSID/密码、服务器 IP | 部署界面输入框或环境变量 |
 | 设备地址 | 串口号、设备 IP | 自动检测 + 手动输入 |
+| 部署后可变参数 | 外部服务 IP、API 端点 | device YAML `reconfigurable: true` + compose `${VAR}` |
 | 业务参数 | 检测阈值、通知邮箱 | Web 管理界面 |
 | 云服务凭证 | API Key、Account ID | 部署步骤中引导用户获取 |
 
@@ -422,6 +423,7 @@ docker:
   compose_file: assets/docker/docker-compose.yml
   environment:
     CUSTOM_VAR: "value"
+    DB_HOST: "{{db_host}}"           # Template var, reconfigurable post-deploy
   options:
     project_name: my_project
     remove_orphans: true
@@ -430,6 +432,14 @@ docker:
       port: 8080
       health_check_endpoint: /api/health
       required: true
+
+user_inputs:
+  - id: db_host
+    name: Database Host
+    name_zh: 数据库地址
+    type: text
+    default: "localhost"
+    reconfigurable: true             # Can update from Devices page after deploy
 ```
 
 **设备配置 `devices/docker_remote.yaml`**：
@@ -484,6 +494,7 @@ solutions/<id>/
 - 本地部署仅支持 Linux/macOS，Windows 用户需选远程部署
 - docker-compose.yml 中的镜像必须已推送到可访问的 registry
 - 平台会自动注入 `com.sensecraft.*` label 用于追踪管理
+- 可重配置环境变量：在 compose 文件中用 `${VAR}` 语法，device YAML 中用 `{{template_var}}` + `reconfigurable: true`，部署后可从 Devices 页面修改
 
 ### esp32_usb
 

@@ -1018,6 +1018,53 @@ export const dockerDevicesApi = {
       timeout: 120000,
     });
   },
+
+  // ============================================
+  // Configuration Management
+  // ============================================
+
+  /**
+   * Get configuration for a locally deployed app
+   * @param {string} solutionId - Solution ID
+   */
+  getLocalConfig(solutionId) {
+    return request(`/docker-devices/local/config/${solutionId}`);
+  },
+
+  /**
+   * Update configuration for a locally deployed app
+   * @param {string} solutionId - Solution ID
+   * @param {Object} values - Field values to update
+   */
+  updateLocalConfig(solutionId, values) {
+    return request(`/docker-devices/local/config/${solutionId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ values }),
+    });
+  },
+
+  /**
+   * Get configuration for a remotely deployed app
+   * @param {string} solutionId - Solution ID
+   */
+  getRemoteConfig(solutionId) {
+    return request(`/docker-devices/config/${solutionId}`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Update configuration for a remotely deployed app
+   * @param {string} solutionId - Solution ID
+   * @param {Object} values - Field values to update
+   * @param {Object} connection - SSH connection parameters
+   */
+  updateRemoteConfig(solutionId, values, connection) {
+    return request(`/docker-devices/config/${solutionId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ values, connection }),
+    });
+  },
 };
 
 // ============================================

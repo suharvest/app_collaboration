@@ -2,13 +2,39 @@
 Docker device management API routes
 """
 
+from typing import Dict
+
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from ..models.docker_device import (
     ConnectDeviceRequest,
     UpgradeRequest,
 )
 from ..services.docker_device_manager import docker_device_manager
+
+
+class UpdateConfigRequest(BaseModel):
+    """Request to update app configuration"""
+
+    values: Dict[str, str]
+
+
+class RemoteConfigRequest(BaseModel):
+    """Request to get remote app configuration (needs SSH connection)"""
+
+    host: str
+    port: int = 22
+    username: str = "recomputer"
+    password: str
+
+
+class RemoteUpdateConfigRequest(BaseModel):
+    """Request to update remote app configuration"""
+
+    values: Dict[str, str]
+    connection: RemoteConfigRequest
+
 
 router = APIRouter(prefix="/api/docker-devices", tags=["docker-devices"])
 
@@ -137,6 +163,71 @@ async def list_managed_apps(request: ConnectDeviceRequest):
             "success": True,
             "apps": [app.model_dump() for app in apps],
         }
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ============================================
+# Configuration Management Endpoints
+# ============================================
+
+
+@router.get("/local/config/{solution_id}")
+async def get_local_config(solution_id: str):
+    """Get configuration for a locally deployed app"""
+    try:
+        config = await docker_device_manager.get_app_config(solution_id)
+        if not config:
+            return {"success": True, "config": None}
+        return {"success": True, "config": config}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/local/config/{solution_id}")
+async def update_local_config(solution_id: str, request: UpdateConfigRequest):
+    """Update configuration for a locally deployed app and restart containers"""
+    try:
+        result = await docker_device_manager.update_app_config(
+            solution_id=solution_id,
+            values=request.values,
+        )
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/config/{solution_id}")
+async def get_remote_config(solution_id: str):
+    """Get configuration for a remotely deployed app.
+
+    Uses local manifest (no SSH needed for reading config schema).
+    """
+    try:
+        config = await docker_device_manager.get_app_config(solution_id)
+        if not config:
+            return {"success": True, "config": None}
+        return {"success": True, "config": config}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/config/{solution_id}")
+async def update_remote_config(solution_id: str, request: RemoteUpdateConfigRequest):
+    """Update configuration for a remotely deployed app via SSH"""
+    try:
+        connection = ConnectDeviceRequest(
+            host=request.connection.host,
+            port=request.connection.port,
+            username=request.connection.username,
+            password=request.connection.password,
+        )
+        result = await docker_device_manager.update_remote_app_config(
+            connection=connection,
+            solution_id=solution_id,
+            values=request.values,
+        )
+        return result
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -65,6 +65,7 @@ class DockerRemoteDeployer(BaseDeployer):
         self._solution_id = connection.get("_solution_id")
         self._solution_name = connection.get("_solution_name")
         self._device_id = connection.get("_device_id")
+        self._config_file = connection.get("_config_file")
         # Add defaults from user_inputs config
         if config.user_inputs:
             for user_input in config.user_inputs:
@@ -425,6 +426,7 @@ class DockerRemoteDeployer(BaseDeployer):
                     solution_id=self._solution_id,
                     device_id=self._device_id,
                     solution_name=self._solution_name,
+                    config_file=self._config_file,
                 )
 
             # If compose_dir is specified, upload entire directory
