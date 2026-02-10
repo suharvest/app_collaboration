@@ -1,3 +1,4 @@
+/* global process */
 import { defineConfig } from 'vite'
 
 // Check if running in Tauri development mode
@@ -16,6 +17,11 @@ export default defineConfig({
       // Only use proxy in non-Tauri mode (regular web development)
       // Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues on Windows
       '/api/preview/ws': {
+        target: 'http://127.0.0.1:3260',
+        changeOrigin: true,
+        ws: true,
+      },
+      '/api/serial-camera/ws': {
         target: 'http://127.0.0.1:3260',
         changeOrigin: true,
         ws: true,

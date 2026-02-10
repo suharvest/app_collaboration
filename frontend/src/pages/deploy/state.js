@@ -21,6 +21,9 @@ let showDetailedLogs = false;
 // Preview window instances: { deviceId: PreviewWindow }
 let previewInstances = {};
 
+// Serial camera instances: { deviceId: { canvas, panel, sessionId } }
+let serialCameraInstances = {};
+
 // Device group selections: { groupId: deviceRef }
 let deviceGroupSelections = {};
 
@@ -61,6 +64,14 @@ export function getPreviewInstances() {
 
 export function getPreviewInstance(deviceId) {
   return previewInstances[deviceId];
+}
+
+export function getSerialCameraInstances() {
+  return serialCameraInstances;
+}
+
+export function getSerialCameraInstance(deviceId) {
+  return serialCameraInstances[deviceId];
 }
 
 export function getDeviceGroupSelections() {
@@ -115,6 +126,10 @@ export function setShowDetailedLogs(value) {
 
 export function setPreviewInstance(deviceId, instance) {
   previewInstances[deviceId] = instance;
+}
+
+export function setSerialCameraInstance(deviceId, instance) {
+  serialCameraInstances[deviceId] = instance;
 }
 
 export function setDeviceGroupSelection(groupId, deviceRef) {
@@ -179,4 +194,11 @@ export function cleanupState() {
   // Cleanup preview instances
   Object.values(previewInstances).forEach(preview => preview?.destroy());
   previewInstances = {};
+
+  // Cleanup serial camera instances
+  Object.values(serialCameraInstances).forEach(instance => {
+    instance?.canvas?.destroy();
+    instance?.panel?.destroy();
+  });
+  serialCameraInstances = {};
 }

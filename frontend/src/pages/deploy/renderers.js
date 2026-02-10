@@ -459,6 +459,7 @@ export function renderDeploySection(device, stepNumber) {
   const isManual = device.type === 'manual';
   const isScript = device.type === 'script';
   const isPreview = device.type === 'preview';
+  const isSerialCamera = device.type === 'serial_camera';
   const isDockerDeploy = device.type === 'docker_deploy' && device.targets;
   const isRecameraCppWithTargets = device.type === 'recamera_cpp' && device.targets;
 
@@ -485,7 +486,7 @@ export function renderDeploySection(device, stepNumber) {
         </div>
         <div class="deploy-section-info">
           <div class="deploy-section-title">${escapeHtml(sectionTitle)}</div>
-          <div class="deploy-section-subtitle">${escapeHtml(name)}</div>
+          ${section.subtitle ? `<div class="deploy-section-subtitle">${escapeHtml(section.subtitle)}</div>` : ''}
         </div>
         <div class="deploy-section-status ${getStatusClass(state)}" id="status-${device.id}">
           ${getStatusIcon(state)}
@@ -502,6 +503,7 @@ export function renderDeploySection(device, stepNumber) {
       <div class="deploy-section-content ${state.sectionExpanded ? 'expanded' : ''}" id="content-${device.id}">
         ${isManual ? renderManualSectionContent(device, state, sectionDescription) :
           isPreview ? renderPreviewSectionContent(device, sectionDescription) :
+          isSerialCamera ? renderSerialCameraSectionContent(device, state, sectionDescription) :
           (isDockerDeploy || isRecameraCppWithTargets) ? renderTargetSectionContent(device, state) :
           renderAutoSectionContent(device, state, sectionDescription, isScript)}
 
@@ -714,8 +716,12 @@ export function renderDeployActionArea(device, state, isManual = false) {
 function renderTargetSectionContent(device, state) {
   const target = getSelectedTarget(device);
   const isRemote = target?.id === 'remote' || target?.id?.endsWith('_remote') || target?.id?.includes('remote');
+  const stepDescription = device.section?.description || '';
 
   return `
+    <!-- Step-level description -->
+    ${renderDescriptionSection(stepDescription)}
+
     <!-- Target selector -->
     ${renderDockerTargetSelector(device)}
 
@@ -738,10 +744,12 @@ function renderTargetSectionContent(device, state) {
 
 /**
  * Render manual section content
- * Simple structure: description -> mark done button
+ * Structure: wiring -> description -> mark done button
  */
 function renderManualSectionContent(device, state, sectionDescription) {
+  const section = device.section || {};
   return `
+    ${renderWiringSection(section.wiring, getCurrentSolution()?.id)}
     ${renderDescriptionSection(sectionDescription)}
     ${renderDeployActionArea(device, state, true)}
   `;
@@ -756,6 +764,50 @@ function renderPreviewSectionContent(device, sectionDescription) {
     ${renderDescriptionSection(sectionDescription)}
     ${renderPreviewInputs(device)}
     <div class="preview-container-wrapper" id="preview-container-${device.id}"></div>
+  `;
+}
+
+/**
+ * Render serial camera section content
+ * Structure: description -> port status -> camera container -> panel containers
+ */
+function renderSerialCameraSectionContent(device, state, sectionDescription) {
+  const serialCamera = device.serial_camera || {};
+  const cameraRef = serialCamera.camera_port?.port_from_device;
+  const panels = serialCamera.panels || [];
+
+  // Check port readiness
+  const portWarnings = [];
+  if (cameraRef) {
+    const deviceStates = getDeviceStates();
+    const cameraPort = deviceStates[cameraRef]?.port;
+    if (!cameraPort) {
+      portWarnings.push(t('serialCamera.portMissing', { step: cameraRef }));
+    }
+  }
+
+  for (const panel of panels) {
+    const dbRef = panel.database_port?.port_from_device;
+    if (dbRef) {
+      const deviceStates = getDeviceStates();
+      const dbPort = deviceStates[dbRef]?.port;
+      if (!dbPort) {
+        portWarnings.push(t('serialCamera.portMissing', { step: dbRef }));
+      }
+    }
+  }
+
+  const portStatusHtml = portWarnings.length > 0
+    ? `<div class="port-status-warning">
+        ${portWarnings.map(w => `<div>${escapeHtml(w)}</div>`).join('')}
+      </div>`
+    : `<div class="port-status-ready">${t('serialCamera.portsReady')}</div>`;
+
+  return `
+    ${renderDescriptionSection(sectionDescription)}
+    ${portStatusHtml}
+    <div class="serial-camera-container-wrapper" id="serial-camera-container-${device.id}"></div>
+    ${panels.length > 0 ? `<div class="serial-camera-panel-wrapper" id="serial-camera-panel-${device.id}"></div>` : ''}
   `;
 }
 
@@ -779,7 +831,7 @@ function renderAutoSectionContent(device, state, sectionDescription, isScript) {
 
     <!-- Deploy controls (SSH form, serial port, etc.) -->
     ${SSH_DEVICE_TYPES.includes(device.type) ? renderSSHForm(device) : ''}
-    ${device.type === 'docker_remote' && device.user_inputs ? renderUserInputs(device, device.user_inputs, ['host', 'username', 'password', 'port']) : ''}
+    ${(device.type === 'docker_remote' || device.type === 'recamera_nodered') && device.user_inputs ? renderUserInputs(device, device.user_inputs, ['host', 'username', 'password', 'port']) : ''}
     ${SERIAL_DEVICE_TYPES.includes(device.type) ? renderSerialPortSelector(device) : ''}
 
     <!-- Deploy button -->
@@ -1290,6 +1342,11 @@ export function getDeviceTypeIcon(type) {
         <polygon points="10 8 16 11 10 14 10 8"/>
         <line x1="8" y1="21" x2="16" y2="21"/>
         <line x1="12" y1="17" x2="12" y2="21"/>
+      </svg>`;
+    case 'serial_camera':
+      return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
       </svg>`;
     default:
       return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
