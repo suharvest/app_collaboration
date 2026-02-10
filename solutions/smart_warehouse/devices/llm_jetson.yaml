@@ -151,6 +151,35 @@ user_inputs:
     description: Choose how to deploy images and models
     description_zh: 选择镜像和模型的部署方式
 
+actions:
+  before:
+    - name: Import Docker image (offline)
+      name_zh: 导入 Docker 镜像（离线）
+      when:
+        field: deploy_method
+        value: offline
+      run: |
+        gunzip -c mlc-qwen3-fs.tar.gz | docker import \
+          --change 'CMD ["/app/proxy/start.sh"]' \
+          --change 'ENV MLC_BACKEND_URL=http://localhost:8001' \
+          --change 'ENV MODEL_ALIAS={{model_name}}' \
+          --change 'ENV PROXY_PORT=8000' \
+          --change 'ENV TTS_MODEL_DIR=/data/models/kokoro-multi-lang-v1_1' \
+          --change 'ENV TTS_DEFAULT_SID={{tts_speaker}}' \
+          --change 'ENV WARMUP_ENABLED=true' \
+          --change 'WORKDIR /app' \
+          --change 'EXPOSE 8000' \
+          - mlc-qwen3-proxy:v1.0
+    - name: Restore model files (offline)
+      name_zh: 恢复模型文件（离线）
+      when:
+        field: deploy_method
+        value: offline
+      run: |
+        docker volume create mlc_models
+        docker run --rm -v mlc_models:/data -v $(pwd):/backup alpine \
+          tar xzf /backup/models-backup.tar.gz -C /data
+
 pre_checks:
   - type: docker_version
     min_version: "20.0"
@@ -160,108 +189,6 @@ pre_checks:
   - type: disk_space
     min_gb: 15
     description: Check available disk space (model ~5GB + runtime)
-
-steps:
-  - id: connect
-    name: SSH Connect
-    name_zh: SSH 连接
-    description: Connect to Jetson device via SSH
-    description_zh: 通过 SSH 连接 Jetson 设备
-    optional: false
-    default: true
-
-  - id: prepare
-    name: Prepare Directory
-    name_zh: 准备目录
-    description: Create deployment directory on Jetson
-    description_zh: 在 Jetson 上创建部署目录
-    optional: false
-    default: true
-
-  - id: upload
-    name: Upload Deployment Package
-    name_zh: 上传部署包
-    description: Upload Docker image and model files to Jetson
-    description_zh: 上传 Docker 镜像和模型文件到 Jetson
-    optional: false
-    default: true
-    show_when:
-      field: deploy_method
-      value: offline
-
-  - id: import_image
-    name: Import Docker Image
-    name_zh: 导入 Docker 镜像
-    description: Import container image from uploaded package
-    description_zh: 从上传的包导入容器镜像
-    optional: false
-    default: true
-    show_when:
-      field: deploy_method
-      value: offline
-    command: |
-      gunzip -c mlc-qwen3-fs.tar.gz | docker import \
-        --change 'CMD ["/app/proxy/start.sh"]' \
-        --change 'ENV MLC_BACKEND_URL=http://localhost:8001' \
-        --change 'ENV MODEL_ALIAS={{model_name}}' \
-        --change 'ENV PROXY_PORT=8000' \
-        --change 'ENV TTS_MODEL_DIR=/data/models/kokoro-multi-lang-v1_1' \
-        --change 'ENV TTS_DEFAULT_SID={{tts_speaker}}' \
-        --change 'ENV WARMUP_ENABLED=true' \
-        --change 'WORKDIR /app' \
-        --change 'EXPOSE 8000' \
-        - mlc-qwen3-proxy:v1.0
-
-  - id: restore_models
-    name: Restore Model Files
-    name_zh: 恢复模型文件
-    description: Extract model files to Docker volume
-    description_zh: 解压模型文件到 Docker 卷
-    optional: false
-    default: true
-    show_when:
-      field: deploy_method
-      value: offline
-    command: |
-      docker volume create mlc_models
-      docker run --rm -v mlc_models:/data -v $(pwd):/backup alpine \
-        tar xzf /backup/models-backup.tar.gz -C /data
-
-  - id: pull_images
-    name: Pull Docker Images
-    name_zh: 拉取 Docker 镜像
-    description: Download container images from registry
-    description_zh: 从镜像仓库下载容器镜像
-    optional: false
-    default: true
-    show_when:
-      field: deploy_method
-      value: online
-
-  - id: start_services
-    name: Start LLM & TTS Service
-    name_zh: 启动 LLM 和 TTS 服务
-    description: Launch the AI service container
-    description_zh: 启动 AI 服务容器
-    optional: false
-    default: true
-    command: |
-      docker run -d --name mlc-qwen3 \
-        --runtime nvidia \
-        --network host \
-        -v mlc_models:/data \
-        mlc-qwen3-proxy:v1.0
-
-  - id: health_check
-    name: Health Check
-    name_zh: 健康检查
-    description: Verify LLM and TTS services are running
-    description_zh: 验证 LLM 和 TTS 服务运行正常
-    optional: false
-    default: true
-    command: |
-      curl -s http://localhost:8000/health && \
-      curl -s http://localhost:8000/v1/models
 
 post_deployment:
   message: "LLM & TTS service is running on {{host}}:8000. Model: {{model_name}}"

@@ -23,7 +23,7 @@ Deploy a KNN-based HVAC optimization system that learns from your historical dat
 
 ## Step 1: HVAC Control System {#hvac type=docker_deploy required=true config=devices/local.yaml}
 
-HVAC Control System
+Deploy a smart temperature optimization service that learns from your building data.
 
 ### Target: Local Deployment {#hvac_local type=local config=devices/local.yaml default=true}
 

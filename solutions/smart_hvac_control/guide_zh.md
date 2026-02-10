@@ -23,7 +23,7 @@
 
 ## 步骤 1: 暖通控制系统 {#hvac type=docker_deploy required=true config=devices/local.yaml}
 
-暖通控制系统
+部署智能温控优化服务，自动从建筑数据中学习最佳温度设置。
 
 ### 部署目标: 本机部署 {#hvac_local type=local config=devices/local.yaml default=true}
 

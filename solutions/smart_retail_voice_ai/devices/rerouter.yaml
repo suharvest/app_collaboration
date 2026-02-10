@@ -24,10 +24,6 @@ docker_remote:
   compose_dir: assets/docker
   remote_path: /data-iot/respeaker
 
-  pre_commands:
-    - mkdir -p /data-iot/respeaker/recordings /data-iot/respeaker/models /data-iot/respeaker/voiceprints /data-iot/respeaker/logs
-    - chmod -R 666 /dev/snd/* || true
-
   environment:
     TZ: Asia/Shanghai
     AUDIO_CARD_ID: "1"
@@ -66,6 +62,22 @@ docker_remote:
       size: 500MB
       required: true
 
+actions:
+  before:
+    - name: Create data directories
+      name_zh: 创建数据目录
+      run: mkdir -p /data-iot/respeaker/recordings /data-iot/respeaker/models /data-iot/respeaker/voiceprints /data-iot/respeaker/logs
+    - name: Download default configuration
+      name_zh: 下载默认配置
+      run: |
+        cd /data-iot/respeaker
+        wget -q -O config.yaml 'https://appstore.seeed-fleet.com/config.yaml'
+      ignore_error: true
+    - name: Set audio device permissions
+      name_zh: 设置音频设备权限
+      run: chmod -R 666 /dev/snd/* || true
+      ignore_error: true
+
 user_inputs:
   - id: host
     name: Device IP
@@ -97,63 +109,6 @@ pre_checks:
   - type: audio_device
     device_path: /dev/snd
     description: Check audio device availability
-
-steps:
-  - id: connect
-    name: SSH Connect
-    name_zh: SSH 连接
-    description: Connect to reRouter via SSH
-    description_zh: 通过 SSH 连接 reRouter
-    optional: false
-    default: true
-
-  - id: prepare
-    name: Prepare Directories
-    name_zh: 准备目录
-    description: Create data directories for voice services
-    description_zh: 创建语音服务数据目录
-    optional: false
-    default: true
-
-  - id: download_models
-    name: Download ASR Models
-    name_zh: 下载语音模型
-    description: Download pre-trained ASR models (~500MB)
-    description_zh: 下载预训练语音识别模型（约 500MB）
-    optional: false
-    default: true
-
-  - id: upload
-    name: Upload Files
-    name_zh: 上传文件
-    description: Upload Docker Compose configuration
-    description_zh: 上传 Docker Compose 配置
-    optional: false
-    default: true
-
-  - id: pull_images
-    name: Pull Docker Images
-    name_zh: 拉取 Docker 镜像
-    description: Download container images from registry
-    description_zh: 从镜像仓库下载容器镜像
-    optional: false
-    default: true
-
-  - id: start_services
-    name: Start Services
-    name_zh: 启动服务
-    description: Launch voice processing containers
-    description_zh: 启动语音处理容器
-    optional: false
-    default: true
-
-  - id: health_check
-    name: Health Check
-    name_zh: 健康检查
-    description: Verify services are running correctly
-    description_zh: 验证服务运行正常
-    optional: false
-    default: true
 
 post_deployment:
   open_browser: true

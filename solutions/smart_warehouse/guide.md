@@ -16,6 +16,8 @@ Use [SenseCraft](https://sensecraft.seeed.cc/ai/) cloud service for voice AI. Si
 
 ## Step 1: Warehouse System {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
 
+Deploy the inventory management service with voice control and web dashboard.
+
 ### Target: Local Deployment {#warehouse_local type=local config=devices/recomputer.yaml}
 
 Run the warehouse system on this computer.
@@ -166,6 +168,8 @@ Self-host the voice AI server while using cloud APIs (DeepSeek, OpenAI, etc.) fo
 **Requirements:** Internet connection (for LLM/TTS API) · API keys for your AI provider (recommend [DeepSeek](https://platform.deepseek.com/) - free credits on signup)
 
 ## Step 1: Warehouse System {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
+
+Deploy the inventory management service with voice control and web dashboard.
 
 ### Target: Local Deployment {#warehouse_local type=local config=devices/recomputer.yaml}
 
@@ -351,6 +355,8 @@ Run everything locally including LLM and TTS - no internet required. Ideal for a
 **Requirements:** reComputer J4012 or equivalent Jetson device · Internet needed for initial deployment only
 
 ## Step 1: Warehouse System {#warehouse type=docker_deploy required=true config=devices/recomputer.yaml}
+
+Deploy the inventory management service with voice control and web dashboard.
 
 ### Target: Local Deployment {#warehouse_local type=local config=devices/recomputer.yaml}
 

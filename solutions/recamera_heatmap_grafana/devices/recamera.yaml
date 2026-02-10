@@ -1,32 +1,69 @@
 version: "1.0"
 id: recamera
-name: reCamera Node-RED Configuration
-name_zh: reCamera Node-RED 配置
-
+name: reCamera Node-RED Flow
+name_zh: reCamera Node-RED 流
 type: recamera_nodered
 
-detection:
-  method: network_scan
-  manual_entry: true
-  requirements: []
+ssh:
+  port: 22
+  default_user: recamera
+  default_host: 192.168.42.1
+  connection_timeout: 30
+  command_timeout: 300
 
 nodered:
-  flow_file: flow.json
+  flow_file: devices/flow.json
   port: 1880
   influxdb_node_id: "069087e0ad1b172e"
+  modules:
+    - name: node-red-contrib-influxdb
+      version: "0.7.0"
+
+actions:
+  before:
+    - name: Stop C++ detector
+      name_zh: 停止 C++ 检测器
+      sudo: true
+      ignore_error: true
+      run: |
+        for svc in yolo11-detector yolo26-detector; do
+          pid=$(pidof $svc 2>/dev/null) && kill "$pid" 2>/dev/null
+          for f in /etc/init.d/S*${svc}*; do
+            [ -f "$f" ] && mv "$f" "$(echo "$f" | sed 's|/S|/K|')" 2>/dev/null
+          done
+        done
+    - name: Enable Node-RED autostart
+      name_zh: 启用 Node-RED 自启动
+      sudo: true
+      ignore_error: true
+      run: |
+        for svc in node-red sscma-node; do
+          for f in /etc/init.d/K*${svc}*; do
+            [ -f "$f" ] && mv "$f" "$(echo "$f" | sed 's|/K|/S|')" 2>/dev/null
+          done
+        done
 
 user_inputs:
-  - id: recamera_ip
+  - id: host
     name: reCamera IP Address
     name_zh: reCamera IP 地址
     type: text
     default: "192.168.42.1"
     placeholder: "192.168.42.1"
-    description: IP address of your reCamera device
-    description_zh: 您的 reCamera 设备 IP 地址
+    description: IP address of your reCamera (USB default 192.168.42.1)
+    description_zh: reCamera 的 IP 地址（USB 默认 192.168.42.1）
     required: true
     validation:
       pattern: "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"
+
+  - id: password
+    name: SSH Password
+    name_zh: SSH 密码
+    type: password
+    default: "recamera"
+    description: SSH password (try 'recamera' or 'recamera.2')
+    description_zh: SSH 密码（尝试 'recamera' 或 'recamera.2'）
+    required: true
 
   - id: influxdb_host
     name: InfluxDB Server IP
@@ -45,23 +82,3 @@ influxdb:
   org: "seeed"
   bucket: "recamera"
   port: 8086
-
-steps:
-  - id: load_flow
-    name: Load flow template
-    name_zh: 加载流程模板
-  - id: configure
-    name: Configure InfluxDB connection
-    name_zh: 配置 InfluxDB 连接
-  - id: connect
-    name: Connect to Node-RED
-    name_zh: 连接到 Node-RED
-  - id: deploy
-    name: Deploy flow
-    name_zh: 部署流程
-  - id: verify
-    name: Verify deployment
-    name_zh: 验证部署
-
-post_deployment:
-  open_browser: false

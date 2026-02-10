@@ -1,5 +1,5 @@
 version: "1.0"
-id: recamera
+id: recamera_yolo26
 name: reCamera YOLO26 Detector
 name_zh: reCamera YOLO26 检测器
 type: recamera_cpp
@@ -35,25 +35,38 @@ binary:
   service_name: yolo26-detector
   service_priority: 92
 
-  # MQTT 外部访问配置（启用外部 MQTT 访问以供预览使用）
-  mqtt_config:
-    enable: true
-    port: 1883
-    allow_anonymous: true
-
-  # 冲突服务处理
+  # 冲突服务处理（内置逻辑：停止服务）
   conflict_services:
     stop:
       - S03node-red
       - S91sscma-node
       - S93sscma-supervisor
       - S92yolo11-detector
-    disable:
-      - node-red
-      - sscma-node
-      - sscma-supervisor
 
   auto_start: true
+
+actions:
+  after:
+    - name: Enable external MQTT access
+      name_zh: 启用 MQTT 外部访问
+      run: |
+        CONF="/etc/mosquitto/mosquitto.conf"
+        grep -q 'listener 1883 0.0.0.0' "$CONF" 2>/dev/null && exit 0
+        echo "listener 1883 0.0.0.0" >> "$CONF"
+        echo "allow_anonymous true" >> "$CONF"
+        killall mosquitto 2>/dev/null || true
+        sleep 1
+        /usr/sbin/mosquitto -c "$CONF" -d
+      sudo: true
+    - name: Disable Node-RED autostart
+      name_zh: 禁用 Node-RED 自启动
+      run: |
+        for svc in node-red sscma-node sscma-supervisor; do
+          for f in /etc/init.d/S*${svc}*; do
+            [ -f "$f" ] && mv "$f" "$(echo "$f" | sed 's|/S|/K|')" 2>/dev/null
+          done
+        done
+      sudo: true
 
 # 用户输入
 user_inputs:
@@ -77,62 +90,6 @@ user_inputs:
     description: SSH password (try 'recamera' or 'recamera.2')
     description_zh: SSH 密码（尝试 'recamera' 或 'recamera.2'）
     required: true
-
-# 部署步骤
-steps:
-  - id: connect
-    name: SSH Connect
-    name_zh: SSH 连接
-    description: Connect to reCamera via SSH as user 'recamera'
-    description_zh: 以 recamera 用户通过 SSH 连接设备
-
-  - id: prepare
-    name: Stop Conflicting Services
-    name_zh: 停止冲突服务
-    description: Stop Node-RED, sscma-node, and supervisor
-    description_zh: 停止 Node-RED、sscma-node 和 supervisor 服务
-
-  - id: transfer
-    name: Transfer Files
-    name_zh: 传输文件
-    description: Upload .deb package and model file via SCP
-    description_zh: 通过 SCP 上传 deb 包和模型文件
-
-  - id: install
-    name: Install Package
-    name_zh: 安装软件包
-    description: Install deb package via opkg
-    description_zh: 通过 opkg 安装 deb 软件包
-
-  - id: models
-    name: Deploy Model
-    name_zh: 部署模型
-    description: Copy model file to /userdata/local/models
-    description_zh: 复制模型文件到 /userdata/local/models
-
-  - id: mqtt
-    name: Configure MQTT
-    name_zh: 配置 MQTT
-    description: Enable external MQTT access
-    description_zh: 启用 MQTT 外部访问
-
-  - id: disable
-    name: Disable Conflicts
-    name_zh: 禁用冲突服务
-    description: Rename S* services to K* to prevent auto-start
-    description_zh: 将 S* 服务重命名为 K* 防止自启动
-
-  - id: start
-    name: Start Service
-    name_zh: 启动服务
-    description: Start YOLO26 detector service
-    description_zh: 启动 YOLO26 检测器服务
-
-  - id: verify
-    name: Verify
-    name_zh: 验证
-    description: Verify service is running
-    description_zh: 验证服务正在运行
 
 post_deployment:
   open_browser: false

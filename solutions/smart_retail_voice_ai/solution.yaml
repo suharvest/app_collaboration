@@ -3,7 +3,8 @@ id: smart_retail_voice_ai
 name: Smart Retail Voice Collection
 name_zh: 智慧零售语音采集
 intro:
-  summary: Capture and analyze in-store conversations to understand what customers are saying and what help they need
+  summary: Capture and analyze in-store conversations to understand what customers
+    are saying and what help they need
   summary_zh: 门店顾客声音采集，听懂顾客在说什么、需要什么帮助
   description_file: description.md
   description_file_zh: description_zh.md
@@ -79,4 +80,4 @@ deployment:
   guide_file: guide.md
   guide_file_zh: guide_zh.md
   selection_mode: sequential
-enabled: false
+enabled: true
