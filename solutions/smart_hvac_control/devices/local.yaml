@@ -28,10 +28,6 @@ docker:
       health_check_endpoint: /api/v1/health
       required: true
 
-  images:
-    - name: sensecraft-missionpack.seeed.cn/suzhou/missionpack-knn:v1.6.5
-      required: true
-
 user_inputs:
   - id: opc_ua_server
     name: OPC-UA Server Address

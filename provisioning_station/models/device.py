@@ -99,7 +99,6 @@ class DockerConfig(BaseModel):
     environment: Dict[str, str] = {}
     options: Dict[str, Any] = {}
     services: List[DockerService] = []
-    images: List[Dict[str, Any]] = []
 
 
 class DockerRemoteConfig(BaseModel):

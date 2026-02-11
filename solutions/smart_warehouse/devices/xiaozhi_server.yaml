@@ -32,12 +32,6 @@ docker:
       port: 18004
       required: true
 
-  images:
-    - name: ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:server_arm64
-      required: true
-    - name: ghcr.nju.edu.cn/xinnan-tech/mcp-endpoint-server:latest
-      required: true
-
 user_inputs:
   # 部署方案选择
   - id: deploy_mode

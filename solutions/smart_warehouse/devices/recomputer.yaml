@@ -35,12 +35,6 @@ docker:
       health_check_endpoint: /
       required: true
 
-  images:
-    - name: seeedstudio/warehouse-backend:latest
-      required: true
-    - name: seeedstudio/warehouse-frontend:latest
-      required: true
-
 pre_checks:
   - type: docker_version
     min_version: "20.0"
