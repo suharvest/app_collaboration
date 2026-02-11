@@ -103,22 +103,17 @@ Start the voice recognition and analysis services on the device.
 
 Deploy voice services on your local computer.
 
+### Wiring
+
 | Device | Connection | Notes |
 |--------|------------|-------|
 | reSpeaker XVF3800 | USB to computer | Must complete Step 2 configuration first |
 | Computer | Docker Desktop installed | Download for Windows/Mac |
 
-**Prerequisites:**
-- Docker Desktop installed and running
-- reSpeaker XVF3800 connected via USB
-- At least 2GB free disk space
-- Port 8090 available
-
-**Verify Connection:**
-Before deployment, confirm reSpeaker is recognized:
-- **Windows**: Device Manager > Sound, video and game controllers
-- **Mac**: System Preferences > Sound > Input, select XVF3800
-- **Linux**: Run `arecord -l` to list recording devices
+1. Make sure Docker Desktop is installed and running
+2. Confirm reSpeaker XVF3800 is connected via USB
+3. Verify at least 2GB free disk space and port 8090 is available
+4. Check reSpeaker is recognized: **Windows** Device Manager > Sound controllers; **Mac** System Preferences > Sound > Input; **Linux** run `arecord -l`
 
 ### Troubleshooting
 
@@ -133,6 +128,10 @@ Before deployment, confirm reSpeaker is recognized:
 
 Deploy voice services to a remote device (reRouter, Raspberry Pi, etc.).
 
+### Wiring
+
+![Wiring](gallery/wan_lan.png)
+
 | Device | Connection | Notes |
 |--------|------------|-------|
 | reSpeaker XVF3800 | USB to reRouter | Must complete Step 2 configuration first |
@@ -140,33 +139,10 @@ Deploy voice services to a remote device (reRouter, Raspberry Pi, etc.).
 | reRouter CM4 | LAN port to computer | For SSH access and deployment |
 | Computer | Same network as reRouter | For running remote deployment |
 
-**Before You Begin:**
-
-1. **Confirm device is online**
-   - reRouter WAN port connected to router
-   - Verify internet connection in reRouter admin panel
-
-2. **Record connection info**
-
-| Field | Default Value | Notes |
-|-------|---------------|-------|
-| Device IP | 192.168.49.1 | Access from LAN port |
-| SSH Username | root | OpenWrt default user |
-| SSH Password | (empty) | No password by default |
-
-**Connection Diagram:**
-
-```
-┌────────┐     WAN      ┌──────────┐     LAN      ┌────────┐
-│ Router │ ──────────── │ reRouter │ ──────────── │Computer│
-└────────┘              └────┬─────┘              └────────┘
-                             │ USB
-                        ┌────┴─────┐
-                        │ reSpeaker│
-                        └──────────┘
-```
-
-![Wiring](gallery/wan_lan.png)
+1. Confirm reRouter WAN port is connected to router and has internet
+2. Connect computer to reRouter LAN port
+3. Default SSH: IP `192.168.49.1`, user `root`, no password
+4. Plug reSpeaker XVF3800 into reRouter USB port
 
 ### Troubleshooting
 
