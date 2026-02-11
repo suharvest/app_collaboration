@@ -1247,6 +1247,22 @@
     @apply text-sm;
   }
 
+  /* Post-Deploy Success Section (shown after step deployment completes) */
+  .deploy-post-deploy {
+    @apply mt-3 p-4 rounded-lg;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+  }
+
+  .deploy-post-deploy .markdown-content {
+    @apply text-sm;
+  }
+
+  .deploy-post-deploy .markdown-content ol {
+    @apply pl-5 space-y-1;
+    list-style: decimal;
+  }
+
   /* Post-deployment Instructions */
   .deploy-post-instructions {
     @apply mt-4 pt-4 border-t border-border;
@@ -2194,26 +2210,20 @@ button.spinning {
 .face-database-table {
   @apply w-full text-sm;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .face-database-table th {
   @apply text-left text-xs text-gray-500 font-medium py-2 px-3 border-b border-gray-200;
 }
 
-.face-database-table th:first-child,
-.face-database-table td:first-child {
-  width: 40px;
-  white-space: nowrap;
-}
-
-.face-database-table th:nth-child(2),
-.face-database-table td:nth-child(2) {
-  width: 100%;
+.face-database-table th:first-child {
+  width: 48px;
 }
 
 .face-database-table th:last-child,
 .face-database-table td:last-child {
-  width: auto;
+  width: 200px;
   text-align: right;
   white-space: nowrap;
 }
