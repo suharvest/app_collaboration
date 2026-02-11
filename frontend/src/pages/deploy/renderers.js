@@ -967,7 +967,7 @@ export function renderUserInputs(device, inputs, excludeIds = [], noWrapper = fa
     }
   }
 
-  return noWrapper ? content : `<div class="deploy-user-inputs">${content}</div>`;
+  return noWrapper ? content : `<form class="deploy-user-inputs" onsubmit="event.preventDefault()">${content}</form>`;
 }
 
 // ============================================
@@ -1075,7 +1075,7 @@ export function renderSSHForm(device, mode = null, additionalContent = '') {
   const defaultUser = mode?.ssh?.default_user || device.ssh?.default_user || 'root';
 
   return `
-    <div class="deploy-user-inputs">
+    <form class="deploy-user-inputs" onsubmit="event.preventDefault()">
       <div class="flex gap-4">
         <div class="form-group flex-1">
           <label>${t('deploy.connection.host')}</label>
@@ -1110,7 +1110,7 @@ export function renderSSHForm(device, mode = null, additionalContent = '') {
       <button class="btn btn-secondary w-full" id="test-ssh-${device.id}" data-device-id="${device.id}">
         ${t('deploy.connection.test')}
       </button>
-    </div>
+    </form>
   `;
 }
 
@@ -1239,7 +1239,7 @@ export function renderPreviewInputs(device) {
 
   if (hasCompactLayout) {
     return `
-      <div class="deploy-user-inputs preview-inputs">
+      <form class="deploy-user-inputs preview-inputs" onsubmit="event.preventDefault()">
         ${rtspUrl ? renderInput(rtspUrl) : ''}
         <div class="flex gap-4">
           ${mqttBroker ? renderInput(mqttBroker, 'flex-1') : ''}
@@ -1263,15 +1263,15 @@ export function renderPreviewInputs(device) {
             ${mqttPassword ? renderInput(mqttPassword, 'flex-1') : ''}
           </div>
         ` : ''}
-      </div>
+      </form>
     `;
   }
 
   // Fallback: render all inputs vertically
   return `
-    <div class="deploy-user-inputs preview-inputs">
+    <form class="deploy-user-inputs preview-inputs" onsubmit="event.preventDefault()">
       ${userInputs.map(input => renderInput(input)).join('')}
-    </div>
+    </form>
   `;
 }
 

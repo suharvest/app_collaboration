@@ -185,7 +185,7 @@ export async function renderDevicesPage() {
         </div>
 
         <!-- reCamera SSH Config -->
-        <div id="restore-recamera-config" class="restore-config" style="display: none;">
+        <form id="restore-recamera-config" class="restore-config" style="display: none;" onsubmit="event.preventDefault()">
           <p class="text-sm text-text-secondary mb-3">${t('devices.restore.recameraHint')}</p>
           <div class="grid gap-3" style="grid-template-columns: 1fr 1fr 1fr;">
             <div class="form-group mb-0">
@@ -201,7 +201,7 @@ export async function renderDevicesPage() {
               <input type="password" id="restore-password" class="input">
             </div>
           </div>
-        </div>
+        </form>
 
         <!-- Restore Button -->
         <div class="restore-action mt-4">
