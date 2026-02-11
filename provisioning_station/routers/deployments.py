@@ -122,7 +122,7 @@ async def cancel_deployment(deployment_id: str):
 @router.get("/", response_model=List[DeploymentListItem])
 async def list_deployments(
     limit: int = Query(20, ge=1, le=100),
-    lang: str = Query("en", regex="^(en|zh)$"),
+    lang: str = Query("en", pattern="^(en|zh)$"),
 ):
     """List recent deployments - merges active + persisted history"""
     result = []

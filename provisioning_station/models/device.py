@@ -4,7 +4,7 @@ Device configuration models
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DeploymentStep(BaseModel):
@@ -312,10 +312,12 @@ class ActionCopy(BaseModel):
 class ActionConfig(BaseModel):
     """Single action configuration"""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     name: str
     name_zh: Optional[str] = None
     run: Optional[str] = None  # Shell command or script
-    copy: Optional[ActionCopy] = None  # File copy
+    copy_files: Optional[ActionCopy] = Field(None, alias="copy")  # File copy
     sudo: bool = False  # Whether to run with sudo (SSH deployers)
     when: Optional[ActionWhen] = None  # Conditional execution
     env: Dict[str, str] = {}  # Extra environment variables
