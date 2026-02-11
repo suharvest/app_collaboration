@@ -15,6 +15,7 @@ from ..deployers.docker_remote_deployer import (
     RemoteDockerNotInstalled,
 )
 from ..deployers.esp32_deployer import ESP32Deployer
+from ..deployers.ha_integration_deployer import HAIntegrationDeployer
 from ..deployers.himax_deployer import HimaxDeployer
 from ..deployers.manual_deployer import ManualDeployer
 from ..deployers.recamera_cpp_deployer import ReCameraCppDeployer
@@ -59,6 +60,7 @@ class DeploymentEngine:
             "recamera_nodered": ReCameraNodeRedDeployer(),
             "recamera_cpp": ReCameraCppDeployer(),
             "serial_camera": SerialCameraDeployer(),
+            "ha_integration": HAIntegrationDeployer(),
         }
 
     def set_websocket_manager(self, manager):
