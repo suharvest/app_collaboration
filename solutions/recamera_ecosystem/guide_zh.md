@@ -102,19 +102,20 @@
 
 ## 步骤 1: 部署 Home Assistant {#deploy_ha type=docker_deploy required=false config=devices/homeassistant.yaml}
 
-启动预装了 reCamera 集成的 Home Assistant。如果你已有 Home Assistant，可以跳过这一步。
+启动 Home Assistant。如果你已有 HA，可以跳过这一步。
 
 ### 部署目标: 在本机运行 {#ha_local type=local config=devices/homeassistant.yaml default=true}
 
 ### 接线
 
-确保 Docker Desktop 已安装并运行，至少 2GB 可用磁盘空间。
+1. 确保 Docker Desktop 已安装并运行
+2. 至少 2GB 可用磁盘空间
 
-部署完成后：
+### 部署完成
 
 1. 在浏览器打开 **http://localhost:8123**
-2. 按照引导向导创建管理员账号（请记住用户名和密码——步骤 3 需要用到）
-3. 完成基本设置（位置、时区等）
+2. 按照引导向导创建管理员账号
+3. 请记住用户名和密码——步骤 3 需要用到
 
 ### 故障排查
 
@@ -128,17 +129,14 @@
 
 ### 接线
 
-| 字段 | 示例 |
-|------|------|
-| 设备 IP | 192.168.1.100 或 reComputer-R110x.local |
-| 用户名 | recomputer |
-| 密码 | 12345678 |
+1. 将目标设备连接到网络
+2. 在下方输入 IP 地址、用户名和密码
 
-部署完成后：
+### 部署完成
 
 1. 在浏览器打开 **http://\<设备IP\>:8123**
-2. 按照引导向导创建管理员账号（请记住用户名和密码——步骤 3 需要用到）
-3. 完成基本设置（位置、时区等）
+2. 按照引导向导创建管理员账号
+3. 请记住用户名和密码——步骤 3 需要用到
 
 ### 故障排查
 
@@ -151,7 +149,7 @@
 
 ## 步骤 2: 部署 AI 识别流程 {#deploy_flow type=recamera_nodered required=true config=devices/recamera.yaml}
 
-给 reCamera 安装 YOLO 识别 + RTSP 视频流程序。安装后摄像头就能识别物体并提供视频流给 Home Assistant 显示。
+给 reCamera 安装 YOLO 识别 + RTSP 视频流程序。
 
 ### 接线
 
@@ -171,7 +169,7 @@
 
 ## 步骤 3: 在 Home Assistant 中添加 reCamera {#configure_ha type=ha_integration required=true config=devices/homeassistant_existing.yaml}
 
-安装 reCamera 集成并连接到 Home Assistant。这一步会自动复制集成文件、重启 HA、添加 reCamera 设备。
+安装 reCamera 集成并连接到 Home Assistant。
 
 ### 接线
 

@@ -102,19 +102,20 @@ Connect reCamera to Home Assistant for unified smart home monitoring.
 
 ## Step 1: Deploy Home Assistant {#deploy_ha type=docker_deploy required=false config=devices/homeassistant.yaml}
 
-Start Home Assistant with the reCamera integration pre-installed. Skip this step if you already have Home Assistant running.
+Start Home Assistant. Skip this step if you already have HA running.
 
 ### Target: Run on This Computer {#ha_local type=local config=devices/homeassistant.yaml default=true}
 
 ### Wiring
 
-Make sure Docker Desktop is installed and running, with at least 2GB free disk space.
+1. Make sure Docker Desktop is installed and running
+2. Ensure at least 2GB free disk space
 
-After deployment completes:
+### Deployment Complete
 
 1. Open **http://localhost:8123** in your browser
-2. Follow the onboarding wizard to create your admin account (remember your username and password — you'll need them in Step 3)
-3. Complete the basic setup (location, timezone, etc.)
+2. Follow the onboarding wizard to create your admin account
+3. Remember your username and password — you'll need them in Step 3
 
 ### Troubleshooting
 
@@ -128,17 +129,14 @@ After deployment completes:
 
 ### Wiring
 
-| Field | Example |
-|-------|---------|
-| Device IP | 192.168.1.100 or reComputer-R110x.local |
-| Username | recomputer |
-| Password | 12345678 |
+1. Connect the target device to the network
+2. Enter IP address, username and password below
 
-After deployment completes:
+### Deployment Complete
 
 1. Open **http://\<device-ip\>:8123** in your browser
-2. Follow the onboarding wizard to create your admin account (remember your username and password — you'll need them in Step 3)
-3. Complete the basic setup (location, timezone, etc.)
+2. Follow the onboarding wizard to create your admin account
+3. Remember your username and password — you'll need them in Step 3
 
 ### Troubleshooting
 
@@ -151,7 +149,7 @@ After deployment completes:
 
 ## Step 2: Deploy AI Detection Flow {#deploy_flow type=recamera_nodered required=true config=devices/recamera.yaml}
 
-Install YOLO detection + RTSP streaming flow on reCamera. This enables the camera to detect objects and serve a video stream that Home Assistant can display.
+Install YOLO detection + RTSP streaming flow on reCamera.
 
 ### Wiring
 
@@ -171,7 +169,7 @@ Install YOLO detection + RTSP streaming flow on reCamera. This enables the camer
 
 ## Step 3: Add reCamera to Home Assistant {#configure_ha type=ha_integration required=true config=devices/homeassistant_existing.yaml}
 
-Install the reCamera integration and connect it to Home Assistant. This step automatically copies the integration files, restarts HA, and adds the reCamera device.
+Install the reCamera integration and connect it to Home Assistant.
 
 ### Wiring
 

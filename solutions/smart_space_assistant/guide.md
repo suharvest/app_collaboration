@@ -9,8 +9,8 @@ Add face recognition to your Xiaozhi, letting it recognize family and friends.
 
 **What you'll get:**
 - Automatic greeting when recognized face appears
-- Voice-based face enrollment ("Remember my face, I'm John")
-- Stores up to 20 people
+- Enroll and manage faces from the web panel (up to 20 people)
+- Voice control to enable, query, and delete faces
 
 **Requirements:** WiFi network · [Xiaozhi App](https://github.com/78/xiaozhi-esp32) for device binding
 
@@ -74,9 +74,9 @@ Device will prompt for network setup on first boot. Follow voice instructions to
 2. Scan the QR code displayed on device
 3. Complete the binding process
 
-### Test the Function
+### Test Voice
 
-Wake up the device by saying "Xiaozhi Xiaozhi", then say "Remember my face, my name is Mike" to test face enrollment.
+Wake up the device by saying "Xiaozhi Xiaozhi" to test voice interaction. If it responds normally, the setup is successful.
 
 ### Troubleshooting
 
@@ -115,9 +115,34 @@ Manage the face recognition database through the app interface.
 
 ### Deployment Complete
 
-Face recognition database is ready!
+Face recognition is ready! Let's try it out.
 
-**Manage faces** directly from this panel — register, rename, or delete entries at any time.
+**Step 1: Enroll faces from the panel above**
+
+Use the **Face Database** panel to enroll family or colleagues (see "Register a New Face" above).
+
+**Step 2: Enable face recognition by voice**
+
+Unplug the USB cable, wake up the device by saying **"Xiaozhi Xiaozhi"**, then say:
+
+> "Turn on face recognition"
+
+Once confirmed, Watcher will automatically scan for faces while idle.
+
+**Step 3: Experience automatic recognition**
+
+Walk in front of the Watcher — it will recognize you and greet you by name!
+
+**Voice Commands**
+
+| Say this | Effect |
+|----------|--------|
+| "Turn on face recognition" | Enable recognition (required on first use) |
+| "Turn off face recognition" | Disable recognition |
+| "Delete face XXX" | Remove an enrolled face |
+| "Who do you know" | List all enrolled faces |
+| "Turn on familiar mode" | Only alert for strangers, ignore familiar faces |
+| "Turn off familiar mode" | Greet everyone |
 
 ---
 
