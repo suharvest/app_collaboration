@@ -190,6 +190,7 @@ solutions/<solution_id>/
 - 每个 Step 标题下方建议写一句描述文字（会自动作为卡片副标题显示）
 - 每个 Step 必须有 `### Wiring` / `### 接线`（如涉及硬件）
 - 每个 Step 必须有 `### Troubleshooting` / `### 故障排查`（表格格式）
+- 有部署后操作的 Step 应有 `### Deployment Complete` / `### 部署完成`（绿色背景提示区）
 - 末尾必须有 `# Deployment Complete` / `# 部署完成`
 
 **Step 9**: 运行质量检查
@@ -393,9 +394,21 @@ ls -lh solutions/<id>/gallery/step3-grafana-config.gif
 ```markdown
 ## Step 1: Deploy Services {#backend type=docker_deploy required=true config=devices/docker.yaml}
 
+Deploy the backend services on your device.
+
 ### Target: Local Deployment {#backend_local type=local config=devices/docker.yaml default=true}
+
+Deploy on your local computer.
+
+### Wiring
+
 1. Ensure Docker is running
 2. Click Deploy
+
+### Deployment Complete
+
+1. Open **http://localhost:8080** in your browser
+2. Create your admin account
 
 ### Troubleshooting
 | Issue | Solution |
@@ -403,14 +416,26 @@ ls -lh solutions/<id>/gallery/step3-grafana-config.gif
 | Docker not found | Install Docker Desktop |
 
 ### Target: Remote Deployment {#backend_remote type=remote config=devices/docker_remote.yaml}
+
+Deploy to a remote device via SSH.
+
+### Wiring
+
 1. Enter device IP and SSH credentials
 2. Click Deploy
+
+### Deployment Complete
+
+1. Open **http://\<device-ip\>:8080** in your browser
+2. Create your admin account
 
 ### Troubleshooting
 | Issue | Solution |
 |-------|----------|
 | SSH failed | Check IP and credentials |
 ```
+
+> ⚠️ **注意**：Target 标题下只写一行简短描述。表格、列表等详细内容必须放在 `### Wiring` 子节中，否则会以原始 markdown 文本显示在选择卡片上。
 
 **设备配置 `devices/docker.yaml`**：
 ```yaml
