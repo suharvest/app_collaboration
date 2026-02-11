@@ -26,9 +26,22 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from ..models.device import DeviceConfig, NodeRedModuleConfig
+from ..utils.recamera_ssh import (
+    build_sudo_cmd,
+    exec_ssh_cmd,
+    kill_nonystem_processes,
+    remove_packages_for_services,
+    restore_nodered_services,
+    start_nodered_services,
+    stop_and_disable_nonystem_services,
+)
 from .nodered_deployer import NodeRedDeployer
 
 logger = logging.getLogger(__name__)
+
+
+# Re-import helpers for device state detection
+from ..utils.recamera_ssh import _is_system_service, _parse_svc_name
 
 
 class DeviceMode(str, Enum):
@@ -71,33 +84,6 @@ class DeviceState:
     def needs_nodered_restore(self) -> bool:
         """Check if Node-RED service needs to be restored (K* → S*)"""
         return self.nodered_disabled and not self.nodered_enabled
-
-
-def _build_sudo_cmd(password: str, cmd: str) -> str:
-    """
-    Build a sudo command with proper password escaping.
-
-    Uses printf instead of echo to avoid issues with special characters
-    (single quotes, backslashes, etc.) in passwords.
-    """
-    escaped_password = shlex.quote(password)
-    return f"printf '%s\\n' {escaped_password} | sudo -S {cmd}"
-
-
-# C++ services that conflict with Node-RED (need to stop and disable)
-CPP_CONFLICT_SERVICES = [
-    "yolo26-detector",
-    "sensecraft",
-    "sscma",
-    "recamera",
-]
-
-# Node-RED related services that need to be enabled
-NODERED_SERVICES = [
-    "node-red",
-    "sscma-node",
-    "sscma-supervisor",
-]
 
 
 DEFAULT_SSCMA_CLIENT_ID = "d4edfe2d22b78af8"
@@ -182,25 +168,16 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
 
                 await self._report_progress(progress_callback, "prepare", 20, state_msg)
 
-                # Step 2: Perform cleanup if needed
-                if state.needs_cpp_cleanup or state.needs_nodered_restore:
-                    await self._report_progress(
-                        progress_callback,
-                        "prepare",
-                        30,
-                        "Cleaning up conflicting state...",
-                    )
-                    await self._ensure_clean_state_for_nodered(
-                        client, state, ssh_password, progress_callback
-                    )
-                else:
-                    # Just do the standard service management
-                    await self._report_progress(
-                        progress_callback, "prepare", 30, "Preparing services..."
-                    )
-                    await self._stop_and_disable_cpp_services(client, ssh_password)
-                    await self._restore_nodered_services(client, ssh_password)
-                    await self._kill_cpp_processes(client, ssh_password)
+                # Step 2: Cleanup and prepare for deployment
+                await self._report_progress(
+                    progress_callback,
+                    "prepare",
+                    30,
+                    "Cleaning up conflicting state...",
+                )
+                await self._ensure_clean_state_for_nodered(
+                    client, state, ssh_password, progress_callback
+                )
 
                 # Step 3: Sync device clock if needed
                 # reCamera via USB has no internet → NTP fails → clock stuck at 1970
@@ -232,59 +209,80 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
         """Check the current deployment state of the device.
 
         Detects:
-        - C++ services (init scripts matching yolo*, detector*, sensecraft*)
-        - Installed C++ packages (via opkg)
-        - Running C++ processes
+        - Non-system services (init scripts not in whitelist)
+        - Installed third-party packages (via opkg)
+        - Running non-system processes
         - Node-RED service state (enabled/disabled, running)
 
         Note: Only S* scripts (enabled) are counted as active services.
         K* scripts (disabled) are tracked separately but don't count as "has service".
         """
-        # Check for C++ init scripts (both S* enabled and K* disabled)
+        # Check for non-system init scripts (exclusion approach)
         cpp_services = []
         cpp_services_enabled = []  # Only S* scripts
-        cpp_patterns = ["yolo", "detector", "sensecraft", "sscma-cpp", "recamera-app"]
-
-        for pattern in cpp_patterns:
-            cmd = f"ls /etc/init.d/S*{pattern}* /etc/init.d/K*{pattern}* 2>/dev/null || true"
-            result = await self._exec_cmd(client, cmd)
-            if result and result.strip():
-                for line in result.strip().split("\n"):
-                    svc = line.strip()
-                    if svc and svc not in cpp_services:
-                        cpp_services.append(svc)
-                        # Track enabled services separately
-                        if "/S" in svc:
-                            cpp_services_enabled.append(svc)
-
-        # Check for installed C++ packages
-        cpp_packages = []
-        cmd = "opkg list-installed 2>/dev/null | grep -E 'yolo|detector|sensecraft|sscma' || true"
-        result = await self._exec_cmd(client, cmd)
+        scan_cmd = "ls /etc/init.d/S* /etc/init.d/K* 2>/dev/null || true"
+        result = await exec_ssh_cmd(client, scan_cmd)
         if result and result.strip():
             for line in result.strip().split("\n"):
-                parts = line.strip().split()
-                if parts:
-                    cpp_packages.append(parts[0])  # Full package name
+                svc_path = line.strip()
+                if not svc_path:
+                    continue
+                svc_file = svc_path.rsplit("/", 1)[-1]
+                svc_name = _parse_svc_name(svc_file)
+                if not svc_name:
+                    continue
+                # Skip system services
+                if _is_system_service(svc_name):
+                    continue
+                if svc_path not in cpp_services:
+                    cpp_services.append(svc_path)
+                    if svc_file[0] == "S":
+                        cpp_services_enabled.append(svc_path)
 
-        # Check for running C++ processes (use ps instead of pgrep for BusyBox compatibility)
-        cmd = "ps aux 2>/dev/null | grep -v grep | grep -E 'yolo.*detector|sensecraft|sscma-cpp' && echo 'running' || true"
-        result = await self._exec_cmd(client, cmd)
-        cpp_processes_running = result and "running" in result
+        # Check for installed third-party packages (exclusion approach)
+        cpp_packages = []
+        if cpp_services:
+            cmd = "opkg list-installed 2>/dev/null || true"
+            result = await exec_ssh_cmd(client, cmd)
+            if result and result.strip():
+                for line in result.strip().split("\n"):
+                    parts = line.strip().split()
+                    if not parts:
+                        continue
+                    pkg_name = parts[0]
+                    pkg_lower = pkg_name.lower()
+                    for svc_path in cpp_services:
+                        svc_file = svc_path.rsplit("/", 1)[-1]
+                        svc_name = _parse_svc_name(svc_file)
+                        if svc_name and svc_name.lower() in pkg_lower:
+                            cpp_packages.append(pkg_name)
+                            break
+
+        # Check for running non-system processes
+        cpp_processes_running = False
+        for svc_path in cpp_services_enabled:
+            svc_file = svc_path.rsplit("/", 1)[-1]
+            svc_name = _parse_svc_name(svc_file)
+            if svc_name:
+                cmd = f"ps aux 2>/dev/null | grep -v grep | grep -q {shlex.quote(svc_name)} && echo 'running' || true"
+                result = await exec_ssh_cmd(client, cmd)
+                if result and "running" in result:
+                    cpp_processes_running = True
+                    break
 
         # Check Node-RED enabled state (S* script exists)
         cmd = "ls /etc/init.d/S*node-red* 2>/dev/null && echo 'enabled' || true"
-        result = await self._exec_cmd(client, cmd)
+        result = await exec_ssh_cmd(client, cmd)
         nodered_enabled = result and "enabled" in result
 
         # Check Node-RED disabled state (K* script exists)
         cmd = "ls /etc/init.d/K*node-red* 2>/dev/null && echo 'disabled' || true"
-        result = await self._exec_cmd(client, cmd)
+        result = await exec_ssh_cmd(client, cmd)
         nodered_disabled = result and "disabled" in result
 
         # Check Node-RED running (use ps instead of pgrep for BusyBox compatibility)
         cmd = "ps aux 2>/dev/null | grep -v grep | grep node-red && echo 'running' || true"
-        result = await self._exec_cmd(client, cmd)
+        result = await exec_ssh_cmd(client, cmd)
         nodered_running = result and "running" in result
 
         # Determine mode
@@ -322,160 +320,58 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
     ) -> None:
         """Ensure device is ready for Node-RED deployment by cleaning up conflicts.
 
-        Actions:
-        - Stop C++ services
-        - Disable C++ autostart (S* → K*)
-        - Uninstall C++ packages
+        Uses shared recamera_ssh module for all cleanup operations:
+        - Stop non-system services (exclusion approach)
+        - Kill remaining processes
+        - Remove packages for disabled services
         - Restore Node-RED service (K* → S*)
         - Start Node-RED if not running
         """
-        # Stop C++ services first
+
+        async def log_cb(msg):
+            await self._report_progress(progress_callback, "prepare", 40, msg)
+
+        # Stop and disable non-system services
         if state.cpp_processes_running or state.cpp_services:
-            logger.info("Stopping C++ services...")
+            logger.info("Stopping non-system services...")
             await self._report_progress(
-                progress_callback, "prepare", 40, "Stopping C++ services..."
+                progress_callback, "prepare", 40, "Stopping non-system services..."
             )
-            await self._stop_and_disable_cpp_services(client, password)
-            await self._kill_cpp_processes(client, password)
-
-        # Uninstall C++ packages
-        if state.cpp_packages:
-            logger.info(f"Uninstalling C++ packages: {state.cpp_packages}")
-            await self._report_progress(
-                progress_callback, "prepare", 50, "Removing C++ packages..."
+            disabled = await stop_and_disable_nonystem_services(
+                client, password, log_cb
             )
 
-            for pkg in state.cpp_packages:
-                cmd = _build_sudo_cmd(
-                    password, f"opkg remove {shlex.quote(pkg)} 2>/dev/null || true"
+            # Kill remaining processes
+            await kill_nonystem_processes(client, password)
+
+            # Remove packages for disabled services
+            if disabled:
+                await self._report_progress(
+                    progress_callback, "prepare", 50, "Removing packages..."
                 )
-                await self._exec_cmd(client, cmd)
+                await remove_packages_for_services(client, password, disabled, log_cb)
 
-        # Restore Node-RED service if it was disabled
-        if state.needs_nodered_restore:
-            logger.info("Restoring Node-RED service...")
-            await self._report_progress(
-                progress_callback, "prepare", 70, "Restoring Node-RED service..."
-            )
-            await self._restore_nodered_services(client, password)
+        # Always restore Node-RED services (K* → S*) after cleanup.
+        # _stop_and_disable_nonystem_services may have accidentally disabled them
+        # if patterns overlap, and we need them enabled for deployment.
+        logger.info("Restoring Node-RED services...")
+        await self._report_progress(
+            progress_callback, "prepare", 70, "Restoring Node-RED services..."
+        )
+        await restore_nodered_services(client, password)
 
         # Start Node-RED if not running
         if not state.nodered_running:
-            logger.info("Starting Node-RED service...")
+            logger.info("Starting Node-RED services...")
             await self._report_progress(
                 progress_callback, "prepare", 80, "Starting Node-RED..."
             )
-
-            # Find and start Node-RED service
-            start_script = """for svc in /etc/init.d/S*node-red*; do
-    if [ -f "$svc" ]; then
-        $svc start && echo "Started: $svc"
-    fi
-done"""
-            cmd = (
-                _build_sudo_cmd(password, f"sh -c {shlex.quote(start_script)}")
-                + " 2>/dev/null || true"
-            )
-            result = await self._exec_cmd(client, cmd)
-            if result and "Started:" in result:
-                logger.info(result.strip())
+            await start_nodered_services(client, password)
 
             # Wait for Node-RED to start
             await asyncio.sleep(3)
 
         logger.info("Device cleanup completed, ready for Node-RED deployment")
-
-    async def _stop_and_disable_cpp_services(
-        self,
-        client,
-        password: str,
-    ) -> None:
-        """Stop C++ services and disable them (S* → K*)."""
-        # Find all C++ related services
-        for svc_name in CPP_CONFLICT_SERVICES:
-            # Stop and disable S* version
-            stop_script = f'for f in /etc/init.d/S*{svc_name}*; do [ -f "$f" ] && $f stop 2>/dev/null; done'
-            stop_cmd = (
-                _build_sudo_cmd(password, f"sh -c {shlex.quote(stop_script)}")
-                + " || true"
-            )
-            await self._exec_cmd(client, stop_cmd)
-
-            # Rename S* to K* to disable auto-start
-            disable_script = f"""for svc in /etc/init.d/S*{svc_name}*; do
-    if [ -f "$svc" ]; then
-        new_name=$(echo "$svc" | sed "s|/S|/K|")
-        mv "$svc" "$new_name" 2>/dev/null && echo "Disabled: $svc -> $new_name"
-    fi
-done"""
-            disable_cmd = (
-                _build_sudo_cmd(password, f"sh -c {shlex.quote(disable_script)}")
-                + " || true"
-            )
-            result = await self._exec_cmd(client, disable_cmd)
-            if result and "Disabled:" in result:
-                logger.info(result.strip())
-
-        # Also scan for other custom S9* services and stop them
-        scan_script = 'for f in /etc/init.d/S9*; do [ -f "$f" ] && basename "$f"; done'
-        scan_cmd = (
-            _build_sudo_cmd(password, f"sh -c {shlex.quote(scan_script)}")
-            + " 2>/dev/null || true"
-        )
-        result = await self._exec_cmd(client, scan_cmd)
-        if result:
-            for svc in result.strip().split("\n"):
-                svc = svc.strip()
-                if not svc:
-                    continue
-                # Skip Node-RED related services
-                if any(
-                    nr in svc.lower()
-                    for nr in ["node-red", "sscma-node", "sscma-supervisor"]
-                ):
-                    continue
-                # Stop other S9* services
-                cmd = _build_sudo_cmd(
-                    password, f"/etc/init.d/{svc} stop 2>/dev/null || true"
-                )
-                await self._exec_cmd(client, cmd)
-
-    async def _restore_nodered_services(
-        self,
-        client,
-        password: str,
-    ) -> None:
-        """Restore Node-RED services that may have been disabled (K* → S*)."""
-        for svc_name in NODERED_SERVICES:
-            # Rename K* back to S* to enable auto-start
-            restore_script = f"""for svc in /etc/init.d/K*{svc_name}*; do
-    if [ -f "$svc" ]; then
-        new_name=$(echo "$svc" | sed "s|/K|/S|")
-        mv "$svc" "$new_name" 2>/dev/null && echo "Restored: $svc -> $new_name"
-    fi
-done"""
-            restore_cmd = (
-                _build_sudo_cmd(password, f"sh -c {shlex.quote(restore_script)}")
-                + " || true"
-            )
-            result = await self._exec_cmd(client, restore_cmd)
-            if result and "Restored:" in result:
-                logger.info(result.strip())
-
-    async def _kill_cpp_processes(
-        self,
-        client,
-        password: str,
-    ) -> None:
-        """Kill any remaining C++ processes (use killall, no pkill on BusyBox)."""
-        kill_cmds = [
-            _build_sudo_cmd(password, "killall yolo11-detector 2>/dev/null || true"),
-            _build_sudo_cmd(password, "killall yolo26-detector 2>/dev/null || true"),
-            _build_sudo_cmd(password, "killall sensecraft 2>/dev/null || true"),
-            _build_sudo_cmd(password, "killall sscma-cpp 2>/dev/null || true"),
-        ]
-        for cmd in kill_cmds:
-            await self._exec_cmd(client, cmd)
 
     async def _sync_device_clock(
         self,
@@ -495,7 +391,7 @@ done"""
         import datetime
 
         # Read device's current year
-        result = await self._exec_cmd(client, "date +%Y")
+        result = await exec_ssh_cmd(client, "date +%Y")
         if not result:
             return
 
@@ -522,29 +418,12 @@ done"""
         utc_now = datetime.datetime.now(datetime.timezone.utc).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
-        cmd = _build_sudo_cmd(password, f"date -s {shlex.quote(utc_now)}")
-        result = await self._exec_cmd(client, cmd)
+        cmd = build_sudo_cmd(password, f"date -s {shlex.quote(utc_now)}")
+        result = await exec_ssh_cmd(client, cmd)
         if result:
             logger.info(f"Device clock synced to: {utc_now} UTC")
         else:
             logger.warning("Failed to sync device clock")
-
-    async def _exec_cmd(
-        self,
-        client,
-        cmd: str,
-        timeout: int = 30,
-    ) -> Optional[str]:
-        """Execute SSH command and return stdout."""
-        try:
-            stdin, stdout, stderr = await asyncio.to_thread(
-                client.exec_command, cmd, timeout=timeout
-            )
-            stdout.channel.recv_exit_status()
-            return stdout.read().decode()
-        except Exception as e:
-            logger.debug(f"Command failed: {e}")
-            return None
 
     async def _discover_sscma_client_id(
         self,
@@ -837,7 +716,7 @@ done"""
 
                 # Extract into userDir (no sudo needed, owned by recamera)
                 extract_cmd = f"tar xzf {remote_tmp} -C {nodered_user_dir}"
-                result = await self._exec_cmd(client, extract_cmd, timeout=60)
+                await exec_ssh_cmd(client, extract_cmd, timeout=60)
 
                 # Update package.json to register the module
                 version_spec = f"~{module.version}" if module.version else "*"
@@ -854,14 +733,14 @@ done"""
                     f'sed -i \'"dependencies":/a\\    "{module.name}": "{version_spec}",\' '
                     f"{nodered_user_dir}/package.json"
                 )
-                await self._exec_cmd(client, update_pkg_script, timeout=10)
+                await exec_ssh_cmd(client, update_pkg_script, timeout=10)
 
                 # Verify extraction
                 check_cmd = (
                     f"ls {nodered_user_dir}/node_modules/{module.name}/package.json "
                     f"2>/dev/null && echo 'EXTRACTED_OK'"
                 )
-                check_result = await self._exec_cmd(client, check_cmd)
+                check_result = await exec_ssh_cmd(client, check_cmd)
                 if check_result and "EXTRACTED_OK" in check_result:
                     logger.info(f"Module {module.name} extracted to device userDir")
                 else:
@@ -870,7 +749,7 @@ done"""
                     )
 
                 # Clean up remote tarball
-                await self._exec_cmd(client, f"rm -f {remote_tmp}")
+                await exec_ssh_cmd(client, f"rm -f {remote_tmp}")
                 return True
 
         except Exception as e:
@@ -895,7 +774,7 @@ done"""
             async with self._ssh_connect(connection) as client:
                 # Kill node-red process — init script auto-restarts it
                 kill_cmd = "kill $(pidof node-red) 2>/dev/null && echo 'KILLED'"
-                result = await self._exec_cmd(client, kill_cmd, timeout=10)
+                result = await exec_ssh_cmd(client, kill_cmd, timeout=10)
                 if result and "KILLED" in result:
                     logger.info("Node-RED process killed, waiting for auto-restart...")
                     # Wait for init script to respawn and Node-RED to begin startup.
@@ -908,6 +787,85 @@ done"""
         except Exception as e:
             logger.warning(f"Node-RED restart failed: {e}")
             return False
+
+    async def _post_deploy_hook(
+        self,
+        config: DeviceConfig,
+        connection: Dict[str, Any],
+        progress_callback: Optional[Callable] = None,
+    ) -> None:
+        """Restart sscma-node and sscma-supervisor after flow deployment.
+
+        The flow uses SSCMA camera/model nodes which depend on sscma-node
+        for MQTT communication and sscma-supervisor for WebSocket preview
+        (port 8090). These services must be restarted after deploying a
+        new flow so they pick up the updated configuration.
+        """
+        recamera_ip = connection.get("recamera_ip")
+        ssh_password = connection.get("ssh_password")
+
+        if not recamera_ip or not ssh_password:
+            return
+
+        try:
+            import paramiko
+
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+            try:
+                await asyncio.to_thread(
+                    client.connect,
+                    hostname=recamera_ip,
+                    port=connection.get("ssh_port", 22),
+                    username=connection.get("ssh_username", "recamera"),
+                    password=ssh_password,
+                    timeout=10,
+                )
+
+                await self._report_progress(
+                    progress_callback,
+                    "verify",
+                    50,
+                    "Restarting camera services...",
+                )
+
+                # Restart sscma-node and sscma-supervisor via init scripts
+                for svc_name in ["sscma-node", "sscma-supervisor"]:
+                    restart_script = f"""for svc in /etc/init.d/S*{svc_name}* /etc/init.d/K*{svc_name}*; do
+    if [ -f "$svc" ]; then
+        $svc stop 2>/dev/null
+        sleep 1
+        $svc start 2>/dev/null && echo "Restarted: $svc"
+    fi
+done"""
+                    cmd = (
+                        build_sudo_cmd(
+                            ssh_password, f"sh -c {shlex.quote(restart_script)}"
+                        )
+                        + " 2>/dev/null || true"
+                    )
+                    result = await exec_ssh_cmd(client, cmd)
+                    if result and "Restarted:" in result:
+                        logger.info(result.strip())
+
+                # Wait for services to initialize
+                await asyncio.sleep(5)
+
+                await self._report_progress(
+                    progress_callback,
+                    "verify",
+                    80,
+                    "Camera services restarted",
+                )
+
+            finally:
+                client.close()
+
+        except ImportError:
+            logger.warning("paramiko not available, skipping service restart")
+        except Exception as e:
+            logger.warning(f"Post-deploy service restart failed (non-fatal): {e}")
 
     async def get_current_flows(
         self,

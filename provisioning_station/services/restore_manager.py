@@ -496,9 +496,20 @@ class RestoreManager:
         device_config: Dict[str, Any],
         connection: Dict[str, Any],
     ):
-        """Restore reCamera via SSH commands"""
+        """Restore reCamera via SSH using shared cleanup logic.
+
+        Uses the same exclusion-based cleanup as the deployer:
+        1. Stop and disable non-system services (whitelist approach)
+        2. Kill remaining processes
+        3. Remove packages for disabled services
+        4. Remove deployed models
+        5. Restore Node-RED services (K* → S*)
+        6. Start Node-RED services
+        """
         try:
             import paramiko
+
+            from ..utils.recamera_ssh import full_cleanup_and_restore
 
             host = connection.get("host")
             username = connection.get(
@@ -515,8 +526,7 @@ class RestoreManager:
             if not password:
                 raise ValueError("SSH password required")
 
-            restore_ops = device_config.get("restore_operations", [])
-            operation.total_steps = len(restore_ops)
+            operation.total_steps = 6
 
             self._add_log(
                 operation, "info", f"Connecting to {host}:{port} as {username}"
@@ -529,7 +539,8 @@ class RestoreManager:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
             try:
-                ssh.connect(
+                await asyncio.to_thread(
+                    ssh.connect,
                     hostname=host,
                     port=port,
                     username=username,
@@ -544,10 +555,10 @@ class RestoreManager:
                 operation.message = "Checking remote operating system..."
                 await self._notify_progress(operation)
 
-                stdin, stdout, stderr = ssh.exec_command("uname -s", timeout=30)
-                os_name = stdout.read().decode("utf-8", errors="ignore").strip().lower()
+                from ..utils.recamera_ssh import exec_ssh_cmd
 
-                if os_name != "linux":
+                os_name = await exec_ssh_cmd(ssh, "uname -s")
+                if not os_name or os_name.strip().lower() != "linux":
                     raise RuntimeError(
                         f"Remote device is not running Linux (detected: {os_name}). "
                         f"Only Linux devices are supported for restore operations."
@@ -557,61 +568,45 @@ class RestoreManager:
                     operation, "info", "Confirmed remote device is running Linux"
                 )
 
-                for i, restore_op in enumerate(restore_ops):
-                    op_name = restore_op.get("name", f"Step {i + 1}")
-                    op_command = restore_op.get("command", "")
-
-                    operation.current_step = op_name
-                    operation.message = f"Executing: {op_name}"
-                    operation.progress = int((i / operation.total_steps) * 100)
+                # Run full cleanup and restore using shared logic
+                async def log_callback(msg):
+                    self._add_log(operation, "info", msg)
+                    operation.message = msg
+                    operation.completed_steps = min(
+                        operation.total_steps, operation.completed_steps + 1
+                    )
+                    operation.progress = int(
+                        (operation.completed_steps / operation.total_steps) * 90
+                    )
                     await self._notify_progress(operation)
-                    self._add_log(operation, "info", f"Executing: {op_name}")
 
-                    # Replace sudo with password-enabled sudo -S
-                    # This handles commands that use 'sudo' which requires password
-                    if "sudo " in op_command and password:
-                        # Use printf to avoid echo issues with special characters
-                        # Replace 'sudo ' with 'printf "password\n" | sudo -S '
-                        escaped_password = password.replace("'", "'\"'\"'")
-                        op_command = op_command.replace(
-                            "sudo ", f"printf '%s\\n' '{escaped_password}' | sudo -S "
-                        )
+                operation.message = "Restoring factory state..."
+                operation.progress = 10
+                await self._notify_progress(operation)
 
-                    # Execute command
-                    try:
-                        stdin, stdout, stderr = ssh.exec_command(op_command, timeout=60)
-                        exit_status = stdout.channel.recv_exit_status()
+                await full_cleanup_and_restore(ssh, password, log_callback)
 
-                        stdout_text = (
-                            stdout.read().decode("utf-8", errors="ignore").strip()
-                        )
-                        stderr_text = (
-                            stderr.read().decode("utf-8", errors="ignore").strip()
-                        )
+                # Reboot device to reinitialize ISP/camera pipeline.
+                # Stopped C++ services (e.g. yolo11-detector) leave the
+                # video pipeline in a dirty state; only a reboot cleans it.
+                from ..utils.recamera_ssh import build_sudo_cmd
 
-                        if stdout_text:
-                            self._add_log(operation, "info", f"Output: {stdout_text}")
-                        if stderr_text and exit_status != 0:
-                            self._add_log(
-                                operation, "warning", f"Stderr: {stderr_text}"
-                            )
+                operation.message = "Rebooting device..."
+                operation.progress = 92
+                await self._notify_progress(operation)
+                self._add_log(operation, "info", "Rebooting device...")
 
-                        self._add_log(operation, "info", f"Completed: {op_name}")
-
-                    except Exception as cmd_err:
-                        self._add_log(
-                            operation,
-                            "warning",
-                            f"Error executing {op_name}: {cmd_err}",
-                        )
-
-                    operation.completed_steps = i + 1
-
-                    # Small delay between operations
-                    await asyncio.sleep(0.5)
+                await exec_ssh_cmd(ssh, build_sudo_cmd(password, "reboot"), timeout=5)
 
             finally:
                 ssh.close()
+
+            # Wait for device to come back up (~90s for reCamera boot + Node-RED start)
+            operation.message = "Waiting for device to reboot..."
+            operation.progress = 95
+            await self._notify_progress(operation)
+            self._add_log(operation, "info", "Waiting for device to reboot (~90s)...")
+            await asyncio.sleep(90)
 
             # Complete
             operation.status = RestoreStatus.COMPLETED
