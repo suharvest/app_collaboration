@@ -40,9 +40,34 @@ export async function detectDevices() {
     });
 
     await refreshSerialPorts();
+
+    // Retry if any USB device didn't get a port auto-selected
+    // (handles USB devices that are slow to enumerate)
+    if (hasUnselectedSerialPorts()) {
+      setTimeout(() => refreshSerialPorts(), 1500);
+    }
   } catch (error) {
     console.error('Device detection failed:', error);
+    // Even if detect fails, still try to list and auto-select ports
+    await refreshSerialPorts().catch(() => {});
   }
+}
+
+/**
+ * Check if any USB device still has no port selected
+ */
+function hasUnselectedSerialPorts() {
+  const currentSolution = getCurrentSolution();
+  const deployment = currentSolution?.deployment || {};
+  const devices = getFilteredDevices(deployment.devices || []);
+
+  for (const device of devices) {
+    if (device.type === 'esp32_usb' || device.type === 'himax_usb') {
+      const select = document.getElementById(`serial-port-${device.id}`);
+      if (select && !select.value) return true;
+    }
+  }
+  return false;
 }
 
 // ============================================
@@ -365,6 +390,16 @@ export async function startDeployment(deviceId) {
       username: document.getElementById(`ssh-user-${deviceId}`)?.value || 'recamera',
       password: document.getElementById(`ssh-pass-${deviceId}`)?.value,
     };
+  } else if (device.type === 'ha_integration') {
+    // HA integration - collect all user_inputs into device_connections
+    params.device_connections[deviceId] = {};
+    const inputs = device.user_inputs || [];
+    inputs.forEach(input => {
+      const el = document.getElementById(`input-${deviceId}-${input.id}`);
+      if (el) {
+        params.device_connections[deviceId][input.id] = el.value;
+      }
+    });
   } else {
     // For local docker or other types, include target if selected
     params.device_connections[deviceId] = {
