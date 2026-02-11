@@ -1,0 +1,63 @@
+version: "1.0"
+id: homeassistant_existing
+name: Existing Home Assistant
+name_zh: 已有 Home Assistant
+type: ha_integration
+
+user_inputs:
+  - id: host
+    name: HA Address
+    name_zh: HA 地址
+    type: text
+    required: true
+    placeholder: "192.168.1.100"
+    description: Home Assistant IP address or hostname
+    description_zh: Home Assistant 的 IP 地址或主机名
+    row: 1
+
+  - id: username
+    name: HA Username
+    name_zh: HA 用户名
+    type: text
+    required: true
+    description: Home Assistant login username
+    description_zh: Home Assistant 登录用户名
+    row: 2
+
+  - id: password
+    name: HA Password
+    name_zh: HA 密码
+    type: password
+    required: true
+    description: Home Assistant login password
+    description_zh: Home Assistant 登录密码
+    row: 2
+
+  - id: recamera_ip
+    name: reCamera IP
+    name_zh: reCamera IP 地址
+    type: text
+    required: true
+    default: "192.168.42.1"
+    placeholder: "192.168.42.1"
+    description: "reCamera IP (USB: 192.168.42.1, or WiFi IP)"
+    description_zh: "reCamera IP 地址（USB 连接用 192.168.42.1，或 WiFi IP）"
+    row: 3
+
+  - id: ssh_username
+    name: SSH Username (Docker only)
+    name_zh: SSH 用户名（仅 Docker 需要）
+    type: text
+    required: false
+    description: "Leave empty for HA OS — SSH will be set up automatically"
+    description_zh: "HA OS 用户留空 — SSH 会自动安装配置"
+    row: 4
+
+  - id: ssh_password
+    name: SSH Password (Docker only)
+    name_zh: SSH 密码（仅 Docker 需要）
+    type: password
+    required: false
+    description: "Leave empty for HA OS"
+    description_zh: "HA OS 用户留空"
+    row: 4
