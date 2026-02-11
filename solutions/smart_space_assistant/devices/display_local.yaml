@@ -40,10 +40,6 @@ docker:
       health_check_endpoint: /
       required: true
 
-  images:
-    - name: sensecraft-missionpack.seeed.cn/solution/xiaozhi-display:latest
-      required: true
-
 pre_checks:
   - type: docker_version
     min_version: "20.0"

@@ -41,10 +41,6 @@ docker_remote:
       health_check_endpoint: /
       required: true
 
-  images:
-    - name: sensecraft-missionpack.seeed.cn/solution/xiaozhi-display:latest
-      required: true
-
 user_inputs:
   - id: host
     name: Device IP

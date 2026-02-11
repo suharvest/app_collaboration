@@ -45,14 +45,6 @@ docker_remote:
     - name: watchtower
       required: false
 
-  images:
-    - name: sensecraft-missionpack.seeed.cn/respeaker/sensecraft-voice-client:v0.0.2
-      required: true
-    - name: sensecraft-missionpack.seeed.cn/respeaker/sensecraft-asr-server:latest
-      required: true
-    - name: sensecraft-missionpack.seeed.cn/respeaker/containrrr/watchtower:latest
-      required: false
-
   models:
     - name: ASR Models
       name_zh: 语音识别模型

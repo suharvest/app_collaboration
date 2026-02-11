@@ -45,12 +45,6 @@ docker_remote:
       health_check_endpoint: /api/health
       required: true
 
-  images:
-    - name: influxdb:2.7
-      required: true
-    - name: grafana/grafana:latest
-      required: true
-
 user_inputs:
   - id: host
     name: Device IP

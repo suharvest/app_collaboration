@@ -39,10 +39,6 @@ docker_remote:
       health_check_endpoint: /
       required: true
 
-  images:
-    - name: seeedcloud/sensecraft-indoor-positioning
-      required: true
-
 user_inputs:
   - id: host
     name: Device IP

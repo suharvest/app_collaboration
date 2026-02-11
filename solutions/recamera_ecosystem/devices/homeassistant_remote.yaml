@@ -32,9 +32,6 @@ docker_remote:
       port: 8123
       health_check_endpoint: /api/
       required: true
-  images:
-    - name: ghcr.io/home-assistant/home-assistant:stable
-      required: true
 
 user_inputs:
   - id: host
