@@ -463,12 +463,16 @@ export function renderDeploySection(device, stepNumber) {
   const isDockerDeploy = device.type === 'docker_deploy' && device.targets;
   const isRecameraCppWithTargets = device.type === 'recamera_cpp' && device.targets;
 
-  // For devices with targets, get troubleshoot from selected target's section
+  // For devices with targets, get troubleshoot and post_deploy from selected target's section
   let sectionTroubleshoot = section.troubleshoot || '';
+  let sectionPostDeploy = section.post_deploy || '';
   if ((isDockerDeploy || isRecameraCppWithTargets) && device.targets) {
     const target = getSelectedTarget(device);
     if (target?.section?.troubleshoot) {
       sectionTroubleshoot = target.section.troubleshoot;
+    }
+    if (target?.section?.post_deploy) {
+      sectionPostDeploy = target.section.post_deploy;
     }
   }
   const isCompleted = state.deploymentStatus === 'completed';
@@ -506,6 +510,13 @@ export function renderDeploySection(device, stepNumber) {
           isSerialCamera ? renderSerialCameraSectionContent(device, state, sectionDescription) :
           (isDockerDeploy || isRecameraCppWithTargets) ? renderTargetSectionContent(device, state) :
           renderAutoSectionContent(device, state, sectionDescription, isScript)}
+
+        <!-- Post-Deploy Section -->
+        ${sectionPostDeploy ? `
+          <div class="deploy-post-deploy">
+            <div class="markdown-content">${processMarkdown(sectionPostDeploy)}</div>
+          </div>
+        ` : ''}
 
         <!-- Troubleshoot Section (shown below deploy button) -->
         ${sectionTroubleshoot ? `
@@ -652,14 +663,25 @@ export function renderDeployControls(device, options = {}) {
     controls.push(renderModelSelection(device));
   }
 
-  // User inputs for script type
-  if (device.type === 'script' && device.user_inputs) {
-    controls.push(renderUserInputs(device, device.user_inputs));
-  }
+  // Generic user_inputs rendering for any device type not already handled above.
+  // SSH remote types merge user_inputs into SSH form; serial types don't use them.
+  // All other types: render user_inputs automatically from YAML config.
+  const userInputsAlreadyRendered =
+    (SSH_DEVICE_TYPES.includes(device.type) && (device.type === 'docker_remote' || isRemote)) ||
+    SERIAL_DEVICE_TYPES.includes(device.type) ||
+    (device.type === 'docker_deploy' && isRemote);
 
-  // User inputs for local docker_deploy target (non-SSH inputs)
-  if (device.type === 'docker_deploy' && !isRemote && target?.user_inputs) {
-    controls.push(renderUserInputs(device, target.user_inputs));
+  if (!userInputsAlreadyRendered) {
+    const inputs = target?.user_inputs || device.user_inputs;
+    if (inputs) {
+      // For SSH device types, exclude SSH fields (already shown in SSH form)
+      if (SSH_DEVICE_TYPES.includes(device.type)) {
+        const sshExcludeIds = ['host', 'username', 'password', 'port'];
+        controls.push(renderUserInputs(device, inputs, sshExcludeIds));
+      } else {
+        controls.push(renderUserInputs(device, inputs));
+      }
+    }
   }
 
   return controls.join('');
@@ -816,8 +838,6 @@ function renderSerialCameraSectionContent(device, state, sectionDescription) {
  * Unified structure: warning -> user inputs -> description -> controls -> action
  */
 function renderAutoSectionContent(device, state, sectionDescription, isScript) {
-  const section = device.section || {};
-
   return `
     <!-- Service Switch Warning -->
     ${renderServiceSwitchWarning(device.type)}
@@ -826,13 +846,14 @@ function renderAutoSectionContent(device, state, sectionDescription, isScript) {
     ${isScript && device.user_inputs ? renderUserInputs(device, device.user_inputs) : ''}
 
     <!-- Content area: wiring + description -->
-    ${renderWiringSection(section.wiring, getCurrentSolution()?.id)}
+    ${renderWiringSection(device.section?.wiring, getCurrentSolution()?.id)}
     ${renderDescriptionSection(sectionDescription)}
 
-    <!-- Deploy controls (SSH form, serial port, etc.) -->
+    <!-- Deploy controls (SSH form, serial port, or generic user inputs) -->
     ${SSH_DEVICE_TYPES.includes(device.type) ? renderSSHForm(device) : ''}
     ${(device.type === 'docker_remote' || device.type === 'recamera_nodered') && device.user_inputs ? renderUserInputs(device, device.user_inputs, ['host', 'username', 'password', 'port']) : ''}
     ${SERIAL_DEVICE_TYPES.includes(device.type) ? renderSerialPortSelector(device) : ''}
+    ${!isScript && !SSH_DEVICE_TYPES.includes(device.type) && !SERIAL_DEVICE_TYPES.includes(device.type) && device.user_inputs ? renderUserInputs(device, device.user_inputs) : ''}
 
     <!-- Deploy button -->
     ${renderDeployActionArea(device, state)}

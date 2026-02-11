@@ -41,6 +41,11 @@ export class SerialCameraCanvas {
     this._frameCallbacks = [];
     this._statusCallbacks = [];
 
+    // Canvas dimensions (cached, only updated on resize)
+    this._canvasW = 0;
+    this._canvasH = 0;
+    this._resizeObserver = null;
+
     // Stats
     this._frameCount = 0;
     this._lastFpsTime = performance.now();
@@ -87,6 +92,28 @@ export class SerialCameraCanvas {
 
     this.canvas = this.container.querySelector('#sc-canvas');
     this.ctx = this.canvas.getContext('2d');
+
+    // Set initial canvas size and watch for resizes
+    this._updateCanvasSize();
+    this._resizeObserver = new ResizeObserver(() => this._updateCanvasSize());
+    this._resizeObserver.observe(this.canvas.parentElement);
+  }
+
+  /**
+   * Update canvas backing size (only on init/resize, NOT every frame)
+   */
+  _updateCanvasSize() {
+    const rect = this.canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const newW = Math.round(rect.width * dpr);
+    const newH = Math.round(rect.height * dpr);
+
+    if (newW !== this._canvasW || newH !== this._canvasH) {
+      this._canvasW = newW;
+      this._canvasH = newH;
+      this.canvas.width = newW;
+      this.canvas.height = newH;
+    }
   }
 
   /**
@@ -179,6 +206,10 @@ export class SerialCameraCanvas {
    */
   destroy() {
     this.disconnect();
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = null;
+    }
     this._frameCallbacks = [];
     this._statusCallbacks = [];
     this.container.innerHTML = '';
@@ -267,14 +298,12 @@ export class SerialCameraCanvas {
   }
 
   _drawWithContext(drawFn) {
-    const canvas = this.canvas;
     const ctx = this.ctx;
-    const containerRect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = containerRect.width * (window.devicePixelRatio || 1);
-    canvas.height = containerRect.height * (window.devicePixelRatio || 1);
-    ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-    const cw = containerRect.width;
-    const ch = containerRect.height;
+    const dpr = window.devicePixelRatio || 1;
+    const cw = this._canvasW / dpr;
+    const ch = this._canvasH / dpr;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawFn(cw, ch);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
