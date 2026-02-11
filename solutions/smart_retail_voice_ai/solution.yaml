@@ -49,7 +49,7 @@ intro:
     deployed_count: 0
     likes_count: 0
     difficulty: intermediate
-    estimated_time: 45min
+    estimated_time: 30min
   links:
     wiki: https://wiki.seeedstudio.com/cn/solutions/smart-retail-voice-ai-solution-1/
     purchase: https://www.seeedstudio.com.cn/solutions/voicecollectionanalysis-zh-hans
