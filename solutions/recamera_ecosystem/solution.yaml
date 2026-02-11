@@ -1,0 +1,90 @@
+version: '1.0'
+id: recamera_ecosystem
+name: reCamera Ecosystem
+name_zh: reCamera 生态集成
+intro:
+  summary: One reCamera, many platforms — heatmap preview, Home Assistant integration, and more ecosystem connections
+  summary_zh: 一台 reCamera 对接多种平台——热力图预览、Home Assistant 集成，以及更多生态对接
+  description_file: description.md
+  description_file_zh: description_zh.md
+  cover_image: gallery/recamera.svg
+  category: automation
+  tags:
+  - recamera
+  - home-assistant
+  - yolo
+  - smart-home
+  - rtsp
+  - privacy
+  device_catalog:
+    recamera:
+      name: reCamera
+      name_zh: reCamera
+      image: gallery/recamera.svg
+      product_url: https://www.seeedstudio.com/reCamera-2002w-8GB-p-6250.html
+      description: AI camera with YOLO detection and RTSP streaming
+      description_zh: AI 摄像头，支持 YOLO 识别和 RTSP 视频流
+    recomputer_r1100:
+      name: reComputer R1100
+      name_zh: reComputer R1100
+      image: gallery/recomputer.svg
+      product_url: https://www.seeedstudio.com/reComputer-R1100-p-6253.html
+      description: Edge computing device for running Home Assistant
+      description_zh: 边缘计算设备，运行 Home Assistant
+  stats:
+    deployed_count: 0
+    likes_count: 0
+    difficulty: beginner
+    estimated_time: 20min
+  links:
+    github: https://github.com/xr686/reCamer_HA
+  presets:
+  - id: simple
+    name: Quick Preview
+    name_zh: 快速预览
+    badge: Quick Start
+    badge_zh: 快速上手
+    description: Just reCamera - see heatmap directly on camera, no extra setup
+    description_zh: 只需 reCamera，直接在摄像头上看热力图，无需额外设置
+    device_groups:
+    - id: camera
+      name: AI Camera
+      name_zh: AI 摄像头
+      type: single
+      required: true
+      options:
+      - device_ref: recamera
+      default: recamera
+    links:
+      wiki: https://wiki.seeedstudio.com/
+      github: https://github.com/Seeed-Studio/sscma-example-sg200x
+  - id: ha_integration
+    name: Home Assistant Integration
+    name_zh: Home Assistant 集成
+    badge: Smart Home
+    badge_zh: 智能家居
+    description: Connect reCamera to Home Assistant — live RTSP stream + AI detection sensor in HA dashboard
+    description_zh: 将 reCamera 接入 Home Assistant，实时 RTSP 画面 + AI 识别传感器一站式显示
+    device_groups:
+    - id: camera
+      name: AI Camera
+      name_zh: AI 摄像头
+      type: single
+      required: true
+      options:
+      - device_ref: recamera
+      default: recamera
+    - id: server
+      name: Home Assistant Server
+      name_zh: Home Assistant 服务器
+      type: single
+      required: true
+      options:
+      - device_ref: recomputer_r1100
+      default: recomputer_r1100
+    links:
+      github: https://github.com/xr686/reCamer_HA
+deployment:
+  guide_file: guide.md
+  guide_file_zh: guide_zh.md
+  selection_mode: sequential

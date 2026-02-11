@@ -1,0 +1,33 @@
+version: "1.0"
+id: homeassistant
+name: Home Assistant
+name_zh: Home Assistant
+
+type: docker_local
+
+detection:
+  method: local
+  requirements:
+    - docker
+
+docker:
+  compose_file: ../assets/docker/docker-compose.yml
+  options:
+    project_name: recamera-homeassistant
+    remove_orphans: true
+  services:
+    - name: homeassistant
+      port: 8123
+      health_check_endpoint: /api/
+      required: true
+
+pre_checks:
+  - type: docker
+    description: Docker must be installed and running
+  - type: port_available
+    ports:
+      - 8123
+
+post_deployment:
+  open_browser: true
+  url: http://localhost:8123

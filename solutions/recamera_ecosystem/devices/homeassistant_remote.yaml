@@ -1,0 +1,72 @@
+version: "1.0"
+id: homeassistant_remote
+name: Home Assistant (Remote)
+name_zh: Home Assistant（远程）
+type: docker_remote
+
+detection:
+  method: network_scan
+  manual_entry: true
+  requirements:
+    - docker_installed
+    - docker_running
+
+ssh:
+  port: 22
+  default_user: root
+  auth_methods:
+    - password
+    - key
+  connection_timeout: 30
+  command_timeout: 600
+
+docker_remote:
+  compose_file: ../assets/docker/docker-compose.yml
+  compose_dir: ../assets/docker
+  remote_path: /home/{{username}}/recamera-ha
+  options:
+    project_name: recamera-homeassistant
+    remove_orphans: true
+  services:
+    - name: homeassistant
+      port: 8123
+      health_check_endpoint: /api/
+      required: true
+  images:
+    - name: ghcr.io/home-assistant/home-assistant:stable
+      required: true
+
+user_inputs:
+  - id: host
+    name: Device IP
+    name_zh: 设备 IP 地址
+    type: text
+    required: true
+    placeholder: "192.168.1.100"
+    description: IP address of the target device (reComputer, Raspberry Pi, etc.)
+    description_zh: 目标设备的 IP 地址（reComputer、树莓派等）
+    validation:
+      pattern: "^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$"
+      message: Please enter a valid IP address
+
+  - id: username
+    name: SSH Username
+    name_zh: SSH 用户名
+    type: text
+    default: recomputer
+    required: true
+    description: SSH login username
+    description_zh: SSH 登录用户名
+
+  - id: password
+    name: SSH Password
+    name_zh: SSH 密码
+    type: password
+    default: "12345678"
+    required: true
+    description: SSH login password
+    description_zh: SSH 登录密码
+
+post_deployment:
+  open_browser: true
+  url: "http://{{host}}:8123"
