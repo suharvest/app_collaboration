@@ -72,6 +72,7 @@ EXPECTED_BASE_STEPS = {
     ],
     "script": ["validate", "setup", "configure", "start", "health_check"],
     "preview": ["preview_setup"],
+    "ha_integration": ["auth", "detect", "ssh", "copy", "restart", "integrate"],
 }
 
 

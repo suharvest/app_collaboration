@@ -619,6 +619,7 @@ class TestValidStepTypes:
             "recamera_cpp",
             "recamera_nodered",
             "serial_camera",
+            "ha_integration",
         }
         assert VALID_STEP_TYPES == expected_types
 

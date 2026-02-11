@@ -96,6 +96,7 @@ class TargetInfo:
         default_factory=lambda: Localized()
     )  # HTML for content area
     troubleshoot: Localized[str] = field(default_factory=lambda: Localized())  # HTML
+    post_deploy: Localized[str] = field(default_factory=lambda: Localized())  # HTML
     wiring: Optional["WiringInfo"] = None
 
 
@@ -111,6 +112,9 @@ class SectionContent:
         default_factory=lambda: Localized()
     )  # HTML content
     troubleshoot: Localized[str] = field(
+        default_factory=lambda: Localized()
+    )  # HTML content
+    post_deploy: Localized[str] = field(
         default_factory=lambda: Localized()
     )  # HTML content
     wiring: Optional[WiringInfo] = None
@@ -199,6 +203,7 @@ VALID_STEP_TYPES = {
     "recamera_cpp",
     "recamera_nodered",
     "serial_camera",
+    "ha_integration",
 }
 
 # Regex patterns
@@ -227,6 +232,9 @@ SUBSECTION_PATTERNS = {
     "wiring": re.compile(r"^###\s+(Wiring|接线)\s*$", re.IGNORECASE),
     "troubleshoot": re.compile(
         r"^###\s+(Troubleshooting|故障排查|故障排除)\s*$", re.IGNORECASE
+    ),
+    "post_deploy": re.compile(
+        r"^###\s+(Deployment\s+Complete|部署完成)\s*$", re.IGNORECASE
     ),
 }
 IMAGE_PATTERN = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
@@ -402,7 +410,13 @@ def parse_subsections(content: str) -> dict[str, str]:
 
     Returns dict with keys: 'main', 'prerequisites', 'wiring', 'troubleshoot'
     """
-    result = {"main": "", "prerequisites": "", "wiring": "", "troubleshoot": ""}
+    result = {
+        "main": "",
+        "prerequisites": "",
+        "wiring": "",
+        "troubleshoot": "",
+        "post_deploy": "",
+    }
 
     lines = content.split("\n")
     current_section = "main"
@@ -510,6 +524,11 @@ def parse_deployment_step(
                 "en": md_to_html(subsections_en.get("troubleshoot", "")),
             }
         ),
+        post_deploy=Localized(
+            {
+                "en": md_to_html(subsections_en.get("post_deploy", "")),
+            }
+        ),
     )
 
     # Add Chinese content if available
@@ -520,6 +539,8 @@ def parse_deployment_step(
             section.subtitle.set("zh", zh_subtitle)
     if subsections_zh.get("troubleshoot"):
         section.troubleshoot.set("zh", md_to_html(subsections_zh["troubleshoot"]))
+    if subsections_zh.get("post_deploy"):
+        section.post_deploy.set("zh", md_to_html(subsections_zh["post_deploy"]))
 
     # Extract wiring if present
     if subsections_en.get("wiring"):
@@ -547,10 +568,10 @@ def parse_deployment_step(
 
 def _parse_target_content(
     content_lines: list[str],
-) -> tuple[str, list[str], Optional[str], str]:
-    """Parse target content into description, wiring steps, wiring image, and troubleshoot.
+) -> tuple[str, list[str], Optional[str], str, str]:
+    """Parse target content into description, wiring steps, wiring image, troubleshoot, and post_deploy.
 
-    Returns: (description, wiring_steps, wiring_image, troubleshoot)
+    Returns: (description, wiring_steps, wiring_image, troubleshoot, post_deploy)
     """
     # Join lines and use parse_subsections for consistent parsing
     content = "\n".join(content_lines)
@@ -587,7 +608,10 @@ def _parse_target_content(
     # Troubleshoot content (as markdown, will be converted to HTML later)
     troubleshoot = subsections.get("troubleshoot", "").strip()
 
-    return description, wiring_steps, wiring_image, troubleshoot
+    # Post-deploy content (as markdown, will be converted to HTML later)
+    post_deploy = subsections.get("post_deploy", "").strip()
+
+    return description, wiring_steps, wiring_image, troubleshoot, post_deploy
 
 
 def _parse_targets_single_lang(content: str, lang: str) -> list[TargetInfo]:
@@ -612,8 +636,8 @@ def _parse_targets_single_lang(content: str, lang: str) -> list[TargetInfo]:
         if match:
             # Save previous target if exists
             if current_target_id:
-                desc, wiring_steps, wiring_image, troubleshoot = _parse_target_content(
-                    current_content
+                desc, wiring_steps, wiring_image, troubleshoot, post_deploy = (
+                    _parse_target_content(current_content)
                 )
                 wiring = None
                 if wiring_image or wiring_steps:
@@ -635,6 +659,9 @@ def _parse_targets_single_lang(content: str, lang: str) -> list[TargetInfo]:
                     troubleshoot=Localized(
                         {lang: md_to_html(troubleshoot) if troubleshoot else ""}
                     ),
+                    post_deploy=Localized(
+                        {lang: md_to_html(post_deploy) if post_deploy else ""}
+                    ),
                 )
                 targets.append(target)
 
@@ -649,8 +676,8 @@ def _parse_targets_single_lang(content: str, lang: str) -> list[TargetInfo]:
 
     # Save last target
     if current_target_id:
-        desc, wiring_steps, wiring_image, troubleshoot = _parse_target_content(
-            current_content
+        desc, wiring_steps, wiring_image, troubleshoot, post_deploy = (
+            _parse_target_content(current_content)
         )
         wiring = None
         if wiring_image or wiring_steps:
@@ -669,6 +696,9 @@ def _parse_targets_single_lang(content: str, lang: str) -> list[TargetInfo]:
             wiring=wiring,
             troubleshoot=Localized(
                 {lang: md_to_html(troubleshoot) if troubleshoot else ""}
+            ),
+            post_deploy=Localized(
+                {lang: md_to_html(post_deploy) if post_deploy else ""}
             ),
         )
         targets.append(target)
@@ -703,6 +733,8 @@ def parse_targets(content_en: str, content_zh: str) -> list[TargetInfo]:
                 target.description_html.set("zh", zh_target.description_html.get("zh"))
                 # Merge troubleshoot
                 target.troubleshoot.set("zh", zh_target.troubleshoot.get("zh"))
+                # Merge post_deploy
+                target.post_deploy.set("zh", zh_target.post_deploy.get("zh"))
                 # Merge wiring steps
                 if target.wiring and zh_target.wiring:
                     target.wiring.steps.set("zh", zh_target.wiring.steps.get("zh"))
@@ -821,6 +853,9 @@ def _parse_guide_content(content: str, lang: str, result: ParseResult) -> None:
                                 step.section.subtitle.set(lang, sub)
                             step.section.troubleshoot.set(
                                 lang, md_to_html(subsections.get("troubleshoot", ""))
+                            )
+                            step.section.post_deploy.set(
+                                lang, md_to_html(subsections.get("post_deploy", ""))
                             )
                             # Try to extract title from header
                             title_match = STEP_HEADER_PATTERN.match(current_step_header)
@@ -1045,7 +1080,9 @@ def parse_single_language_guide(content: str, lang: str = "en") -> ParseResult:
             continue
 
         # Check for preset completion section (### Deployment Complete / ### 部署完成)
-        if PRESET_COMPLETION_PATTERN.match(stripped):
+        # Only at preset level (not inside a step — inside steps it's a subsection
+        # handled by parse_subsections via post_deploy pattern)
+        if PRESET_COMPLETION_PATTERN.match(stripped) and current_step_header is None:
             flush_step()
             flush_preset_description()
             current_section = "preset_completion"
@@ -1318,6 +1355,7 @@ def parse_guide_multilang(
                     subtitle=Localized(),
                     description=Localized(),
                     troubleshoot=Localized(),
+                    post_deploy=Localized(),
                     wiring=None,
                 ),
             )
@@ -1349,6 +1387,10 @@ def parse_guide_multilang(
                         troubleshoot = lang_step.section.troubleshoot.get(lang)
                         if troubleshoot:
                             merged_step.section.troubleshoot.set(lang, troubleshoot)
+                        # Merge post_deploy
+                        post_deploy = lang_step.section.post_deploy.get(lang)
+                        if post_deploy:
+                            merged_step.section.post_deploy.set(lang, post_deploy)
                         # Merge wiring (image from base, steps from all languages)
                         if lang_step.section.wiring:
                             if merged_step.section.wiring is None:
@@ -1373,6 +1415,7 @@ def parse_guide_multilang(
                         description=Localized(),
                         description_html=Localized(),
                         troubleshoot=Localized(),
+                        post_deploy=Localized(),
                         wiring=None,
                     )
 
@@ -1415,6 +1458,10 @@ def parse_guide_multilang(
                                         merged_target.troubleshoot.set(
                                             lang, troubleshoot
                                         )
+                                    # Merge post_deploy
+                                    post_deploy = lang_target.post_deploy.get(lang)
+                                    if post_deploy:
+                                        merged_target.post_deploy.set(lang, post_deploy)
                                     # Merge wiring
                                     if lang_target.wiring:
                                         if merged_target.wiring is None:
