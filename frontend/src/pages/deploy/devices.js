@@ -390,27 +390,24 @@ export async function startDeployment(deviceId) {
       username: document.getElementById(`ssh-user-${deviceId}`)?.value || 'recamera',
       password: document.getElementById(`ssh-pass-${deviceId}`)?.value,
     };
-  } else if (device.type === 'ha_integration') {
-    // HA integration - collect all user_inputs into device_connections
-    params.device_connections[deviceId] = {};
-    const inputs = device.user_inputs || [];
-    inputs.forEach(input => {
-      const el = document.getElementById(`input-${deviceId}-${input.id}`);
-      if (el) {
-        params.device_connections[deviceId][input.id] = el.value;
-      }
-    });
   } else {
     // For local docker or other types, include target if selected
     params.device_connections[deviceId] = {
       target: selectedTarget?.id,
       target_type: selectedTarget?.target_type || 'local',
     };
+  }
 
-    // Add user inputs for docker_local (e.g., device_name)
-    const targetUserInputs = selectedTarget?.user_inputs;
-    if (effectiveType === 'docker_local' && targetUserInputs) {
-      targetUserInputs.forEach(input => {
+  // Generic: collect any user_inputs defined in YAML into device_connections.
+  // Only adds values not already set by type-specific code above.
+  // script type is excluded (it uses options.user_inputs instead).
+  const allUserInputs = selectedTarget?.user_inputs || device.user_inputs;
+  if (allUserInputs && device.type !== 'script') {
+    if (!params.device_connections[deviceId]) {
+      params.device_connections[deviceId] = {};
+    }
+    allUserInputs.forEach(input => {
+      if (params.device_connections[deviceId][input.id] === undefined) {
         const el = document.getElementById(`input-${deviceId}-${input.id}`);
         if (el) {
           if (input.type === 'checkbox') {
@@ -419,8 +416,8 @@ export async function startDeployment(deviceId) {
             params.device_connections[deviceId][input.id] = el.value;
           }
         }
-      });
-    }
+      }
+    });
   }
 
   try {
