@@ -173,6 +173,10 @@ Deploy the inventory management service with voice control and web dashboard.
 
 ### Target: Local Deployment {#warehouse_local type=local config=devices/recomputer.yaml}
 
+Run the warehouse system on this computer.
+
+### Wiring
+
 1. Ensure Docker is installed and running on your machine
 2. Click Deploy button to start services
 
@@ -184,6 +188,10 @@ Deploy the inventory management service with voice control and web dashboard.
 | Docker not running | Start Docker Desktop and retry |
 
 ### Target: Remote Deployment (R1100) {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
+
+Deploy to reComputer R1100 edge device.
+
+### Wiring
 
 ![Wiring](gallery/R1100_connected.png)
 
@@ -360,6 +368,10 @@ Deploy the inventory management service with voice control and web dashboard.
 
 ### Target: Local Deployment {#warehouse_local type=local config=devices/recomputer.yaml}
 
+Run the warehouse system on this computer.
+
+### Wiring
+
 1. Ensure Docker is installed and running on your machine
 2. Click Deploy button to start services
 
@@ -371,6 +383,10 @@ Deploy the inventory management service with voice control and web dashboard.
 | Docker not running | Start Docker Desktop and retry |
 
 ### Target: Remote Deployment (R1100) {#warehouse_remote type=remote config=devices/warehouse_remote.yaml default=true}
+
+Deploy to reComputer R1100 edge device.
+
+### Wiring
 
 ![Wiring](gallery/R1100_connected.png)
 
