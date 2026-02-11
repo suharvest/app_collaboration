@@ -231,6 +231,26 @@ async def debug_session(session_id: str):
 # ============================================
 
 
+@router.post("/sessions/{session_id}/faces/test-add")
+async def test_add_face(session_id: str, name: str = "test"):
+    """Debug: test face_add with given name and dummy 128D embedding."""
+    client = _get_crud_client(session_id)
+    if not client:
+        raise HTTPException(
+            status_code=404, detail="No database connection for this session"
+        )
+
+    dummy_embedding = [0.1] * 128
+    try:
+        result = await client.add_face(name, dummy_embedding)
+        # Clean up if successful
+        if result.get("ok"):
+            await client.delete_face(name)
+        return {"test_result": result, "name": name}
+    except Exception as e:
+        return {"test_result": {"ok": False, "error": str(e)}}
+
+
 @router.get("/sessions/{session_id}/faces")
 async def list_faces(session_id: str):
     """List all enrolled faces."""
@@ -368,10 +388,18 @@ async def enrollment_status(session_id: str):
 
     # Enrollment finished - check result
     result = enrollment.result
+    # Clear enrollment_state on camera session to stop broadcasting
+    enrollment.camera_session.enrollment_state = None
+
     if result and result.get("ok"):
         # Auto-store the result
         try:
             store_result = await enrollment.store()
+            logger.info(
+                "Enrollment store result for '%s': %s",
+                enrollment.name,
+                store_result,
+            )
             _enrollments.pop(session_id, None)
             return {
                 "active": False,
@@ -381,6 +409,7 @@ async def enrollment_status(session_id: str):
                 "stored": store_result.get("ok", False),
             }
         except Exception as e:
+            _enrollments.pop(session_id, None)
             return {
                 "active": False,
                 "completed": True,

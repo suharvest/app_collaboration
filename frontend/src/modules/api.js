@@ -1403,6 +1403,13 @@ export const serialCameraApi = {
       method: 'POST',
     });
   },
+
+  /**
+   * Get enrollment status (also triggers auto-store if complete)
+   */
+  enrollmentStatus(sessionId) {
+    return request(`/serial-camera/sessions/${sessionId}/enroll/status`);
+  },
 };
 
 // ============================================
