@@ -103,7 +103,7 @@ class TestActionsConfigParsing:
     def test_action_defaults(self):
         a = ActionConfig(name="test")
         assert a.run is None
-        assert a.copy is None
+        assert a.copy_files is None
         assert a.sudo is False
         assert a.when is None
         assert a.env == {}

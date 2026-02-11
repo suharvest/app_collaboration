@@ -133,9 +133,9 @@ class BaseDeployer(ABC):
                 success = await executor.execute_run(
                     action, context, cwd=config.base_path
                 )
-            elif action.copy:
+            elif action.copy_files:
                 success = await executor.execute_copy(
-                    action.copy, context, base_path=config.base_path
+                    action.copy_files, context, base_path=config.base_path
                 )
 
             if not success:
