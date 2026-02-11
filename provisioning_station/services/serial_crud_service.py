@@ -33,6 +33,34 @@ DEFAULT_TIMEOUT = 5.0
 CHUNK_SIZE = 32
 CHUNK_DELAY = 0.01  # 10ms
 
+# Name encoding prefix for non-ASCII names
+_NAME_PREFIX = "u_"
+
+
+def _encode_name(name: str) -> str:
+    """Encode non-ASCII name to hex for ESP32 console compatibility.
+
+    "苏禾" → "u_e88b8fe7a6be"
+    "Alice" → "Alice" (unchanged)
+    """
+    if name.isascii():
+        return name
+    return _NAME_PREFIX + name.encode("utf-8").hex()
+
+
+def _decode_name(raw: str) -> str:
+    """Decode hex-encoded name back to Unicode.
+
+    "u_e88b8fe7a6be" → "苏禾"
+    "Alice" → "Alice" (unchanged)
+    """
+    if raw.startswith(_NAME_PREFIX):
+        try:
+            return bytes.fromhex(raw[len(_NAME_PREFIX) :]).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            pass
+    return raw
+
 
 class SerialCrudClient:
     """ESP Console command client for face database CRUD.
@@ -64,15 +92,27 @@ class SerialCrudClient:
             self._serial.close()
         self._serial = None
 
-    def _send_chunked(self, data: bytes):
-        """Send data in 32-byte chunks with 10ms delay to avoid USB FIFO overflow."""
+    def _send_chunked(self, data: bytes, drain_echo: bool = False):
+        """Send data in 32-byte chunks with 10ms delay to avoid USB FIFO overflow.
+
+        For long commands (e.g. face_add with 1KB+ payload), set drain_echo=True
+        to read back echo data between chunks.  This prevents the device's output
+        FIFO from filling up and stalling input processing.
+        """
         for i in range(0, len(data), CHUNK_SIZE):
             self._serial.write(data[i : i + CHUNK_SIZE])
             self._serial.flush()
             if i + CHUNK_SIZE < len(data):
                 time.sleep(CHUNK_DELAY)
+                if drain_echo and self._serial.in_waiting > 0:
+                    self._serial.read(self._serial.in_waiting)
 
-    def _send_command(self, cmd_str: str, timeout: float = DEFAULT_TIMEOUT) -> dict:
+    def _send_command(
+        self,
+        cmd_str: str,
+        timeout: float = DEFAULT_TIMEOUT,
+        drain_echo: bool = False,
+    ) -> dict:
         """Send a plain-text command and wait for JSON response.
 
         Skips echo lines, ESP logs, and REPL prompts.
@@ -85,11 +125,19 @@ class SerialCrudClient:
         # Clear input buffer before sending
         self._serial.reset_input_buffer()
 
+        # Flush any pending input on ESP32 side with a blank line
+        if drain_echo:
+            self._serial.write(b"\r\n")
+            self._serial.flush()
+            time.sleep(0.1)
+            self._serial.reset_input_buffer()
+
         # Send command in chunks
         data = (cmd_str + "\n").encode("utf-8")
-        self._send_chunked(data)
+        self._send_chunked(data, drain_echo=drain_echo)
 
         # Read response lines, filter for JSON
+        cmd_name = cmd_str.split()[0] if cmd_str else "?"
         start = time.time()
         while time.time() - start < timeout:
             raw = self._serial.readline()
@@ -102,6 +150,8 @@ class SerialCrudClient:
 
             # Only parse lines that look like JSON responses
             if not line.startswith("{"):
+                if drain_echo:
+                    logger.debug("[%s] echo: %s", cmd_name, line[:120])
                 continue
 
             try:
@@ -111,17 +161,21 @@ class SerialCrudClient:
                 logger.debug("Failed to parse JSON response: %s", line[:200])
                 continue
 
-        raise TimeoutError(
-            f"No response within {timeout}s for command: {cmd_str.split()[0]}"
-        )
+        raise TimeoutError(f"No response within {timeout}s for command: {cmd_name}")
 
     async def list_faces(self) -> dict:
         """List all enrolled faces.
 
         Returns: {ok: bool, faces: [{name, index}], count, max}
+        Decodes hex-encoded names back to Unicode.
         """
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._send_command, "face_list")
+        result = await loop.run_in_executor(None, self._send_command, "face_list")
+        # Decode names
+        for face in result.get("faces", []):
+            if "name" in face:
+                face["name"] = _decode_name(face["name"])
+        return result
 
     async def add_face(self, name: str, embedding: List[float]) -> dict:
         """Add a face to the database.
@@ -129,20 +183,36 @@ class SerialCrudClient:
         Embedding is sent as comma-separated floats with 6 decimal places.
         Returns: {ok: bool}
         """
+        if not embedding:
+            return {"ok": False, "error": "Empty embedding"}
+
+        safe_name = _encode_name(name)
         emb_str = ",".join(f"{x:.6f}" for x in embedding)
-        cmd = f"face_add {name} {emb_str}"
+        cmd = f"face_add {safe_name} {emb_str}"
+        logger.info(
+            "add_face: name='%s', embedding_dim=%d, cmd_len=%d, cmd_preview='%s...%s'",
+            name,
+            len(embedding),
+            len(cmd),
+            cmd[:60],
+            cmd[-30:],
+        )
         loop = asyncio.get_event_loop()
-        # Use longer timeout for add (large payload)
-        return await loop.run_in_executor(None, self._send_command, cmd, 10.0)
+        # Use longer timeout and drain echo for large payload
+        return await loop.run_in_executor(
+            None,
+            lambda: self._send_command(cmd, timeout=10.0, drain_echo=True),
+        )
 
     async def delete_face(self, name: str) -> dict:
         """Delete a face from the database.
 
         Returns: {ok: bool}
         """
+        safe_name = _encode_name(name)
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            None, self._send_command, f"face_delete {name}"
+            None, self._send_command, f"face_delete {safe_name}"
         )
 
     async def rename_face(self, old_name: str, new_name: str) -> dict:
@@ -150,7 +220,9 @@ class SerialCrudClient:
 
         Returns: {ok: bool}
         """
+        safe_old = _encode_name(old_name)
+        safe_new = _encode_name(new_name)
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            None, self._send_command, f"face_rename {old_name} {new_name}"
+            None, self._send_command, f"face_rename {safe_old} {safe_new}"
         )

@@ -148,7 +148,14 @@ class FaceEnrollmentSession:
         """Finalize enrollment - average embeddings and prepare result."""
         self._active = False
         self.camera_session.remove_frame_callback(self._on_frame)
-        self.camera_session.enrollment_state = None
+        # Signal completion to frontend (keep broadcasting active=False for a few frames)
+        self.camera_session.enrollment_state = {
+            "active": False,
+            "name": self.name,
+            "samples": len(self._samples),
+            "min_samples": self.min_samples,
+            "remaining_seconds": 0,
+        }
 
         if len(self._samples) < self.min_samples:
             self.result = {
@@ -200,4 +207,11 @@ class FaceEnrollmentSession:
         if not self.result or not self.result.get("ok"):
             return {"ok": False, "error": "No valid enrollment result"}
 
-        return await self.crud_client.add_face(self.name, self.result["embedding"])
+        embedding = self.result["embedding"]
+        logger.info(
+            "Storing face '%s': embedding_dim=%d, first_3=%s",
+            self.name,
+            len(embedding),
+            embedding[:3],
+        )
+        return await self.crud_client.add_face(self.name, embedding)

@@ -9,6 +9,7 @@
 
 import { t } from '../../modules/i18n.js';
 import { serialCameraApi } from '../../modules/api.js';
+import { toast } from '../../modules/toast.js';
 
 export class FaceDatabasePanel {
   /**
@@ -41,6 +42,10 @@ export class FaceDatabasePanel {
   onFrameUpdate(data) {
     if (data.enrollment) {
       this._updateEnrollmentProgress(data.enrollment);
+    } else if (this._enrolling) {
+      // No enrollment data in frame but we think we're still enrolling
+      // → enrollment finished and state was cleared
+      this._updateEnrollmentProgress({ active: false });
     }
   }
 
@@ -72,9 +77,14 @@ export class FaceDatabasePanel {
       <div class="face-database-panel">
         <div class="face-database-header">
           <h4 class="face-database-title">${t('faceDatabase.title')}</h4>
-          <button class="btn btn-sm btn-primary" id="fdb-register-btn">
-            + ${t('faceDatabase.register')}
-          </button>
+          <div class="face-database-header-actions">
+            <button class="btn-icon" id="fdb-refresh-btn" title="${t('faceDatabase.refresh') || 'Refresh'}">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+            </button>
+            <button class="btn btn-sm btn-primary" id="fdb-register-btn">
+              + ${t('faceDatabase.register')}
+            </button>
+          </div>
         </div>
         <div id="fdb-table-container">
           <div class="face-database-empty">${t('faceDatabase.empty')}</div>
@@ -119,8 +129,8 @@ export class FaceDatabasePanel {
         <td>${face.index}</td>
         <td>${this._escapeHtml(face.name)}</td>
         <td class="face-database-actions">
-          <button class="btn btn-xs btn-secondary fdb-rename-btn" data-name="${this._escapeHtml(face.name)}">${t('faceDatabase.rename')}</button>
-          <button class="btn btn-xs btn-danger fdb-delete-btn" data-name="${this._escapeHtml(face.name)}">${t('faceDatabase.delete')}</button>
+          <button class="btn btn-xs btn-ghost fdb-rename-btn" data-name="${this._escapeHtml(face.name)}">${t('faceDatabase.rename')}</button>
+          <button class="btn btn-xs btn-ghost btn-ghost-danger fdb-delete-btn" data-name="${this._escapeHtml(face.name)}">${t('faceDatabase.delete')}</button>
         </td>
       </tr>
     `).join('');
@@ -154,6 +164,10 @@ export class FaceDatabasePanel {
   // ============================================
 
   _bindEvents() {
+    this.container.querySelector('#fdb-refresh-btn')?.addEventListener('click', () => {
+      this.refresh();
+    });
+
     this.container.querySelector('#fdb-register-btn')?.addEventListener('click', () => {
       this._showEnrollmentPanel(true);
     });
@@ -206,7 +220,7 @@ export class FaceDatabasePanel {
         startBtn.textContent = t('faceDatabase.capturing');
       }
 
-      await serialCameraApi.startEnrollment(this.sessionId, name);
+      await serialCameraApi.startEnrollment(this.sessionId, name, 3.0);
 
       // Enrollment progress will be tracked via frame updates
       this._enrollmentData = { name, startTime: Date.now() };
@@ -239,8 +253,8 @@ export class FaceDatabasePanel {
       this._resetEnrollmentUI();
       this._showEnrollmentPanel(false);
 
-      // Refresh table to show new face
-      setTimeout(() => this.refresh(), 500);
+      // Trigger store via status API, then refresh table
+      this._finalizeEnrollment();
       return;
     }
 
@@ -261,6 +275,22 @@ export class FaceDatabasePanel {
         seconds: enrollment.remaining_seconds,
       });
     }
+  }
+
+  async _finalizeEnrollment() {
+    if (!this.sessionId) return;
+    try {
+      const status = await serialCameraApi.enrollmentStatus(this.sessionId);
+      if (status.stored) {
+        toast.success(t('faceDatabase.enrollSuccess', { name: status.name }));
+      } else if (status.error) {
+        toast.error(status.error);
+      }
+    } catch (e) {
+      console.error('Failed to finalize enrollment:', e);
+    }
+    // Refresh table regardless
+    await this.refresh();
   }
 
   _resetEnrollmentUI() {

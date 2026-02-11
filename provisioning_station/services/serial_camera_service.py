@@ -67,9 +67,6 @@ class SSCMAParser:
         self._buffer = b""
 
 
-_logged_sscma_keys = False
-
-
 def parse_face_result(msg: dict) -> Optional[dict]:
     """Extract face data from SSCMA INVOKE message.
 
@@ -89,38 +86,28 @@ def parse_face_result(msg: dict) -> Optional[dict]:
     image = data.get("image")
     resolution = data.get("resolution", [240, 240])
 
-    # Log data keys once for debugging
-    global _logged_sscma_keys
-    if not _logged_sscma_keys:
-        keys = [k for k in data.keys() if k != "image"]
-        img_len = len(image) if image else 0
-        img_head = image[:60] if image else ""
-        logger.info(
-            "SSCMA first frame: keys=%s, image=%s (%d chars), resolution=%s, head=%s",
-            keys,
-            bool(image),
-            img_len,
-            resolution,
-            repr(img_head),
-        )
-        _logged_sscma_keys = True
-
     faces = []
 
     # Format 1: Custom face firmware (data.faces is array of dicts)
+    # SCRFD outputs top-left coords [x, y, w, h] — no conversion needed
     raw_faces = data.get("faces", [])
     if raw_faces:
         for f in raw_faces:
-            score = f.get("score", 0)
+            # Support both field names: box/bbox, score/confidence
+            raw_box = f.get("box") or f.get("bbox", [0, 0, 0, 0])
+            score = f.get("score", f.get("confidence", 0))
+            x, y, bw, bh = raw_box[:4] if len(raw_box) >= 4 else (0, 0, 0, 0)
             face = {
-                "bbox": f.get("box", [0, 0, 0, 0]),
+                "bbox": [x, y, bw, bh],
                 "confidence": score / 100 if score > 1 else score,
                 "quality": f.get("quality", 0),
                 "landmarks": f.get("landmarks", []),
                 "embedding": f.get("embedding", []),
             }
             if "recognized_name" in f:
-                face["recognized_name"] = f["recognized_name"]
+                from .serial_crud_service import _decode_name
+
+                face["recognized_name"] = _decode_name(f["recognized_name"])
             if "similarity" in f:
                 face["similarity"] = f["similarity"]
             faces.append(face)
@@ -167,7 +154,7 @@ class SerialCameraSession:
         session_id: str,
         port: str,
         baudrate: int = 921600,
-        face_mode: bool = False,
+        face_mode: bool = True,
     ):
         self.session_id = session_id
         self.port = port
@@ -268,8 +255,12 @@ class SerialCameraSession:
         self._parser.reset()
         logger.info("Serial camera session %s stopped", self.session_id)
 
-    def _wait_for_ready(self, timeout: float = 10.0) -> bool:
-        """Wait for INIT@STAT? with is_ready=1 from device boot."""
+    def _wait_for_ready(self, timeout: float = 3.0) -> bool:
+        """Wait for INIT@STAT? with is_ready=1 from device boot.
+
+        Timeout reduced to 3s — if device is already running (no USB reset),
+        it won't send INIT@STAT? and we shouldn't block the user.
+        """
         start = time.time()
         buf = b""
         while time.time() - start < timeout and self._running:
@@ -300,14 +291,20 @@ class SerialCameraSession:
         return False
 
     def _reader_loop(self):
-        """Background thread: wait for ready, send AT+INVOKE, then parse frames."""
-        # Wait for device boot (USB port open may trigger reset)
+        """Background thread: stop previous inference, wait for ready, then start."""
         self._broadcast_status("connecting", "Waiting for device...")
-        if not self._wait_for_ready():
-            logger.warning("Device ready timeout, sending AT+INVOKE anyway")
 
-        # Small delay after boot
-        time.sleep(0.3)
+        # Stop any previously running inference first
+        try:
+            self._serial.write(b"AT+BREAK\r")
+            self._serial.flush()
+            time.sleep(0.5)
+            self._serial.reset_input_buffer()
+        except Exception:
+            pass
+
+        # Wait for device boot (USB port open may trigger reset)
+        self._wait_for_ready()
         self._serial.reset_input_buffer()
 
         # Enable face mode (provides embeddings for enrollment) then start inference
@@ -315,11 +312,11 @@ class SerialCameraSession:
             if self.face_mode:
                 self._serial.write(b"AT+FACE=1\r")
                 self._serial.flush()
-                time.sleep(0.2)
-                logger.info("Sent AT+FACE=1 on session %s", self.session_id)
-            self._serial.write(b"AT+INVOKE=-1,0,0\r")
+                self._broadcast_status("connecting", "Loading face models...")
+                time.sleep(2.0)
+                self._serial.reset_input_buffer()
+            self._serial.write(b"AT+INVOKE=-1,0,1\r")
             self._serial.flush()
-            logger.info("Sent AT+INVOKE=-1,0,0 on session %s", self.session_id)
         except Exception as e:
             logger.error("Failed to send AT commands: %s", e)
             self._broadcast_status("error", f"Failed to start inference: {e}")
@@ -339,22 +336,9 @@ class SerialCameraSession:
                     continue
 
                 messages = self._parser.feed(data)
-                if messages:
-                    logger.debug(
-                        "Session %s: %d bytes -> %d msgs",
-                        self.session_id,
-                        len(data),
-                        len(messages),
-                    )
                 for msg in messages:
                     frame = parse_face_result(msg)
                     if not frame:
-                        logger.debug(
-                            "Session %s: skipped msg name=%s type=%s",
-                            self.session_id,
-                            msg.get("name"),
-                            msg.get("type"),
-                        )
                         continue
 
                     self._update_fps()
@@ -443,7 +427,7 @@ class SerialCameraManager:
         self,
         port: str,
         baudrate: int = 921600,
-        face_mode: bool = False,
+        face_mode: bool = True,
     ) -> SerialCameraSession:
         """Create a new camera session."""
         # Check port exclusivity
