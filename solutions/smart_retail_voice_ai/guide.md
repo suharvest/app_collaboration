@@ -15,9 +15,9 @@ Deploy an edge-based voice collection and analysis system for your retail store.
 
 **Requirements:** USB-C data cable · Network cables
 
-## Step 1: Flash OpenWrt Firmware {#firmware type=manual required=true config=devices/firmware.yaml}
+## Step 1: Flash OpenWrt Firmware {#firmware type=manual required=false}
 
-Write the operating system to the reRouter, then connect it to your network.
+Write the operating system to the reRouter, then connect it to your network. **Skip this step** if your reRouter was purchased after November 2025 — it already has the correct firmware.
 
 | Device | Connection | Notes |
 |--------|------------|-------|
@@ -52,50 +52,7 @@ Write the operating system to the reRouter, then connect it to your network.
 
 ---
 
-## Step 2: Configure reSpeaker {#respeaker type=manual required=true config=devices/respeaker.yaml}
-
-Connect the microphone to your computer and adjust audio settings for best voice quality.
-
-| Device | Connection | Notes |
-|--------|------------|-------|
-| reSpeaker XVF3800 | USB-C to **computer** | Must connect to computer for configuration, not reRouter |
-| Computer | Terminal/command line required | Windows: PowerShell, Mac/Linux: Terminal |
-
-**Why Configuration is Needed:**
-
-reSpeaker has echo cancellation enabled by default, which affects recording quality for this solution. We need to disable it.
-
-**Configuration Steps:**
-
-1. Connect reSpeaker to **computer** via USB-C (not reRouter)
-2. Verify computer recognizes the device (Windows Device Manager / Mac System Info)
-3. Download configuration tool:
-   ```bash
-   git clone https://github.com/respeaker/reSpeaker_XVF3800_USB_4MIC_ARRAY.git
-   cd reSpeaker_XVF3800_USB_4MIC_ARRAY
-   ```
-4. Navigate to your OS directory (`windows` / `macos` / `linux`)
-5. Run configuration commands:
-   ```bash
-   # Mac/Linux requires sudo
-   sudo ./xvf_host clear_configuration 1
-   sudo ./xvf_host audio_mgr_op_r 8 0
-   sudo ./xvf_host save_configuration 1
-   ```
-6. After configuration, **disconnect from computer** and connect reSpeaker to **reRouter USB port**
-
-### Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Device not recognized | Try a different USB cable, make sure it's a data cable not just a charging cable |
-| Command error | Make sure you're in the correct OS directory |
-| Permission denied | Mac/Linux requires sudo, Windows needs to run as administrator |
-| No effect after configuration | Unplug and replug reSpeaker to apply the configuration |
-
----
-
-## Step 3: Deploy Voice Services {#voice_services type=docker_deploy required=true config=devices/rerouter.yaml}
+## Step 2: Deploy Voice Services {#voice_services type=docker_deploy required=true config=devices/rerouter.yaml}
 
 Start the voice recognition and analysis services on the device.
 
@@ -107,7 +64,7 @@ Deploy voice services on your local computer.
 
 | Device | Connection | Notes |
 |--------|------------|-------|
-| reSpeaker XVF3800 | USB to computer | Must complete Step 2 configuration first |
+| reSpeaker XVF3800 | USB to computer | Make sure it's a data cable, not just a charging cable |
 | Computer | Docker Desktop installed | Download for Windows/Mac |
 
 1. Make sure Docker Desktop is installed and running
@@ -134,7 +91,7 @@ Deploy voice services to a remote device (reRouter, Raspberry Pi, etc.).
 
 | Device | Connection | Notes |
 |--------|------------|-------|
-| reSpeaker XVF3800 | USB to reRouter | Must complete Step 2 configuration first |
+| reSpeaker XVF3800 | USB to reRouter | Audio settings are configured automatically during deployment |
 | reRouter CM4 | WAN port to router | Internet required for downloading container images |
 | reRouter CM4 | LAN port to computer | For SSH access and deployment |
 | Computer | Same network as reRouter | For running remote deployment |

@@ -229,6 +229,73 @@ solutions/<solution_id>/
 | 原理解释 | 算法原理、架构设计 | 用户只关心怎么用 |
 | 版本历史 | Changelog、迁移指南 | 与首次部署无关 |
 
+### 手动步骤自动化模式
+
+原始文档中标记为 `type=manual` 的步骤，应逐一审查是否能自动化。核心思路：**如果一个"手动"步骤的本质是在某个设备上执行命令，那它就能变成 action**。
+
+#### 审查流程
+
+```
+manual 步骤 → 本质是什么？
+│
+├─ 在部署目标设备上执行命令
+│   ├─ 命令在部署前执行 → actions.before
+│   └─ 命令在部署后执行 → actions.after
+│
+├─ 在用户电脑上执行命令（配置外设等）
+│   └─ 能否改为在目标设备上执行？→ 见下方"外设配置转移"
+│
+├─ 用户需要物理操作（接线、插卡、按按钮）
+│   └─ 保留 manual，无法自动化
+│
+└─ 用户需要访问外部平台（注册账号、获取 API Key）
+    └─ 保留 manual，无法自动化
+```
+
+#### 外设配置转移模式
+
+当原始步骤要求用户在电脑上配置外设（如 USB 设备），应优先考虑把配置转移到部署目标设备上执行：
+
+**问题**：reSpeaker 配置要求用户先连电脑、装工具、跑命令，再拔线换到 reRouter
+**分析**：
+1. reSpeaker 最终要连 reRouter → 直接插 reRouter 更自然
+2. 配置工具 `xvf_host` 只有 glibc 二进制 → OpenWrt (musl) 跑不了
+3. 但 Docker 容器内有 glibc 环境 + Python + pyusb → 可以跑
+4. 容器镜像在 Step 3 (docker_deploy) pull 完后就可用
+5. `docker run --rm --privileged` 一次性运行，零残留
+
+**解法**：在 `actions.after` 中用已拉取的容器执行配置
+
+```yaml
+actions:
+  after:
+    - name: Configure USB peripheral
+      name_zh: 配置 USB 外设
+      run: |
+        docker run --rm --privileged \
+          -v /dev/bus/usb:/dev/bus/usb \
+          already-pulled-image:tag \
+          python3 -c "...usb config script..."
+      ignore_error: true  # 外设未连接时不阻塞
+```
+
+**关键约束**：
+- 容器镜像必须是同一步骤已经 pull 的（不能依赖外部网络额外下载）
+- `--rm` 确保零残留，不留多余容器
+- `--privileged` + `-v /dev/bus/usb` 获取 USB 访问权限
+- `ignore_error: true` 防止外设未接入时阻塞整个部署
+- 配置脚本应内联在 YAML 中（不依赖外部文件）
+
+#### 决策原则
+
+| 原则 | 说明 |
+|------|------|
+| **方案专属，不改通用组件** | 自动化逻辑放在方案的 device YAML `actions` 中，不修改通用 deployer |
+| **利用已有资源** | 优先复用已拉取的镜像、已安装的工具，不引入额外依赖 |
+| **环境适配** | 目标设备 libc 不兼容时（如 OpenWrt musl vs glibc），用容器桥接 |
+| **优雅降级** | `ignore_error: true` 让非关键配置失败不阻塞主流程 |
+| **物理操作不可消除** | 接线、插拔等物理动作无法自动化，但可以减少次数（如从"连电脑配置→拔→连设备"简化为"直接连设备"） |
+
 ---
 
 ## 录屏规范
@@ -929,6 +996,37 @@ actions:
       ignore_error: true
 ```
 
+**Docker Remote + USB 外设配置（利用已拉取镜像）**：
+```yaml
+# 场景：reSpeaker XVF3800 需要关闭回声消除，原方案要求用户在电脑上配置
+# 优化：部署时直接在目标设备上用容器跑配置脚本
+actions:
+  after:
+    - name: Configure reSpeaker audio output
+      name_zh: 配置 reSpeaker 音频输出
+      run: |
+        docker run --rm --privileged \
+          -v /dev/bus/usb:/dev/bus/usb \
+          registry.example.com/voice-client:v1.0 \
+          python3 -c "
+        import sys, usb.core, usb.util
+        dev = usb.core.find(idVendor=0x2886, idProduct=0x001A)
+        if not dev:
+            print('reSpeaker not found, skipping')
+            sys.exit(0)
+        dev.ctrl_transfer(0x40, 0, 10, 48, [1], 100000)  # CLEAR_CONFIGURATION
+        dev.ctrl_transfer(0x40, 0, 19, 35, [8, 0], 100000)  # AUDIO_MGR_OP_R 8 0
+        dev.ctrl_transfer(0x40, 0, 9, 48, [1], 100000)  # SAVE_CONFIGURATION
+        print('reSpeaker configured')
+        usb.util.dispose_resources(dev)
+        "
+      ignore_error: true  # reSpeaker 未连接时不阻塞部署
+```
+
+> **要点**：镜像 `voice-client:v1.0` 是同步骤 docker compose pull 已拉取的，
+> 容器内已有 Python + pyusb + libusb，无需额外安装。
+> `--rm` 保证一次性运行无残留。设备未连接时 `sys.exit(0)` + `ignore_error` 双重保底。
+
 #### 封装时的 actions 决策
 
 | 原始操作 | actions 处理 |
@@ -938,6 +1036,7 @@ actions:
 | 部署后配置网络/MQTT | `after` + `run` + `sudo` |
 | 部署后禁用冲突服务 | `after` + `run` + `sudo` |
 | 部署后复制配置文件 | `after` + `copy` |
+| 部署后配置 USB 外设 | `after` + `docker run --rm` + `ignore_error` |
 | 根据用户选择走不同路径 | `when.field` + `when.value` |
 | 可能失败不影响主流程 | `ignore_error: true` |
 

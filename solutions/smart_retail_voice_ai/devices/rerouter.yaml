@@ -77,6 +77,30 @@ actions:
       name_zh: 设置音频设备权限
       run: chmod -R 666 /dev/snd/* || true
       ignore_error: true
+  after:
+    - name: Configure reSpeaker audio output
+      name_zh: 配置 reSpeaker 音频输出
+      run: |
+        docker run --rm --privileged \
+          -v /dev/bus/usb:/dev/bus/usb \
+          sensecraft-missionpack.seeed.cn/respeaker/sensecraft-voice-client:v0.0.2 \
+          python3 -c "
+        import sys, usb.core, usb.util
+        dev = usb.core.find(idVendor=0x2886, idProduct=0x001A)
+        if not dev:
+            print('reSpeaker not found, skipping configuration')
+            sys.exit(0)
+        print('Found reSpeaker, configuring audio output...')
+        dev.ctrl_transfer(0x40, 0, 10, 48, [1], 100000)
+        print('  CLEAR_CONFIGURATION: done')
+        dev.ctrl_transfer(0x40, 0, 19, 35, [8, 0], 100000)
+        print('  AUDIO_MGR_OP_R 8 0: done')
+        dev.ctrl_transfer(0x40, 0, 9, 48, [1], 100000)
+        print('  SAVE_CONFIGURATION: done')
+        usb.util.dispose_resources(dev)
+        print('reSpeaker configured successfully')
+        "
+      ignore_error: true
 
 user_inputs:
   - id: host
