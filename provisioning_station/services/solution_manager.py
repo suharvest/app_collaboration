@@ -856,6 +856,11 @@ class SolutionManager:
         if troubleshoot:
             section["troubleshoot"] = troubleshoot
 
+        # Post-deploy
+        post_deploy = step.section.post_deploy.get(lang)
+        if post_deploy:
+            section["post_deploy"] = post_deploy
+
         # Wiring
         if step.section.wiring:
             wiring_steps = step.section.wiring.steps.get(lang) or []
@@ -936,6 +941,11 @@ class SolutionManager:
                 troubleshoot = target.troubleshoot.get(lang)
                 if troubleshoot:
                     target_section["troubleshoot"] = troubleshoot
+
+                # Add post_deploy
+                post_deploy = target.post_deploy.get(lang)
+                if post_deploy:
+                    target_section["post_deploy"] = post_deploy
 
                 # Add wiring
                 if target.wiring:

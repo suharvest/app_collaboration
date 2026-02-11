@@ -172,6 +172,15 @@ DEPLOYER_STEPS: Dict[str, List[dict]] = {
     "preview": [
         {"id": "preview_setup", "name": "Preview Setup", "name_zh": "预览设置"},
     ],
+    # ----- HA Integration (install custom component + add integration) -----
+    "ha_integration": [
+        {"id": "auth", "name": "Authenticate", "name_zh": "认证"},
+        {"id": "detect", "name": "Detect HA Type", "name_zh": "检测 HA 类型"},
+        {"id": "ssh", "name": "Setup SSH", "name_zh": "配置 SSH"},
+        {"id": "copy", "name": "Copy Files", "name_zh": "复制文件"},
+        {"id": "restart", "name": "Restart HA", "name_zh": "重启 HA"},
+        {"id": "integrate", "name": "Add Integration", "name_zh": "添加集成"},
+    ],
 }
 
 
