@@ -105,6 +105,34 @@ class ReCameraCppDeployer(BaseDeployer):
     separate init script generation is needed.
     """
 
+    device_type = "recamera_cpp"
+    ui_traits = {
+        "connection": "ssh",
+        "auto_deploy": True,
+        "renderer": None,
+        "has_targets": True,
+        "show_model_selection": False,
+        "show_service_warning": True,
+        "connection_scope": "device",
+    }
+    steps = [
+        {"id": "connect", "name": "Connect", "name_zh": "连接设备"},
+        {"id": "precheck", "name": "Pre-check", "name_zh": "预检查"},
+        {"id": "prepare", "name": "Stop Conflicts", "name_zh": "停止冲突服务"},
+        {"id": "transfer", "name": "Transfer Files", "name_zh": "传输文件"},
+        {"id": "install", "name": "Install Package", "name_zh": "安装软件包"},
+        {"id": "models", "name": "Deploy Models", "name_zh": "部署模型"},
+        {"id": "configure", "name": "Configure", "name_zh": "配置服务"},
+        {
+            "id": "actions_after",
+            "name": "Custom Config",
+            "name_zh": "自定义配置",
+            "_condition": "actions.after",
+        },
+        {"id": "start", "name": "Start Service", "name_zh": "启动服务"},
+        {"id": "verify", "name": "Verify", "name_zh": "验证"},
+    ]
+
     async def deploy(
         self,
         config: DeviceConfig,

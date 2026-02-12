@@ -33,6 +33,39 @@ class RemoteDockerNotInstalled(Exception):
 class DockerRemoteDeployer(BaseDeployer):
     """Deploy Docker Compose applications to remote devices via SSH"""
 
+    device_type = "docker_remote"
+    ui_traits = {
+        "connection": "ssh",
+        "auto_deploy": True,
+        "renderer": None,
+        "has_targets": False,
+        "show_model_selection": False,
+        "show_service_warning": False,
+        "connection_scope": "device",
+    }
+    steps = [
+        {"id": "connect", "name": "Connect", "name_zh": "连接设备"},
+        {"id": "check_os", "name": "Check OS", "name_zh": "检查系统"},
+        {"id": "check_docker", "name": "Check Docker", "name_zh": "检查 Docker"},
+        {"id": "prepare", "name": "Prepare Environment", "name_zh": "准备环境"},
+        {
+            "id": "actions_before",
+            "name": "Custom Setup",
+            "name_zh": "自定义准备",
+            "_condition": "actions.before",
+        },
+        {"id": "upload", "name": "Upload Files", "name_zh": "上传文件"},
+        {"id": "pull_images", "name": "Pull Docker Images", "name_zh": "拉取镜像"},
+        {"id": "start_services", "name": "Start Services", "name_zh": "启动服务"},
+        {"id": "health_check", "name": "Health Check", "name_zh": "健康检查"},
+        {
+            "id": "actions_after",
+            "name": "Custom Config",
+            "name_zh": "自定义配置",
+            "_condition": "actions.after",
+        },
+    ]
+
     async def deploy(
         self,
         config: DeviceConfig,

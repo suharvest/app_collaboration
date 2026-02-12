@@ -59,7 +59,7 @@ export function updateSectionUI(deviceId) {
   const btn = document.getElementById(`deploy-btn-${deviceId}`);
   if (btn) {
     const device = getDeviceById(deviceId);
-    btn.innerHTML = getDeployButtonContent(state, device?.type === 'manual');
+    btn.innerHTML = getDeployButtonContent(state, !device?.ui_traits?.auto_deploy && !device?.ui_traits?.renderer);
     btn.disabled = state.deploymentStatus === 'running';
     btn.className = `deploy-action-btn ${getButtonClass(state)}`;
   }
@@ -265,7 +265,7 @@ export function updateDockerTargetUI(deviceId, container, testSSHHandler = null,
 
     // For recamera_cpp: only content area (SSH is outside target-content)
     // For docker_deploy: content area + controls
-    if (device.type === 'recamera_cpp') {
+    if (device.ui_traits?.connection_scope === 'device') {
       contentEl.innerHTML = renderContentArea(device);
     } else {
       contentEl.innerHTML = `

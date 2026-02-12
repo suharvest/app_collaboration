@@ -101,7 +101,61 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
     - Template variable replacement ({{influxdb_host}}, {{sscma_client_id}})
     """
 
+    device_type = "recamera_nodered"
+    ui_traits = {
+        "connection": "ssh",
+        "auto_deploy": True,
+        "renderer": None,
+        "has_targets": False,
+        "show_model_selection": False,
+        "show_service_warning": True,
+        "connection_scope": "device",
+    }
+    steps = [
+        {"id": "prepare", "name": "Prepare", "name_zh": "准备环境"},
+        {
+            "id": "actions_before",
+            "name": "Custom Setup",
+            "name_zh": "自定义准备",
+            "_condition": "actions.before",
+        },
+        {"id": "load_flow", "name": "Load Flow", "name_zh": "加载流程"},
+        {"id": "configure", "name": "Configure", "name_zh": "配置"},
+        {"id": "connect", "name": "Connect", "name_zh": "连接"},
+        {"id": "deploy", "name": "Deploy", "name_zh": "部署"},
+        {"id": "verify", "name": "Verify", "name_zh": "验证"},
+        {
+            "id": "actions_after",
+            "name": "Custom Config",
+            "name_zh": "自定义配置",
+            "_condition": "actions.after",
+        },
+    ]
+
     _sscma_client_id: str = DEFAULT_SSCMA_CLIENT_ID
+
+    @staticmethod
+    def _normalize_connection(connection: Dict[str, Any]) -> Dict[str, Any]:
+        """Accept both standard SSH keys and legacy recamera-specific keys.
+
+        After frontend trait conversion, SSH form sends standard keys
+        (host, username, password, port). Legacy format used recamera_ip,
+        ssh_username, ssh_password, ssh_port. This method ensures both work.
+        """
+        conn = dict(connection)
+        # Standard → legacy (so existing code keeps working)
+        if "host" in conn and "recamera_ip" not in conn:
+            conn["recamera_ip"] = conn["host"]
+        if "username" in conn and "ssh_username" not in conn:
+            conn["ssh_username"] = conn["username"]
+        if "password" in conn and "ssh_password" not in conn:
+            conn["ssh_password"] = conn["password"]
+        if "port" in conn and "ssh_port" not in conn:
+            conn["ssh_port"] = conn["port"]
+        # Also set nodered_host from host if missing
+        if "host" in conn and "nodered_host" not in conn:
+            conn["nodered_host"] = conn["host"]
+        return conn
 
     async def _pre_deploy_hook(
         self,
@@ -117,6 +171,7 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
         3. Stopping and disabling C++ services
         4. Restoring Node-RED services that may have been disabled
         """
+        connection = self._normalize_connection(connection)
         recamera_ip = connection.get("recamera_ip")
         ssh_password = connection.get("ssh_password")
 
@@ -435,6 +490,7 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
         The SSCMA config node (type "sscma") is created by the reCamera system
         and has a unique ID. Our flow template references it via {{sscma_client_id}}.
         """
+        connection = self._normalize_connection(connection)
         recamera_ip = connection.get("recamera_ip")
         if not recamera_ip:
             return
@@ -550,6 +606,7 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
         """Create a temporary SSH connection from connection parameters."""
         import paramiko
 
+        connection = self._normalize_connection(connection)
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         recamera_ip = connection.get("recamera_ip")
@@ -581,6 +638,7 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
         3. tar + SCP to device ~/.node-red/
         4. Extract and update package.json on device
         """
+        connection = self._normalize_connection(connection)
         recamera_ip = connection.get("recamera_ip")
         ssh_password = connection.get("ssh_password")
         if not recamera_ip or not ssh_password:
@@ -673,6 +731,7 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
         progress_callback=None,
     ) -> bool:
         """Install module from a pre-packaged offline tarball."""
+        connection = self._normalize_connection(connection)
         if not connection.get("ssh_password"):
             return False
 
@@ -801,6 +860,7 @@ class ReCameraNodeRedDeployer(NodeRedDeployer):
         (port 8090). These services must be restarted after deploying a
         new flow so they pick up the updated configuration.
         """
+        connection = self._normalize_connection(connection)
         recamera_ip = connection.get("recamera_ip")
         ssh_password = connection.get("ssh_password")
 

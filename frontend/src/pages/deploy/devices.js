@@ -62,7 +62,7 @@ function hasUnselectedSerialPorts() {
   const devices = getFilteredDevices(deployment.devices || []);
 
   for (const device of devices) {
-    if (device.type === 'esp32_usb' || device.type === 'himax_usb') {
+    if (device.ui_traits?.connection === 'serial') {
       const select = document.getElementById(`serial-port-${device.id}`);
       if (select && !select.value) return true;
     }
@@ -97,7 +97,7 @@ export async function refreshSerialPorts(clickedBtn = null) {
     const devices = getFilteredDevices(allDevices);
 
     devices.forEach(device => {
-      if (device.type === 'esp32_usb' || device.type === 'himax_usb') {
+      if (device.ui_traits?.connection === 'serial') {
         const select = document.getElementById(`serial-port-${device.id}`);
         if (select) {
           const currentValue = select.value;
@@ -276,19 +276,10 @@ export async function startDeployment(deviceId) {
 
   addLogToDevice(deviceId, 'info', t('deploy.logs.starting'));
 
-  // Determine effective device type (handle docker_deploy with targets)
-  let effectiveType = device.type;
+  // Get selected target if device has targets
   let selectedTarget = null;
-
   if (device.targets) {
     selectedTarget = getSelectedTarget(device);
-    if (device.type === 'docker_deploy') {
-      // Map target id to deployment type (supports 'remote', 'xxx_remote' formats)
-      const isRemote = selectedTarget?.id === 'remote' ||
-                       selectedTarget?.id?.endsWith('_remote') ||
-                       selectedTarget?.id?.includes('remote');
-      effectiveType = isRemote ? 'docker_remote' : 'docker_local';
-    }
   }
 
   // Build params in the format expected by backend
@@ -316,80 +307,32 @@ export async function startDeployment(deviceId) {
     });
   }
 
-  // Add connection info based on effective device type
-  if (effectiveType === 'esp32_usb') {
+  // Add connection info based on device traits
+  const traits = device.ui_traits || {};
+  const conn = traits.connection;
+  const isRemote = selectedTarget?.id === 'remote' ||
+                   selectedTarget?.id?.endsWith('_remote') ||
+                   selectedTarget?.id?.includes('remote');
+
+  if (conn === 'serial') {
     const select = document.getElementById(`serial-port-${deviceId}`);
     params.device_connections[deviceId] = {
       port: select?.value || state.port,
     };
-  } else if (effectiveType === 'himax_usb') {
-    const select = document.getElementById(`serial-port-${deviceId}`);
-    const selectedModels = getSelectedModels(deviceId);
+    if (traits.show_model_selection) {
+      params.device_connections[deviceId].selected_models = getSelectedModels(deviceId);
+    }
+  } else if (conn === 'ssh' || (traits.has_targets && selectedTarget && isRemote)) {
     params.device_connections[deviceId] = {
-      port: select?.value || state.port,
-      selected_models: selectedModels,
-    };
-  } else if (effectiveType === 'ssh_deb' || effectiveType === 'docker_remote') {
-    params.device_connections[deviceId] = {
-      target: selectedTarget?.id,
-      target_type: selectedTarget?.target_type || 'remote',
       host: document.getElementById(`ssh-host-${deviceId}`)?.value,
       port: parseInt(document.getElementById(`ssh-port-${deviceId}`)?.value || '22'),
       username: document.getElementById(`ssh-user-${deviceId}`)?.value,
       password: document.getElementById(`ssh-pass-${deviceId}`)?.value,
     };
-
-    // Add additional user inputs to connection (for docker_remote)
-    // Backend docker_remote_deployer expects these in connection, not options
-    // Use selectedTarget.user_inputs for docker_deploy type (user_inputs are in target config)
-    const targetUserInputs = selectedTarget?.user_inputs || device.user_inputs;
-    if (effectiveType === 'docker_remote' && targetUserInputs) {
-      const sshFields = ['host', 'username', 'password', 'port'];
-      const additionalInputs = targetUserInputs.filter(input => !sshFields.includes(input.id));
-      additionalInputs.forEach(input => {
-        const el = document.getElementById(`input-${deviceId}-${input.id}`);
-        if (el) {
-          // Handle checkbox type
-          if (input.type === 'checkbox') {
-            params.device_connections[deviceId][input.id] = el.checked ? 'true' : 'false';
-          } else {
-            params.device_connections[deviceId][input.id] = el.value;
-          }
-        }
-      });
+    if (selectedTarget) {
+      params.device_connections[deviceId].target = selectedTarget.id;
+      params.device_connections[deviceId].target_type = selectedTarget.target_type || (isRemote ? 'remote' : 'local');
     }
-  } else if (effectiveType === 'recamera_nodered') {
-    // reCamera Node-RED deployment - need IP for Node-RED API and optional SSH for service cleanup
-    const host = document.getElementById(`ssh-host-${deviceId}`)?.value;
-    params.device_connections[deviceId] = {
-      recamera_ip: host,
-      nodered_host: host,
-      ssh_username: document.getElementById(`ssh-user-${deviceId}`)?.value || 'recamera',
-      ssh_password: document.getElementById(`ssh-pass-${deviceId}`)?.value,
-      ssh_port: parseInt(document.getElementById(`ssh-port-${deviceId}`)?.value || '22'),
-    };
-
-    // Collect additional user_inputs (e.g., influxdb_host)
-    const sshFields = ['host', 'username', 'password', 'port'];
-    const recameraUserInputs = device.user_inputs || [];
-    recameraUserInputs.filter(input => !sshFields.includes(input.id)).forEach(input => {
-      const el = document.getElementById(`input-${deviceId}-${input.id}`);
-      if (el) {
-        if (input.type === 'checkbox') {
-          params.device_connections[deviceId][input.id] = el.checked ? 'true' : 'false';
-        } else {
-          params.device_connections[deviceId][input.id] = el.value;
-        }
-      }
-    });
-  } else if (device.type === 'recamera_cpp') {
-    // reCamera C++ deployment - need SSH credentials
-    params.device_connections[deviceId] = {
-      host: document.getElementById(`ssh-host-${deviceId}`)?.value,
-      port: parseInt(document.getElementById(`ssh-port-${deviceId}`)?.value || '22'),
-      username: document.getElementById(`ssh-user-${deviceId}`)?.value || 'recamera',
-      password: document.getElementById(`ssh-pass-${deviceId}`)?.value,
-    };
   } else {
     // For local docker or other types, include target if selected
     params.device_connections[deviceId] = {

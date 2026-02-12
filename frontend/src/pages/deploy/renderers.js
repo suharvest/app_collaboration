@@ -392,28 +392,29 @@ export function renderSelectedDeviceContent(device) {
   const section = device.section || {};
   const sectionTroubleshoot = section.troubleshoot || '';
 
-  // Build controls based on device type using unified function
+  // Build controls based on ui_traits
+  const traits = device.ui_traits || {};
   let controls = '';
 
-  // Serial port selector for USB devices
-  if (SERIAL_DEVICE_TYPES.includes(device.type)) {
+  // Serial port selector for serial connection devices
+  if (traits.connection === 'serial') {
     controls += renderSerialPortSelector(device);
   }
 
-  // Model selection for Himax devices
-  if (device.type === 'himax_usb') {
+  // Model selection
+  if (traits.show_model_selection) {
     controls += renderModelSelection(device);
   }
 
-  // SSH form for SSH-based devices
-  if (SSH_DEVICE_TYPES.includes(device.type)) {
+  // SSH form for SSH connection devices
+  if (traits.connection === 'ssh') {
     controls += renderSSHForm(device);
   }
 
   return `
     <div class="deploy-selected-card" data-device-id="${device.id}">
       <!-- Service Switch Warning -->
-      ${renderServiceSwitchWarning(device.type)}
+      ${traits.show_service_warning ? renderServiceSwitchWarning(device.type) : ''}
 
       <!-- Content area: wiring + description -->
       ${renderWiringSection(section.wiring, currentSolution?.id)}
@@ -456,17 +457,19 @@ export function renderDeploySection(device, stepNumber) {
   const section = device.section || {};
   const sectionTitle = getLocalizedField(section, 'title') || name;
   const sectionDescription = section.description || '';
-  const isManual = device.type === 'manual';
-  const isScript = device.type === 'script';
-  const isPreview = device.type === 'preview';
-  const isSerialCamera = device.type === 'serial_camera';
-  const isDockerDeploy = device.type === 'docker_deploy' && device.targets;
-  const isRecameraCppWithTargets = device.type === 'recamera_cpp' && device.targets;
+  const traits = device.ui_traits || {};
+  const isManual = !traits.auto_deploy && !traits.renderer;
+  const isScript = device.type === 'script';  // layout quirk: user_inputs before description
+  const isPreview = traits.renderer === 'preview';
+  const isSerialCamera = traits.renderer === 'serial-camera';
+  const hasTargets = traits.has_targets && device.targets;
+  const isDeviceScopeTargets = hasTargets && traits.connection_scope === 'device';
+  const isTargetScopeTargets = hasTargets && traits.connection_scope === 'target';
 
   // For devices with targets, get troubleshoot and post_deploy from selected target's section
   let sectionTroubleshoot = section.troubleshoot || '';
   let sectionPostDeploy = section.post_deploy || '';
-  if ((isDockerDeploy || isRecameraCppWithTargets) && device.targets) {
+  if (hasTargets && device.targets) {
     const target = getSelectedTarget(device);
     if (target?.section?.troubleshoot) {
       sectionTroubleshoot = target.section.troubleshoot;
@@ -508,7 +511,7 @@ export function renderDeploySection(device, stepNumber) {
         ${isManual ? renderManualSectionContent(device, state, sectionDescription) :
           isPreview ? renderPreviewSectionContent(device, sectionDescription) :
           isSerialCamera ? renderSerialCameraSectionContent(device, state, sectionDescription) :
-          (isDockerDeploy || isRecameraCppWithTargets) ? renderTargetSectionContent(device, state) :
+          hasTargets ? renderTargetSectionContent(device, state) :
           renderAutoSectionContent(device, state, sectionDescription, isScript)}
 
         <!-- Post-Deploy Section -->
@@ -536,11 +539,9 @@ export function renderDeploySection(device, stepNumber) {
 // Unified Rendering Architecture
 // ============================================
 
-// Device types that require SSH connection form
-const SSH_DEVICE_TYPES = ['ssh_deb', 'docker_remote', 'recamera_cpp', 'recamera_nodered'];
-
-// Device types that require serial port selector
-const SERIAL_DEVICE_TYPES = ['esp32_usb', 'himax_usb'];
+// Legacy constants kept for reference — trait-based checks are preferred.
+// SSH: device.ui_traits?.connection === 'ssh'
+// Serial: device.ui_traits?.connection === 'serial'
 
 /**
  * Render wiring section (diagram + steps)
@@ -628,12 +629,15 @@ export function renderContentArea(device, targetOverride = null) {
  */
 export function renderDeployControls(device, options = {}) {
   const { isRemote = false, target = null } = options;
+  const traits = device.ui_traits || {};
+  const isSSH = traits.connection === 'ssh';
+  const isSerial = traits.connection === 'serial';
   const controls = [];
 
   // SSH form for SSH-based devices
-  if (SSH_DEVICE_TYPES.includes(device.type)) {
-    // For docker_remote or when isRemote, render SSH form with user_inputs merged
-    if (device.type === 'docker_remote' || isRemote) {
+  if (isSSH) {
+    if (isRemote) {
+      // Remote SSH: merge user_inputs into the SSH form
       const excludeIds = ['host', 'username', 'password', 'port'];
       const userInputsContent = target?.user_inputs
         ? renderUserInputs(device, target.user_inputs, excludeIds, true)
@@ -644,8 +648,8 @@ export function renderDeployControls(device, options = {}) {
     }
   }
 
-  // SSH form for docker_deploy with remote target (docker_deploy is not in SSH_DEVICE_TYPES)
-  if (device.type === 'docker_deploy' && isRemote) {
+  // SSH form for target-scoped devices with remote target (e.g. docker_deploy)
+  if (!isSSH && traits.connection_scope === 'target' && isRemote) {
     const excludeIds = ['host', 'username', 'password', 'port'];
     const userInputsContent = target?.user_inputs
       ? renderUserInputs(device, target.user_inputs, excludeIds, true)
@@ -653,29 +657,27 @@ export function renderDeployControls(device, options = {}) {
     controls.push(renderSSHForm(device, target, userInputsContent));
   }
 
-  // Serial port selector for USB devices
-  if (SERIAL_DEVICE_TYPES.includes(device.type)) {
+  // Serial port selector
+  if (isSerial) {
     controls.push(renderSerialPortSelector(device));
   }
 
-  // Model selection for Himax devices
-  if (device.type === 'himax_usb') {
+  // Model selection
+  if (traits.show_model_selection) {
     controls.push(renderModelSelection(device));
   }
 
   // Generic user_inputs rendering for any device type not already handled above.
-  // SSH remote types merge user_inputs into SSH form; serial types don't use them.
-  // All other types: render user_inputs automatically from YAML config.
   const userInputsAlreadyRendered =
-    (SSH_DEVICE_TYPES.includes(device.type) && (device.type === 'docker_remote' || isRemote)) ||
-    SERIAL_DEVICE_TYPES.includes(device.type) ||
-    (device.type === 'docker_deploy' && isRemote);
+    (isSSH && isRemote) ||
+    isSerial ||
+    (!isSSH && traits.connection_scope === 'target' && isRemote);
 
   if (!userInputsAlreadyRendered) {
     const inputs = target?.user_inputs || device.user_inputs;
     if (inputs) {
       // For SSH device types, exclude SSH fields (already shown in SSH form)
-      if (SSH_DEVICE_TYPES.includes(device.type)) {
+      if (isSSH) {
         const sshExcludeIds = ['host', 'username', 'password', 'port'];
         controls.push(renderUserInputs(device, inputs, sshExcludeIds));
       } else {
@@ -736,9 +738,11 @@ export function renderDeployActionArea(device, state, isManual = false) {
  * Unified structure: target selector -> warnings -> content -> controls -> action
  */
 function renderTargetSectionContent(device, state) {
+  const traits = device.ui_traits || {};
   const target = getSelectedTarget(device);
   const isRemote = target?.id === 'remote' || target?.id?.endsWith('_remote') || target?.id?.includes('remote');
   const stepDescription = device.section?.description || '';
+  const isDeviceScope = traits.connection_scope === 'device';
 
   return `
     <!-- Step-level description -->
@@ -747,16 +751,16 @@ function renderTargetSectionContent(device, state) {
     <!-- Target selector -->
     ${renderDockerTargetSelector(device)}
 
-    <!-- Service Switch Warning (for recamera types) -->
-    ${renderServiceSwitchWarning(device.type)}
+    <!-- Service Switch Warning -->
+    ${traits.show_service_warning ? renderServiceSwitchWarning(device.type) : ''}
 
-    <!-- Connection settings before content for recamera_cpp -->
-    ${device.type === 'recamera_cpp' ? renderSSHForm(device) : ''}
+    <!-- Connection settings before content for device-scope SSH -->
+    ${traits.connection === 'ssh' && isDeviceScope ? renderSSHForm(device) : ''}
 
     <!-- Content area (wiring + description) -->
     <div class="deploy-target-content" id="target-content-${device.id}">
       ${renderContentArea(device)}
-      ${device.type !== 'recamera_cpp' ? renderDeployControls(device, { isRemote, target }) : ''}
+      ${!isDeviceScope ? renderDeployControls(device, { isRemote, target }) : ''}
     </div>
 
     <!-- Deploy button -->
@@ -838,9 +842,14 @@ function renderSerialCameraSectionContent(device, state, sectionDescription) {
  * Unified structure: warning -> user inputs -> description -> controls -> action
  */
 function renderAutoSectionContent(device, state, sectionDescription, isScript) {
+  const traits = device.ui_traits || {};
+  const isSSH = traits.connection === 'ssh';
+  const isSerial = traits.connection === 'serial';
+  const sshExclude = ['host', 'username', 'password', 'port'];
+
   return `
     <!-- Service Switch Warning -->
-    ${renderServiceSwitchWarning(device.type)}
+    ${traits.show_service_warning ? renderServiceSwitchWarning(device.type) : ''}
 
     <!-- User Inputs (for script type, placed before description) -->
     ${isScript && device.user_inputs ? renderUserInputs(device, device.user_inputs) : ''}
@@ -850,10 +859,10 @@ function renderAutoSectionContent(device, state, sectionDescription, isScript) {
     ${renderDescriptionSection(sectionDescription)}
 
     <!-- Deploy controls (SSH form, serial port, or generic user inputs) -->
-    ${SSH_DEVICE_TYPES.includes(device.type) ? renderSSHForm(device) : ''}
-    ${(device.type === 'docker_remote' || device.type === 'recamera_nodered') && device.user_inputs ? renderUserInputs(device, device.user_inputs, ['host', 'username', 'password', 'port']) : ''}
-    ${SERIAL_DEVICE_TYPES.includes(device.type) ? renderSerialPortSelector(device) : ''}
-    ${!isScript && !SSH_DEVICE_TYPES.includes(device.type) && !SERIAL_DEVICE_TYPES.includes(device.type) && device.user_inputs ? renderUserInputs(device, device.user_inputs) : ''}
+    ${isSSH ? renderSSHForm(device) : ''}
+    ${isSSH && device.user_inputs ? renderUserInputs(device, device.user_inputs, sshExclude) : ''}
+    ${isSerial ? renderSerialPortSelector(device) : ''}
+    ${!isScript && !isSSH && !isSerial && device.user_inputs ? renderUserInputs(device, device.user_inputs) : ''}
 
     <!-- Deploy button -->
     ${renderDeployActionArea(device, state)}
@@ -1301,21 +1310,10 @@ export function renderPreviewInputs(device) {
 // ============================================
 
 /**
- * Check if a device type requires showing service switch warning
- */
-export function shouldShowServiceSwitchWarning(deviceType) {
-  return deviceType === 'recamera_nodered' ||
-         deviceType === 'recamera_cpp';
-}
-
-/**
- * Render service switch warning banner
+ * Render service switch warning banner.
+ * Callers should check ui_traits.show_service_warning before calling.
  */
 export function renderServiceSwitchWarning(deviceType) {
-  if (!shouldShowServiceSwitchWarning(deviceType)) {
-    return '';
-  }
-
   const isReCamera = deviceType.startsWith('recamera_');
   const warningText = isReCamera
     ? t('deploy.warnings.recameraSwitch')

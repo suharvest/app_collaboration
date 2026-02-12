@@ -14,6 +14,18 @@ logger = logging.getLogger(__name__)
 class BaseDeployer(ABC):
     """Abstract base class for deployers"""
 
+    device_type: str = ""
+    ui_traits: dict = {
+        "connection": "none",
+        "auto_deploy": True,
+        "renderer": None,
+        "has_targets": False,
+        "show_model_selection": False,
+        "show_service_warning": False,
+        "connection_scope": "device",
+    }
+    steps: list = []
+
     @abstractmethod
     async def deploy(
         self,

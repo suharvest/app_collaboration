@@ -5,8 +5,8 @@ Unit tests for the multilingual markdown parser.
 import pytest
 
 from provisioning_station.services.markdown_parser import (
-    VALID_STEP_TYPES,
     ParseErrorType,
+    _get_valid_step_types,
     extract_wiring,
     extract_wiring_multilang,
     parse_bilingual_markdown,
@@ -621,9 +621,9 @@ class TestValidStepTypes:
             "serial_camera",
             "ha_integration",
         }
-        assert VALID_STEP_TYPES == expected_types
+        assert _get_valid_step_types() == expected_types
 
-    @pytest.mark.parametrize("step_type", VALID_STEP_TYPES)
+    @pytest.mark.parametrize("step_type", _get_valid_step_types())
     def test_each_valid_type_parses(self, step_type):
         """Each valid step type parses without error."""
         content = f"""<!-- @lang:en -->

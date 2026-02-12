@@ -23,6 +23,43 @@ logger = logging.getLogger(__name__)
 class DockerDeployer(BaseDeployer):
     """Docker compose deployment"""
 
+    device_type = "docker_local"
+    ui_traits = {
+        "connection": "none",
+        "auto_deploy": True,
+        "renderer": None,
+        "has_targets": False,
+        "show_model_selection": False,
+        "show_service_warning": False,
+        "connection_scope": "device",
+    }
+    steps = [
+        {
+            "id": "actions_before",
+            "name": "Custom Setup",
+            "name_zh": "自定义准备",
+            "_condition": "actions.before",
+        },
+        {
+            "id": "pull_images",
+            "name": "Pull Docker Images",
+            "name_zh": "拉取 Docker 镜像",
+        },
+        {
+            "id": "create_volumes",
+            "name": "Create Data Volumes",
+            "name_zh": "创建数据卷",
+        },
+        {"id": "start_services", "name": "Start Services", "name_zh": "启动服务"},
+        {"id": "health_check", "name": "Health Check", "name_zh": "健康检查"},
+        {
+            "id": "actions_after",
+            "name": "Custom Config",
+            "name_zh": "自定义配置",
+            "_condition": "actions.after",
+        },
+    ]
+
     async def deploy(
         self,
         config: DeviceConfig,

@@ -189,22 +189,14 @@ class StructureValidationResult:
     zh_steps_by_preset: dict = field(default_factory=dict)
 
 
-# Valid deployment types
-VALID_STEP_TYPES = {
-    "docker_deploy",
-    "docker_local",
-    "docker_remote",
-    "ssh_deb",
-    "script",
-    "manual",
-    "esp32_usb",
-    "himax_usb",
-    "preview",
-    "recamera_cpp",
-    "recamera_nodered",
-    "serial_camera",
-    "ha_integration",
-}
+# Valid deployment types — built dynamically from the deployer registry.
+# "docker_deploy" is a meta-type (not a deployer) but valid in guide.md.
+# Evaluated lazily to avoid circular import issues during auto-discovery.
+def _get_valid_step_types():
+    from ..deployers import DEPLOYER_REGISTRY
+
+    return set(DEPLOYER_REGISTRY.keys()) | {"docker_deploy"}
+
 
 # Regex patterns
 LANG_MARKER_PATTERN = re.compile(r"<!--\s*@lang:(\w+)\s*-->")
@@ -480,18 +472,18 @@ def parse_deployment_step(
                 error_type=ParseErrorType.MISSING_REQUIRED_FIELD,
                 message=f"Step '{step_id}' missing required 'type' attribute",
                 line_number=line_number,
-                suggestion=f"Add type=xxx where xxx is one of: {', '.join(sorted(VALID_STEP_TYPES))}",
+                suggestion=f"Add type=xxx where xxx is one of: {', '.join(sorted(_get_valid_step_types()))}",
             )
         )
         return None, errors, warnings
 
-    if step_type not in VALID_STEP_TYPES:
+    if step_type not in _get_valid_step_types():
         errors.append(
             ParseError(
                 error_type=ParseErrorType.INVALID_STEP_TYPE,
                 message=f"Invalid step type '{step_type}' for step '{step_id}'",
                 line_number=line_number,
-                suggestion=f"Valid types: {', '.join(sorted(VALID_STEP_TYPES))}",
+                suggestion=f"Valid types: {', '.join(sorted(_get_valid_step_types()))}",
             )
         )
         return None, errors, warnings
