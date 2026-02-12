@@ -25,6 +25,7 @@ export class FaceDatabasePanel {
     this._enrolling = false;
     this._enrollmentData = null;
     this._frameCallback = null;
+    this._cameraAvailable = false;
 
     this._render();
     this._bindEvents();
@@ -32,7 +33,16 @@ export class FaceDatabasePanel {
 
   setSessionId(id) {
     this.sessionId = id;
+    this._updateConnectState();
     if (id) this.refresh();
+  }
+
+  /**
+   * Set whether camera preview is available (controls enrollment button)
+   */
+  setCameraAvailable(available) {
+    this._cameraAvailable = available;
+    this._updateRegisterButton();
   }
 
   /**
@@ -78,10 +88,13 @@ export class FaceDatabasePanel {
         <div class="face-database-header">
           <h4 class="face-database-title">${t('faceDatabase.title')}</h4>
           <div class="face-database-header-actions">
+            <button class="btn btn-sm btn-primary" id="fdb-connect-btn" style="display:none">
+              ${t('faceDatabase.connect')}
+            </button>
             <button class="btn-icon" id="fdb-refresh-btn" title="${t('faceDatabase.refresh') || 'Refresh'}">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
             </button>
-            <button class="btn btn-sm btn-primary" id="fdb-register-btn">
+            <button class="btn btn-sm btn-primary" id="fdb-register-btn" disabled title="${t('faceDatabase.cameraRequired')}">
               + ${t('faceDatabase.register')}
             </button>
           </div>
@@ -162,6 +175,31 @@ export class FaceDatabasePanel {
   // ============================================
   // Event Handlers
   // ============================================
+
+  /**
+   * Update connect button visibility based on session state
+   */
+  _updateConnectState() {
+    const connectBtn = this.container.querySelector('#fdb-connect-btn');
+    if (connectBtn) {
+      connectBtn.style.display = this.sessionId ? 'none' : '';
+    }
+  }
+
+  /**
+   * Update register button based on camera availability
+   */
+  _updateRegisterButton() {
+    const btn = this.container.querySelector('#fdb-register-btn');
+    if (!btn) return;
+    if (this._cameraAvailable) {
+      btn.disabled = false;
+      btn.title = '';
+    } else {
+      btn.disabled = true;
+      btn.title = t('faceDatabase.cameraRequired');
+    }
+  }
 
   _bindEvents() {
     this.container.querySelector('#fdb-refresh-btn')?.addEventListener('click', () => {

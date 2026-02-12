@@ -3,6 +3,11 @@
  *
  * Manages session lifecycle and wires up the camera + panel components
  * for serial_camera type deployment steps.
+ *
+ * Supports three connection modes:
+ * - Both ports: camera preview + face DB (full functionality)
+ * - Camera only: preview without face DB
+ * - CRUD only: face DB without preview (enrollment disabled)
  */
 
 import { t } from '../../modules/i18n.js';
@@ -19,7 +24,7 @@ import { getDeviceById } from './utils.js';
 
 /**
  * Initialize serial camera step UI
- * Creates canvas and panel instances, wires up connect button
+ * Creates canvas and panel instances, wires up connect buttons
  */
 export function initSerialCameraStep(deviceId) {
   const device = getDeviceById(deviceId);
@@ -54,29 +59,52 @@ export function initSerialCameraStep(deviceId) {
   }
 
   // Store instances
-  setSerialCameraInstance(deviceId, { canvas, panel, sessionId: null });
+  setSerialCameraInstance(deviceId, { canvas, panel, sessionId: null, crudSessionId: null });
 
-  // Wire connect button
+  // Wire camera connect button
   const connectBtn = cameraContainer.querySelector('#sc-connect-btn');
   if (connectBtn) {
     connectBtn.addEventListener('click', () => handleSerialCameraButtonClick(deviceId));
   }
+
+  // Wire face DB connect button
+  if (panel) {
+    const fdbConnectBtn = panel.container.querySelector('#fdb-connect-btn');
+    if (fdbConnectBtn) {
+      fdbConnectBtn.addEventListener('click', () => handleFaceDatabaseButtonClick(deviceId));
+    }
+  }
 }
 
 /**
- * Handle connect/disconnect button click
+ * Handle camera connect/disconnect button click
  */
 export async function handleSerialCameraButtonClick(deviceId) {
   const instance = getSerialCameraInstance(deviceId);
   if (!instance) return;
 
   if (instance.sessionId) {
-    // Disconnect
     await disconnectSerialCamera(deviceId);
   } else {
-    // Connect
     await connectSerialCamera(deviceId);
   }
+}
+
+/**
+ * Handle face database connect/disconnect button click
+ */
+async function handleFaceDatabaseButtonClick(deviceId) {
+  const instance = getSerialCameraInstance(deviceId);
+  if (!instance || !instance.panel) return;
+
+  if (instance.crudSessionId && !instance.sessionId) {
+    // Disconnect CRUD-only session
+    await disconnectFaceDatabase(deviceId);
+  } else if (!instance.sessionId) {
+    // No camera session — create CRUD-only session
+    await connectFaceDatabase(deviceId);
+  }
+  // If camera session exists, the panel is already using that session
 }
 
 /**
@@ -109,15 +137,18 @@ async function connectSerialCamera(deviceId) {
     const dbRef = faceDbConfig.database_port.port_from_device;
     crudPort = deviceStates[dbRef]?.port;
     crudBaudrate = faceDbConfig.database_port?.baudrate || 115200;
+    // Don't block camera connect if CRUD port is missing
+  }
 
-    if (!crudPort) {
-      toast.error(t('serialCamera.portMissing', { step: dbRef }));
-      return;
-    }
+  // If there's an existing CRUD-only session, close it first
+  if (instance.crudSessionId) {
+    try {
+      await serialCameraApi.deleteSession(instance.crudSessionId);
+    } catch { /* ignore */ }
+    instance.crudSessionId = null;
   }
 
   try {
-    // Create backend session
     const result = await serialCameraApi.createSession(
       cameraPort, cameraBaudrate, crudPort, crudBaudrate
     );
@@ -127,16 +158,91 @@ async function connectSerialCamera(deviceId) {
     // Connect camera canvas WebSocket
     instance.canvas.connect(result.session_id);
 
-    // Connect face database panel
+    // Connect face database panel if CRUD port was included
     if (instance.panel) {
-      instance.panel.setSessionId(result.session_id);
+      if (crudPort) {
+        instance.panel.setSessionId(result.session_id);
+      }
+      instance.panel.setCameraAvailable(true);
     }
 
-    // Update button text
     _updateConnectButton(deviceId, true);
 
   } catch (e) {
     toast.error(`Connection failed: ${e.message}`);
+  }
+}
+
+/**
+ * Connect face database only (CRUD-only session, no camera)
+ */
+async function connectFaceDatabase(deviceId) {
+  const device = getDeviceById(deviceId);
+  const instance = getSerialCameraInstance(deviceId);
+  if (!device || !instance || !instance.panel) return;
+
+  const serialCamera = device.serial_camera || {};
+  const deviceStates = getDeviceStates();
+
+  // Resolve CRUD port
+  const panels = serialCamera.panels || [];
+  const faceDbConfig = panels.find(p => p.type === 'face_database');
+  if (!faceDbConfig?.database_port?.port_from_device) return;
+
+  const dbRef = faceDbConfig.database_port.port_from_device;
+  const crudPort = deviceStates[dbRef]?.port;
+  const crudBaudrate = faceDbConfig.database_port?.baudrate || 115200;
+
+  if (!crudPort) {
+    toast.error(t('serialCamera.crudPortMissing', { step: dbRef }));
+    return;
+  }
+
+  try {
+    const result = await serialCameraApi.createSession(
+      null, 921600, crudPort, crudBaudrate
+    );
+
+    instance.crudSessionId = result.session_id;
+    instance.panel.setSessionId(result.session_id);
+    // No camera available — enrollment stays disabled
+    instance.panel.setCameraAvailable(false);
+
+    // Update the connect button in the panel to show "disconnect"
+    const fdbConnectBtn = instance.panel.container.querySelector('#fdb-connect-btn');
+    if (fdbConnectBtn) {
+      fdbConnectBtn.textContent = t('faceDatabase.disconnect');
+      fdbConnectBtn.className = 'btn btn-sm btn-secondary';
+    }
+
+  } catch (e) {
+    toast.error(`Database connection failed: ${e.message}`);
+  }
+}
+
+/**
+ * Disconnect face database CRUD-only session
+ */
+async function disconnectFaceDatabase(deviceId) {
+  const instance = getSerialCameraInstance(deviceId);
+  if (!instance) return;
+
+  if (instance.crudSessionId) {
+    try {
+      await serialCameraApi.deleteSession(instance.crudSessionId);
+    } catch { /* ignore */ }
+    instance.crudSessionId = null;
+  }
+
+  if (instance.panel) {
+    instance.panel.setSessionId(null);
+    instance.panel.setCameraAvailable(false);
+
+    const fdbConnectBtn = instance.panel.container.querySelector('#fdb-connect-btn');
+    if (fdbConnectBtn) {
+      fdbConnectBtn.textContent = t('faceDatabase.connect');
+      fdbConnectBtn.className = 'btn btn-sm btn-primary';
+    }
   }
 }
 
@@ -155,13 +261,22 @@ async function disconnectSerialCamera(deviceId) {
     }
   }
 
-  instance.canvas.disconnect();
+  if (instance.canvas) {
+    instance.canvas.disconnect();
+  }
+
+  // Reset panel state
+  if (instance.panel) {
+    instance.panel.setSessionId(null);
+    instance.panel.setCameraAvailable(false);
+  }
+
   instance.sessionId = null;
   _updateConnectButton(deviceId, false);
 }
 
 /**
- * Update connect button text
+ * Update camera connect button text
  */
 function _updateConnectButton(deviceId, connected) {
   const container = document.getElementById(`serial-camera-container-${deviceId}`);

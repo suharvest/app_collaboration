@@ -10,6 +10,7 @@ Handles:
 
 import asyncio
 import logging
+import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
@@ -29,7 +30,7 @@ router = APIRouter(prefix="/api/serial-camera", tags=["serial-camera"])
 
 
 class CreateSessionRequest(BaseModel):
-    camera_port: str
+    camera_port: Optional[str] = None
     camera_baudrate: int = 921600
     crud_port: Optional[str] = None
     crud_baudrate: int = 115200
@@ -37,7 +38,7 @@ class CreateSessionRequest(BaseModel):
 
 class CreateSessionResponse(BaseModel):
     session_id: str
-    camera_port: str
+    camera_port: Optional[str] = None
 
 
 class FaceEntry(BaseModel):
@@ -78,6 +79,9 @@ _crud_clients: dict = {}
 # Maps session_id -> FaceEnrollmentSession
 _enrollments: dict = {}
 
+# CRUD-only sessions (no camera) - session_id -> True
+_crud_only_sessions: dict = {}
+
 
 def _get_crud_client(session_id: str) -> Optional[SerialCrudClient]:
     return _crud_clients.get(session_id)
@@ -90,29 +94,51 @@ def _get_crud_client(session_id: str) -> Optional[SerialCrudClient]:
 
 @router.post("/sessions", response_model=CreateSessionResponse)
 async def create_session(req: CreateSessionRequest):
-    """Create a new serial camera session."""
-    manager = get_serial_camera_manager()
+    """Create a new serial camera session.
 
-    try:
-        session = manager.create_session(req.camera_port, req.camera_baudrate)
-        session.start()
-    except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to open camera port: {e}")
+    At least one of camera_port or crud_port must be provided.
+    - camera_port only: camera preview, no face DB
+    - crud_port only: face DB CRUD, no camera preview
+    - both: full functionality
+    """
+    if not req.camera_port and not req.crud_port:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one of camera_port or crud_port must be provided",
+        )
+
+    session_id = None
+
+    if req.camera_port:
+        # Create camera session (generates session_id internally)
+        manager = get_serial_camera_manager()
+        try:
+            session = manager.create_session(req.camera_port, req.camera_baudrate)
+            session.start()
+            session_id = session.session_id
+        except ValueError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to open camera port: {e}"
+            )
+    else:
+        # CRUD-only session — generate ID directly
+        session_id = uuid.uuid4().hex[:8]
+        _crud_only_sessions[session_id] = True
 
     # Open CRUD client if specified
     if req.crud_port:
         try:
             client = SerialCrudClient(req.crud_port, req.crud_baudrate)
             client.open()
-            _crud_clients[session.session_id] = client
+            _crud_clients[session_id] = client
         except Exception as e:
             # Don't fail session creation if CRUD port fails
             logger.warning("Failed to open CRUD port %s: %s", req.crud_port, e)
 
     return CreateSessionResponse(
-        session_id=session.session_id,
+        session_id=session_id,
         camera_port=req.camera_port,
     )
 
@@ -120,8 +146,6 @@ async def create_session(req: CreateSessionRequest):
 @router.delete("/sessions/{session_id}")
 async def delete_session(session_id: str):
     """Close a serial camera session."""
-    manager = get_serial_camera_manager()
-
     # Cancel any active enrollment
     enrollment = _enrollments.pop(session_id, None)
     if enrollment and enrollment.active:
@@ -132,7 +156,13 @@ async def delete_session(session_id: str):
     if client:
         client.close()
 
-    manager.close_session(session_id)
+    # Close camera session if it exists
+    if session_id not in _crud_only_sessions:
+        manager = get_serial_camera_manager()
+        manager.close_session(session_id)
+    else:
+        _crud_only_sessions.pop(session_id, None)
+
     return {"ok": True}
 
 

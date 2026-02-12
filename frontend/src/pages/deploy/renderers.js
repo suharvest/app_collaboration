@@ -801,37 +801,34 @@ function renderSerialCameraSectionContent(device, state, sectionDescription) {
   const serialCamera = device.serial_camera || {};
   const cameraRef = serialCamera.camera_port?.port_from_device;
   const panels = serialCamera.panels || [];
+  const deviceStates = getDeviceStates();
 
-  // Check port readiness
-  const portWarnings = [];
+  // Per-component port warnings (all inside the port-status div so dynamic updater can clear them)
+  const warnings = [];
   if (cameraRef) {
-    const deviceStates = getDeviceStates();
     const cameraPort = deviceStates[cameraRef]?.port;
     if (!cameraPort) {
-      portWarnings.push(t('serialCamera.portMissing', { step: cameraRef }));
+      warnings.push(`<div class="port-status-warning" data-port-type="camera"><div>${escapeHtml(t('serialCamera.cameraPortMissing', { step: cameraRef }))}</div></div>`);
     }
   }
 
   for (const panel of panels) {
     const dbRef = panel.database_port?.port_from_device;
     if (dbRef) {
-      const deviceStates = getDeviceStates();
       const dbPort = deviceStates[dbRef]?.port;
       if (!dbPort) {
-        portWarnings.push(t('serialCamera.portMissing', { step: dbRef }));
+        warnings.push(`<div class="port-status-warning" data-port-type="crud"><div>${escapeHtml(t('serialCamera.crudPortMissing', { step: dbRef }))}</div></div>`);
       }
     }
   }
 
-  const portStatusHtml = portWarnings.length > 0
-    ? `<div class="port-status-warning">
-        ${portWarnings.map(w => `<div>${escapeHtml(w)}</div>`).join('')}
-      </div>`
+  const statusHtml = warnings.length > 0
+    ? warnings.join('')
     : `<div class="port-status-ready">${t('serialCamera.portsReady')}</div>`;
 
   return `
     ${renderDescriptionSection(sectionDescription)}
-    <div id="port-status-${device.id}">${portStatusHtml}</div>
+    <div id="port-status-${device.id}">${statusHtml}</div>
     <div class="serial-camera-container-wrapper" id="serial-camera-container-${device.id}"></div>
     ${panels.length > 0 ? `<div class="serial-camera-panel-wrapper" id="serial-camera-panel-${device.id}"></div>` : ''}
   `;
