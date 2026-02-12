@@ -20,6 +20,36 @@ logger = logging.getLogger(__name__)
 class ScriptDeployer(BaseDeployer):
     """Local script execution deployment"""
 
+    device_type = "script"
+    ui_traits = {
+        "connection": "none",
+        "auto_deploy": True,
+        "renderer": None,
+        "has_targets": False,
+        "show_model_selection": False,
+        "show_service_warning": False,
+        "connection_scope": "device",
+    }
+    steps = [
+        {"id": "validate", "name": "Validate", "name_zh": "验证环境"},
+        {
+            "id": "actions_before",
+            "name": "Custom Setup",
+            "name_zh": "自定义准备",
+            "_condition": "actions.before",
+        },
+        {"id": "setup", "name": "Setup", "name_zh": "安装"},
+        {"id": "configure", "name": "Configure", "name_zh": "配置"},
+        {"id": "start", "name": "Start", "name_zh": "启动"},
+        {"id": "health_check", "name": "Health Check", "name_zh": "健康检查"},
+        {
+            "id": "actions_after",
+            "name": "Custom Config",
+            "name_zh": "自定义配置",
+            "_condition": "actions.after",
+        },
+    ]
+
     async def deploy(
         self,
         config: DeviceConfig,

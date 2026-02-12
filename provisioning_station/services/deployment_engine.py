@@ -8,21 +8,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from ..deployers.base import BaseDeployer
-from ..deployers.docker_deployer import DockerDeployer
-from ..deployers.docker_remote_deployer import (
-    DockerRemoteDeployer,
-    RemoteDockerNotInstalled,
-)
-from ..deployers.esp32_deployer import ESP32Deployer
-from ..deployers.ha_integration_deployer import HAIntegrationDeployer
-from ..deployers.himax_deployer import HimaxDeployer
-from ..deployers.manual_deployer import ManualDeployer
-from ..deployers.recamera_cpp_deployer import ReCameraCppDeployer
-from ..deployers.recamera_nodered_deployer import ReCameraNodeRedDeployer
-from ..deployers.script_deployer import ScriptDeployer
-from ..deployers.serial_camera_deployer import SerialCameraDeployer
-from ..deployers.ssh_deployer import SSHDeployer
+from ..deployers import DEPLOYER_REGISTRY
 from ..models.deployment import (
     Deployment,
     DeploymentStatus,
@@ -48,20 +34,8 @@ class DeploymentEngine:
         self._websocket_manager = None
         self._running_tasks: Dict[str, asyncio.Task] = {}
 
-        # Initialize deployers
-        self.deployers: Dict[str, BaseDeployer] = {
-            "esp32_usb": ESP32Deployer(),
-            "himax_usb": HimaxDeployer(),
-            "docker_local": DockerDeployer(),
-            "docker_remote": DockerRemoteDeployer(),
-            "ssh_deb": SSHDeployer(),
-            "script": ScriptDeployer(),
-            "manual": ManualDeployer(),
-            "recamera_nodered": ReCameraNodeRedDeployer(),
-            "recamera_cpp": ReCameraCppDeployer(),
-            "serial_camera": SerialCameraDeployer(),
-            "ha_integration": HAIntegrationDeployer(),
-        }
+        # Deployers are auto-discovered from the deployers package
+        self.deployers = DEPLOYER_REGISTRY
 
     def set_websocket_manager(self, manager):
         """Set WebSocket manager for broadcasting updates"""
@@ -252,6 +226,9 @@ class DeploymentEngine:
 
     async def _run_deployment(self, deployment_id: str):
         """Execute deployment steps sequentially"""
+        # Lazy import to avoid circular dependency (deployers -> services -> deployers)
+        from ..deployers.docker_remote_deployer import RemoteDockerNotInstalled
+
         deployment = self.active_deployments.get(deployment_id)
         if not deployment:
             return

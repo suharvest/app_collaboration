@@ -27,6 +27,20 @@ class PreviewDeployer(BaseDeployer):
     The deployer just validates that the preview can be started.
     """
 
+    device_type = "preview"
+    ui_traits = {
+        "connection": "none",
+        "auto_deploy": False,
+        "renderer": "preview",
+        "has_targets": False,
+        "show_model_selection": False,
+        "show_service_warning": False,
+        "connection_scope": "device",
+    }
+    steps = [
+        {"id": "preview_setup", "name": "Preview Setup", "name_zh": "预览设置"},
+    ]
+
     async def deploy(
         self,
         config: DeviceConfig,

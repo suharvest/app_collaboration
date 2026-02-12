@@ -836,6 +836,24 @@ class SolutionManager:
             "required": step.required,
         }
 
+        # Inject ui_traits from deployer registry
+        from ..deployers import DEPLOYER_REGISTRY
+
+        deployer = DEPLOYER_REGISTRY.get(step.type)
+        if deployer:
+            device["ui_traits"] = deployer.ui_traits
+        elif step.type == "docker_deploy":
+            # docker_deploy is a meta-type with its own traits
+            device["ui_traits"] = {
+                "connection": "none",
+                "auto_deploy": True,
+                "renderer": None,
+                "has_targets": True,
+                "show_model_selection": False,
+                "show_service_warning": False,
+                "connection_scope": "target",
+            }
+
         # Build section content
         section = {
             "title": title,

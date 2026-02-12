@@ -30,6 +30,35 @@ def is_frozen() -> bool:
 class ESP32Deployer(BaseDeployer):
     """ESP32 firmware flashing via esptool"""
 
+    device_type = "esp32_usb"
+    ui_traits = {
+        "connection": "serial",
+        "auto_deploy": True,
+        "renderer": None,
+        "has_targets": False,
+        "show_model_selection": False,
+        "show_service_warning": False,
+        "connection_scope": "device",
+    }
+    steps = [
+        {"id": "detect", "name": "Detect Device", "name_zh": "检测设备"},
+        {
+            "id": "actions_before",
+            "name": "Custom Setup",
+            "name_zh": "自定义准备",
+            "_condition": "actions.before",
+        },
+        {"id": "erase", "name": "Erase Flash", "name_zh": "擦除闪存"},
+        {"id": "flash", "name": "Flash Firmware", "name_zh": "烧录固件"},
+        {"id": "verify", "name": "Verify", "name_zh": "验证"},
+        {
+            "id": "actions_after",
+            "name": "Custom Config",
+            "name_zh": "自定义配置",
+            "_condition": "actions.after",
+        },
+    ]
+
     async def deploy(
         self,
         config: DeviceConfig,

@@ -33,6 +33,35 @@ PREAMBLE_FOOTER = bytes([0x5A, 0xC0])
 class HimaxDeployer(BaseDeployer):
     """Himax WE2 firmware flashing via xmodem protocol"""
 
+    device_type = "himax_usb"
+    ui_traits = {
+        "connection": "serial",
+        "auto_deploy": True,
+        "renderer": None,
+        "has_targets": False,
+        "show_model_selection": True,
+        "show_service_warning": False,
+        "connection_scope": "device",
+    }
+    steps = [
+        {"id": "detect", "name": "Detect Device", "name_zh": "检测设备"},
+        {"id": "prepare", "name": "Prepare", "name_zh": "准备"},
+        {
+            "id": "actions_before",
+            "name": "Custom Setup",
+            "name_zh": "自定义准备",
+            "_condition": "actions.before",
+        },
+        {"id": "flash", "name": "Flash Firmware", "name_zh": "烧录固件"},
+        {"id": "verify", "name": "Verify", "name_zh": "验证"},
+        {
+            "id": "actions_after",
+            "name": "Custom Config",
+            "name_zh": "自定义配置",
+            "_condition": "actions.after",
+        },
+    ]
+
     # Watcher Himax WE2 USB identifiers (WCH chip)
     DEFAULT_VID = 0x1A86
     DEFAULT_PID = 0x55D2

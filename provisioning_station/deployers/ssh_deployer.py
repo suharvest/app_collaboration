@@ -18,6 +18,17 @@ logger = logging.getLogger(__name__)
 class SSHDeployer(BaseDeployer):
     """SSH-based deb package deployment"""
 
+    device_type = "ssh_deb"
+    ui_traits = {
+        "connection": "ssh",
+        "auto_deploy": True,
+        "renderer": None,
+        "has_targets": False,
+        "show_model_selection": False,
+        "show_service_warning": False,
+        "connection_scope": "device",
+    }
+
     async def deploy(
         self,
         config: DeviceConfig,

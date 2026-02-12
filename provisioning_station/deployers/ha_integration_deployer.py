@@ -43,6 +43,25 @@ CORE_SSH_USERNAME = "root"
 class HAIntegrationDeployer(BaseDeployer):
     """Deploys reCamera custom component to an existing Home Assistant instance."""
 
+    device_type = "ha_integration"
+    ui_traits = {
+        "connection": "ssh",
+        "auto_deploy": True,
+        "renderer": None,
+        "has_targets": False,
+        "show_model_selection": False,
+        "show_service_warning": False,
+        "connection_scope": "device",
+    }
+    steps = [
+        {"id": "auth", "name": "Authenticate", "name_zh": "认证"},
+        {"id": "detect", "name": "Detect HA Type", "name_zh": "检测 HA 类型"},
+        {"id": "ssh", "name": "Setup SSH", "name_zh": "配置 SSH"},
+        {"id": "copy", "name": "Copy Files", "name_zh": "复制文件"},
+        {"id": "restart", "name": "Restart HA", "name_zh": "重启 HA"},
+        {"id": "integrate", "name": "Add Integration", "name_zh": "添加集成"},
+    ]
+
     async def deploy(
         self,
         config: DeviceConfig,

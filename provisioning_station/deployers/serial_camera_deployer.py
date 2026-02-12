@@ -17,6 +17,17 @@ logger = logging.getLogger(__name__)
 class SerialCameraDeployer(BaseDeployer):
     """Serial camera deployment - interactive step handled by frontend."""
 
+    device_type = "serial_camera"
+    ui_traits = {
+        "connection": "none",
+        "auto_deploy": False,
+        "renderer": "serial-camera",
+        "has_targets": False,
+        "show_model_selection": False,
+        "show_service_warning": False,
+        "connection_scope": "device",
+    }
+
     async def deploy(
         self,
         config: DeviceConfig,

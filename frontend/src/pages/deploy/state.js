@@ -167,7 +167,7 @@ export function createInitialDeviceState(device, index) {
     logs: [],
     logsExpanded: false,
     sectionExpanded: index === 0, // First section expanded
-    selectedTarget: (device.type === 'docker_deploy' || (device.type === 'recamera_cpp' && device.targets)) ? defaultTarget : null,
+    selectedTarget: (device.ui_traits?.has_targets && device.targets) ? defaultTarget : null,
   };
 }
 

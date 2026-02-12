@@ -120,12 +120,13 @@ export function setupEventHandlers(container) {
       e.stopPropagation();
       const deviceId = btn.dataset.deviceId;
       const device = getDeviceById(deviceId);
+      const traits = device?.ui_traits || {};
 
-      if (device?.type === 'manual') {
+      if (!traits.auto_deploy && !traits.renderer) {
         markDeviceComplete(deviceId, expandNextSection);
-      } else if (device?.type === 'preview') {
+      } else if (traits.renderer === 'preview') {
         handlePreviewButtonClick(deviceId);
-      } else if (device?.type === 'serial_camera') {
+      } else if (traits.renderer === 'serial-camera') {
         handleSerialCameraButtonClick(deviceId);
       } else {
         startDeployment(deviceId);
@@ -138,9 +139,10 @@ export function setupEventHandlers(container) {
   const globalDevices = deployment.devices || [];
   const filteredDevices = getFilteredDevices(globalDevices);
   filteredDevices.forEach(device => {
-    if (device.type === 'preview') {
+    const traits = device.ui_traits || {};
+    if (traits.renderer === 'preview') {
       initPreviewWindow(device.id);
-    } else if (device.type === 'serial_camera') {
+    } else if (traits.renderer === 'serial-camera') {
       initSerialCameraStep(device.id);
     }
   });
@@ -330,12 +332,13 @@ export function attachSectionEventHandlers(container) {
       e.stopPropagation();
       const deviceId = btn.dataset.deviceId;
       const device = getDeviceById(deviceId);
+      const traits = device?.ui_traits || {};
 
-      if (device?.type === 'manual') {
+      if (!traits.auto_deploy && !traits.renderer) {
         markDeviceComplete(deviceId, expandNextSection);
-      } else if (device?.type === 'preview') {
+      } else if (traits.renderer === 'preview') {
         handlePreviewButtonClick(deviceId);
-      } else if (device?.type === 'serial_camera') {
+      } else if (traits.renderer === 'serial-camera') {
         handleSerialCameraButtonClick(deviceId);
       } else {
         startDeployment(deviceId);
@@ -411,9 +414,10 @@ export function attachSectionEventHandlers(container) {
 
   // Initialize preview windows for filtered devices
   filteredDevices.forEach(device => {
-    if (device.type === 'preview') {
+    const traits = device.ui_traits || {};
+    if (traits.renderer === 'preview') {
       initPreviewWindow(device.id);
-    } else if (device.type === 'serial_camera') {
+    } else if (traits.renderer === 'serial-camera') {
       initSerialCameraStep(device.id);
     }
   });

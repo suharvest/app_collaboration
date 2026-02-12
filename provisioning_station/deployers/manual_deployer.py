@@ -14,6 +14,17 @@ logger = logging.getLogger(__name__)
 class ManualDeployer(BaseDeployer):
     """Manual deployment - user performs steps manually"""
 
+    device_type = "manual"
+    ui_traits = {
+        "connection": "none",
+        "auto_deploy": False,
+        "renderer": None,
+        "has_targets": False,
+        "show_model_selection": False,
+        "show_service_warning": False,
+        "connection_scope": "device",
+    }
+
     async def deploy(
         self,
         config: DeviceConfig,
