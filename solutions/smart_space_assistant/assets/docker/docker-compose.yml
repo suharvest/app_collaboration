@@ -12,7 +12,7 @@
 
 services:
   xiaozhi-display:
-    image: sensecraft-missionpack.seeed.cn/solution/xiaozhi-display:0.3.0
+    image: sensecraft-missionpack.seeed.cn/solution/xiaozhi-display:0.3.1
     container_name: xiaozhi-display
     restart: unless-stopped
 
@@ -20,16 +20,16 @@ services:
     # Note: ports mapping is ignored when using host network mode
     network_mode: host  # Required for mDNS service discovery
 
-    # Audio device passthrough (for HDMI/speaker output)
-    devices:
-      - /dev/snd:/dev/snd
-
-    # Share system sockets for audio and mDNS
+    # Share system sockets for mDNS
     volumes:
-      # PulseAudio socket (use PUID env var for user ID)
-      - /run/user/${PUID:-1000}/pulse:/run/user/${PUID:-1000}/pulse:ro
+      # Persist uploaded images across container updates
+      - display-uploads:/app/uploads
       # D-Bus for Avahi/mDNS (optional, may not exist on all systems)
       - /var/run/dbus:/var/run/dbus:ro
+      # --- Local audio (Linux only, requires RD_LOCAL_AUDIO=1) ---
+      # - /run/user/${PUID:-1000}/pulse:/run/user/${PUID:-1000}/pulse:ro
+    # devices:
+    #   - /dev/snd:/dev/snd
 
     # Environment configuration
     environment:
@@ -64,3 +64,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+volumes:
+  display-uploads:

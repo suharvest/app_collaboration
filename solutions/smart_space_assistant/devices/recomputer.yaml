@@ -28,8 +28,6 @@ docker_remote:
   environment:
     TZ: Asia/Shanghai
     RD_DEVICE_NAME: "{{device_name}}"
-    # Audio plays via browser by default, set RD_LOCAL_AUDIO=1 for server-side HDMI/speaker output
-    RD_LOCAL_AUDIO: "{{local_audio}}"
 
   options:
     project_name: xiaozhi_display
@@ -80,15 +78,6 @@ user_inputs:
     placeholder: "Living Room Display"
     description: Device name shown in mDNS and Web UI
     description_zh: 在 mDNS 和 Web 界面显示的设备名称
-
-  - id: local_audio
-    name: Enable Server Audio
-    name_zh: 启用本机音频
-    type: checkbox
-    default: "0"
-    required: false
-    description: Also play audio from server's HDMI/speaker (browser audio is always enabled)
-    description_zh: 同时从服务器的 HDMI/音箱播放音频（浏览器音频始终开启）
 
 pre_checks:
   - type: docker_version

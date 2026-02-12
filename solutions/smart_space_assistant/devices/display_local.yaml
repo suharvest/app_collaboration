@@ -27,8 +27,6 @@ docker:
   environment:
     TZ: Asia/Shanghai
     RD_DEVICE_NAME: "{{device_name}}"
-    # Audio plays via browser by default, set RD_LOCAL_AUDIO=1 for server-side audio
-    RD_LOCAL_AUDIO: "0"
 
   options:
     project_name: xiaozhi_display
