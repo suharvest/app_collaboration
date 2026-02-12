@@ -97,21 +97,21 @@ function updateDependentSerialCameraPortStatus(changedDeviceId) {
     // Only update if this serial_camera references the changed device
     if (cameraRef !== changedDeviceId && !dbRefs.includes(changedDeviceId)) continue;
 
-    // Re-evaluate port warnings
-    const portWarnings = [];
+    // Re-evaluate per-component port warnings
+    const warnings = [];
     if (cameraRef && !deviceStates[cameraRef]?.port) {
-      portWarnings.push(t('serialCamera.portMissing', { step: cameraRef }));
+      warnings.push(`<div class="port-status-warning" data-port-type="camera"><div>${escapeHtml(t('serialCamera.cameraPortMissing', { step: cameraRef }))}</div></div>`);
     }
     for (const ref of dbRefs) {
       if (!deviceStates[ref]?.port) {
-        portWarnings.push(t('serialCamera.portMissing', { step: ref }));
+        warnings.push(`<div class="port-status-warning" data-port-type="crud"><div>${escapeHtml(t('serialCamera.crudPortMissing', { step: ref }))}</div></div>`);
       }
     }
 
     const container = document.getElementById(`port-status-${device.id}`);
     if (container) {
-      container.innerHTML = portWarnings.length > 0
-        ? `<div class="port-status-warning">${portWarnings.map(w => `<div>${escapeHtml(w)}</div>`).join('')}</div>`
+      container.innerHTML = warnings.length > 0
+        ? warnings.join('')
         : `<div class="port-status-ready">${t('serialCamera.portsReady')}</div>`;
     }
   }

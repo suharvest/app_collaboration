@@ -540,6 +540,8 @@ const translations = {
       portsReady: 'Ports ready',
       camera: 'Camera',
       database: 'Database',
+      cameraPortMissing: 'Camera port not available — complete "{step}" first',
+      crudPortMissing: 'Database port not available — complete "{step}" first',
       status: {
         disconnected: 'Disconnected',
         connecting: 'Connecting...',
@@ -550,6 +552,9 @@ const translations = {
     faceDatabase: {
       title: 'Face Database',
       register: 'Register',
+      connect: 'Connect Database',
+      disconnect: 'Disconnect',
+      cameraRequired: 'Camera required for enrollment',
       name: 'Name',
       nameColumn: 'Name',
       actionsColumn: 'Actions',
@@ -1133,6 +1138,8 @@ const translations = {
       portsReady: '端口就绪',
       camera: '摄像头',
       database: '数据库',
+      cameraPortMissing: '摄像头端口未就绪 — 请先完成「{step}」',
+      crudPortMissing: '数据库端口未就绪 — 请先完成「{step}」',
       status: {
         disconnected: '未连接',
         connecting: '连接中...',
@@ -1143,6 +1150,9 @@ const translations = {
     faceDatabase: {
       title: '人脸数据库',
       register: '注册',
+      connect: '连接数据库',
+      disconnect: '断开',
+      cameraRequired: '注册需要连接摄像头',
       name: '姓名',
       nameColumn: '姓名',
       actionsColumn: '操作',

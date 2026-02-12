@@ -1332,10 +1332,11 @@ export const serialCameraApi = {
    * Create a serial camera session
    */
   createSession(cameraPort, cameraBaudrate = 921600, crudPort = null, crudBaudrate = 115200) {
-    const body = {
-      camera_port: cameraPort,
-      camera_baudrate: cameraBaudrate,
-    };
+    const body = {};
+    if (cameraPort) {
+      body.camera_port = cameraPort;
+      body.camera_baudrate = cameraBaudrate;
+    }
     if (crudPort) {
       body.crud_port = crudPort;
       body.crud_baudrate = crudBaudrate;
