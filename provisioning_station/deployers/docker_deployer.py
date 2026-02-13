@@ -16,6 +16,7 @@ from ..models.device import DeviceConfig
 from ..utils.compose_labels import create_labels, inject_labels_to_compose_file
 from .action_executor import LocalActionExecutor
 from .base import BaseDeployer
+from .docker_remote_deployer import RemoteDockerNotInstalled
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,14 @@ class DockerDeployer(BaseDeployer):
                 "Local Docker deployment is not supported on Windows. "
                 "Please use a Linux or macOS host, or deploy to a remote Linux device.",
             )
+            return False
+
+        # Check if Docker is available locally
+        auto_install = connection.get("auto_install_docker", False)
+        docker_ready = await self._ensure_docker_available(
+            auto_install, progress_callback
+        )
+        if not docker_ready:
             return False
 
         if not config.docker:
@@ -269,6 +278,9 @@ class DockerDeployer(BaseDeployer):
 
             return True
 
+        except RemoteDockerNotInstalled:
+            raise  # Let deployment engine handle Docker installation dialog
+
         except Exception as e:
             logger.error(f"Docker deployment failed: {e}")
             await self._report_progress(
@@ -284,6 +296,155 @@ class DockerDeployer(BaseDeployer):
                     logger.debug(f"Cleaned up temp compose file: {temp_compose_file}")
                 except Exception as e:
                     logger.warning(f"Failed to clean up temp file: {e}")
+
+    async def _ensure_docker_available(
+        self,
+        auto_install: bool,
+        progress_callback: Optional[Callable] = None,
+    ) -> bool:
+        """Check if Docker is available locally, optionally install on Linux"""
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "docker",
+                "--version",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await process.communicate()
+            if process.returncode == 0:
+                logger.info(f"Docker found: {stdout.decode().strip()}")
+                return True
+        except FileNotFoundError:
+            pass
+
+        # Docker not found
+        if sys.platform == "linux":
+            if auto_install:
+                return await self._install_docker_locally(progress_callback)
+            else:
+                raise RemoteDockerNotInstalled(
+                    "Docker is not installed on this machine. "
+                    "Would you like to install it automatically?",
+                    can_auto_fix=True,
+                    fix_action="install_docker",
+                )
+        else:
+            # macOS/Windows - manual install only
+            await self._report_progress(
+                progress_callback,
+                "pull_images",
+                0,
+                "Docker is not installed. "
+                "Please install Docker Desktop from https://www.docker.com/products/docker-desktop/",
+            )
+            return False
+
+    async def _install_docker_locally(
+        self,
+        progress_callback: Optional[Callable] = None,
+    ) -> bool:
+        """Install Docker on local Linux machine"""
+        try:
+            await self._report_progress(
+                progress_callback, "pull_images", 0, "Installing Docker..."
+            )
+
+            # Detect if Debian-based
+            is_debian = False
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    "cat",
+                    "/etc/os-release",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, _ = await process.communicate()
+                os_info = stdout.decode().lower()
+                is_debian = any(
+                    d in os_info for d in ("debian", "ubuntu", "raspbian", "linuxmint")
+                )
+            except Exception:
+                pass
+
+            if is_debian:
+                script = (
+                    "set -e && "
+                    "sudo apt-get update && "
+                    "sudo apt-get install -y ca-certificates curl gnupg && "
+                    "sudo install -m 0755 -d /etc/apt/keyrings && "
+                    'curl -fsSL https://download.docker.com/linux/$(. /etc/os-release && echo "$ID")/gpg | sudo gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg && '
+                    "sudo chmod a+r /etc/apt/keyrings/docker.gpg && "
+                    'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$(. /etc/os-release && echo "$ID") $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null && '
+                    "sudo apt-get update && "
+                    "sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && "
+                    "sudo usermod -aG docker $USER && "
+                    "sudo systemctl enable docker && "
+                    "sudo systemctl start docker"
+                )
+            else:
+                script = (
+                    "set -e && "
+                    "curl -fsSL https://get.docker.com -o /tmp/get-docker.sh && "
+                    "sudo sh /tmp/get-docker.sh && "
+                    "sudo usermod -aG docker $USER && "
+                    "rm -f /tmp/get-docker.sh && "
+                    "sudo systemctl enable docker 2>/dev/null || true && "
+                    "sudo systemctl start docker 2>/dev/null || sudo service docker start || true"
+                )
+
+            await self._report_progress(
+                progress_callback,
+                "pull_images",
+                10,
+                "Running Docker installation script...",
+            )
+
+            process = await asyncio.create_subprocess_exec(
+                "bash",
+                "-c",
+                script,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+
+            output_lines = []
+            while True:
+                line = await process.stdout.readline()
+                if not line:
+                    break
+                line_str = line.decode().strip()
+                output_lines.append(line_str)
+                if progress_callback and line_str:
+                    await self._report_progress(
+                        progress_callback, "pull_images", 50, line_str
+                    )
+
+            await process.wait()
+
+            if process.returncode != 0:
+                error_msg = "\n".join(output_lines[-5:])
+                await self._report_progress(
+                    progress_callback,
+                    "pull_images",
+                    0,
+                    f"Docker installation failed: {error_msg}",
+                )
+                return False
+
+            await self._report_progress(
+                progress_callback, "pull_images", 80, "Docker installed successfully"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Docker installation failed: {e}")
+            await self._report_progress(
+                progress_callback,
+                "pull_images",
+                0,
+                f"Docker installation failed: {str(e)}",
+            )
+            return False
 
     async def _run_docker_compose(
         self,

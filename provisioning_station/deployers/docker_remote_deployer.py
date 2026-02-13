@@ -219,6 +219,15 @@ class DockerRemoteDeployer(BaseDeployer):
                         progress_callback, "check_docker", 100, docker_check.message
                     )
 
+                # Determine if we need sudo for docker commands
+                # (e.g. after fresh install, group membership not active in current session)
+                docker_sudo = ""
+                exit_code, _, _ = await asyncio.to_thread(
+                    self._exec_with_timeout, client, "docker info", 10
+                )
+                if exit_code != 0:
+                    docker_sudo = "sudo "
+
                 # Step 3: Prepare remote directory
                 await self._report_progress(
                     progress_callback, "prepare", 0, "Creating remote directory..."
@@ -286,7 +295,7 @@ class DockerRemoteDeployer(BaseDeployer):
                 exit_code, stdout, stderr = await asyncio.to_thread(
                     self._exec_with_timeout,
                     client,
-                    f"cd {remote_dir_escaped} && docker compose pull",
+                    f"cd {remote_dir_escaped} && {docker_sudo}docker compose pull",
                     ssh_config.command_timeout,
                 )
 
@@ -325,7 +334,7 @@ class DockerRemoteDeployer(BaseDeployer):
                 env_vars = " ".join(env_items)
                 env_prefix = f"env {env_vars} " if env_vars else ""
 
-                compose_cmd = f"cd {remote_dir_escaped} && {env_prefix}docker compose -p {project_name_escaped} up -d"
+                compose_cmd = f"cd {remote_dir_escaped} && {env_prefix}{docker_sudo}docker compose -p {project_name_escaped} up -d"
 
                 if docker_config.options.get("remove_orphans"):
                     compose_cmd += " --remove-orphans"
@@ -426,6 +435,8 @@ class DockerRemoteDeployer(BaseDeployer):
             )
             return False
 
+        except RemoteDockerNotInstalled:
+            raise  # Let deployment engine handle Docker installation dialog
         except Exception as e:
             logger.error(f"Docker remote deployment failed: {e}")
             await self._report_progress(
