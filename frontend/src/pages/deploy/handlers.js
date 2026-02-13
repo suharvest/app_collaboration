@@ -12,6 +12,7 @@ import {
   getCurrentSolution,
   getDeviceStates,
   getDeviceState,
+  setDeviceState,
   getSelectedDevice,
   getSelectedPresetId,
   setSelectedDevice,
@@ -469,6 +470,13 @@ export async function handlePresetChange(presetId) {
   const sectionsContainer = document.getElementById('deploy-sections-container');
   if (sectionsContainer) {
     const filteredDevices = getFilteredDevices(devices);
+    // Initialize device states BEFORE rendering so the renderer can read the default selectedTarget
+    const currentStates = getDeviceStates();
+    filteredDevices.forEach((device, index) => {
+      if (!currentStates[device.id]) {
+        setDeviceState(device.id, createInitialDeviceState(device, index));
+      }
+    });
     sectionsContainer.innerHTML = filteredDevices.map((device, index) => renderDeploySection(device, index + 1)).join('');
     // Re-attach event handlers for the new sections
     attachSectionEventHandlers(sectionsContainer);

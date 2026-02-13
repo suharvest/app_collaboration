@@ -12,7 +12,7 @@ import {
   getDeviceState,
   getSelectedPresetId,
 } from './state.js';
-import { getDeviceById } from './utils.js';
+import { getDeviceById, getSelectedTarget } from './utils.js';
 import { updateSectionUI, updateChoiceOptionUI } from './ui-updates.js';
 import { addLogToDevice, connectLogsWebSocket } from './websocket.js';
 
@@ -130,8 +130,23 @@ export async function startDeploymentWithDockerInstall(deviceId) {
     options: {},
   };
 
+  // Get selected target for docker_deploy with targets
+  let selectedTarget = null;
+  if (device.targets) {
+    selectedTarget = getSelectedTarget(device);
+  }
+  if (selectedTarget) {
+    params.options.deploy_target = selectedTarget.id;
+    params.options.config_file = selectedTarget.config_file;
+  }
+
   // Add connection info with auto_install_docker flag
-  if (device.type === 'docker_remote') {
+  const traits = device.ui_traits || {};
+  const isRemote = selectedTarget?.id === 'remote' ||
+                   selectedTarget?.id?.endsWith('_remote') ||
+                   selectedTarget?.id?.includes('remote');
+
+  if (traits.connection === 'ssh' || (traits.has_targets && selectedTarget && isRemote)) {
     params.device_connections[deviceId] = {
       host: document.getElementById(`ssh-host-${deviceId}`)?.value,
       port: parseInt(document.getElementById(`ssh-port-${deviceId}`)?.value || '22'),
@@ -139,6 +154,28 @@ export async function startDeploymentWithDockerInstall(deviceId) {
       password: document.getElementById(`ssh-pass-${deviceId}`)?.value,
       auto_install_docker: true,  // Key flag for auto-install
     };
+    if (selectedTarget) {
+      params.device_connections[deviceId].target = selectedTarget.id;
+      params.device_connections[deviceId].target_type = selectedTarget.target_type || (isRemote ? 'remote' : 'local');
+    }
+  } else if (device.type === 'docker_remote') {
+    // Legacy: direct docker_remote type
+    params.device_connections[deviceId] = {
+      host: document.getElementById(`ssh-host-${deviceId}`)?.value,
+      port: parseInt(document.getElementById(`ssh-port-${deviceId}`)?.value || '22'),
+      username: document.getElementById(`ssh-user-${deviceId}`)?.value,
+      password: document.getElementById(`ssh-pass-${deviceId}`)?.value,
+      auto_install_docker: true,
+    };
+  } else {
+    // Local deployment (docker_local) - no SSH needed, just pass the flag
+    params.device_connections[deviceId] = {
+      auto_install_docker: true,
+    };
+    if (selectedTarget) {
+      params.device_connections[deviceId].target = selectedTarget.id;
+      params.device_connections[deviceId].target_type = 'local';
+    }
   }
 
   try {
