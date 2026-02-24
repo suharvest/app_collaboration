@@ -2,350 +2,489 @@
 
 ## 项目概述
 
-SenseCraft Solution 是一个 IoT 解决方案部署平台，用于展示和部署 Seeed Studio 的硬件产品方案。
+IoT 解决方案一键部署平台。用户在 Web/桌面端选方案 → 选预设 → 连接设备 → 一键部署。
+技术栈：Vite + Vanilla JS 前端 | Python FastAPI 后端 | Tauri 桌面壳 | YAML + Markdown 方案配置。
 
-## 技术栈
+---
 
-- **前端**: Vite + Vanilla JS + Tailwind CSS
-- **后端**: Python FastAPI
-- **数据格式**: YAML 配置 + Markdown 内容
+## 核心架构
 
-## 项目结构
+```
+用户选方案 → solution.yaml（介绍/设备/预设）
+         → guide.md（部署步骤定义 + 文档）
+         → devices/*.yaml（每步的设备配置）
+                ↓
+后端解析 markdown_parser → 提取 Step/Target 定义
+       → step_registry → 根据 device_type 生成部署步骤
+       → deployment_engine → 调度 DEPLOYER_REGISTRY 中的 deployer 执行
+                ↓
+前端 deploy/ 模块 → WebSocket 实时显示进度
+```
+
+### 关键设计模式
+
+- **Deployer 自注册**：`deployers/__init__.py` 自动扫描包内所有模块，收集 `BaseDeployer` 子类到 `DEPLOYER_REGISTRY`，按 `device_type` 索引。新增部署类型只需创建新文件。
+- **ui_traits**：每个 Deployer 声明 `ui_traits` dict（connection/auto_deploy/renderer/has_targets 等），前端据此动态渲染 UI。
+- **guide.md 驱动部署**：部署步骤不在 YAML 中定义，而在 guide.md 的 H2 header 元数据中：`## Step N: Title {#id type=xxx config=devices/xxx.yaml}`。
+- **设备全局目录**：`devices/catalog.yaml` 定义所有硬件设备，solution.yaml 的 `device_catalog` 可引用或覆盖。
+
+---
+
+## 项目结构（完整）
 
 ```
 app_collaboration/
-├── frontend/                    # 前端应用
+├── frontend/                          # 前端 (Vite + Vanilla JS + Tailwind)
 │   ├── src/
-│   │   ├── modules/            # 核心模块
-│   │   │   ├── api.js          # API 调用
-│   │   │   ├── i18n.js         # 国际化
-│   │   │   ├── router.js       # 路由
-│   │   │   └── __tests__/      # 前端单元测试 (Vitest)
-│   │   └── pages/              # 页面组件
-│   │       ├── solutions.js    # 方案列表
-│   │       ├── solution-detail.js  # 方案详情
-│   │       └── deploy/         # 部署页面模块
-│   └── design-system/          # 设计系统
-│       └── components.css      # 组件样式
-├── provisioning_station/       # 后端服务
-│   ├── routers/
-│   │   └── solutions.py        # 方案 API
-│   ├── services/
-│   │   └── solution_manager.py # 方案管理
-│   └── models/
-│       ├── api.py              # API 请求/响应模型
-│       └── websocket.py        # WebSocket 消息模型
-├── shared/                      # 前后端共享常量
-│   └── constants.py            # 端口、语言等配置
-├── tests/                       # 后端测试
-│   ├── unit/                   # 单元测试
-│   └── integration/            # 集成测试 & API 契约测试
-└── solutions/                  # 方案配置目录
-    └── [solution_id]/          # 单个方案（简化结构）
-        ├── solution.yaml       # 方案配置
-        ├── description.md      # 英文介绍
-        ├── description_zh.md   # 中文介绍
-        ├── guide.md            # 英文部署指南
-        ├── guide_zh.md         # 中文部署指南
-        ├── gallery/            # 图片资源
-        └── deploy/sections/    # 部署步骤详情（可选）
+│   │   ├── main.js                    # 入口：路由注册、导航、i18n 初始化
+│   │   ├── main.css                   # 全局样式
+│   │   ├── modules/                   # 核心模块
+│   │   │   ├── api.js                 # API 调用、后端端口发现、WebSocket
+│   │   │   ├── i18n.js                # 国际化 (en/zh)
+│   │   │   ├── router.js              # hash 路由
+│   │   │   ├── toast.js               # 通知提示
+│   │   │   ├── preview.js             # 视频预览（RTSP proxy/HLS）
+│   │   │   ├── serial-camera.js       # 串口摄像头 WebSocket 客户端
+│   │   │   ├── overlay-renderers.js   # AI 检测框渲染
+│   │   │   ├── updater.js             # 自动更新（Tauri）
+│   │   │   ├── utils.js               # 通用工具函数
+│   │   │   └── __tests__/             # 模块测试 (Vitest)
+│   │   └── pages/                     # 页面
+│   │       ├── solutions.js           # 方案列表页
+│   │       ├── solution-detail.js     # 方案详情页（介绍/设备/预设选择）
+│   │       ├── deploy.js              # 部署页入口（re-export）
+│   │       ├── deploy/                # 部署页模块化拆分
+│   │       │   ├── index.js           # 部署主逻辑：加载方案、渲染步骤
+│   │       │   ├── state.js           # 部署状态管理
+│   │       │   ├── handlers.js        # 按钮/事件处理
+│   │       │   ├── devices.js         # 设备连接 UI
+│   │       │   ├── docker.js          # Docker 设备特殊处理
+│   │       │   ├── renderers.js       # 步骤卡片渲染
+│   │       │   ├── ui-updates.js      # UI 状态更新
+│   │       │   ├── websocket.js       # 部署 WebSocket 管理
+│   │       │   ├── preview.js         # 部署中的预览面板
+│   │       │   ├── serial-camera-handler.js  # 串口摄像头步骤处理
+│   │       │   ├── face-database-panel.js    # 人脸数据库面板
+│   │       │   ├── utils.js           # 部署页工具函数
+│   │       │   └── __tests__/         # 部署页测试
+│   │       ├── deployments.js         # 部署历史页
+│   │       ├── devices.js             # 已连接设备管理页
+│   │       ├── solution-management.js # 方案管理页（导入/导出）
+│   │       └── settings.js            # 设置页
+│   ├── design-system/
+│   │   └── components.css             # 设计系统组件样式
+│   └── public/                        # 静态资源
+│
+├── provisioning_station/              # 后端 (FastAPI)
+│   ├── main.py                        # FastAPI app、路由注册、生命周期
+│   ├── config.py                      # Settings（端口/路径/语言，env_prefix=PS_）
+│   ├── __main__.py                    # uvicorn 启动入口
+│   │
+│   ├── routers/                       # API 路由
+│   │   ├── solutions.py              # /api/solutions — 方案 CRUD
+│   │   ├── devices.py                # /api/devices — USB/串口设备检测
+│   │   ├── docker_devices.py         # /api/docker-devices — Docker 状态/应用管理
+│   │   ├── deployments.py            # /api/deployments — 启动/取消部署
+│   │   ├── websocket.py              # /ws/deployments — 实时日志 WebSocket
+│   │   ├── device_management.py      # /api/device-management — 已部署设备管理
+│   │   ├── preview.py                # /api/preview — 视频流代理
+│   │   ├── serial_camera.py          # /api/serial-camera — 串口摄像头 WebSocket
+│   │   ├── restore.py                # /api/restore — 设备恢复出厂
+│   │   └── versions.py               # /api/versions — 版本/更新检查
+│   │
+│   ├── services/                      # 业务逻辑
+│   │   ├── solution_manager.py       # 方案加载/解析（YAML + Markdown）
+│   │   ├── markdown_parser.py        # guide.md 解析：Step/Target/Preset 提取
+│   │   ├── deployment_engine.py      # 部署编排：调度 deployer、管理状态
+│   │   ├── deployment_history.py     # 部署历史记录
+│   │   ├── device_detector.py        # USB/串口设备检测
+│   │   ├── docker_device_manager.py  # Docker 容器管理
+│   │   ├── mdns_scanner.py           # mDNS 局域网设备扫描
+│   │   ├── pre_check_validator.py    # 部署前检查（Docker/磁盘/端口）
+│   │   ├── remote_pre_check.py       # 远程设备预检查（SSH）
+│   │   ├── stream_proxy.py           # RTSP → WebSocket 视频流代理
+│   │   ├── serial_camera_service.py  # 串口摄像头 WebSocket 服务
+│   │   ├── serial_crud_service.py    # 串口设备 CRUD（人脸数据库）
+│   │   ├── serial_port_manager.py    # 串口端口管理
+│   │   ├── face_enroll_logic.py      # 人脸注册业务逻辑
+│   │   ├── mqtt_bridge.py            # MQTT 桥接（设备消息转发）
+│   │   ├── kiosk_manager.py          # Kiosk 模式管理
+│   │   ├── localized.py              # 多语言字段处理
+│   │   ├── restore_manager.py        # 设备恢复管理
+│   │   ├── update_manager.py         # 应用更新管理
+│   │   └── version_manager.py        # 版本管理
+│   │
+│   ├── deployers/                     # 部署器（自注册模式）
+│   │   ├── __init__.py               # 自动扫描 → DEPLOYER_REGISTRY
+│   │   ├── base.py                   # BaseDeployer ABC（device_type/ui_traits/steps/deploy）
+│   │   ├── docker_deployer.py        # docker_local: docker compose up
+│   │   ├── docker_remote_deployer.py # docker_remote: SSH + docker compose
+│   │   ├── esp32_deployer.py         # esp32_usb: esptool 烧录
+│   │   ├── himax_deployer.py         # himax_usb: xmodem 烧录
+│   │   ├── recamera_cpp_deployer.py  # recamera_cpp: SSH + deb 包
+│   │   ├── recamera_nodered_deployer.py # recamera_nodered: SSH + Node-RED flow
+│   │   ├── ssh_deployer.py           # ssh_deb: SSH + deb 包安装
+│   │   ├── ssh_binary_deployer.py    # ssh_binary: SSH + 二进制部署
+│   │   ├── script_deployer.py        # script: 本地脚本执行
+│   │   ├── manual_deployer.py        # manual: 手动步骤提示
+│   │   ├── preview_deployer.py       # preview: 无操作，仅显示预览
+│   │   ├── serial_camera_deployer.py # serial_camera: 串口摄像头预览
+│   │   ├── nodered_deployer.py       # Node-RED 基类
+│   │   ├── ha_integration_deployer.py # Home Assistant 集成
+│   │   └── action_executor.py        # actions.before/after 执行器
+│   │
+│   ├── models/                        # 数据模型 (Pydantic)
+│   │   ├── solution.py               # Solution/Preset/DeviceGroup/DeviceCatalog
+│   │   ├── device.py                 # DeviceConfig（所有设备类型配置的联合体）
+│   │   ├── deployment.py             # Deployment/DeploymentStatus
+│   │   ├── docker_device.py          # Docker 设备模型
+│   │   ├── api.py                    # API 请求/响应模型
+│   │   ├── websocket.py              # WebSocket 消息模型
+│   │   ├── version.py                # 版本/部署记录模型
+│   │   └── kiosk.py                  # Kiosk 模式模型
+│   │
+│   ├── utils/                         # 工具
+│   │   ├── step_registry.py          # 根据 deployer.steps + device config 生成步骤
+│   │   ├── template.py               # 模板变量替换
+│   │   ├── compose_labels.py         # Docker Compose label 管理
+│   │   └── recamera_ssh.py           # reCamera SSH 工具
+│   │
+│   └── factory_firmware/              # 出厂固件
+│       ├── esp32/                     # ESP32 出厂固件
+│       ├── himax/                     # Himax 出厂固件
+│       └── restore_config.yaml        # 恢复配置
+│
+├── solutions/                         # 方案目录（每个子目录一个方案）
+│   ├── smart_warehouse/              # 智能仓库
+│   ├── smart_space_assistant/        # 智慧空间助手
+│   ├── smart_retail_voice_ai/        # 智慧零售语音 AI
+│   ├── smart_hvac_control/           # 智能暖通控制
+│   ├── recamera_heatmap_grafana/     # reCamera 热力图 + Grafana
+│   ├── recamera_ecosystem/           # reCamera 生态方案
+│   └── indoor_positioning_ble_lorawan/ # 室内定位 (BLE + LoRaWAN)
+│   # 每个方案的标准结构：
+│   #   solution.yaml    — 方案元数据/设备/预设
+│   #   description.md   — 英文介绍
+│   #   description_zh.md — 中文介绍
+│   #   guide.md         — 英文部署指南（含 Step 定义）
+│   #   guide_zh.md      — 中文部署指南
+│   #   devices/         — 设备配置 YAML
+│   #   gallery/         — 图片资源
+│   #   docker/          — Docker Compose 等（可选）
+│   #   packages/        — deb 包/模型文件（可选）
+│
+├── devices/
+│   └── catalog.yaml                   # 全局设备目录（所有 Seeed 硬件）
+│
+├── shared/
+│   └── constants.py                   # 前后端共享常量（端口/语言/设备类型/WS消息类型）
+│
+├── tests/
+│   ├── unit/                          # 单元测试（不需要后端运行）
+│   ├── integration/                   # 集成测试 + API 契约测试（需后端运行）
+│   ├── e2e/                           # 端到端测试（实际设备）
+│   └── fixtures/                      # 测试固件
+│
+├── src-tauri/                         # Tauri 桌面壳 (Rust)
+│   ├── src/main.rs                    # Rust 主程序（sidecar 管理/端口注入）
+│   ├── tauri.conf.json                # Tauri 配置
+│   ├── capabilities/default.json      # 权限
+│   ├── binaries/                      # Sidecar（PyInstaller 打包的后端）
+│   ├── icons/                         # 应用图标
+│   └── deb-files/                     # Linux deb 打包资源
+│
+├── pyinstaller/                       # PyInstaller 打包配置
+├── scripts/                           # 构建/迁移脚本
+│   ├── build-sidecar.py              # Sidecar 构建
+│   ├── build-desktop.sh              # 桌面应用构建
+│   └── ...                           # 其他迁移脚本
+│
+├── .github/workflows/                 # CI/CD
+│   ├── release.yml                    # 发布流程
+│   └── test.yml                       # 测试流程
+│
+├── .claude/skills/                    # Claude 技能
+├── data/                              # 运行时数据（缓存/日志）
+├── dev.sh                             # 开发启动脚本
+├── pyproject.toml                     # Python 项目配置 (uv)
+└── .pre-commit-config.yaml            # Pre-commit hooks
 ```
 
 ---
 
-## 文案编写规范（必须遵守）
+## 快速定位指南
 
-**重要**：创建或修改 `solutions/` 目录下的任何文档前，**必须先读取** `.claude/skills/solution-copywriting/SKILL.md` 获取完整规范。
-
-规范包括：
-- 介绍页四段式结构（痛点、价值、场景、须知）
-- 部署页 section 布局规则（description vs troubleshoot 文件分工）
-- 术语通俗化对照表
-- 质量检查清单
+| 要修改什么 | 找哪个文件 |
+|-----------|-----------|
+| 方案介绍/设备/预设 | `solutions/{id}/solution.yaml` |
+| 部署步骤定义 | `solutions/{id}/guide.md` 的 `## Step:` H2 标题 |
+| 设备配置（端口/固件/Docker等） | `solutions/{id}/devices/*.yaml` |
+| 新增部署器类型 | `provisioning_station/deployers/` 创建新文件 |
+| API 端点 | `provisioning_station/routers/*.py` |
+| 方案加载/解析逻辑 | `provisioning_station/services/solution_manager.py` |
+| guide.md 解析规则 | `provisioning_station/services/markdown_parser.py` |
+| 部署执行流程 | `provisioning_station/services/deployment_engine.py` |
+| 前端部署页交互 | `frontend/src/pages/deploy/` 目录 |
+| 前端 API 调用 | `frontend/src/modules/api.js` |
+| 翻译文本 | `frontend/src/modules/i18n.js` |
+| 全局设备目录 | `devices/catalog.yaml` |
+| 共享常量 | `shared/constants.py` |
+| 设计系统样式 | `frontend/design-system/components.css` |
 
 ---
 
-## 从 Wiki 文档创建新方案
+## 设备类型与 Deployer 映射
 
-### 方案 ID 命名规则
+| device_type | Deployer 文件 | 连接方式 | 说明 |
+|-------------|--------------|---------|------|
+| `docker_local` | docker_deployer.py | 本地 Docker | docker compose up |
+| `docker_remote` | docker_remote_deployer.py | SSH | 远程 Docker 部署 |
+| `docker_deploy` | — (guide.md 中用) | — | 统一写法，Target 区分 local/remote |
+| `esp32_usb` | esp32_deployer.py | USB 串口 | esptool 烧录 |
+| `himax_usb` | himax_deployer.py | USB 串口 | xmodem 烧录 |
+| `recamera_cpp` | recamera_cpp_deployer.py | SSH | deb 包 + 模型部署 |
+| `recamera_nodered` | recamera_nodered_deployer.py | SSH | Node-RED flow 部署 |
+| `ssh_deb` | ssh_deployer.py | SSH | deb 包安装 |
+| `script` | script_deployer.py | 本地 | 本地脚本执行 |
+| `manual` | manual_deployer.py | 无 | 手动步骤提示 |
+| `preview` | preview_deployer.py | 无 | 仅显示预览 |
+| `serial_camera` | serial_camera_deployer.py | USB 串口 | 串口摄像头预览 |
+| `ha_integration` | ha_integration_deployer.py | HTTP | Home Assistant 集成 |
 
-- 只能使用小写字母、数字和下划线
-- 必须以小写字母开头
-- 正则表达式：`^[a-z][a-z0-9_]*$`
-- 示例：`my_solution_name`、`smart_factory_v2`、`voice_assistant`
+**注意**: YAML 配置中用 `docker_local`/`docker_remote`；guide.md 中统一写 `docker_deploy` + `### Target:` 区分。
 
-### 步骤 1: 创建方案目录结构
+---
 
-```bash
-solutions/
-└── your_solution_id/
-    ├── solution.yaml       # 方案配置（必须）
-    ├── description.md      # 英文介绍（必须）
-    ├── description_zh.md   # 中文介绍（必须）
-    ├── guide.md            # 英文部署指南（必须）
-    ├── guide_zh.md         # 中文部署指南（必须）
-    ├── gallery/            # 图片资源
-    │   ├── cover.png       # 封面图
-    │   └── ...
-    └── deploy/sections/    # 部署步骤详情（可选）
-        ├── step1.md
-        ├── step1_zh.md
-        └── ...
+## guide.md Step/Target 语法
+
+```markdown
+## Preset: Preset Name {#preset_id}
+## 套餐: 套餐名称 {#preset_id}
+
+| Device | Purpose |
+|--------|---------|
+| ... | ... |
+
+## Step 1: Step Title {#step_id type=docker_deploy required=true config=devices/default.yaml}
+
+Step description markdown...
+
+### Target: Local {#target_local type=local config=devices/local.yaml default=true}
+### Target: Remote {#target_remote type=remote config=devices/remote.yaml}
+
+## Step 2: Flash Firmware {#step_id type=esp32_usb required=true config=devices/firmware.yaml}
+
+# Deployment Complete
+# 部署完成
+
+Post-deployment instructions...
 ```
 
-### 步骤 2: 编写 solution.yaml
+---
+
+## 文案编写规范
+
+创建/修改 `solutions/` 下文档前，**必须先读取** `.claude/skills/solution-copywriting/SKILL.md`。
+
+---
+
+## 方案 solution.yaml 模板
 
 ```yaml
 version: "1.0"
-id: your_solution_id
-name: Solution Name (English)
-name_zh: 方案名称（中文）
+id: your_solution_id          # ^[a-z][a-z0-9_]*$
+name: Solution Name
+name_zh: 方案名称
 
 intro:
-  # 简短摘要（显示在卡片和标题下方）
-  summary: One-line description of the solution
-  summary_zh: 一句话描述方案
-
-  # Markdown 详细介绍文件（简化路径，直接在根目录）
+  summary: One-line description
+  summary_zh: 一句话描述
   description_file: description.md
   description_file_zh: description_zh.md
-
-  # 封面图片
   cover_image: gallery/cover.png
+  category: voice_ai
+  tags: [iot, watcher]
 
-  # 图库（可选）
-  gallery:
-    - type: image
-      src: gallery/demo1.png
-      caption: Demo screenshot
-      caption_zh: 演示截图
-
-  # 分类和标签
-  category: voice_ai  # 或 sensing, automation 等
-  tags:
-    - iot
-    - watcher
-
-  # 设备目录（新格式：定义可复用的设备）
-  device_catalog:
+  device_catalog:              # 本方案用到的设备（可引用 devices/catalog.yaml）
     device_key:
       name: Device Name
       name_zh: 设备名称
-      image: gallery/device.png
-      product_url: https://www.seeedstudio.com/...
-      description: Device description
-      description_zh: 设备描述
+      product_url: https://...
 
-  # 部署预设（多种部署方案）
-  presets:
+  presets:                     # 部署预设
     - id: preset_id
       name: Preset Name
       name_zh: 预设名称
-      badge: Recommended       # 可选徽章
-      badge_zh: 推荐
-      description: Preset description
-      description_zh: 预设描述
-      device_groups:           # 该预设所需的设备组
+      device_groups:
         - id: group_id
           name: Group Name
-          name_zh: 组名称
-          type: single         # single | multiple
-          required: true
+          type: single         # single | multiple | quantity
           options:
-            - device_ref: device_key  # 引用 device_catalog 中的设备
+            - device_ref: device_key
           default: device_key
-      architecture_image: gallery/architecture.png
-      # 注意：部署步骤现在在 guide.md 中定义，不在 solution.yaml 中
-      # 使用 ## Step: 和 ### Target: 语法，参见"guide.md 中的 Step 和 Target 语法"
 
-  # 统计信息
   stats:
-    difficulty: beginner  # beginner | intermediate | advanced
+    difficulty: beginner       # beginner | intermediate | advanced
     estimated_time: 30min
-
-  # 外部链接
   links:
-    wiki: https://wiki.seeedstudio.com/...
-    github: https://github.com/...
+    wiki: https://...
 
 deployment:
-  # 部署指南（简化路径，直接在根目录）
   guide_file: guide.md
   guide_file_zh: guide_zh.md
 ```
 
-### 步骤 3: 编写 Markdown 内容
-
-#### 介绍页 Markdown 规范
-
-**文件**: `description.md` / `description_zh.md`（直接在方案根目录）
-
-```markdown
-## 核心价值
-
-- **特点1** - 详细说明
-- **特点2** - 详细说明
-
-## 使用场景
-
-| 场景 | 说明 |
-|------|------|
-| 场景1 | 描述 |
-| 场景2 | 描述 |
-```
-
-**注意事项**:
-- 不要写 H1 标题（页面已有标题）
-- 从 H2 (##) 开始
-- 表格会自动应用深色边框样式
-- 支持标准 Markdown 语法
-
-#### 部署页 Markdown 规范
-
-**文件**: `guide.md` / `guide_zh.md`（直接在方案根目录）
-
-```markdown
-## 部署前准备
-
-确保您已准备好以下环境：
-- Docker 已安装
-- 网络连接正常
-
-## 部署完成后
-
-访问 http://localhost:xxxx 查看结果
-```
-
-**注意事项**:
-- 一键部署后，不需要写详细的命令步骤
-- 只保留用户需要手动操作的内容
-- 部署后的验证步骤放在最后
-
-#### guide.md 中的 Step 和 Target 语法
-
-**Step 定义**（H2 标题）:
-```markdown
-## Step 1: Deploy Service {#step_id type=docker_deploy required=true config=devices/default.yaml}
-```
-
-**Target 定义**（H3 标题，仅 `docker_deploy` 类型需要）:
-```markdown
-### Target: Local Deployment {#target_id type=local config=devices/local.yaml default=true}
-
-### Target: Remote Deployment {#target_id type=remote config=devices/remote.yaml}
-```
-
-| 属性 | 说明 | 示例 |
-|------|------|------|
-| `#id` | 唯一标识符 | `#warehouse_local` |
-| `type=` | Target 类型：`local` 或 `remote` | `type=remote` |
-| `config=` | 设备配置文件路径 | `config=devices/remote.yaml` |
-| `default=true` | 标记为默认选项 | `default=true` |
-
 ---
 
-## 国际化 (i18n) 规范
+## 开发命令
 
-### 文件命名
-
-- 英文版: `filename.md`
-- 中文版: `filename_zh.md`
-
-### YAML 字段
-
-- 英文字段: `name`, `summary`, `description`
-- 中文字段: `name_zh`, `summary_zh`, `description_zh`
-
-### 前端翻译
-
-编辑 `frontend/src/modules/i18n.js`:
-
-```javascript
-const translations = {
-  en: {
-    // 英文翻译
-  },
-  zh: {
-    // 中文翻译
-  }
-};
+```bash
+# 启动开发服务器（前端 :5173 + 后端 :3260）
+./dev.sh
 ```
 
 ---
 
-## 常见修改任务
+## 打包与发布
 
-### 修改应用标题
+### 架构
 
-1. 编辑 `frontend/src/modules/i18n.js`:
-   ```javascript
-   en: { app: { title: 'English Title' } },
-   zh: { app: { title: '中文标题' } }
-   ```
-
-2. 编辑 `frontend/index.html`:
-   ```html
-   <title>English Title</title>
-   ```
-
-3. 删除 `frontend/dist` 目录（如果存在）
-
-### 修改方案名称
-
-编辑 `solutions/[id]/solution.yaml`:
-```yaml
-name: New Name
-name_zh: 新名称
+```
+PyInstaller 打包 Python 后端 → sidecar 可执行文件
+                                    ↓
+Tauri 打包 (Rust 壳 + 前端 dist + sidecar + solutions/) → 桌面安装包
 ```
 
-### 修改方案设备列表
+- **Sidecar 模式**：Python 后端通过 PyInstaller 打包为独立可执行文件（含 `_internal/` 依赖目录）
+- **动态端口**：Tauri (Rust) 用 portpicker 选空闲端口，通过 `window.__BACKEND_PORT__` 注入前端
+- **Solutions 资源**：通过 Tauri resources 打包到安装包内（macOS: `Contents/Resources/_up_/solutions/`）
+- **自动更新**：Tauri updater 插件，endpoint 指向 GitHub Release 的 `latest.json`
 
-**重要**：设备信息在多处显示，修改时必须同步更新以保持一致：
+### 本地构建
 
-| 文件 | 位置 | 说明 |
+```bash
+# 一键构建（推荐）
+./scripts/build-desktop.sh --build
+
+# 分步构建：
+# 1. 构建 Python Sidecar（输出到 src-tauri/binaries/）
+uv run --group build python scripts/build-sidecar.py
+
+# 2. 构建 Tauri 桌面应用
+cd src-tauri && cargo tauri build
+
+# 开发模式（带热重载）
+./scripts/build-desktop.sh --dev
+# 或
+cd src-tauri && cargo tauri dev
+
+# 跳过 sidecar 重建（已有时）
+./scripts/build-desktop.sh --build --skip-sidecar
+```
+
+### 构建产物
+
+| 平台 | 格式 | 路径 |
 |------|------|------|
-| `solution.yaml` | `device_catalog` | 介绍页的设备选择器 |
-| `guide.md` | Preset 下的设备表格 | 部署页顶部的设备列表 |
-| `guide_zh.md` | 套餐下的设备表格 | 中文部署页顶部的设备列表 |
+| macOS (Apple Silicon) | `.dmg` / `.app` | `src-tauri/target/release/bundle/dmg/` |
+| Windows (x64) | `.exe` (NSIS) | `src-tauri/target/release/bundle/nsis/` |
+| Linux (ARM64) | `.deb` | `src-tauri/target/release/bundle/deb/` |
 
-示例：将设备从"电脑"改为"reComputer R1100"
+### CI 发布流程 (`.github/workflows/release.yml`)
 
-1. 编辑 `solution.yaml` 的 `device_catalog`：
-```yaml
-device_catalog:
-  recomputer_r1100:           # 设备 key
-    name: reComputer R1100
-    name_zh: reComputer R1100
-    product_url: https://www.seeedstudio.com/...
+触发：push tag `v*` 或手动 workflow_dispatch
+
+```
+pre-release-tests → build-sidecar (3 平台并行) → build-tauri (3 平台并行) → GitHub Release (draft)
 ```
 
-2. 同步更新 `guide.md` 的设备表格：
-```markdown
-| Device | Purpose |
-|--------|---------|
-| reComputer R1100 | Edge computing device |
-```
-
-3. 同步更新 `guide_zh.md` 的设备表格：
-```markdown
-| 设备 | 用途 |
+| 阶段 | 说明 |
 |------|------|
-| reComputer R1100 | 边缘计算设备 |
+| pre-release-tests | 跑全量 pytest（含 unit + integration） |
+| build-sidecar | PyInstaller 打包，矩阵：windows-latest / macos-latest / ubuntu-22.04-arm |
+| build-tauri | 下载 sidecar artifact → 前端 build → cargo tauri build → 上传到 Release |
+| cleanup | 删除临时 sidecar artifact |
+
+### 版本管理
+
+- 版本号在 `src-tauri/tauri.conf.json` 的 `version` 字段（当前 `0.1.4`）
+- CI 发布时自动从 git tag 提取版本号更新 `tauri.conf.json` 和 `Cargo.toml`
+- 本地构建前如需改版本，手动编辑 `src-tauri/tauri.conf.json`
+
+### 关键配置文件
+
+| 文件 | 用途 |
+|------|------|
+| `src-tauri/tauri.conf.json` | Tauri 主配置（版本/bundle/externalBin/resources/updater） |
+| `src-tauri/src/main.rs` | Rust 主程序（sidecar 生命周期管理/端口注入/窗口创建） |
+| `src-tauri/capabilities/default.json` | 权限声明（shell/fs/http 等） |
+| `pyinstaller/provisioning-station.spec` | PyInstaller 打包规格 |
+| `scripts/build-sidecar.py` | Sidecar 构建脚本（支持 `--target` 交叉编译） |
+| `scripts/build-desktop.sh` | 一键构建脚本（`--dev` / `--build` / `--skip-sidecar`） |
+
+---
+
+## 回归测试（每次修改后必须执行）
+
+**原则**：任何代码修改后，必须运行对应层级的测试确保无衰退。不要跳过测试直接提交。
+
+### 测试分层
+
+| 层级 | 命令 | 需要后端？ | 说明 |
+|------|------|-----------|------|
+| 后端单元测试 | `uv run --group test pytest tests/unit/ -v` | 否 | 模型、解析器、deployer 注册、步骤生成 |
+| 前端单元测试 | `cd frontend && npm test` | 否 | API 模块、i18n、参数处理 |
+| 后端集成测试 | `uv run --group test pytest tests/integration/ -v` | 是 | API 端点、方案加载、双语加载 |
+| API 契约测试 | `uv run --group test pytest tests/integration/test_*_contract.py tests/integration/test_port_configuration.py -v` | 是 | 前后端数据结构一致性 |
+| E2E 测试 | `uv run --group test pytest tests/e2e/ -v` | 是 + 真实设备 | 实际设备部署验证 |
+| Lint | `uv run ruff check provisioning_station/` | 否 | 代码风格检查 |
+
+### 修改 → 测试映射
+
+| 修改了什么 | 至少运行 |
+|-----------|---------|
+| `provisioning_station/models/` | 后端单元测试（test_models, test_actions） |
+| `provisioning_station/deployers/` | 后端单元测试（test_deployer_registry, test_step_registry） |
+| `provisioning_station/services/markdown_parser.py` | 后端单元测试（test_markdown_parser） |
+| `provisioning_station/services/solution_manager.py` | 后端单元测试 + 集成测试（test_solution_manager, test_bilingual_loading） |
+| `provisioning_station/routers/` | 集成测试（test_api_solutions 等） |
+| `frontend/src/modules/api.js` | 前端测试 + 契约测试 |
+| `frontend/src/pages/deploy/` | 前端测试（test_params） |
+| `shared/constants.py` | 契约测试（test_port_configuration） |
+| `solutions/` 目录 | 后端单元测试（test_solution_format）— 验证 guide.md 格式 |
+| 任何不确定的修改 | **全量**：后端单元 + 前端 + 集成测试 |
+
+### 快速全量回归（推荐）
+
+```bash
+# 不需要后端运行的测试（快速，30秒内）
+uv run --group test pytest tests/unit/ -v && cd frontend && npm test && cd ..
+
+# 需要后端运行的完整回归（先启动 ./dev.sh）
+uv run --group test pytest tests/ --ignore=tests/e2e -v
 ```
 
-### 调整侧边栏宽度
+### CI 说明
 
-编辑 `frontend/design-system/components.css`:
-```css
-.sidebar {
-  width: 260px;  /* 调整此值 */
-}
-```
+CI (`.github/workflows/test.yml`) 在 PR 和 push 时自动运行：
+1. **backend-test**：单元 + 集成（排除需要后端运行的契约测试和 e2e）
+2. **frontend-test**：Vitest
+3. **contract-test**：启动后端后运行契约测试（依赖 backend-test 通过）
+4. **lint**：ruff + black
 
-### 添加新的翻译文本
+### 关键测试文件说明
 
-1. 在 `i18n.js` 中添加 key
-2. 在组件中使用 `t('key.path')` 或 `${t('key.path')}`
+| 测试文件 | 防止什么衰退 |
+|---------|-------------|
+| `test_deployer_registry.py` | 新增/删除 deployer 后注册表完整性 |
+| `test_step_registry.py` | deployer 的 steps 声明与实际生成的步骤一致 |
+| `test_markdown_parser.py` | guide.md 的 Step/Target/Preset 解析正确性 |
+| `test_solution_format.py` | **所有方案** guide.md 格式规范（扫描真实文件） |
+| `test_models.py` | Pydantic 模型序列化/反序列化 |
+| `test_deployment_api_contract.py` | 前端期望的 API 响应结构不变 |
+| `test_port_configuration.py` | 前后端端口配置一致 |
+| `test_bilingual_loading.py` | 中英文 guide.md 结构匹配 |
+| `test_deployment_params.py` | 部署参数传递正确 |
 
 ---
 
@@ -354,203 +493,33 @@ device_catalog:
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/api/health` | GET | 健康检查 |
-| `/api/solutions?lang=zh` | GET | 获取方案列表 |
-| `/api/solutions/{id}?lang=zh` | GET | 获取方案详情 |
-| `/api/solutions/{id}/deployment?lang=zh` | GET | 获取部署信息 |
-| `/api/solutions/{id}/assets/{path}` | GET | 获取静态资源 |
-| `/api/devices/detect/{solution_id}` | GET | 检测设备 |
+| `/api/solutions?lang=zh` | GET | 方案列表 |
+| `/api/solutions/{id}?lang=zh` | GET | 方案详情 |
+| `/api/solutions/{id}/deployment?lang=zh` | GET | 部署信息（含解析后的步骤） |
+| `/api/solutions/{id}/assets/{path}` | GET | 静态资源 |
+| `/api/devices/detect/{solution_id}` | GET | USB/串口设备检测 |
 | `/api/devices/scan-mdns` | GET | mDNS 局域网设备扫描 |
-| `/api/docker-devices/local/check` | GET | 检查本地 Docker 状态 |
-| `/api/docker-devices/local/managed-apps` | GET | 获取已部署应用列表 |
+| `/api/docker-devices/local/check` | GET | 本地 Docker 状态 |
+| `/api/docker-devices/local/managed-apps` | GET | 已部署应用列表 |
 | `/api/deployments/start` | POST | 启动部署 |
+| `/api/deployments/{id}/cancel` | POST | 取消部署 |
 | `/ws/deployments/{deployment_id}` | WS | 部署日志 WebSocket |
-
-**注意**: `lang` 参数控制返回内容的语言 (`en` 或 `zh`)
-
-### 设备类型
-
-| 类型 | 说明 |
-|------|------|
-| `docker_deploy` | Docker 部署，配合 `### Target:` 定义本地/远程目标 |
-| `esp32_usb` | ESP32 USB 烧录 |
-| `himax_usb` | Himax USB 烧录 |
-| `recamera_cpp` | reCamera C++ 部署 |
-| `recamera_nodered` | reCamera Node-RED 部署 |
-| `ssh_deb` | SSH + DEB 包安装 |
-| `script` | 脚本执行 |
-| `manual` | 手动步骤 |
-| `preview` | 预览步骤（无实际部署） |
-
-**注意**: `docker_local` 和 `docker_remote` 已废弃，统一使用 `docker_deploy` + Target。
-
-### WebSocket 消息类型
-
-部署过程通过 WebSocket 发送实时消息，定义在 `provisioning_station/models/websocket.py`：
-
-| 类型 | 说明 |
-|------|------|
-| `log` | 日志消息 |
-| `status` | 状态更新 |
-| `progress` | 进度更新 |
-| `device_started` | 设备部署开始 |
-| `device_completed` | 设备部署完成 |
-| `deployment_completed` | 整体部署完成 |
-| `docker_not_installed` | Docker 未安装提示 |
+| `/api/serial-camera/{port}/ws` | WS | 串口摄像头 WebSocket |
+| `/api/preview/stream/{stream_id}` | WS | 视频流代理 |
 
 ---
 
-## 开发命令
+## 国际化
 
-```bash
-# 启动开发服务器
-./dev.sh
-
-# 前端: http://localhost:5173
-# 后端: http://localhost:3260
-
-# 如果页面显示旧内容，删除 dist 并重启
-rm -rf frontend/dist
-./dev.sh
-```
-
----
-
-## 测试
-
-### 后端测试 (pytest)
-
-**重要**：必须使用 `--group test` 参数，因为 pytest 在 test 依赖组中，不在主依赖中。
-
-```bash
-# 运行所有后端测试（单元测试 + 集成测试）
-uv run --group test pytest tests/ -v
-
-# 只运行单元测试（不需要后端服务）
-uv run --group test pytest tests/unit/ -v
-
-# 只运行集成测试（需要后端服务运行）
-uv run --group test pytest tests/integration/ -v
-
-# 运行带覆盖率
-uv run --group test pytest tests/ --cov=provisioning_station -v
-```
-
-**注意**：
-- 单元测试 (`tests/unit/`) 不需要后端服务运行
-- 集成测试 (`tests/integration/`) 需要先启动后端服务 (`./dev.sh`)
-- 如果直接使用 `uv run pytest` 会报错 `No module named pytest`
-
-### 前端测试 (Vitest)
-
-```bash
-cd frontend
-
-# 运行测试
-npm test
-
-# 监视模式
-npm run test:watch
-
-# 带覆盖率
-npm run test:coverage
-```
-
-### API 契约测试
-
-契约测试验证前后端数据结构一致性，需要后端服务运行：
-
-```bash
-# 1. 先启动后端服务
-./dev.sh &
-sleep 5
-
-# 2. 运行契约测试
-uv run --group test pytest tests/integration/test_*_contract.py -v
-```
-
-### 共享常量
-
-`shared/constants.py` 是前后端配置的唯一真实来源：
-
-| 常量 | 值 | 说明 |
-|------|-----|------|
-| `DEFAULT_PORT` | 3260 | 后端默认端口 |
-| `SUPPORTED_LANGUAGES` | ["en", "zh"] | 支持的语言 |
-| `REQUEST_TIMEOUT_MS` | 30000 | 请求超时（毫秒） |
-
-修改这些值时需同步更新：
-- `frontend/src/modules/api.js`
-- `provisioning_station/config.py`
-
----
-
-## Tauri 桌面应用打包
-
-### 目录结构
-
-```
-app_collaboration/
-├── src-tauri/                    # Tauri Rust 项目
-│   ├── Cargo.toml
-│   ├── tauri.conf.json           # Tauri 配置
-│   ├── capabilities/default.json # 权限配置
-│   ├── binaries/                 # Sidecar 二进制文件
-│   ├── icons/                    # 应用图标
-│   └── src/main.rs               # Rust 主程序
-├── pyinstaller/                  # PyInstaller 配置
-│   └── provisioning-station.spec
-└── scripts/
-    └── build-sidecar.py          # Sidecar 构建脚本
-```
-
-### 本地构建步骤
-
-**1. 构建 Python Sidecar**
-```bash
-cd /Users/harvest/project/app_collaboration
-uv run --group build python scripts/build-sidecar.py
-```
-输出位置: `src-tauri/binaries/provisioning-station-aarch64-apple-darwin`
-
-**2. 构建 Tauri 应用**
-```bash
-cd /Users/harvest/project/app_collaboration/src-tauri  # 重要：必须在 src-tauri 目录下运行
-cargo tauri build
-```
-- `beforeBuildCommand` 会自动构建前端 (`npm run build --prefix frontend`)
-- 输出位置: `src-tauri/target/release/bundle/macos/SenseCraft Solution.app`
-- DMG 位置: `src-tauri/target/release/bundle/dmg/SenseCraft Solution_1.0.0_aarch64.dmg`
-
-### 开发模式
-```bash
-cd /Users/harvest/project/app_collaboration/src-tauri
-cargo tauri dev
-```
-
-### 架构说明
-
-- **Sidecar 模式**: Python 后端通过 PyInstaller 打包为独立可执行文件
-- **动态端口**: Tauri 使用 portpicker 选择可用端口，避免端口冲突
-- **Solutions 资源**: 通过 Tauri resources 打包到 `Contents/Resources/_up_/solutions/`
-- **端口通信**: Rust 通过 `window.eval()` 注入 `window.__BACKEND_PORT__` 到前端
+- 文件命名：`file.md` / `file_zh.md`
+- YAML 字段：`name` / `name_zh`, `summary` / `summary_zh`
+- 前端翻译：`frontend/src/modules/i18n.js`
 
 ---
 
 ## 设计规范
 
-### 颜色变量
-
-- `primary`: #8CC63F (Seeed 绿)
-- `text-primary`: #1a1a1a
-- `text-secondary`: #666
-- `border`: #e5e5e5
-
-### 按钮样式
-
-- `.btn-primary`: 主要操作按钮
-- `.btn-secondary`: 次要操作按钮
-- `.btn-deploy-hero`: 大号部署按钮
-
-### 间距
-
-使用 Tailwind 类: `mb-4`, `mt-6`, `gap-3` 等
+- Primary: `#8CC63F` (Seeed 绿)
+- 按钮：`.btn-primary` / `.btn-secondary` / `.btn-deploy-hero`
+- 间距：Tailwind 类（`mb-4`, `mt-6`, `gap-3`）
+- 样式文件：`frontend/design-system/components.css`
