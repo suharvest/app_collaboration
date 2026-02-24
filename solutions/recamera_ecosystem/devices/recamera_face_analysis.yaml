@@ -27,15 +27,15 @@ binary:
 
   # 模型文件部署（人脸检测 + 年龄性别 + 表情）
   models:
-    - path: packages/scrfd_500m_int8.cvimodel
+    - path: packages/yolo-face_mixfp16.cvimodel
       target_path: /userdata/local/models
-      filename: scrfd_500m_int8.cvimodel
+      filename: yolo-face_mixfp16.cvimodel
     - path: packages/genderage_int8.cvimodel
       target_path: /userdata/local/models
       filename: genderage_int8.cvimodel
-    - path: packages/emotion_int8.cvimodel
+    - path: packages/emotion_bf16.cvimodel
       target_path: /userdata/local/models
-      filename: emotion_int8.cvimodel
+      filename: emotion_bf16.cvimodel
 
   # 服务配置（deb 包已含 init 脚本）
   service_name: face-analysis

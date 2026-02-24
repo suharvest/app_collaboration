@@ -1,7 +1,7 @@
 /**
  * Face Analysis Overlay Renderer
  *
- * Renders face detection + age/gender/emotion results on canvas.
+ * Renders face detection + age/gender/emotion/race results on canvas.
  * No external dependencies required.
  *
  * Input (data): face-analysis MQTT message
@@ -11,12 +11,19 @@
  *   faces: [{
  *     bbox: { x: 0.25, y: 0.3, w: 0.15, h: 0.2 },
  *     confidence: 0.95,
- *     age: 28,
+ *     age_label: "20-29",
  *     gender: "male",
- *     emotion: "happiness",
- *     emotion_confidence: 0.88
+ *     gender_confidence: 0.88,
+ *     emotion: "happy",
+ *     emotion_confidence: 0.91,
+ *     emotion_probs: { angry: 0.02, disgust: 0.01, fear: 0.0, happy: 0.91, sad: 0.01, surprise: 0.05, neutral: 0.0 },
+ *     race: "East_Asian",
+ *     race_confidence: 0.82
  *   }]
  * }
+ *
+ * Supports both FairFace format (age_bin/age_label/race) and
+ * InsightFace format (age as integer, no race).
  *
  * Coordinates are normalized (0-1).
  * Variables: ctx, data, canvas, img (provided by PreviewWindow)
@@ -56,9 +63,9 @@ const CONFIG = {
 
 // Emotion display names
 const EMOTION_LABELS = {
-  happiness: 'Happy',
-  sadness: 'Sad',
-  anger: 'Angry',
+  happy: 'Happy',
+  sad: 'Sad',
+  angry: 'Angry',
   surprise: 'Surprised',
   fear: 'Fear',
   disgust: 'Disgust',
@@ -72,7 +79,7 @@ const inferenceMs = data?.inference_time_ms;
 
 // ========== Render Face Boxes ==========
 for (const face of faces) {
-  const { bbox, confidence, age, gender, emotion, emotion_confidence } = face;
+  const { bbox, confidence, gender, gender_confidence, emotion, emotion_confidence } = face;
   if (!bbox) continue;
 
   // Normalized coords (0-1) → canvas pixels
@@ -92,14 +99,30 @@ for (const face of faces) {
 
   // Build label lines
   const lines = [];
-  if (gender != null && age != null) {
+
+  // Line 1: Gender + Age
+  if (gender != null) {
     const genderLabel = gender === 'male' ? 'M' : 'F';
-    lines.push(`${genderLabel}, ${age}y`);
+    // Support both FairFace (age_label: "20-29") and InsightFace (age: 28)
+    const ageStr = face.age_label || (face.age != null ? `${face.age}` : null);
+    if (ageStr) {
+      lines.push(`${genderLabel}, ${ageStr}`);
+    } else {
+      lines.push(genderLabel);
+    }
   }
+
+  // Line 2: Emotion
   if (emotion) {
     const emotionLabel = EMOTION_LABELS[emotion] || emotion;
     const conf = emotion_confidence != null ? ` ${(emotion_confidence * 100).toFixed(0)}%` : '';
     lines.push(`${emotionLabel}${conf}`);
+  }
+
+  // Line 3: Race (FairFace only)
+  if (face.race) {
+    const raceLabel = face.race.replace(/_/g, ' ');
+    lines.push(raceLabel);
   }
 
   // Draw label above bounding box
