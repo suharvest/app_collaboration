@@ -25,7 +25,7 @@ Recommended for most scenarios.
 
 1. USB connection: IP address `192.168.42.1`, plug and play
 2. Network/WiFi: Find reCamera's IP in your router admin page
-3. Enter username `recamera`, password `recamera`
+3. Username `recamera`, default password `recamera` (use your own if changed)
 
 ### Troubleshooting
 
@@ -43,7 +43,7 @@ Alternative model, try if needed.
 
 1. USB connection: IP address `192.168.42.1`, plug and play
 2. Network/WiFi: Find reCamera's IP in your router admin page
-3. Enter username `recamera`, password `recamera`
+3. Username `recamera`, default password `recamera` (use your own if changed)
 
 ### Troubleshooting
 
@@ -155,7 +155,7 @@ Install YOLO detection + RTSP streaming flow on reCamera.
 
 1. USB connection: IP address `192.168.42.1`, plug and play
 2. Network/WiFi: Find reCamera's IP in your router admin page
-3. Enter username `recamera`, password `recamera`
+3. Username `recamera`, default password `recamera` (use your own if changed)
 
 ### Troubleshooting
 
@@ -191,9 +191,7 @@ Install the reCamera integration and connect it to Home Assistant.
 | Camera thumbnail blank, but stream works | Known issue: ffmpeg snapshot may time out; the live stream in the dashboard works fine |
 | Sensor shows 0 | Normal when nothing is in view; verify at http://\<recamera-ip\>:1880/data |
 
----
-
-# Deployment Complete
+### Deployment Complete
 
 Your reCamera is now integrated with Home Assistant!
 
@@ -219,3 +217,127 @@ Your reCamera is now integrated with Home Assistant!
 **Having issues?**
 - No video? Check reCamera IP and that Step 2 completed successfully
 - No detection data? Make sure objects are in view; check Node-RED at http://\<recamera-ip\>:1880
+
+---
+
+## Preset: OCR Text Reader {#ocr_reader}
+
+Point reCamera at any text — signs, labels, meter displays — and the recognized characters appear on screen in real-time. All processing happens on the camera, no cloud needed.
+
+| Device | Purpose |
+|--------|---------|
+| reCamera | AI camera that reads text from the video |
+
+**What you'll get:**
+- Live video with recognized text highlighted on screen
+- Works with printed text, signs, labels, and digital displays
+- All processing on-device — no cloud, no extra hardware
+
+**Requirements:** New devices need SSH enabled first — connect via USB, wait for boot (~2 min), visit [192.168.42.1/#/security](http://192.168.42.1/#/security), login with `recamera` / `recamera`, enable the SSH toggle
+
+## Step 1: Install Text Recognition {#deploy_ppocr type=recamera_cpp required=true config=devices/recamera_ppocr.yaml}
+
+Install the text recognition program on reCamera so it can read text in the video.
+
+### Wiring
+
+1. USB connection: IP address `192.168.42.1`, plug and play
+2. Network/WiFi: Find reCamera's IP in your router admin page
+3. Username `recamera`, default password `recamera` (use your own if changed)
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Cannot connect | USB: use `192.168.42.1`; Network: check router for IP |
+| Wrong password | Default is `recamera`, use your new password if changed |
+| Install failed | Restart the camera and try again |
+
+---
+
+## Step 2: View OCR Overlay {#preview_ocr type=preview required=false config=devices/preview_ocr.yaml}
+
+Click **Connect** to see the live video with OCR text overlay.
+
+**Tip:** Point the camera at text — signs, labels, screens — for best results.
+
+**Note:** Video preview requires ffmpeg. Open a terminal and install it:
+- **Windows:** Open PowerShell, run `winget install ffmpeg`
+- **macOS:** Open Terminal, run `brew install ffmpeg`
+- **Linux:** Open Terminal, run `sudo apt install ffmpeg`
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Black screen | Wait 10 seconds for the stream to load; check camera IP is correct |
+| No text detected | Make sure text is clearly visible and well-lit; check Step 1 completed |
+| ffmpeg error | Install ffmpeg using the commands above for your OS |
+
+### Deployment Complete
+
+Camera is ready! Click **Connect** above to view the live OCR overlay.
+
+Point the camera at printed text — the recognized characters will appear above each detected region.
+
+---
+
+## Preset: Face Analysis {#face_analysis}
+
+Point reCamera at people — it detects faces and analyzes age, gender, and emotion in real-time. All processing happens on the camera, no cloud needed.
+
+| Device | Purpose |
+|--------|---------|
+| reCamera | AI camera that analyzes faces in the video |
+
+**What you'll get:**
+- Live video with face bounding boxes and analysis labels
+- Age, gender, and emotion displayed for each detected face
+- All processing on-device — no cloud, no extra hardware
+
+**Requirements:** New devices need SSH enabled first — connect via USB, wait for boot (~2 min), visit [192.168.42.1/#/security](http://192.168.42.1/#/security), login with `recamera` / `recamera`, enable the SSH toggle
+
+## Step 1: Install Face Analysis {#deploy_face_analysis type=recamera_cpp required=true config=devices/recamera_face_analysis.yaml}
+
+Install the face analysis program on reCamera so it can detect faces and analyze age, gender, and emotion.
+
+### Wiring
+
+1. USB connection: IP address `192.168.42.1`, plug and play
+2. Network/WiFi: Find reCamera's IP in your router admin page
+3. Username `recamera`, default password `recamera` (use your own if changed)
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Cannot connect | USB: use `192.168.42.1`; Network: check router for IP |
+| Wrong password | Default is `recamera`, use your new password if changed |
+| Install failed | Restart the camera and try again |
+
+---
+
+## Step 2: View Face Analysis Results {#preview_face_analysis type=preview required=false config=devices/preview_face_analysis.yaml}
+
+Click **Connect** to see the live video with face analysis overlay.
+
+**Tip:** Point the camera at people — each detected face will show age, gender, and emotion.
+
+**Note:** Video preview requires ffmpeg. Open a terminal and install it:
+- **Windows:** Open PowerShell, run `winget install ffmpeg`
+- **macOS:** Open Terminal, run `brew install ffmpeg`
+- **Linux:** Open Terminal, run `sudo apt install ffmpeg`
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Black screen | Wait 10 seconds for the stream to load; check camera IP is correct |
+| No faces detected | Make sure faces are clearly visible and well-lit; check Step 1 completed |
+| ffmpeg error | Install ffmpeg using the commands above for your OS |
+
+### Deployment Complete
+
+Camera is ready! Click **Connect** above to view the live face analysis overlay.
+
+Each detected face will show age, gender, and emotion — all analyzed on-device in real-time.

@@ -1,0 +1,94 @@
+version: "1.0"
+id: recamera_face_analysis
+name: reCamera Face Analysis
+name_zh: reCamera 人脸分析
+type: recamera_cpp
+
+detection:
+  method: network_scan
+  manual_entry: true
+  requirements: []
+
+# SSH 连接配置（用户是 recamera，非 root）
+ssh:
+  port: 22
+  default_user: recamera
+  default_host: 192.168.42.1
+  connection_timeout: 30
+  command_timeout: 300
+
+# C++ 应用部署配置
+binary:
+  # .deb 包安装（包含 init 脚本 S92face-analysis）
+  deb_package:
+    path: packages/face-analysis_0.1.1_riscv64.deb
+    name: face-analysis
+    includes_init_script: true
+
+  # 模型文件部署（人脸检测 + 年龄性别 + 表情）
+  models:
+    - path: packages/scrfd_500m_int8.cvimodel
+      target_path: /userdata/local/models
+      filename: scrfd_500m_int8.cvimodel
+    - path: packages/genderage_int8.cvimodel
+      target_path: /userdata/local/models
+      filename: genderage_int8.cvimodel
+    - path: packages/emotion_int8.cvimodel
+      target_path: /userdata/local/models
+      filename: emotion_int8.cvimodel
+
+  # 服务配置（deb 包已含 init 脚本）
+  service_name: face-analysis
+  service_priority: 92
+
+  auto_start: true
+
+actions:
+  after:
+    - name: Enable external MQTT access
+      name_zh: 启用 MQTT 外部访问
+      run: |
+        CONF="/etc/mosquitto/mosquitto.conf"
+        grep -q 'listener 1883 0.0.0.0' "$CONF" 2>/dev/null && exit 0
+        echo "listener 1883 0.0.0.0" >> "$CONF"
+        echo "allow_anonymous true" >> "$CONF"
+        killall mosquitto 2>/dev/null || true
+        sleep 1
+        /usr/sbin/mosquitto -c "$CONF" -d
+      sudo: true
+    - name: Disable Node-RED autostart
+      name_zh: 禁用 Node-RED 自启动
+      run: |
+        for svc in node-red sscma-node sscma-supervisor; do
+          for f in /etc/init.d/S*${svc}*; do
+            [ -f "$f" ] && mv "$f" "$(echo "$f" | sed 's|/S|/K|')" 2>/dev/null
+          done
+        done
+        true
+      sudo: true
+
+# 用户输入
+user_inputs:
+  - id: host
+    name: Device IP Address
+    name_zh: 设备 IP 地址
+    type: text
+    default: "192.168.42.1"
+    placeholder: "192.168.42.1"
+    description: IP address of your reCamera (USB default 192.168.42.1)
+    description_zh: reCamera 的 IP 地址（USB 默认 192.168.42.1）
+    required: true
+    validation:
+      pattern: "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"
+
+  - id: password
+    name: SSH Password
+    name_zh: SSH 密码
+    type: password
+    default: "recamera"
+    description: SSH password (try 'recamera' or 'recamera.2')
+    description_zh: SSH 密码（尝试 'recamera' 或 'recamera.2'）
+    required: true
+
+post_deployment:
+  open_browser: false

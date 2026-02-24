@@ -25,7 +25,7 @@
 
 1. USB 连接：IP 地址 `192.168.42.1`，即插即用
 2. 网线/WiFi：在路由器管理页面查找 reCamera 的 IP
-3. 输入用户名 `recamera`，密码 `recamera`
+3. 输入用户名 `recamera`，默认密码 `recamera`（若已修改请用新密码）
 
 ### 故障排查
 
@@ -43,7 +43,7 @@
 
 1. USB 连接：IP 地址 `192.168.42.1`，即插即用
 2. 网线/WiFi：在路由器管理页面查找 reCamera 的 IP
-3. 输入用户名 `recamera`，密码 `recamera`
+3. 输入用户名 `recamera`，默认密码 `recamera`（若已修改请用新密码）
 
 ### 故障排查
 
@@ -155,7 +155,7 @@
 
 1. USB 连接：IP 地址 `192.168.42.1`，即插即用
 2. 网线/WiFi：在路由器管理页面查找 reCamera 的 IP
-3. 输入用户名 `recamera`，密码 `recamera`
+3. 输入用户名 `recamera`，默认密码 `recamera`（若已修改请用新密码）
 
 ### 故障排查
 
@@ -191,9 +191,7 @@
 | 摄像头缩略图空白，但直播正常 | 已知问题：ffmpeg 截图可能超时，面板中的实时画面不受影响 |
 | 传感器显示 0 | 摄像头视野内没有可识别物体时属正常；可访问 http://\<reCamera IP\>:1880/data 验证 |
 
----
-
-# 部署完成
+### 部署完成
 
 reCamera 已成功接入 Home Assistant！
 
@@ -219,3 +217,127 @@ reCamera 已成功接入 Home Assistant！
 **遇到问题？**
 - 看不到画面？检查 reCamera IP，确认步骤 2 已完成
 - 没有识别数据？确保视野内有物体；访问 http://\<reCamera IP\>:1880 检查 Node-RED
+
+---
+
+## 套餐: OCR 文字识别 {#ocr_reader}
+
+把 reCamera 对准任何文字——标牌、标签、仪表显示屏——识别出的字符实时显示在画面上。全部在摄像头上处理，不需要联网。
+
+| 设备 | 用途 |
+|------|------|
+| reCamera | AI 摄像头，识别画面中的文字 |
+
+**部署完成后你可以：**
+- 实时看到画面中被识别出的文字
+- 支持印刷文字、标牌、标签、电子显示屏
+- 全部在设备上处理——不需要联网，不需要额外设备
+
+**前提条件：** 新设备需先开启 SSH——用 USB 连接电脑，等设备开机（约 2 分钟），访问 [192.168.42.1/#/security](http://192.168.42.1/#/security)，输入初始账号 `recamera` / `recamera`，打开 SSH 开关
+
+## 步骤 1: 安装文字识别程序 {#deploy_ppocr type=recamera_cpp required=true config=devices/recamera_ppocr.yaml}
+
+给 reCamera 安装文字识别程序，让它能读取画面中的文字。
+
+### 接线
+
+1. USB 连接：IP 地址 `192.168.42.1`，即插即用
+2. 网线/WiFi：在路由器管理页面查找 reCamera 的 IP
+3. 输入用户名 `recamera`，默认密码 `recamera`（若已修改请用新密码）
+
+### 故障排查
+
+| 问题 | 解决方法 |
+|------|----------|
+| 连不上 | USB 连接用 `192.168.42.1`；网络连接去路由器查 IP |
+| 密码错误 | 初始密码 `recamera`，若改过请用新密码 |
+| 安装失败 | 重启摄像头再试一次 |
+
+---
+
+## 步骤 2: 查看 OCR 文字叠加 {#preview_ocr type=preview required=false config=devices/preview_ocr.yaml}
+
+点击 **连接** 查看带文字识别叠加的实时视频。
+
+**提示：** 将摄像头对准文字——标牌、标签、屏幕——效果最佳。
+
+**注意：** 视频预览需要 ffmpeg，打开终端安装：
+- **Windows:** 打开 PowerShell，运行 `winget install ffmpeg`
+- **macOS:** 打开终端，运行 `brew install ffmpeg`
+- **Linux:** 打开终端，运行 `sudo apt install ffmpeg`
+
+### 故障排查
+
+| 问题 | 解决方法 |
+|------|----------|
+| 黑屏 | 等 10 秒让视频流加载；检查摄像头 IP 是否正确 |
+| 没有识别到文字 | 确保文字清晰可见且光线充足；确认步骤 1 已完成 |
+| ffmpeg 报错 | 按上方说明安装 ffmpeg |
+
+### 部署完成
+
+摄像头已就绪！点击上方 **连接** 查看实时 OCR 文字叠加。
+
+将摄像头对准印刷文字——识别出的字符会显示在每个检测区域上方。
+
+---
+
+## 套餐: 人脸分析 {#face_analysis}
+
+把 reCamera 对准人——实时检测人脸并分析年龄、性别、表情。全部在摄像头上处理，不需要联网。
+
+| 设备 | 用途 |
+|------|------|
+| reCamera | AI 摄像头，分析画面中的人脸 |
+
+**部署完成后你可以：**
+- 实时看到人脸框和分析标签
+- 每张检测到的人脸都显示年龄、性别和表情
+- 全部在设备上处理——不需要联网，不需要额外设备
+
+**前提条件：** 新设备需先开启 SSH——用 USB 连接电脑，等设备开机（约 2 分钟），访问 [192.168.42.1/#/security](http://192.168.42.1/#/security)，输入初始账号 `recamera` / `recamera`，打开 SSH 开关
+
+## 步骤 1: 安装人脸分析程序 {#deploy_face_analysis type=recamera_cpp required=true config=devices/recamera_face_analysis.yaml}
+
+给 reCamera 安装人脸分析程序，让它能检测人脸并分析年龄、性别和表情。
+
+### 接线
+
+1. USB 连接：IP 地址 `192.168.42.1`，即插即用
+2. 网线/WiFi：在路由器管理页面查找 reCamera 的 IP
+3. 输入用户名 `recamera`，默认密码 `recamera`（若已修改请用新密码）
+
+### 故障排查
+
+| 问题 | 解决方法 |
+|------|----------|
+| 连不上 | USB 连接用 `192.168.42.1`；网络连接去路由器查 IP |
+| 密码错误 | 初始密码 `recamera`，若改过请用新密码 |
+| 安装失败 | 重启摄像头再试一次 |
+
+---
+
+## 步骤 2: 查看人脸分析结果 {#preview_face_analysis type=preview required=false config=devices/preview_face_analysis.yaml}
+
+点击 **连接** 查看带人脸分析叠加的实时视频。
+
+**提示：** 将摄像头对准人——每张检测到的人脸都会显示年龄、性别和表情。
+
+**注意：** 视频预览需要 ffmpeg，打开终端安装：
+- **Windows:** 打开 PowerShell，运行 `winget install ffmpeg`
+- **macOS:** 打开终端，运行 `brew install ffmpeg`
+- **Linux:** 打开终端，运行 `sudo apt install ffmpeg`
+
+### 故障排查
+
+| 问题 | 解决方法 |
+|------|----------|
+| 黑屏 | 等 10 秒让视频流加载；检查摄像头 IP 是否正确 |
+| 没有检测到人脸 | 确保人脸清晰可见且光线充足；确认步骤 1 已完成 |
+| ffmpeg 报错 | 按上方说明安装 ffmpeg |
+
+### 部署完成
+
+摄像头已就绪！点击上方 **连接** 查看实时人脸分析叠加。
+
+每张检测到的人脸都会显示年龄、性别和表情——全部在设备上实时分析。
