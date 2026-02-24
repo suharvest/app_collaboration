@@ -21,17 +21,17 @@ detection:
 firmware:
   source:
     type: local
-    path: assets/watcher_firmware/firmware.bin
+    path: assets/watcher_firmware/merged-binary.bin
   flash_config:
     chip: esp32s3
     baud_rate: 921600
     flash_mode: dio
     flash_freq: 80m
-    flash_size: 32MB
+    flash_size: 16MB
     partitions:
-      - name: firmware
+      - name: merged_firmware
         offset: "0x0"
-        file: firmware.bin
+        file: merged-binary.bin
 
 user_inputs:
   - id: serial_port
