@@ -1,10 +1,10 @@
 version: '1.0'
 id: recamera_ecosystem
-name: reCamera Ecosystem
-name_zh: reCamera 生态集成
+name: Plug & Play AI Camera
+name_zh: 即插即用 AI 摄像头
 intro:
-  summary: One reCamera, many platforms — heatmap preview, Home Assistant integration, and more ecosystem connections
-  summary_zh: 一台 reCamera 对接多种平台——热力图预览、Home Assistant 集成，以及更多生态对接
+  summary: A plug-and-play AI camera with one-click apps — object detection, text reading, face analysis, smart home, and more
+  summary_zh: 即插即用的 AI 摄像头，一键安装各种应用——物体检测、文字识别、人脸分析、智能家居联动
   description_file: description.md
   description_file_zh: description_zh.md
   cover_image: gallery/recamera.svg
