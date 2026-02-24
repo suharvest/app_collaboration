@@ -532,6 +532,7 @@ const translations = {
     },
     serialCamera: {
       connect: 'Connect',
+      connecting: 'Connecting...',
       disconnect: 'Disconnect',
       clickConnect: 'Click Connect to start camera',
       noPreview: 'No image preview (face detection active)',
@@ -553,6 +554,7 @@ const translations = {
       title: 'Face Database',
       register: 'Register',
       connect: 'Connect Database',
+      connecting: 'Connecting...',
       disconnect: 'Disconnect',
       cameraRequired: 'Camera required for enrollment',
       name: 'Name',
@@ -1130,6 +1132,7 @@ const translations = {
     },
     serialCamera: {
       connect: '连接',
+      connecting: '连接中...',
       disconnect: '断开',
       clickConnect: '点击连接启动摄像头',
       noPreview: '无图像预览（人脸检测运行中）',
@@ -1151,6 +1154,7 @@ const translations = {
       title: '人脸数据库',
       register: '注册',
       connect: '连接数据库',
+      connecting: '连接中...',
       disconnect: '断开',
       cameraRequired: '注册需要连接摄像头',
       name: '姓名',

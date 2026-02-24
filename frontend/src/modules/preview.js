@@ -102,6 +102,7 @@ export class PreviewWindow {
     this._statusHandlers = [];
     this._frameCount = 0;
     this._lastFpsUpdate = 0;
+    this._overlayTimeout = null;
 
     this._render();
   }
@@ -481,8 +482,17 @@ export class PreviewWindow {
     }
 
     const ctx = this.canvas.getContext('2d');
-    // Note: Don't clear canvas here - overlay script handles its own clearing
-    // via double buffering to prevent flicker
+    // Clear previous frame so new data fully replaces old detections
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Auto-clear overlay after 3s of no new MQTT messages
+    clearTimeout(this._overlayTimeout);
+    this._overlayTimeout = setTimeout(() => {
+      if (this.canvas) {
+        const c = this.canvas.getContext('2d');
+        c.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      }
+    }, 3000);
 
     try {
       this.overlayRenderer(ctx, data, this.canvas, this.img);
@@ -501,7 +511,17 @@ export class PreviewWindow {
         }
       }
     } catch (e) {
-      console.error('Overlay render error:', e);
+      console.error('Overlay render error:', e, 'data:', data);
+      // Show error visually on canvas so users can diagnose
+      if (this._renderErrorCount === undefined) this._renderErrorCount = 0;
+      this._renderErrorCount++;
+      if (this._renderErrorCount <= 3) {
+        ctx.fillStyle = 'rgba(200, 0, 0, 0.8)';
+        ctx.fillRect(10, 10, 300, 30);
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px monospace';
+        ctx.fillText(`Overlay error: ${e.message}`, 18, 30);
+      }
     }
   }
 
@@ -559,7 +579,8 @@ export class PreviewWindow {
       this.streamId = null;
     }
 
-    // Clear canvas
+    // Clear canvas and overlay timer
+    clearTimeout(this._overlayTimeout);
     if (this.canvas) {
       const ctx = this.canvas.getContext('2d');
       ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -754,14 +775,19 @@ export function loadOverlayScript(scriptContent) {
  */
 export async function fetchOverlayScript(url) {
   try {
+    console.log('[Preview] Loading overlay script:', url);
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch script: ${response.status}`);
     }
     const scriptContent = await response.text();
-    return loadOverlayScript(scriptContent);
+    const renderer = loadOverlayScript(scriptContent);
+    if (renderer) {
+      console.log('[Preview] Overlay script loaded successfully');
+    }
+    return renderer;
   } catch (e) {
-    console.error('Failed to fetch overlay script:', e);
+    console.error('[Preview] Failed to fetch overlay script:', e);
     return null;
   }
 }
