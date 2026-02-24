@@ -164,10 +164,10 @@ class SSHActionExecutor(ActionExecutor):
             env_parts.append(f"{k}={shlex.quote(val)}")
         env_prefix = f"env {' '.join(env_parts)} " if env_parts else ""
 
-        # Prepend cd if cwd
-        cd_prefix = f"cd {shlex.quote(cwd)} && " if cwd else ""
-
-        full_cmd = f"{cd_prefix}{env_prefix}{cmd}"
+        # Ignore cwd for SSH — it's always a local solution path that
+        # doesn't exist on the remote device.  Remote action scripts
+        # should use absolute paths.
+        full_cmd = f"{env_prefix}{cmd}"
 
         # Wrap with sudo if needed
         if action.sudo and self._password:
