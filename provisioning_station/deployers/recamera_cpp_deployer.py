@@ -15,6 +15,7 @@ Key features:
 
 import asyncio
 import logging
+import os
 import shlex
 from dataclasses import dataclass
 from enum import Enum
@@ -22,6 +23,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from ..models.device import DeviceConfig
+from ..utils.recamera_ssh import _is_system_service, _parse_svc_name
 from .action_executor import SSHActionExecutor
 from .base import BaseDeployer
 
@@ -51,8 +53,10 @@ class DeviceState:
     @property
     def ready_for_cpp(self) -> bool:
         """Check if device is ready for C++ deployment without cleanup"""
-        # Ready if clean or already in cpp mode (will reinstall)
-        return self.mode in (DeviceMode.CLEAN, DeviceMode.CPP)
+        # Only CLEAN needs no cleanup. CPP mode means another app is
+        # running and must be stopped before the new one can start
+        # (they share the same video hardware exclusively).
+        return self.mode == DeviceMode.CLEAN
 
     @property
     def needs_nodered_cleanup(self) -> bool:
@@ -417,50 +421,67 @@ class ReCameraCppDeployer(BaseDeployer):
     ) -> DeviceState:
         """Check the current deployment state of the device.
 
-        Detects:
-        - C++ services (init scripts matching yolo*, detector*, sensecraft*)
-        - Installed C++ packages (via opkg)
-        - Running C++ processes
-        - Node-RED service state (enabled/disabled, running)
+        Uses the same whitelist approach as recamera_ssh.py:
+        scan all init scripts, filter out system services → whatever
+        remains is a third-party C++ service.  No hardcoded app names.
 
         Note: Only S* scripts (enabled) are counted as active services.
         K* scripts (disabled) are tracked separately but don't count as "has service".
         """
-        # Check for C++ init scripts (both S* enabled and K* disabled)
+        # Scan ALL init scripts, filter via whitelist → third-party C++ services
         cpp_services = []
         cpp_services_enabled = []  # Only S* scripts
-        cpp_patterns = ["yolo", "detector", "sensecraft", "sscma-cpp", "recamera-app"]
+        cpp_service_names = []  # Parsed names (e.g. "yolo11-detector")
 
-        for pattern in cpp_patterns:
-            cmd = f"ls /etc/init.d/S*{pattern}* /etc/init.d/K*{pattern}* 2>/dev/null || true"
+        scan_cmd = (
+            "for f in /etc/init.d/S* /etc/init.d/K*; do "
+            '[ -f "$f" ] && basename "$f"; done 2>/dev/null || true'
+        )
+        cmd = _build_sudo_cmd(password, f"sh -c {shlex.quote(scan_cmd)}")
+        exit_code, stdout, _ = await self._exec_sudo(client, cmd, password, timeout=10)
+        if stdout.strip():
+            for svc_file in stdout.strip().split("\n"):
+                svc_file = svc_file.strip()
+                if not svc_file:
+                    continue
+                svc_name = _parse_svc_name(svc_file)
+                if not svc_name or _is_system_service(svc_name):
+                    continue
+                full_path = f"/etc/init.d/{svc_file}"
+                if full_path not in cpp_services:
+                    cpp_services.append(full_path)
+                    if svc_name not in cpp_service_names:
+                        cpp_service_names.append(svc_name)
+                    if svc_file.startswith("S"):
+                        cpp_services_enabled.append(full_path)
+
+        # Check for installed C++ packages (match against discovered service names)
+        cpp_packages = []
+        cmd = "opkg list-installed 2>/dev/null || true"
+        exit_code, stdout, _ = await self._exec_sudo(client, cmd, password, timeout=10)
+        if stdout.strip() and cpp_service_names:
+            for line in stdout.strip().split("\n"):
+                parts = line.strip().split()
+                if not parts:
+                    continue
+                pkg_name = parts[0]
+                pkg_lower = pkg_name.lower()
+                if any(svc.lower() in pkg_lower for svc in cpp_service_names):
+                    if pkg_name not in cpp_packages:
+                        cpp_packages.append(pkg_name)
+
+        # Check for running C++ processes (match against discovered service names)
+        cpp_processes_running = False
+        if cpp_service_names:
+            pattern = "|".join(cpp_service_names)
+            cmd = (
+                f"ps aux 2>/dev/null | grep -v grep | grep -E '{pattern}' "
+                f"&& echo 'running' || true"
+            )
             exit_code, stdout, _ = await self._exec_sudo(
                 client, cmd, password, timeout=10
             )
-            if stdout.strip():
-                for line in stdout.strip().split("\n"):
-                    svc = line.strip()
-                    if svc and svc not in cpp_services:
-                        cpp_services.append(svc)
-                        # Track enabled services separately
-                        if "/S" in svc:
-                            cpp_services_enabled.append(svc)
-
-        # Check for installed C++ packages
-        cpp_packages = []
-        cmd = "opkg list-installed 2>/dev/null | grep -E 'yolo|detector|sensecraft|sscma' || true"
-        exit_code, stdout, _ = await self._exec_sudo(client, cmd, password, timeout=10)
-        if stdout.strip():
-            for line in stdout.strip().split("\n"):
-                parts = line.strip().split()
-                if parts:
-                    pkg_name = parts[0].split("-")[0]  # Get base package name
-                    if pkg_name and pkg_name not in cpp_packages:
-                        cpp_packages.append(parts[0])  # Full package name
-
-        # Check for running C++ processes (use ps instead of pgrep for BusyBox compatibility)
-        cmd = "ps aux 2>/dev/null | grep -v grep | grep -E 'yolo.*detector|sensecraft|sscma-cpp' && echo 'running' || true"
-        exit_code, stdout, _ = await self._exec_sudo(client, cmd, password, timeout=10)
-        cpp_processes_running = "running" in stdout
+            cpp_processes_running = "running" in stdout
 
         # Check Node-RED enabled state (S* script exists)
         cmd = "ls /etc/init.d/S*node-red* 2>/dev/null && echo 'enabled' || true"
@@ -550,31 +571,46 @@ done"""
             if stdout and "Disabled:" in stdout:
                 logger.info(stdout.strip())
 
-        # Stop C++ processes if running
-        if state.cpp_processes_running:
-            logger.info("Stopping C++ processes...")
+        # Stop and disable C++ services
+        cpp_s_scripts = [s for s in state.cpp_services if "/S" in s]
+        if cpp_s_scripts or state.cpp_processes_running:
+            logger.info("Stopping C++ services...")
             await self._report_progress(
-                progress_callback, "precheck", 80, "Stopping C++ services..."
+                progress_callback, "precheck", 75, "Stopping C++ services..."
             )
 
             # Stop via init scripts first
-            for svc_path in state.cpp_services:
-                if "/S" in svc_path:  # Only stop enabled services
-                    cmd = _build_sudo_cmd(
-                        password, f"{svc_path} stop 2>/dev/null || true"
-                    )
-                    await self._exec_sudo(client, cmd, password, timeout=30)
+            for svc_path in cpp_s_scripts:
+                cmd = _build_sudo_cmd(password, f"{svc_path} stop 2>/dev/null || true")
+                await self._exec_sudo(client, cmd, password, timeout=30)
 
-            # Kill remaining processes (use killall, no pkill on BusyBox)
-            kill_processes = [
-                "yolo11-detector",
-                "yolo26-detector",
-                "sensecraft",
-                "sscma-cpp",
-            ]
-            for proc in kill_processes:
-                cmd = _build_sudo_cmd(password, f"killall {proc} 2>/dev/null || true")
-                await self._exec_sudo(client, cmd, password, timeout=10)
+            # Kill remaining processes — derive from discovered services
+            # (use killall, no pkill on BusyBox)
+            for svc_path in state.cpp_services:
+                svc_name = _parse_svc_name(os.path.basename(svc_path))
+                if svc_name:
+                    cmd = _build_sudo_cmd(
+                        password, f"killall {shlex.quote(svc_name)} 2>/dev/null || true"
+                    )
+                    await self._exec_sudo(client, cmd, password, timeout=10)
+
+            # Disable old C++ init scripts (S* → K*) so they won't restart
+            # on reboot.  Essential because opkg removal is unreliable
+            # (cpp_packages often empty) and the old S* script would survive.
+            await self._report_progress(
+                progress_callback, "precheck", 85, "Disabling old services..."
+            )
+            for svc_path in cpp_s_scripts:
+                basename = os.path.basename(svc_path)
+                k_name = "K" + basename[1:]  # S92xxx → K92xxx
+                cmd = _build_sudo_cmd(
+                    password,
+                    f"mv /etc/init.d/{basename} /etc/init.d/{k_name} 2>/dev/null || true",
+                )
+                exit_code, stdout, _ = await self._exec_sudo(
+                    client, cmd, password, timeout=10
+                )
+                logger.info(f"Disabled: {basename} → {k_name}")
 
         # Uninstall old C++ packages for clean reinstall (optional, but ensures idempotency)
         if state.cpp_packages and state.mode == DeviceMode.CPP:

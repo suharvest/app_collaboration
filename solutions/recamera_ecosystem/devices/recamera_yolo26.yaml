@@ -35,14 +35,6 @@ binary:
   service_name: yolo26-detector
   service_priority: 92
 
-  # 冲突服务处理（内置逻辑：停止服务）
-  conflict_services:
-    stop:
-      - S03node-red
-      - S91sscma-node
-      - S93sscma-supervisor
-      - S92yolo11-detector
-
   auto_start: true
 
 actions:
@@ -66,6 +58,7 @@ actions:
             [ -f "$f" ] && mv "$f" "$(echo "$f" | sed 's|/S|/K|')" 2>/dev/null
           done
         done
+        true
       sudo: true
 
 # 用户输入
