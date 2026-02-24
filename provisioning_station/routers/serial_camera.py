@@ -107,9 +107,54 @@ async def create_session(req: CreateSessionRequest):
             detail="At least one of camera_port or crud_port must be provided",
         )
 
+    # Reject if both ports point to the same device
+    if req.camera_port and req.crud_port and req.camera_port == req.crud_port:
+        raise HTTPException(
+            status_code=400,
+            detail=f"camera_port and crud_port must be different (both are {req.camera_port})",
+        )
+
+    logger.info(
+        "create_session: camera_port=%s, crud_port=%s",
+        req.camera_port,
+        req.crud_port,
+    )
+
     session_id = None
 
+    # Open CRUD client
+    crud_client = None
+    if req.crud_port:
+        try:
+            crud_client = SerialCrudClient(req.crud_port, req.crud_baudrate)
+            crud_client.open()
+            logger.info("CRUD client opened: port=%s", req.crud_port)
+        except Exception as e:
+            logger.warning("Failed to open CRUD port %s: %s", req.crud_port, e)
+
     if req.camera_port:
+        # Pause ESP32 SPI inference so UART's AT+FACE=1 takes effect on Himax.
+        # Without pause, SPI commands override face mode back to standard detection
+        # (boxes, no image). With pause, Himax enters face mode which includes
+        # JPEG image in UART responses (see face_invoke.hpp include_image logic).
+        if crud_client:
+            pause_ok = False
+            for attempt in range(1, 4):
+                try:
+                    result = await crud_client.pause_inference()
+                    logger.info("Inference paused (attempt %d): %s", attempt, result)
+                    if result.get("ok"):
+                        pause_ok = True
+                        break
+                except Exception as e:
+                    logger.warning(
+                        "Failed to pause inference (attempt %d): %s", attempt, e
+                    )
+                if attempt < 3:
+                    await asyncio.sleep(0.5)
+            if not pause_ok:
+                logger.warning("Could not pause inference after 3 attempts")
+
         # Create camera session (generates session_id internally)
         manager = get_serial_camera_manager()
         try:
@@ -127,15 +172,9 @@ async def create_session(req: CreateSessionRequest):
         session_id = uuid.uuid4().hex[:8]
         _crud_only_sessions[session_id] = True
 
-    # Open CRUD client if specified
-    if req.crud_port:
-        try:
-            client = SerialCrudClient(req.crud_port, req.crud_baudrate)
-            client.open()
-            _crud_clients[session_id] = client
-        except Exception as e:
-            # Don't fail session creation if CRUD port fails
-            logger.warning("Failed to open CRUD port %s: %s", req.crud_port, e)
+    # Register CRUD client for this session
+    if crud_client:
+        _crud_clients[session_id] = crud_client
 
     return CreateSessionResponse(
         session_id=session_id,
@@ -151,17 +190,26 @@ async def delete_session(session_id: str):
     if enrollment and enrollment.active:
         enrollment.cancel()
 
-    # Close CRUD client
-    client = _crud_clients.pop(session_id, None)
+    # Resume inference if it was paused (e.g. during enrollment)
+    client = _crud_clients.get(session_id)
     if client:
-        client.close()
+        try:
+            result = await client.resume_inference()
+            logger.info("Inference resumed after session close: %s", result)
+        except Exception:
+            pass  # Best-effort; ESP32 has 5min auto-resume timeout
 
-    # Close camera session if it exists
+    # Close camera session (stops UART AT commands to Himax)
     if session_id not in _crud_only_sessions:
         manager = get_serial_camera_manager()
         manager.close_session(session_id)
     else:
         _crud_only_sessions.pop(session_id, None)
+
+    # Close CRUD client
+    client = _crud_clients.pop(session_id, None)
+    if client:
+        client.close()
 
     return {"ok": True}
 
@@ -223,6 +271,17 @@ async def websocket_frames(ws: WebSocket, session_id: str):
         if session.client_count == 0:
             logger.info("Last WS client left session %s, auto-closing", session_id)
             manager.close_session(session_id)
+            # Resume inference if CRUD client exists (browser may have closed without calling delete_session)
+            # Use fire-and-forget to release the serial port immediately — avoids blocking
+            # new sessions that need to open the same port.
+            client = _crud_clients.pop(session_id, None)
+            if client:
+                client.resume_inference_nowait()
+                client.close()
+                logger.info(
+                    "Inference resume sent (nowait) on WS disconnect for session %s",
+                    session_id,
+                )
 
 
 # ============================================
@@ -296,6 +355,7 @@ async def list_faces(session_id: str):
     except TimeoutError:
         raise HTTPException(status_code=504, detail="Device did not respond")
     except Exception as e:
+        logger.exception("list_faces failed session=%s", session_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -314,6 +374,7 @@ async def add_face(session_id: str, req: AddFaceRequest):
     except TimeoutError:
         raise HTTPException(status_code=504, detail="Device did not respond")
     except Exception as e:
+        logger.exception("add_face failed session=%s", session_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -332,6 +393,7 @@ async def delete_face(session_id: str, name: str):
     except TimeoutError:
         raise HTTPException(status_code=504, detail="Device did not respond")
     except Exception as e:
+        logger.exception("delete_face failed for name=%r session=%s", name, session_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -350,6 +412,7 @@ async def rename_face(session_id: str, name: str, req: RenameFaceRequest):
     except TimeoutError:
         raise HTTPException(status_code=504, detail="Device did not respond")
     except Exception as e:
+        logger.exception("rename_face failed session=%s", session_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
