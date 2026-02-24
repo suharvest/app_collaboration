@@ -1,0 +1,70 @@
+version: "1.0"
+id: gun_detection_frigate
+name: AI Gun Detection
+name_zh: AI 视觉枪支检测
+
+intro:
+  summary: Real-time gun detection using Frigate NVR with AI-accelerated video analysis on edge devices
+  summary_zh: 使用 Frigate NVR 在边缘设备上实时检测枪支，支持多种 AI 加速硬件
+  description_file: description.md
+  description_file_zh: description_zh.md
+  cover_image: gallery/cover.svg
+  category: security
+  tags: [security, gun-detection, frigate, nvr, ai]
+
+  device_catalog:
+    nvidia_jetson:
+      name: NVIDIA Jetson
+      name_zh: NVIDIA Jetson
+      product_url: https://www.seeedstudio.com/reComputer-J4012-p-5586.html
+      description: Edge AI computing device with TensorRT GPU acceleration
+      description_zh: 支持 TensorRT GPU 加速的边缘 AI 计算设备
+    r2000_hailo:
+      name: reComputer R2000 + Hailo
+      name_zh: reComputer R2000 + Hailo
+      product_url: https://www.seeedstudio.com/reComputer-R2000-Series.html
+      description: Industrial edge AI with Hailo NPU acceleration
+      description_zh: 搭载 Hailo NPU 加速的工业边缘 AI 设备
+
+  presets:
+    - id: jetson
+      name: NVIDIA Jetson
+      name_zh: NVIDIA Jetson
+      description: Deploy with TensorRT GPU acceleration on NVIDIA Jetson
+      description_zh: 在 NVIDIA Jetson 上使用 TensorRT GPU 加速部署
+      device_groups:
+        - id: edge_device
+          name: Edge AI Device
+          name_zh: 边缘 AI 设备
+          type: single
+          required: true
+          options:
+            - device_ref: nvidia_jetson
+          default: nvidia_jetson
+
+    - id: r2000_hailo
+      name: reComputer R2000 + Hailo
+      name_zh: reComputer R2000 + Hailo
+      description: Deploy with Hailo NPU acceleration on reComputer R2000
+      description_zh: 在 reComputer R2000 上使用 Hailo NPU 加速部署
+      device_groups:
+        - id: edge_device
+          name: Edge AI Device
+          name_zh: 边缘 AI 设备
+          type: single
+          required: true
+          options:
+            - device_ref: r2000_hailo
+          default: r2000_hailo
+
+  stats:
+    difficulty: beginner
+    estimated_time: 10min
+
+  links:
+    github: https://github.com/Seeed-Projects/frigate-on-jetson
+
+deployment:
+  guide_file: guide.md
+  guide_file_zh: guide_zh.md
+  selection_mode: sequential

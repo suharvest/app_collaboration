@@ -1,0 +1,20 @@
+version: "1.0"
+id: jetson_local
+name: NVIDIA Jetson (Local)
+name_zh: NVIDIA Jetson（本机）
+type: docker_local
+
+docker:
+  compose_file: assets/jetson/docker-compose.yml
+  options:
+    project_name: gun-detection-frigate
+    remove_orphans: true
+  services:
+    - name: frigate
+      port: 5000
+      health_check_endpoint: /api/version
+      required: true
+
+post_deployment:
+  open_browser: true
+  url: http://localhost:5000

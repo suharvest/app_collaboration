@@ -1,0 +1,161 @@
+version: "1.0"
+id: r2000_hailo
+name: reComputer R2000 + Hailo
+name_zh: reComputer R2000 + Hailo
+type: docker_remote
+
+detection:
+  method: network_scan
+  manual_entry: true
+
+ssh:
+  port: 22
+  default_user: recomputer
+  auth_methods:
+    - password
+
+docker_remote:
+  compose_file: assets/r2000-hailo/docker-compose.yml
+  compose_dir: assets/r2000-hailo
+  remote_path: /home/{{username}}/gun-detection-frigate
+  options:
+    project_name: gun-detection-frigate
+    remove_orphans: true
+  services:
+    - name: frigate-hailo
+      port: 5000
+      health_check_endpoint: /api/version
+      required: true
+
+user_inputs:
+  - id: host
+    name: Host / IP
+    name_zh: 主机 / IP
+    type: text
+    required: true
+    placeholder: "192.168.1.100 or hostname.local"
+  - id: username
+    name: SSH Username
+    name_zh: SSH 用户名
+    type: text
+    default: recomputer
+    required: true
+  - id: password
+    name: SSH Password
+    name_zh: SSH 密码
+    type: password
+    required: true
+  - id: rtsp_url_1
+    name: "Camera 1 RTSP URL (optional)"
+    name_zh: "摄像头 1 RTSP 地址（可选）"
+    type: text
+    required: false
+    placeholder: "rtsp://admin:password@192.168.1.64:554/Streaming/Channels/101"
+  - id: rtsp_url_2
+    name: "Camera 2 RTSP URL (optional)"
+    name_zh: "摄像头 2 RTSP 地址（可选）"
+    type: text
+    required: false
+    placeholder: "rtsp://admin:password@192.168.1.65:554/Streaming/Channels/101"
+
+actions:
+  before:
+    - name: Verify Hailo hardware
+      name_zh: 检查 Hailo 硬件
+      sudo: true
+      run: |
+        if [ ! -e /dev/hailo0 ]; then
+          echo "ERROR: /dev/hailo0 not found."
+          echo "Please ensure the Hailo AI Kit is properly installed in the M.2 slot."
+          echo "After installing hardware, reboot and retry."
+          exit 1
+        fi
+        echo "Hailo device found at /dev/hailo0"
+
+    - name: Check and install HailoRT 4.21.0 driver
+      name_zh: 检查并安装 HailoRT 4.21.0 驱动
+      sudo: true
+      timeout: 600
+      run: |
+        REQUIRED="4.21.0"
+
+        # Check current driver version
+        INSTALLED=$(dpkg-query -W -f='${Version}' hailort 2>/dev/null || echo "none")
+        if echo "$INSTALLED" | grep -q "^${REQUIRED}"; then
+          echo "HailoRT ${REQUIRED} already installed"
+          exit 0
+        fi
+
+        echo "HailoRT version: ${INSTALLED} (need ${REQUIRED})"
+        echo "Installing HailoRT ${REQUIRED} driver using Frigate's official script..."
+        echo "This may take 5-10 minutes (compiling kernel module)..."
+
+        # Use Frigate's official HailoRT installation script
+        curl -sfL https://raw.githubusercontent.com/blakeblackshear/frigate/dev/docker/hailo8l/user_installation.sh -o /tmp/install_hailort.sh
+        chmod +x /tmp/install_hailort.sh
+        bash /tmp/install_hailort.sh
+        rm -f /tmp/install_hailort.sh
+
+        # Verify driver loaded
+        if lsmod | grep -q hailo_pci; then
+          echo "HailoRT ${REQUIRED} installed and loaded successfully"
+        else
+          echo "HailoRT installed but kernel module not loaded."
+          echo "Please reboot the device and retry deployment."
+          exit 1
+        fi
+
+  after:
+    - name: Configure RTSP cameras
+      name_zh: 配置 RTSP 摄像头
+      ignore_error: true
+      run: |
+        URL1="{{rtsp_url_1}}"
+        URL2="{{rtsp_url_2}}"
+        CONFIG="/home/{{username}}/gun-detection-frigate/config/config.yml"
+        ADDED=0
+
+        add_camera() {
+          local name="$1" url="$2"
+          cat >> "$CONFIG" << 'ENDCAM'
+
+          __CAMERA_NAME__:
+            enabled: true
+            ffmpeg:
+              inputs:
+                - path: __CAMERA_URL__
+                  roles:
+                    - detect
+                    - record
+            detect:
+              width: 1920
+              height: 1080
+              fps: 5
+            objects:
+              track:
+                - gun
+              filters:
+                gun:
+                  threshold: 0.25
+                  min_area: 10
+                  max_area: 500000
+        ENDCAM
+          sed -i "s|__CAMERA_NAME__|$name|" "$CONFIG"
+          sed -i "s|__CAMERA_URL__|$url|" "$CONFIG"
+          ADDED=1
+        }
+
+        [ -n "$URL1" ] && add_camera "rtsp_camera_1" "$URL1"
+        [ -n "$URL2" ] && add_camera "rtsp_camera_2" "$URL2"
+
+        if [ "$ADDED" -eq 1 ]; then
+          cd /home/{{username}}/gun-detection-frigate
+          docker compose restart
+          echo "RTSP cameras configured and Frigate restarted"
+        else
+          echo "No RTSP cameras configured, using demo videos only"
+        fi
+
+post_deployment:
+  open_browser: true
+  url: http://{{host}}:5000
