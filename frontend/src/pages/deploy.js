@@ -140,6 +140,6 @@ export function cleanupDeployPage() {
 i18n.onLocaleChange(() => {
   const currentSolution = getCurrentSolution();
   if (router.currentRoute === 'deploy' && currentSolution) {
-    renderDeployPage({ id: currentSolution.id });
+    renderDeployPage({ id: currentSolution.id, preset: getSelectedPresetId() });
   }
 });

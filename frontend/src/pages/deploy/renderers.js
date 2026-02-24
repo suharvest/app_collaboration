@@ -944,6 +944,23 @@ export function renderUserInputs(device, inputs, excludeIds = [], noWrapper = fa
         </div>
       `;
     }
+    if (input.type === 'select' && input.options?.length) {
+      const options = input.options.map(opt => {
+        const label = getLocalizedField(opt, 'label');
+        const selected = String(opt.value) === String(input.default) ? ' selected' : '';
+        return `<option value="${opt.value}"${selected}>${label}</option>`;
+      }).join('');
+      return `
+        <div class="form-group${inRow ? ' flex-1' : ''}">
+          <label>${getLocalizedField(input, 'name')}</label>
+          ${input.description ? `<p class="text-xs text-text-muted mb-1">${getLocalizedField(input, 'description')}</p>` : ''}
+          <select
+            id="input-${device.id}-${input.id}"
+            ${input.required ? 'required' : ''}
+          >${options}</select>
+        </div>
+      `;
+    }
     return `
       <div class="form-group${inRow ? ' flex-1' : ''}">
         <label>${getLocalizedField(input, 'name')}</label>
@@ -1234,6 +1251,25 @@ export function renderPreviewInputs(device) {
     let defaultValue = input.default || '';
     if (input.default_template) {
       defaultValue = resolveTemplate(input.default_template, previousInputs);
+    }
+    if (input.type === 'select' && input.options?.length) {
+      const options = input.options.map(opt => {
+        const label = getLocalizedField(opt, 'label');
+        const selected = String(opt.value) === String(defaultValue) ? ' selected' : '';
+        return `<option value="${opt.value}"${selected}>${label}</option>`;
+      }).join('');
+      return `
+        <div class="form-group ${extraClass}">
+          <label>${getLocalizedField(input, 'name')}</label>
+          <select
+            id="preview-input-${device.id}-${input.id}"
+            class="preview-input"
+            data-device-id="${device.id}"
+            data-input-id="${input.id}"
+            ${input.required ? 'required' : ''}
+          >${options}</select>
+        </div>
+      `;
     }
     return `
       <div class="form-group ${extraClass}">

@@ -148,6 +148,9 @@ async function connectSerialCamera(deviceId) {
     instance.crudSessionId = null;
   }
 
+  // Show connecting state
+  _updateConnectButton(deviceId, false, true);
+
   try {
     const result = await serialCameraApi.createSession(
       cameraPort, cameraBaudrate, crudPort, crudBaudrate
@@ -169,6 +172,7 @@ async function connectSerialCamera(deviceId) {
     _updateConnectButton(deviceId, true);
 
   } catch (e) {
+    _updateConnectButton(deviceId, false);
     toast.error(`Connection failed: ${e.message}`);
   }
 }
@@ -198,6 +202,14 @@ async function connectFaceDatabase(deviceId) {
     return;
   }
 
+  // Show connecting state
+  const fdbConnectBtn = instance.panel.container.querySelector('#fdb-connect-btn');
+  if (fdbConnectBtn) {
+    fdbConnectBtn.textContent = t('faceDatabase.connecting');
+    fdbConnectBtn.className = 'btn btn-sm btn-secondary';
+    fdbConnectBtn.disabled = true;
+  }
+
   try {
     const result = await serialCameraApi.createSession(
       null, 921600, crudPort, crudBaudrate
@@ -209,13 +221,19 @@ async function connectFaceDatabase(deviceId) {
     instance.panel.setCameraAvailable(false);
 
     // Update the connect button in the panel to show "disconnect"
-    const fdbConnectBtn = instance.panel.container.querySelector('#fdb-connect-btn');
     if (fdbConnectBtn) {
       fdbConnectBtn.textContent = t('faceDatabase.disconnect');
       fdbConnectBtn.className = 'btn btn-sm btn-secondary';
+      fdbConnectBtn.disabled = false;
     }
 
   } catch (e) {
+    // Revert button to connect state
+    if (fdbConnectBtn) {
+      fdbConnectBtn.textContent = t('faceDatabase.connect');
+      fdbConnectBtn.className = 'btn btn-sm btn-primary';
+      fdbConnectBtn.disabled = false;
+    }
     toast.error(`Database connection failed: ${e.message}`);
   }
 }
@@ -278,15 +296,22 @@ async function disconnectSerialCamera(deviceId) {
 /**
  * Update camera connect button text
  */
-function _updateConnectButton(deviceId, connected) {
+function _updateConnectButton(deviceId, connected, connecting = false) {
   const container = document.getElementById(`serial-camera-container-${deviceId}`);
   if (!container) return;
 
   const btn = container.querySelector('#sc-connect-btn');
   if (btn) {
-    btn.textContent = connected ? t('serialCamera.disconnect') : t('serialCamera.connect');
-    btn.className = connected
-      ? 'btn btn-sm btn-secondary serial-camera-connect-btn'
-      : 'btn btn-sm btn-primary serial-camera-connect-btn';
+    if (connecting) {
+      btn.textContent = t('serialCamera.connecting');
+      btn.className = 'btn btn-sm btn-secondary serial-camera-connect-btn';
+      btn.disabled = true;
+    } else {
+      btn.textContent = connected ? t('serialCamera.disconnect') : t('serialCamera.connect');
+      btn.className = connected
+        ? 'btn btn-sm btn-secondary serial-camera-connect-btn'
+        : 'btn btn-sm btn-primary serial-camera-connect-btn';
+      btn.disabled = false;
+    }
   }
 }

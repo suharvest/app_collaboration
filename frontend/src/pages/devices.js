@@ -190,7 +190,7 @@ export async function renderDevicesPage() {
           <div class="grid gap-3" style="grid-template-columns: 1fr 1fr 1fr;">
             <div class="form-group mb-0">
               <label>${t('devices.restore.host')}</label>
-              <input type="text" id="restore-host" class="input" placeholder="192.168.x.x">
+              <input type="text" id="restore-host" class="input" value="192.168.42.1" placeholder="192.168.x.x">
             </div>
             <div class="form-group mb-0">
               <label>${t('devices.restore.username')}</label>
