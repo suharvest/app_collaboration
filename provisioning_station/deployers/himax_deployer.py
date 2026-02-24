@@ -317,6 +317,26 @@ class HimaxDeployer(BaseDeployer):
                         logger.info(f"Found Himax device by VID/PID: {port.device}")
                         return port.device
 
+        # Method 2.5: VID/PID match + wchusbserial (macOS driver variant)
+        # Some macOS WCH driver versions show Himax as wchusbserial instead of usbmodem.
+        # When multiple wchusbserial ports exist, prefer the lower-numbered suffix
+        # (Himax is typically interface 0, ESP32 is interface 2).
+        wch_candidates = []
+        for port in serial.tools.list_ports.comports():
+            if port.vid == vid and port.pid == pid:
+                if "wchusbserial" in port.device.lower():
+                    wch_candidates.append(port.device)
+
+        if wch_candidates:
+            wch_candidates.sort()
+            selected = wch_candidates[0]
+            logger.info(f"Found Himax device by VID/PID + wchusbserial: {selected}")
+            if len(wch_candidates) > 1:
+                logger.debug(
+                    f"Other wchusbserial candidates (likely ESP32): {wch_candidates[1:]}"
+                )
+            return selected
+
         # Method 3: Fallback - usbmodem pattern only (without VID/PID check)
         # This is less reliable but kept for backwards compatibility
         for port in serial.tools.list_ports.comports():
@@ -557,37 +577,45 @@ class HimaxDeployer(BaseDeployer):
             logger.warning("Could not find ESP32 companion port on Linux")
             return None
 
-        # === macOS: Original usbmodem/wchusbserial logic ===
+        # === macOS: Find companion ESP32 port ===
+        # Method 1: Serial number match (most reliable)
+        if himax_port_info and himax_port_info.serial_number:
+            for port in serial.tools.list_ports.comports():
+                if (
+                    port.device != himax_port
+                    and port.serial_number == himax_port_info.serial_number
+                ):
+                    logger.info(f"Found ESP32 port by serial number: {port.device}")
+                    return port.device
+
+        # Method 2: Same VID/PID, different port
+        if himax_port_info and himax_port_info.vid and himax_port_info.pid:
+            for port in serial.tools.list_ports.comports():
+                if (
+                    port.device != himax_port
+                    and port.vid == himax_port_info.vid
+                    and port.pid == himax_port_info.pid
+                ):
+                    logger.info(f"Found ESP32 port by VID/PID: {port.device}")
+                    return port.device
+
+        # Method 3: Legacy usbmodem → wchusbserial pattern
         match = re.search(r"usbmodem(\w+)", himax_port)
-        if not match:
-            return None
+        if match:
+            himax_serial = match.group(1)
+            himax_suffix = himax_serial[-2:] if len(himax_serial) > 2 else himax_serial
 
-        himax_serial = match.group(1)
-        himax_base = himax_serial[:10] if len(himax_serial) > 10 else himax_serial[:-2]
-        himax_suffix = himax_serial[-2:] if len(himax_serial) > 2 else himax_serial
-
-        logger.debug(
-            f"Himax serial: {himax_serial}, base: {himax_base}, suffix: {himax_suffix}"
-        )
-
-        # Find ESP32 port with DIFFERENT suffix (different USB interface)
-        for port in serial.tools.list_ports.comports():
-            if "wchusbserial" in port.device.lower():
-                esp_match = re.search(r"wchusbserial(\w+)", port.device)
-                if esp_match:
-                    esp_serial = esp_match.group(1)
-                    esp_suffix = esp_serial[-2:] if len(esp_serial) > 2 else esp_serial
-
-                    # Same device but different interface
-                    if esp_suffix != himax_suffix:
-                        logger.info(f"Found ESP32 port: {port.device}")
-                        return port.device
-
-        # Fallback: return any wchusbserial port
-        for port in serial.tools.list_ports.comports():
-            if "wchusbserial" in port.device.lower():
-                logger.info(f"Using fallback ESP32 port: {port.device}")
-                return port.device
+            for port in serial.tools.list_ports.comports():
+                if "wchusbserial" in port.device.lower():
+                    esp_match = re.search(r"wchusbserial(\w+)", port.device)
+                    if esp_match:
+                        esp_serial = esp_match.group(1)
+                        esp_suffix = (
+                            esp_serial[-2:] if len(esp_serial) > 2 else esp_serial
+                        )
+                        if esp_suffix != himax_suffix:
+                            logger.info(f"Found ESP32 port: {port.device}")
+                            return port.device
 
         return None
 
