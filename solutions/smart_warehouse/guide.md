@@ -233,33 +233,23 @@ After deployment, open the warehouse system to complete initial setup:
 
 Deploy the voice AI service to enable voice interaction with Watcher. Select "Private Cloud" mode and fill in your LLM API details.
 
+Get API keys: [DeepSeek](https://platform.deepseek.com/) (recommended, free credits for new users) · [OpenAI](https://platform.openai.com/) · [Moonshot](https://platform.moonshot.cn/)
+
+TTS uses free Edge TTS by default, no additional configuration needed.
+
 ### Target: Local Deployment {#voice_local type=local config=devices/xiaozhi_server.yaml}
+
+### Wiring
 
 1. Ensure Docker is installed and running
 2. Click Deploy button to start services
 
 ### Target: Remote Deployment (R1100) {#voice_remote type=remote config=devices/xiaozhi_remote.yaml default=true}
 
+### Wiring
+
 1. Enter R1100 IP address and SSH credentials
 2. Click Deploy and wait for installation to complete
-
-### LLM API Configuration
-
-Fill in the following during deployment:
-
-| Field | Example | Description |
-|-------|---------|-------------|
-| API URL | `https://api.deepseek.com/v1` | OpenAI-compatible API endpoint |
-| Model Name | `deepseek-chat` | Model to use |
-| API Key | `sk-...` | Get from your provider |
-
-TTS uses free Edge TTS by default, no additional configuration needed.
-
-### Getting API Keys
-
-- **DeepSeek** (Recommended): Visit [platform.deepseek.com](https://platform.deepseek.com/), free credits for new users
-- **OpenAI**: Visit [platform.openai.com](https://platform.openai.com/)
-- **Moonshot**: Visit [platform.moonshot.cn](https://platform.moonshot.cn/)
 
 ### Troubleshooting
 
@@ -426,14 +416,16 @@ After deployment, open the warehouse system to complete initial setup:
 
 ## Step 3: Jetson Local AI {#jetson_ai type=docker_deploy required=true config=devices/llm_jetson.yaml}
 
-Deploy local LLM and TTS services on the Jetson device:
+Deploy local LLM and TTS services on the Jetson device.
+
+### Target: Remote Deployment (Jetson) {#jetson_remote type=remote config=devices/llm_jetson.yaml default=true}
+
+### Wiring
 
 1. Connect Jetson (e.g., reComputer J4012) to power and ethernet
 2. Enter Jetson IP address and SSH credentials
 3. Select model (Qwen3-8B recommended, requires ~4.3GB VRAM)
-4. Choose deployment method:
-   - **Offline Package**: Use pre-downloaded images and models (recommended)
-   - **Online Download**: Download from registry (requires internet)
+4. Choose deployment method (offline package recommended)
 5. Click Deploy and wait for image import and service startup
 
 ### Troubleshooting
@@ -448,21 +440,21 @@ Deploy local LLM and TTS services on the Jetson device:
 
 ## Step 4: Voice AI Service {#voice_service type=docker_deploy required=true config=devices/xiaozhi_remote.yaml}
 
-Deploy voice AI service on R1100, connecting to Jetson for inference. Select "Edge Computing" mode and enter the Jetson IP address.
+Deploy voice AI service on R1100, connecting to Jetson for inference. Select "Edge Computing" mode and enter the Jetson IP address (auto-filled if Jetson was deployed in previous step).
 
 ### Target: Local Deployment {#voice_local type=local config=devices/xiaozhi_server.yaml}
+
+### Wiring
 
 1. Ensure Docker is installed and running
 2. Click Deploy button to start services
 
 ### Target: Remote Deployment (R1100) {#voice_remote type=remote config=devices/xiaozhi_remote.yaml default=true}
 
+### Wiring
+
 1. Enter R1100 IP address and SSH credentials
 2. Click Deploy and wait for installation to complete
-
-### Configuration Notes
-
-Enter the Jetson IP address during deployment (auto-filled if Jetson was deployed in previous step). The voice service will connect to the LLM and TTS running on Jetson for local inference.
 
 ### Troubleshooting
 

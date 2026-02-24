@@ -233,33 +233,23 @@
 
 部署语音 AI 服务，为 Watcher 提供语音交互能力。部署时选择「私有云方案」，需要填写 LLM API 信息。
 
+获取 API 密钥：[DeepSeek](https://platform.deepseek.com/)（推荐，新用户赠送免费额度） · [OpenAI](https://platform.openai.com/) · [月之暗面](https://platform.moonshot.cn/)
+
+TTS 默认使用免费的 Edge TTS，无需额外配置。
+
 ### 部署目标: 本机部署 {#voice_local type=local config=devices/xiaozhi_server.yaml}
+
+### 接线
 
 1. 确保 Docker 已安装并运行
 2. 点击部署按钮启动服务
 
 ### 部署目标: 远程部署（R1100） {#voice_remote type=remote config=devices/xiaozhi_remote.yaml default=true}
 
+### 接线
+
 1. 输入 R1100 的 IP 地址和 SSH 凭据
 2. 点击部署，等待安装完成
-
-### LLM API 配置说明
-
-部署时需要填写以下信息：
-
-| 字段 | 示例值 | 说明 |
-|------|--------|------|
-| API 地址 | `https://api.deepseek.com/v1` | 兼容 OpenAI 的 API 端点 |
-| 模型名称 | `deepseek-chat` | 使用的模型 |
-| API 密钥 | `sk-...` | 从服务商获取 |
-
-TTS 默认使用免费的 Edge TTS，无需额外配置。
-
-### 获取 API 密钥
-
-- **DeepSeek**（推荐）：访问 [platform.deepseek.com](https://platform.deepseek.com/)，新用户赠送免费额度
-- **OpenAI**：访问 [platform.openai.com](https://platform.openai.com/)
-- **月之暗面**：访问 [platform.moonshot.cn](https://platform.moonshot.cn/)
 
 ### 故障排除
 
@@ -426,14 +416,16 @@ TTS 默认使用免费的 Edge TTS，无需额外配置。
 
 ## 步骤 3: Jetson 本地 AI {#jetson_ai type=docker_deploy required=true config=devices/llm_jetson.yaml}
 
-在 Jetson 设备上部署本地大模型和语音合成服务：
+在 Jetson 设备上部署本地大模型和语音合成服务。
+
+### 部署目标: 远程部署（Jetson） {#jetson_remote type=remote config=devices/llm_jetson.yaml default=true}
+
+### 接线
 
 1. 将 Jetson（如 reComputer J4012）接上电源和网线
 2. 输入 Jetson 的 IP 地址和 SSH 凭据
 3. 选择模型（推荐 Qwen3-8B，需约 4.3GB 显存）
-4. 选择部署方式：
-   - **离线包部署**：使用预下载的镜像和模型（推荐）
-   - **在线下载**：从镜像仓库下载（需要网络）
+4. 选择部署方式（推荐离线包部署）
 5. 点击部署，等待镜像导入和服务启动
 
 ### 故障排除
@@ -448,21 +440,21 @@ TTS 默认使用免费的 Edge TTS，无需额外配置。
 
 ## 步骤 4: 语音 AI 服务 {#voice_service type=docker_deploy required=true config=devices/xiaozhi_remote.yaml}
 
-在 R1100 上部署语音 AI 服务，连接 Jetson 进行推理。部署时选择「边缘计算方案」，并输入 Jetson IP 地址。
+在 R1100 上部署语音 AI 服务，连接 Jetson 进行推理。部署时选择「边缘计算方案」，并输入 Jetson IP 地址（如已在上一步部署则自动填充）。
 
 ### 部署目标: 本机部署 {#voice_local type=local config=devices/xiaozhi_server.yaml}
+
+### 接线
 
 1. 确保 Docker 已安装并运行
 2. 点击部署按钮启动服务
 
 ### 部署目标: 远程部署（R1100） {#voice_remote type=remote config=devices/xiaozhi_remote.yaml default=true}
 
+### 接线
+
 1. 输入 R1100 的 IP 地址和 SSH 凭据
 2. 点击部署，等待安装完成
-
-### 配置说明
-
-部署时需要填写 Jetson IP 地址（如已在上一步部署 Jetson 服务则自动填充）。语音服务会连接 Jetson 上的 LLM 和 TTS 进行本地推理。
 
 ### 故障排除
 

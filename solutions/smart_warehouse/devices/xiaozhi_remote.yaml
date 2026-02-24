@@ -87,6 +87,7 @@ user_inputs:
     name_zh: 部署方案
     type: select
     required: true
+    row: 1
     options:
       - value: private_cloud
         label: Private Cloud (Cloud LLM/TTS)
@@ -104,9 +105,10 @@ user_inputs:
     name_zh: LLM API 地址
     type: text
     required: false
+    row: 1
     placeholder: "https://api.deepseek.com/v1"
-    description: "OpenAI-compatible API endpoint (e.g., DeepSeek, OpenAI, Moonshot)"
-    description_zh: "兼容 OpenAI 的 API 端点（如 DeepSeek、OpenAI、月之暗面）"
+    description: "OpenAI-compatible API endpoint"
+    description_zh: "兼容 OpenAI 的 API 端点"
     show_when:
       field: deploy_mode
       value: private_cloud
@@ -116,6 +118,7 @@ user_inputs:
     name_zh: LLM 模型名称
     type: text
     required: false
+    row: 1
     placeholder: "deepseek-chat"
     description: "Model name to use"
     description_zh: "使用的模型名称"
@@ -128,6 +131,7 @@ user_inputs:
     name_zh: LLM API 密钥
     type: password
     required: false
+    row: 1
     placeholder: "sk-..."
     description: "API key for LLM service"
     description_zh: "LLM 服务的 API 密钥"
@@ -141,6 +145,7 @@ user_inputs:
     name_zh: TTS 服务商
     type: select
     required: false
+    row: 2
     options:
       - value: openai
         label: OpenAI TTS
@@ -169,9 +174,10 @@ user_inputs:
     name_zh: TTS API 地址
     type: text
     required: false
+    row: 2
     placeholder: "https://api.openai.com/v1"
-    description: "TTS API endpoint (not needed for Edge TTS)"
-    description_zh: "TTS API 端点（Edge TTS 不需要）"
+    description: "Not needed for Edge TTS"
+    description_zh: "Edge TTS 不需要"
     show_when:
       field: deploy_mode
       value: private_cloud
@@ -181,9 +187,10 @@ user_inputs:
     name_zh: TTS API 密钥
     type: password
     required: false
+    row: 2
     placeholder: "sk-..."
-    description: "API key for TTS service (not needed for Edge TTS)"
-    description_zh: "TTS 服务的 API 密钥（Edge TTS 不需要）"
+    description: "Not needed for Edge TTS"
+    description_zh: "Edge TTS 不需要"
     show_when:
       field: deploy_mode
       value: private_cloud
@@ -193,6 +200,7 @@ user_inputs:
     name_zh: TTS 语音
     type: text
     required: false
+    row: 2
     placeholder: "zh-CN-XiaoxiaoNeural"
     description: "Voice ID or name"
     description_zh: "语音 ID 或名称"
