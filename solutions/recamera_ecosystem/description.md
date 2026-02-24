@@ -6,8 +6,8 @@ reCamera can do a lot on its own — but its real power comes from connecting it
 
 | Benefit | Details |
 |---------|---------|
-| Pick Your Platform | Choose the integration that fits your workflow — Home Assistant, standalone preview, or more coming soon |
-| One Camera, Multiple Uses | The same reCamera can serve heatmap data, smart home automation, and more simultaneously |
+| Pick Your Platform | Choose the integration that fits your workflow — Home Assistant, heatmap preview, OCR text reader, face analysis, or more coming soon |
+| One Camera, Multiple Uses | The same reCamera can serve heatmap data, text recognition, face analysis, smart home automation, and more |
 | Quick Setup | Each integration is a one-click deployment — no coding, no manual configuration |
 | Privacy by Default | AI processing stays on the camera; only the data each platform needs gets sent |
 
@@ -17,8 +17,9 @@ reCamera can do a lot on its own — but its real power comes from connecting it
 |----------|------------|
 | Quick Demo | Deploy the heatmap preview to show clients what reCamera can do — no extra hardware needed |
 | Smart Home | Add reCamera to Home Assistant for live video + AI-triggered automations |
+| Text Reading | Point the camera at signs, labels, or displays — recognized text appears on screen in real-time |
+| Face Analysis | Detect faces and see age, gender, and emotion — all processed on-device with privacy in mind |
 | Multi-Platform Setup | Use heatmap preview for analytics AND Home Assistant for automations — both from the same camera |
-| Platform Evaluation | Try different integrations to find the best fit before committing to a platform |
 
 ## Requirements
 

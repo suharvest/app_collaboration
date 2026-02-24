@@ -13,6 +13,11 @@ intro:
   - recamera
   - home-assistant
   - yolo
+  - ocr
+  - text-recognition
+  - face-analysis
+  - emotion
+  - age-gender
   - smart-home
   - rtsp
   - privacy
@@ -84,6 +89,42 @@ intro:
       default: recomputer_r1100
     links:
       github: https://github.com/xr686/reCamer_HA
+  - id: ocr_reader
+    name: OCR Text Reader
+    name_zh: OCR 文字识别
+    badge: New
+    badge_zh: 新功能
+    description: Read text from camera feed with PP-OCRv3 — supports Chinese and English
+    description_zh: 使用 PP-OCRv3 从摄像头画面中识别文字——支持中文和英文
+    device_groups:
+    - id: camera
+      name: AI Camera
+      name_zh: AI 摄像头
+      type: single
+      required: true
+      options:
+      - device_ref: recamera
+      default: recamera
+    links:
+      github: https://github.com/Seeed-Studio/sscma-example-sg200x
+  - id: face_analysis
+    name: Face Analysis
+    name_zh: 人脸分析
+    badge: New
+    badge_zh: 新功能
+    description: Detect faces and analyze age, gender, and emotion — all on-device, with privacy blur on the video stream
+    description_zh: 检测人脸并分析年龄、性别、表情——全部在设备上处理，视频流中自动打码保护隐私
+    device_groups:
+    - id: camera
+      name: AI Camera
+      name_zh: AI 摄像头
+      type: single
+      required: true
+      options:
+      - device_ref: recamera
+      default: recamera
+    links:
+      github: https://github.com/Seeed-Studio/sscma-example-sg200x
 deployment:
   guide_file: guide.md
   guide_file_zh: guide_zh.md
