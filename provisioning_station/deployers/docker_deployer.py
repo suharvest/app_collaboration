@@ -10,7 +10,9 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
+
+import yaml
 
 from ..models.device import DeviceConfig
 from ..utils.compose_labels import create_labels, inject_labels_to_compose_file
@@ -126,6 +128,16 @@ class DockerDeployer(BaseDeployer):
                 compose_file = temp_compose_file
                 logger.info("Injected SenseCraft labels into compose file")
 
+            # Check for existing containers that would conflict
+            auto_replace = connection.get("auto_replace_containers", False)
+            await self._check_existing_containers(
+                compose_file,
+                project_name,
+                str(compose_dir),
+                auto_replace,
+                progress_callback,
+            )
+
             # Before actions
             executor = LocalActionExecutor()
             if not await self._execute_actions(
@@ -234,8 +246,9 @@ class DockerDeployer(BaseDeployer):
                     healthy = await self._check_service_health(
                         service.port,
                         service.health_check_endpoint,
-                        timeout=30,
+                        timeout=service.health_check_timeout,
                         progress_callback=progress_callback,
+                        container_name=service.name,
                     )
                     if not healthy and service.required:
                         all_healthy = False
@@ -503,10 +516,126 @@ class DockerDeployer(BaseDeployer):
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def _get_compose_container_names(self, compose_file: str) -> List[str]:
+        """Extract container_name values from compose file"""
+        try:
+            with open(compose_file, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            if not data or "services" not in data:
+                return []
+            names = []
+            for service_config in data.get("services", {}).values():
+                if service_config and "container_name" in service_config:
+                    names.append(service_config["container_name"])
+            return names
+        except Exception as e:
+            logger.debug(f"Failed to parse compose file for container names: {e}")
+            return []
+
+    async def _check_existing_containers(
+        self,
+        compose_file: str,
+        project_name: str,
+        working_dir: str,
+        auto_replace: bool,
+        progress_callback: Optional[Callable] = None,
+    ) -> None:
+        """Check for existing containers that would conflict with deployment.
+
+        If conflicting containers are found and auto_replace is False, raises
+        RemoteDockerNotInstalled to trigger a user confirmation dialog.
+        If auto_replace is True, stops and removes the existing containers.
+        """
+        container_names = self._get_compose_container_names(compose_file)
+        if not container_names:
+            return  # No explicit container_name, compose handles it
+
+        # Check which container names already exist
+        existing = []
+        for name in container_names:
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    "docker",
+                    "ps",
+                    "-a",
+                    "--filter",
+                    f"name=^/{name}$",
+                    "--format",
+                    "{{.Names}} ({{.Image}}) - {{.Status}}",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, _ = await process.communicate()
+                output = stdout.decode().strip()
+                if output:
+                    existing.append(output)
+            except Exception:
+                pass
+
+        if not existing:
+            return  # No conflicts
+
+        if auto_replace:
+            await self._report_progress(
+                progress_callback,
+                "pull_images",
+                0,
+                "Stopping existing containers...",
+            )
+
+            # Run docker compose down for this project
+            await self._run_docker_compose(
+                compose_file,
+                ["down", "--remove-orphans"],
+                project_name,
+                working_dir=working_dir,
+            )
+
+            # Force remove any remaining containers with conflicting names
+            # (handles cross-project conflicts)
+            for name in container_names:
+                try:
+                    await asyncio.create_subprocess_exec(
+                        "docker",
+                        "rm",
+                        "-f",
+                        name,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                except Exception:
+                    pass
+
+            await self._report_progress(
+                progress_callback,
+                "pull_images",
+                0,
+                "Existing containers removed",
+            )
+        else:
+            container_list = ", ".join(
+                name for name in container_names if any(name in e for e in existing)
+            )
+            raise RemoteDockerNotInstalled(
+                f"Found existing containers: {container_list}. "
+                "Would you like to stop and replace them with the new deployment?",
+                can_auto_fix=True,
+                fix_action="replace_containers",
+            )
+
     async def _check_service_health(
-        self, port: int, endpoint: str, timeout: int = 30, progress_callback=None
+        self,
+        port: int,
+        endpoint: str,
+        timeout: int = 60,
+        progress_callback=None,
+        container_name: str = None,
     ) -> bool:
-        """Check if a service is healthy"""
+        """Check if a service is healthy.
+
+        First tries HTTP health check. If that times out and a container_name
+        is provided, falls back to checking Docker's own container health status.
+        """
         import httpx
 
         url = f"http://localhost:{port}{endpoint}"
@@ -533,4 +662,52 @@ class DockerDeployer(BaseDeployer):
 
             await asyncio.sleep(2)
 
+        # HTTP check timed out — fallback to Docker's own health status
+        if container_name:
+            docker_healthy = await self._check_docker_container_health(container_name)
+            if docker_healthy:
+                logger.info(
+                    f"HTTP health check timed out but Docker reports {container_name} as healthy"
+                )
+                return True
+
         return False
+
+    async def _check_docker_container_health(self, container_name: str) -> bool:
+        """Check Docker's own container health status as fallback.
+
+        Returns True if the container is running (and healthy if healthcheck defined).
+        """
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "docker",
+                "inspect",
+                "--format",
+                "{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}",
+                container_name,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await process.communicate()
+            if process.returncode != 0:
+                return False
+
+            output = stdout.decode().strip()
+            parts = output.split("|")
+            state_status = parts[0] if parts else ""
+            health_status = parts[1] if len(parts) > 1 else "none"
+
+            # Container must be running
+            if state_status != "running":
+                return False
+
+            # If no healthcheck defined, running is good enough
+            if health_status == "none":
+                return True
+
+            # If healthcheck defined, it must be healthy
+            return health_status == "healthy"
+
+        except Exception as e:
+            logger.debug(f"Docker health check fallback failed: {e}")
+            return False

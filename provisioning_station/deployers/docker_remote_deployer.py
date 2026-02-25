@@ -8,7 +8,9 @@ import os
 import shlex
 import tempfile
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
+
+import yaml
 
 from ..models.device import DeviceConfig, SSHConfig
 from ..services.remote_pre_check import remote_pre_check
@@ -261,6 +263,22 @@ class DockerRemoteDeployer(BaseDeployer):
                     progress_callback, "prepare", 100, f"Directory ready: {remote_dir}"
                 )
 
+                # Check for existing containers that would conflict
+                compose_path = config.get_asset_path(docker_config.compose_file)
+                auto_replace = connection.get("auto_replace_containers", False)
+                project_name = docker_config.options.get("project_name", config.id)
+                project_name_escaped = shlex.quote(project_name)
+
+                await self._check_existing_remote_containers(
+                    client,
+                    compose_path,
+                    project_name_escaped,
+                    remote_dir_escaped,
+                    docker_sudo,
+                    auto_replace,
+                    progress_callback,
+                )
+
                 # Before actions
                 ssh_executor = SSHActionExecutor(client, password)
                 if not await self._execute_actions(
@@ -316,10 +334,6 @@ class DockerRemoteDeployer(BaseDeployer):
                 await self._report_progress(
                     progress_callback, "start_services", 0, "Starting services..."
                 )
-
-                project_name = docker_config.options.get("project_name", config.id)
-                # Escape project name for shell safety
-                project_name_escaped = shlex.quote(project_name)
 
                 # Substitute template variables in environment values
                 # Quote values properly to handle spaces and special characters
@@ -716,6 +730,95 @@ class DockerRemoteDeployer(BaseDeployer):
         except Exception as e:
             logger.error(f"Directory contents transfer with labels failed: {e}")
             return False
+
+    def _get_compose_container_names(self, compose_file: str) -> List[str]:
+        """Extract container_name values from a local compose file"""
+        try:
+            with open(compose_file, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            if not data or "services" not in data:
+                return []
+            names = []
+            for service_config in data.get("services", {}).values():
+                if service_config and "container_name" in service_config:
+                    names.append(service_config["container_name"])
+            return names
+        except Exception as e:
+            logger.debug(f"Failed to parse compose file for container names: {e}")
+            return []
+
+    async def _check_existing_remote_containers(
+        self,
+        client,
+        local_compose_file: str,
+        project_name_escaped: str,
+        remote_dir_escaped: str,
+        docker_sudo: str,
+        auto_replace: bool,
+        progress_callback=None,
+    ) -> None:
+        """Check for existing containers on remote that would conflict.
+
+        Parses the local compose file for container_name values, then checks
+        on the remote machine via SSH whether those containers already exist.
+        """
+        if not local_compose_file:
+            return
+
+        container_names = self._get_compose_container_names(local_compose_file)
+        if not container_names:
+            return
+
+        # Build a single SSH command to check all container names at once
+        filter_args = " ".join(
+            f"--filter 'name=^/{shlex.quote(n)}$'" for n in container_names
+        )
+        check_cmd = (
+            f"{docker_sudo}docker ps -a {filter_args} "
+            "--format '{{.Names}} ({{.Image}}) - {{.Status}}'"
+        )
+
+        exit_code, stdout, _ = await asyncio.to_thread(
+            self._exec_with_timeout, client, check_cmd, 15
+        )
+
+        existing = [line for line in stdout.strip().split("\n") if line.strip()]
+        if not existing:
+            return
+
+        if auto_replace:
+            await self._report_progress(
+                progress_callback,
+                "prepare",
+                50,
+                "Stopping existing containers...",
+            )
+
+            # Run docker compose down for the project
+            down_cmd = (
+                f"cd {remote_dir_escaped} && "
+                f"{docker_sudo}docker compose -p {project_name_escaped} down --remove-orphans 2>/dev/null; "
+            )
+            # Also force remove by container name (cross-project conflicts)
+            rm_names = " ".join(shlex.quote(n) for n in container_names)
+            down_cmd += f"{docker_sudo}docker rm -f {rm_names} 2>/dev/null || true"
+
+            await asyncio.to_thread(self._exec_with_timeout, client, down_cmd, 60)
+
+            await self._report_progress(
+                progress_callback,
+                "prepare",
+                80,
+                "Existing containers removed",
+            )
+        else:
+            container_list = ", ".join(container_names)
+            raise RemoteDockerNotInstalled(
+                f"Found existing containers: {container_list}. "
+                "Would you like to stop and replace them with the new deployment?",
+                can_auto_fix=True,
+                fix_action="replace_containers",
+            )
 
     def _exec_with_timeout(
         self,

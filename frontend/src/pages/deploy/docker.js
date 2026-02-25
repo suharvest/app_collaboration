@@ -57,7 +57,15 @@ export function showDockerInstallDialog(deviceId, message, fixAction) {
   const actionText = fixAction === 'install_docker' ? t('deploy.docker.installAction') :
                      fixAction === 'fix_docker_permission' ? t('deploy.docker.fixPermissionAction') :
                      fixAction === 'start_docker' ? t('deploy.docker.startAction') :
+                     fixAction === 'replace_containers' ? t('deploy.docker.replaceAction') :
                      t('deploy.docker.fixAction');
+
+  const dialogTitle = fixAction === 'replace_containers'
+    ? t('deploy.docker.existingContainers')
+    : t('deploy.docker.notInstalled');
+  const dialogHint = fixAction === 'replace_containers'
+    ? t('deploy.docker.replaceHint')
+    : t('deploy.docker.installHint');
 
   overlay.innerHTML = `
     <div class="dialog">
@@ -67,11 +75,11 @@ export function showDockerInstallDialog(deviceId, message, fixAction) {
           <line x1="12" y1="9" x2="12" y2="13"/>
           <line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
-        <h3>${t('deploy.docker.notInstalled')}</h3>
+        <h3>${dialogTitle}</h3>
       </div>
       <div class="dialog-body">
         <p>${escapeHtml(message)}</p>
-        <p class="dialog-hint">${t('deploy.docker.installHint')}</p>
+        <p class="dialog-hint">${dialogHint}</p>
       </div>
       <div class="dialog-actions">
         <button class="btn btn-secondary" id="dialog-cancel">${t('common.cancel')}</button>
@@ -88,11 +96,14 @@ export function showDockerInstallDialog(deviceId, message, fixAction) {
     addLogToDevice(deviceId, 'warning', t('deploy.docker.installCancelled'));
   });
 
-  // Handle confirm - restart deployment with auto_install_docker flag
+  // Handle confirm - restart deployment with appropriate auto-fix flag
   overlay.querySelector('#dialog-confirm').addEventListener('click', () => {
     overlay.remove();
-    addLogToDevice(deviceId, 'info', t('deploy.docker.installing'));
-    startDeploymentWithDockerInstall(deviceId);
+    const logMsg = fixAction === 'replace_containers'
+      ? t('deploy.docker.replacing')
+      : t('deploy.docker.installing');
+    addLogToDevice(deviceId, 'info', logMsg);
+    startDeploymentWithDockerInstall(deviceId, fixAction);
   });
 
   // Click outside to close
@@ -109,9 +120,9 @@ export function showDockerInstallDialog(deviceId, message, fixAction) {
 // ============================================
 
 /**
- * Start deployment with auto_install_docker flag
+ * Start deployment with auto-fix flag (Docker install or container replacement)
  */
-export async function startDeploymentWithDockerInstall(deviceId) {
+export async function startDeploymentWithDockerInstall(deviceId, fixAction = 'install_docker') {
   const device = getDeviceById(deviceId);
   if (!device) return;
 
@@ -140,7 +151,12 @@ export async function startDeploymentWithDockerInstall(deviceId) {
     params.options.config_file = selectedTarget.config_file;
   }
 
-  // Add connection info with auto_install_docker flag
+  // Build auto-fix flags based on fixAction
+  const autoFixFlags = fixAction === 'replace_containers'
+    ? { auto_replace_containers: true }
+    : { auto_install_docker: true };
+
+  // Add connection info with appropriate auto-fix flag
   const traits = device.ui_traits || {};
   const isRemote = selectedTarget?.id === 'remote' ||
                    selectedTarget?.id?.endsWith('_remote') ||
@@ -152,7 +168,7 @@ export async function startDeploymentWithDockerInstall(deviceId) {
       port: parseInt(document.getElementById(`ssh-port-${deviceId}`)?.value || '22'),
       username: document.getElementById(`ssh-user-${deviceId}`)?.value,
       password: document.getElementById(`ssh-pass-${deviceId}`)?.value,
-      auto_install_docker: true,  // Key flag for auto-install
+      ...autoFixFlags,
     };
     if (selectedTarget) {
       params.device_connections[deviceId].target = selectedTarget.id;
@@ -165,12 +181,12 @@ export async function startDeploymentWithDockerInstall(deviceId) {
       port: parseInt(document.getElementById(`ssh-port-${deviceId}`)?.value || '22'),
       username: document.getElementById(`ssh-user-${deviceId}`)?.value,
       password: document.getElementById(`ssh-pass-${deviceId}`)?.value,
-      auto_install_docker: true,
+      ...autoFixFlags,
     };
   } else {
     // Local deployment (docker_local) - no SSH needed, just pass the flag
     params.device_connections[deviceId] = {
-      auto_install_docker: true,
+      ...autoFixFlags,
     };
     if (selectedTarget) {
       params.device_connections[deviceId].target = selectedTarget.id;

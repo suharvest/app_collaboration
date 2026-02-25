@@ -89,6 +89,7 @@ class DockerService(BaseModel):
     name: str
     port: Optional[int] = None
     health_check_endpoint: Optional[str] = None
+    health_check_timeout: int = 60  # seconds
     required: bool = True
 
 
