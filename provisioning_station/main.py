@@ -165,13 +165,15 @@ app.include_router(restore.router)
 app.include_router(serial_camera.router)
 
 # Serve static frontend files
-frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
-if frontend_dist.exists():
-    app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")
+_frontend_dir = settings.frontend_dir or (
+    Path(__file__).parent.parent / "frontend" / "dist"
+)
+if _frontend_dir.exists():
+    app.mount("/assets", StaticFiles(directory=_frontend_dir / "assets"), name="assets")
 
     @app.get("/")
     async def serve_frontend():
-        return FileResponse(frontend_dist / "index.html")
+        return FileResponse(_frontend_dir / "index.html")
 
 
 @app.get("/api/health")
@@ -218,6 +220,12 @@ def main():
         help="Path to solutions directory (overrides default)",
     )
     parser.add_argument(
+        "--frontend-dir",
+        type=str,
+        default=None,
+        help="Path to frontend dist directory",
+    )
+    parser.add_argument(
         "--reload",
         action="store_true",
         default=settings.debug,
@@ -229,6 +237,9 @@ def main():
     # This will be picked up when uvicorn imports the app
     if args.solutions_dir:
         os.environ["PS_SOLUTIONS_DIR"] = args.solutions_dir
+
+    if args.frontend_dir:
+        os.environ["PS_FRONTEND_DIR"] = args.frontend_dir
 
     if is_frozen:
         # For frozen executables, pass the app object directly to avoid

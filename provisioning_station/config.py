@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     # Paths - solutions_dir can be overridden via PS_SOLUTIONS_DIR env var
     base_dir: Path = Path(__file__).parent.parent
     solutions_dir: Path = _get_default_solutions_dir()
+    frontend_dir: Optional[Path] = None  # Set via PS_FRONTEND_DIR or --frontend-dir
     data_dir: Path = base_dir / "data"
     logs_dir: Path = data_dir / "logs"
     cache_dir: Path = data_dir / "cache"

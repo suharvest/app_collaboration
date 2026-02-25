@@ -19,6 +19,17 @@ let backendPort = null;
 async function initBackendPort() {
   if (!isTauri) return;
 
+  // When served from backend (http://127.0.0.1:{port}/), port is in the URL
+  // Only match 127.0.0.1 (not localhost) to avoid conflicts with Vite dev server
+  if (window.location.hostname === '127.0.0.1') {
+    const port = parseInt(window.location.port);
+    if (port > 0) {
+      backendPort = port;
+      window.__BACKEND_PORT__ = port;
+      return;
+    }
+  }
+
   // First check if already injected
   if (window.__BACKEND_PORT__) {
     backendPort = window.__BACKEND_PORT__;

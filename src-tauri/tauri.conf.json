@@ -26,7 +26,8 @@
     ],
     "resources": [
       "../solutions/**/*",
-      "binaries/_internal/**/*"
+      "binaries/_internal/**/*",
+      "../frontend/dist/**/*"
     ],
     "targets": "all",
     "linux": {
@@ -70,7 +71,15 @@
   "app": {
     "withGlobalTauri": true,
     "security": {
-      "csp": null
+      "csp": null,
+      "dangerousRemoteDomainIpcAccess": [
+        {
+          "scheme": "http",
+          "domain": "127.0.0.1",
+          "windows": ["main"],
+          "plugins": true
+        }
+      ]
     },
     "windows": []
   },
