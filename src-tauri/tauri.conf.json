@@ -71,15 +71,7 @@
   "app": {
     "withGlobalTauri": true,
     "security": {
-      "csp": null,
-      "dangerousRemoteDomainIpcAccess": [
-        {
-          "scheme": "http",
-          "domain": "127.0.0.1",
-          "windows": ["main"],
-          "plugins": true
-        }
-      ]
+      "csp": null
     },
     "windows": []
   },
