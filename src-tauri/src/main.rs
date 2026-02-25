@@ -504,9 +504,13 @@ fn main() {
                     log::info!("Navigation: {}", url_str);
 
                     // Check if this is an external link
+                    // Note: Tauri uses different URL schemes per platform:
+                    //   macOS/Linux: tauri://localhost/
+                    //   Windows:     https://tauri.localhost/
                     let is_external = !url_str.starts_with("http://localhost")
                         && !url_str.starts_with("http://127.0.0.1")
                         && !url_str.starts_with("tauri://")
+                        && !url_str.starts_with("https://tauri.localhost")
                         && (url_str.starts_with("http://") || url_str.starts_with("https://"));
 
                     if is_external {
