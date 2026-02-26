@@ -44,11 +44,10 @@ async def scan_mdns_devices(
         timeout=timeout, filter_known=filter_known
     )
 
-    result = {"devices": devices}
-
-    # If no devices found, include suggested hosts from device catalog
-    if not devices:
-        result["suggested_hosts"] = solution_manager.get_suggested_mdns_hosts()
+    result = {
+        "devices": devices,
+        "suggested_hosts": solution_manager.get_suggested_mdns_hosts(),
+    }
 
     return result
 

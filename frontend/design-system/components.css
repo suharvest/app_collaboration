@@ -1020,11 +1020,11 @@
   }
 
   .deploy-section {
-    @apply bg-card rounded-lg shadow-sm border border-border mb-6 overflow-hidden;
+    @apply bg-card rounded-lg shadow-sm border border-border mb-6;
   }
 
   .deploy-section-header {
-    @apply flex items-center gap-4 p-5 border-b border-border bg-gray-50/50 cursor-pointer;
+    @apply flex items-center gap-4 p-5 border-b border-border bg-gray-50/50 cursor-pointer rounded-t-lg;
   }
 
   .deploy-section-header:hover {
@@ -3914,4 +3914,12 @@ button.spinning {
 
 .mdns-empty {
   @apply flex items-center justify-center gap-2 px-3 py-4 text-sm text-text-secondary;
+}
+
+.mdns-suggested-header {
+  @apply border-t border-border;
+}
+
+.mdns-hint {
+  @apply text-xs text-text-secondary px-3 py-1;
 }

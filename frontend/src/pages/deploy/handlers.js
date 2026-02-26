@@ -621,104 +621,82 @@ async function scanMdnsDevices(deviceId, btn) {
 
     if (!dropdown) return;
 
-    if (devices.length === 0) {
-      // No devices found - show suggested hosts if available
-      if (suggestedHosts.length > 0) {
-        dropdown.innerHTML = `
-          <div class="mdns-empty" style="border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 8px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            <span>${t('deploy.connection.noDevicesFound')}</span>
-          </div>
-          <div class="mdns-header">${t('deploy.connection.suggestedHosts')}</div>
-          <div class="mdns-hint" style="font-size: 12px; color: var(--text-secondary); padding: 4px 12px 8px;">${t('deploy.connection.suggestedHostsHint')}</div>
-          ${suggestedHosts.map(host => `
-            <div class="mdns-device mdns-suggested" data-hostname="${host.hostname}">
-              <span class="mdns-device-icon">${getMdnsDeviceIcon(host.device_id)}</span>
-              <span class="mdns-device-name">${host.hostname}</span>
-              <span class="mdns-device-ip" style="color: var(--text-tertiary);">${i18n.locale === 'zh' ? host.device_name_zh : host.device_name}</span>
-            </div>
-          `).join('')}
-        `;
-        dropdown.style.display = 'block';
+    // Build dropdown content: discovered devices + suggested hosts
+    let html = '';
 
-        // Setup click handlers for suggested hosts
-        dropdown.querySelectorAll('.mdns-suggested').forEach(el => {
-          el.addEventListener('click', () => {
-            const hostname = el.dataset.hostname;
-            if (hostInput) {
-              hostInput.value = hostname;
-              hostInput.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-            dropdown.style.display = 'none';
-          });
-        });
-
-        // Close dropdown when clicking outside
-        const closeDropdown = (e) => {
-          if (!dropdown.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
-            dropdown.style.display = 'none';
-            document.removeEventListener('click', closeDropdown);
-          }
-        };
-        setTimeout(() => document.addEventListener('click', closeDropdown), 100);
-      } else {
-        // No devices and no suggestions
-        dropdown.innerHTML = `
-          <div class="mdns-empty">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            <span>${t('deploy.connection.noDevicesFound')}</span>
-          </div>
-        `;
-        dropdown.style.display = 'block';
-
-        // Auto-hide after 3 seconds
-        setTimeout(() => {
-          dropdown.style.display = 'none';
-        }, 3000);
-      }
-    } else {
-      dropdown.innerHTML = `
+    // Section 1: Discovered devices (or "no devices found" message)
+    if (devices.length > 0) {
+      html += `
         <div class="mdns-header">${t('deploy.connection.discoveredDevices')}</div>
         ${devices.map(device => `
-          <div class="mdns-device" data-ip="${device.ip}" data-hostname="${device.hostname}">
+          <div class="mdns-device mdns-discovered" data-ip="${device.ip}" data-hostname="${device.hostname}">
             <span class="mdns-device-icon">${getMdnsDeviceIcon(device.device_type)}</span>
             <span class="mdns-device-name">${device.hostname}</span>
             <span class="mdns-device-ip">${device.ip}</span>
           </div>
         `).join('')}
       `;
-      dropdown.style.display = 'block';
-
-      // Setup click handlers for device selection
-      dropdown.querySelectorAll('.mdns-device').forEach(el => {
-        el.addEventListener('click', () => {
-          const ip = el.dataset.ip;
-          if (hostInput) {
-            hostInput.value = ip;
-            // Trigger input event for any listeners
-            hostInput.dispatchEvent(new Event('input', { bubbles: true }));
-          }
-          dropdown.style.display = 'none';
-        });
-      });
-
-      // Close dropdown when clicking outside
-      const closeDropdown = (e) => {
-        if (!dropdown.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
-          dropdown.style.display = 'none';
-          document.removeEventListener('click', closeDropdown);
-        }
-      };
-      setTimeout(() => document.addEventListener('click', closeDropdown), 100);
+    } else {
+      html += `
+        <div class="mdns-empty">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>${t('deploy.connection.noDevicesFound')}</span>
+        </div>
+      `;
     }
+
+    // Section 2: Suggested hosts (always shown if available)
+    if (suggestedHosts.length > 0) {
+      html += `
+        <div class="mdns-header mdns-suggested-header">${t('deploy.connection.suggestedHosts')}</div>
+        <div class="mdns-hint">${t('deploy.connection.suggestedHostsHint')}</div>
+        ${suggestedHosts.map(host => `
+          <div class="mdns-device mdns-suggested" data-hostname="${host.hostname}">
+            <span class="mdns-device-icon">${getMdnsDeviceIcon(host.device_id)}</span>
+            <span class="mdns-device-name">${host.hostname}</span>
+            <span class="mdns-device-ip" style="color: var(--text-tertiary);">${i18n.locale === 'zh' ? host.device_name_zh : host.device_name}</span>
+          </div>
+        `).join('')}
+      `;
+    }
+
+    dropdown.innerHTML = html;
+    dropdown.style.display = 'block';
+
+    // Click handlers for discovered devices (fill IP)
+    dropdown.querySelectorAll('.mdns-discovered').forEach(el => {
+      el.addEventListener('click', () => {
+        if (hostInput) {
+          hostInput.value = el.dataset.ip;
+          hostInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        dropdown.style.display = 'none';
+      });
+    });
+
+    // Click handlers for suggested hosts (fill hostname)
+    dropdown.querySelectorAll('.mdns-suggested').forEach(el => {
+      el.addEventListener('click', () => {
+        if (hostInput) {
+          hostInput.value = el.dataset.hostname;
+          hostInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        dropdown.style.display = 'none';
+      });
+    });
+
+    // Close dropdown when clicking outside
+    const closeDropdown = (e) => {
+      if (!dropdown.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+        dropdown.style.display = 'none';
+        document.removeEventListener('click', closeDropdown);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeDropdown), 100);
   } catch (error) {
     console.error('mDNS scan failed:', error);
     toast.error(error.message || t('common.error'));
