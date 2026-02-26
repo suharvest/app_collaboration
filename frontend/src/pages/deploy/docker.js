@@ -27,6 +27,9 @@ export function handleDockerNotInstalled(deviceId, data) {
   const state = getDeviceState(deviceId);
   if (!state) return;
 
+  // Flag to suppress the generic failure toast — the dialog (or specific error) is enough
+  state.dockerInstallPending = true;
+
   // Update status to failed (deployment stopped)
   state.deploymentStatus = 'failed';
   updateSectionUI(deviceId);
@@ -128,6 +131,7 @@ export async function startDeploymentWithDockerInstall(deviceId, fixAction = 'in
 
   const currentSolution = getCurrentSolution();
   const state = getDeviceState(deviceId);
+  state.dockerInstallPending = false;
   state.deploymentStatus = 'running';
   updateSectionUI(deviceId);
   updateChoiceOptionUI(deviceId);

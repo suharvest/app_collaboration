@@ -58,8 +58,11 @@ export function connectLogsWebSocket(deploymentId, deviceId) {
         // Auto-expand next section (only for sequential mode)
         expandNextSection(deviceId);
       } else if (data.status === 'failed') {
-        addLogToDevice(deviceId, 'error', t('deploy.status.failed'));
-        toast.error(`${getDeviceById(deviceId)?.name}: ${t('deploy.status.failed')}`);
+        // Suppress generic failure toast when docker install dialog is showing
+        if (!state.dockerInstallPending) {
+          addLogToDevice(deviceId, 'error', t('deploy.status.failed'));
+          toast.error(`${getDeviceById(deviceId)?.name}: ${t('deploy.status.failed')}`);
+        }
       }
     }
   });
