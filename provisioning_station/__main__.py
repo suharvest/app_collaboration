@@ -26,6 +26,17 @@ if "--solutions-dir" in sys.argv:
     except (ValueError, IndexError):
         pass
 
+# Parse --frontend-dir early (same pattern)
+if "--frontend-dir" in sys.argv:
+    try:
+        idx = sys.argv.index("--frontend-dir")
+        if idx + 1 < len(sys.argv):
+            frontend_dir = sys.argv[idx + 1]
+            os.environ["PS_FRONTEND_DIR"] = frontend_dir
+            print(f"Setting PS_FRONTEND_DIR={frontend_dir}")
+    except (ValueError, IndexError):
+        pass
+
 # Now import and run
 from provisioning_station.main import main
 

@@ -448,18 +448,27 @@ fn main() {
             let handle = app.handle().clone();
             let port = backend_port;
 
-            // Spawn sidecar in async context
+            // Spawn sidecar, then navigate window to backend URL once ready
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = start_sidecar(&handle, port).await {
                     log::error!("Failed to start sidecar: {}", e);
+                    return;
+                }
+                // Backend is ready — navigate the window to the real URL
+                let backend_url = format!("http://127.0.0.1:{}", port);
+                if let Some(win) = handle.get_webview_window("main") {
+                    log::info!("Navigating to backend URL: {}", backend_url);
+                    let _ = win.navigate(backend_url.parse().unwrap());
                 }
             });
 
-            // Create main window with download and navigation handlers
+            // Create main window with the frontend dist (Tauri default).
+            // After sidecar is ready, navigate to the backend-served URL.
             let nav_handle = app.handle().clone();
             let download_handle = app.handle().clone();
 
-            let main_window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+            let backend_url = format!("http://127.0.0.1:{}", backend_port);
+            let _main_window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(backend_url.parse().unwrap()))
                 .title("SenseCraft Solution")
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(800.0, 600.0)
@@ -525,13 +534,6 @@ fn main() {
                 })
                 .build()
                 .expect("Failed to create main window");
-
-            // Inject backend port into frontend
-            let init_script = format!(
-                "window.__BACKEND_PORT__ = {};",
-                backend_port
-            );
-            let _ = main_window.eval(&init_script);
 
             Ok(())
         })
@@ -787,6 +789,13 @@ async fn start_sidecar(
     if solutions_dir.exists() {
         args.push("--solutions-dir".to_string());
         args.push(solutions_dir.to_string_lossy().to_string());
+    }
+
+    // Pass frontend dist directory to backend for serving static files
+    let frontend_dir = resource_path.join("_up_").join("frontend").join("dist");
+    if frontend_dir.exists() {
+        args.push("--frontend-dir".to_string());
+        args.push(frontend_dir.to_string_lossy().to_string());
     }
 
     // Try to setup and use extracted sidecar (PyInstaller onedir mode)
