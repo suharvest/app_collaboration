@@ -26,6 +26,7 @@
     ],
     "resources": [
       "../solutions/**/*",
+      "../devices/**/*",
       "binaries/_internal/**/*",
       "../frontend/dist/**/*"
     ],
