@@ -2,25 +2,25 @@
 Unit tests for Pydantic models in provisioning_station.models.solution
 """
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
 from provisioning_station.models.solution import (
-    MediaItem,
-    RequiredDevice,
-    DeviceCatalogItem,
-    DeviceGroupOption,
     DeviceGroup,
-    Preset,
-    SolutionStats,
-    SolutionLinks,
-    Partner,
-    SolutionIntro,
-    DeviceSection,
-    UserInput,
+    DeviceGroupOption,
     DeviceRef,
-    SolutionDeployment,
+    MediaItem,
+    Partner,
+    Preset,
+    RequiredDevice,
     Solution,
+    SolutionDeployment,
+    SolutionIntro,
+    SolutionLinks,
+    SolutionStats,
+    UserInput,
 )
 
 
@@ -320,7 +320,7 @@ class TestSolution:
         test_solution_yaml["base_path"] = "/path/to/solution"
         solution = Solution(**test_solution_yaml)
         path = solution.get_asset_path("intro/cover.png")
-        assert path == "/path/to/solution/intro/cover.png"
+        assert path == str(Path("/path/to/solution") / "intro/cover.png")
 
     def test_solution_get_asset_path_no_base(self, test_solution_yaml):
         """Test getting asset path without base_path"""

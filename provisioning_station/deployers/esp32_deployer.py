@@ -161,7 +161,15 @@ class ESP32Deployer(BaseDeployer):
                 )
 
                 erase_result = await self._run_esptool(
-                    ["--port", port, "--chip", flash_config.chip, "erase_flash"]
+                    [
+                        "--port",
+                        port,
+                        "--chip",
+                        flash_config.chip,
+                        "--after",
+                        "no_reset",
+                        "erase_flash",
+                    ]
                 )
 
                 if not erase_result["success"]:
@@ -194,14 +202,15 @@ class ESP32Deployer(BaseDeployer):
                 progress_callback, "flash", 0, "Starting firmware flash..."
             )
 
-            # Build flash command
-            flash_args = [
+            # Build flash command parts (baud rate added per attempt)
+            flash_args_prefix = [
                 "--port",
                 port,
                 "--chip",
                 flash_config.chip,
-                "--baud",
-                str(flash_config.baud_rate),
+            ]
+
+            flash_args_suffix = [
                 "write_flash",
                 "--flash_mode",
                 flash_config.flash_mode,
@@ -229,26 +238,70 @@ class ESP32Deployer(BaseDeployer):
                     )
                     return False
 
-                flash_args.extend([partition.offset, firmware_path])
+                flash_args_suffix.extend([partition.offset, firmware_path])
 
-            # Run flash with progress parsing
-            flash_result = await self._run_esptool_with_progress(
-                flash_args,
-                lambda p, m: (
-                    asyncio.create_task(
-                        self._report_progress(progress_callback, "flash", p, m)
+            # Try flash with configured baud rate, fallback to lower rates on Windows
+            # WCH USB-UART chips (CH340/CH342) can be unreliable at 921600 on Windows
+            baud_rates = [flash_config.baud_rate]
+            if sys.platform == "win32" and flash_config.baud_rate > 460800:
+                baud_rates.extend([460800, 230400])
+
+            flash_result = None
+            for attempt, baud in enumerate(baud_rates):
+                if attempt > 0:
+                    await self._report_progress(
+                        progress_callback,
+                        "flash",
+                        0,
+                        f"Retrying flash at {baud} baud...",
                     )
-                    if progress_callback
-                    else None
-                ),
-            )
+                    await asyncio.sleep(1)
+                    if not await self._wait_for_port_available(
+                        port, timeout=10, auto_release=True
+                    ):
+                        continue
 
-            if not flash_result["success"]:
+                flash_args = (
+                    flash_args_prefix + ["--baud", str(baud)] + flash_args_suffix
+                )
+
+                # Run flash with progress parsing
+                flash_result = await self._run_esptool_with_progress(
+                    flash_args,
+                    lambda p, m: (
+                        asyncio.create_task(
+                            self._report_progress(progress_callback, "flash", p, m)
+                        )
+                        if progress_callback
+                        else None
+                    ),
+                )
+
+                if flash_result["success"]:
+                    break
+
+                error_preview = (flash_result.get("error") or "")[:100]
+                logger.warning(f"Flash at {baud} baud failed: {error_preview}")
+
+            if not flash_result or not flash_result["success"]:
+                error_msg = flash_result.get("error", "") if flash_result else ""
+                # Extract last meaningful line from multi-line error
+                if error_msg:
+                    error_lines = [
+                        l.strip()
+                        for l in error_msg.split("\n")
+                        if l.strip()
+                        and "Writing at" not in l
+                        and not l.strip().startswith(".")
+                    ]
+                    display_error = error_lines[-1] if error_lines else error_msg[:200]
+                else:
+                    display_error = "Unknown error - check USB connection and cable"
                 await self._report_progress(
                     progress_callback,
                     "flash",
                     0,
-                    f"Flash failed: {flash_result.get('error', 'Unknown error')}",
+                    f"Flash failed: {display_error}",
                 )
                 return False
 
