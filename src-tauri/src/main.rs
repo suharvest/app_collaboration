@@ -27,6 +27,58 @@ static SIDECAR_CHILD: Mutex<Option<CommandChild>> = Mutex::new(None);
 /// Graceful shutdown timeout in seconds
 const GRACEFUL_SHUTDOWN_TIMEOUT_SECS: u64 = 5;
 
+/// Maximum file size accepted by save_file_dialog (50 MiB)
+const MAX_SAVE_FILE_BYTES: usize = 50 * 1024 * 1024;
+const MAX_SAVE_FILE_BASE64_LEN: usize = (MAX_SAVE_FILE_BYTES * 4 / 3) + 16;
+
+/// Sanitize download filename to avoid path traversal and invalid characters.
+fn sanitize_download_filename(raw: &str) -> String {
+    let fallback = "download";
+    let normalized = raw.replace('\\', "/");
+    let base = normalized.rsplit('/').next().unwrap_or("").trim();
+
+    if base.is_empty() || base == "." || base == ".." {
+        return fallback.to_string();
+    }
+
+    let mut cleaned: String = base
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '(' | ')' | ' ' | '%') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+
+    cleaned = cleaned.trim_matches('.').trim().to_string();
+    if cleaned.is_empty() || cleaned == "." || cleaned == ".." {
+        return fallback.to_string();
+    }
+
+    if cleaned.len() > 120 {
+        cleaned.truncate(120);
+    }
+
+    cleaned
+}
+
+/// Check whether a URL target should be considered internal to the app.
+fn is_internal_navigation_target(scheme: &str, host: Option<&str>) -> bool {
+    matches!(
+        (scheme, host),
+        ("tauri", Some("localhost"))
+            | ("http" | "https", Some("tauri.localhost"))
+            | ("http" | "https", Some("localhost" | "127.0.0.1"))
+    )
+}
+
+/// Return true when a URL should be opened in the external browser.
+fn should_open_external_browser(scheme: &str, host: Option<&str>) -> bool {
+    matches!(scheme, "http" | "https") && !is_internal_navigation_target(scheme, host)
+}
+
 /// Windows: CREATE_NO_WINDOW flag to hide console windows
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
@@ -424,10 +476,24 @@ fn get_backend_port() -> u16 {
 /// Tauri command: show native save dialog and write file data
 #[tauri::command]
 async fn save_file_dialog(filename: String, data: String) -> Result<String, String> {
+    if data.len() > MAX_SAVE_FILE_BASE64_LEN {
+        return Err(format!(
+            "file too large: max {} MB",
+            MAX_SAVE_FILE_BYTES / 1024 / 1024
+        ));
+    }
+
     use base64::Engine;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(&data)
         .map_err(|e| format!("base64 decode error: {}", e))?;
+
+    if bytes.len() > MAX_SAVE_FILE_BYTES {
+        return Err(format!(
+            "file too large: max {} MB",
+            MAX_SAVE_FILE_BYTES / 1024 / 1024
+        ));
+    }
 
     let mut dialog = rfd::AsyncFileDialog::new().set_file_name(&filename);
     if let Some(dl) = dirs::download_dir() {
@@ -513,7 +579,7 @@ fn main() {
                                 let url_str = url.as_str();
                                 // For blob URLs, extract filename from fragment (#filename)
                                 // For regular URLs, extract from path
-                                let filename = if url_str.starts_with("blob:") {
+                                let raw_filename = if url_str.starts_with("blob:") {
                                     url_str.split('#').nth(1)
                                         .map(|f| f.replace("%20", " ").replace("%28", "(").replace("%29", ")"))
                                         .unwrap_or_else(|| "download".to_string())
@@ -523,6 +589,7 @@ fn main() {
                                         .unwrap_or("download")
                                         .to_string()
                                 };
+                                let filename = sanitize_download_filename(&raw_filename);
                                 let dest_path = downloads_dir.join(&filename);
                                 *destination = dest_path.clone();
                                 log::info!("Download destination: {:?}", dest_path);
@@ -554,12 +621,11 @@ fn main() {
                     //   macOS/Linux: tauri://localhost/
                     //   Windows:     http://tauri.localhost/ (Tauri v2 default)
                     //   Backend:     http://127.0.0.1:{port}/
-                    let is_external = !url_str.starts_with("http://localhost")
-                        && !url_str.starts_with("http://127.0.0.1")
-                        && !url_str.starts_with("tauri://")
-                        && !url_str.starts_with("http://tauri.localhost")
-                        && !url_str.starts_with("https://tauri.localhost")
-                        && (url_str.starts_with("http://") || url_str.starts_with("https://"));
+                    // Use parsed scheme/host matching to avoid prefix bypasses like
+                    // http://localhost.evil.com.
+                    let scheme = url.scheme();
+                    let host = url.host_str();
+                    let is_external = should_open_external_browser(scheme, host);
 
                     if is_external {
                         log::info!("Opening external URL in browser: {}", url_str);
@@ -974,5 +1040,68 @@ async fn start_sidecar(
         }
     }
 
+    // Backend never became healthy: clean up the spawned sidecar to avoid
+    // leaving an orphan process occupying the selected port.
+    log::error!("Backend health check timed out, cleaning up sidecar");
+    if SIDECAR_PID.load(Ordering::SeqCst) != 0 {
+        shutdown_sidecar_graceful();
+    }
+    SIDECAR_STARTED.store(false, Ordering::SeqCst);
+    if let Ok(mut guard) = SIDECAR_CHILD.lock() {
+        *guard = None;
+    }
+
     Err("Backend failed to start within timeout".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_download_filename_keeps_safe_name() {
+        assert_eq!(sanitize_download_filename("report-2026_02(1).csv"), "report-2026_02(1).csv");
+    }
+
+    #[test]
+    fn sanitize_download_filename_strips_path_segments() {
+        assert_eq!(sanitize_download_filename("../../etc/passwd"), "passwd");
+        assert_eq!(sanitize_download_filename(r"..\..\evil.txt"), "evil.txt");
+    }
+
+    #[test]
+    fn sanitize_download_filename_rejects_empty_or_dot_names() {
+        assert_eq!(sanitize_download_filename(""), "download");
+        assert_eq!(sanitize_download_filename("."), "download");
+        assert_eq!(sanitize_download_filename(".."), "download");
+        assert_eq!(sanitize_download_filename("   "), "download");
+    }
+
+    #[test]
+    fn sanitize_download_filename_replaces_unsafe_chars() {
+        assert_eq!(sanitize_download_filename("bad*name?.txt"), "bad_name_.txt");
+    }
+
+    #[test]
+    fn sanitize_download_filename_truncates_long_names() {
+        let long_name = format!("{}.txt", "a".repeat(200));
+        assert_eq!(sanitize_download_filename(&long_name).len(), 120);
+    }
+
+    #[test]
+    fn navigation_internal_targets_are_allowed_in_webview() {
+        assert!(is_internal_navigation_target("tauri", Some("localhost")));
+        assert!(is_internal_navigation_target("http", Some("localhost")));
+        assert!(is_internal_navigation_target("https", Some("127.0.0.1")));
+        assert!(is_internal_navigation_target("http", Some("tauri.localhost")));
+    }
+
+    #[test]
+    fn navigation_external_targets_are_detected_correctly() {
+        assert!(should_open_external_browser("https", Some("example.com")));
+        assert!(should_open_external_browser("http", Some("localhost.evil.com")));
+        assert!(should_open_external_browser("http", Some("127.0.0.1.evil.com")));
+        assert!(!should_open_external_browser("tauri", Some("localhost")));
+        assert!(!should_open_external_browser("file", None));
+    }
 }
