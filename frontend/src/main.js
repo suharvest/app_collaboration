@@ -18,6 +18,26 @@ import { renderDevicesPage } from './pages/devices.js';
 import { renderManagementPage } from './pages/solution-management.js';
 import { renderSettingsPage } from './pages/settings.js';
 
+// Global asset download handler (works across all platforms including Tauri WebView2 on Windows)
+window.__downloadAsset = async (url) => {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
+    const blob = await resp.blob();
+    const filename = url.split('/').pop()?.split('?')[0] || 'download';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 100);
+  } catch (e) {
+    console.error('Download error:', e);
+    // Fallback: open URL directly
+    window.open(url, '_blank');
+  }
+};
+
 // Initialize application
 async function initApp() {
   const splash = document.getElementById('splash-screen');
@@ -117,7 +137,7 @@ function setupRouter() {
   });
 
   // After each navigation
-  router.afterEach((to, params) => {
+  router.afterEach((to, _params) => {
     // Update page title
     updatePageTitle(to);
 

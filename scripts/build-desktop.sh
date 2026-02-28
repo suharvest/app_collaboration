@@ -87,14 +87,8 @@ echo_info "All prerequisites met."
 if [ "$SKIP_SIDECAR" = false ]; then
     echo_info "Building Python sidecar..."
 
-    # Ensure PyInstaller is installed
-    if ! python3 -m pip show pyinstaller &> /dev/null; then
-        echo_info "Installing PyInstaller..."
-        python3 -m pip install pyinstaller
-    fi
-
-    # Build sidecar
-    python3 scripts/build-sidecar.py --clean
+    # Build sidecar using uv (project uses uv for dependency management)
+    uv run --group build python scripts/build-sidecar.py --clean
 
     echo_info "Sidecar build complete."
 else

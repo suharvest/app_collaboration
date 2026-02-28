@@ -71,10 +71,9 @@ export function processMarkdownImages(html, solutionId, getAssetUrl) {
         return match;
       }
       const assetUrl = getAssetUrl(solutionId, href);
-      // Add download attribute for file downloads
-      const hasDownload = /download/i.test(before + after);
-      const downloadAttr = hasDownload ? '' : ' download';
-      return `<a ${before}href="${assetUrl}"${after}${downloadAttr}>`;
+      // Use JS-based download (Tauri WebView2 on Windows doesn't handle <a download>)
+      const escapedUrl = assetUrl.replace(/'/g, "\\'");
+      return `<a ${before}href="${assetUrl}"${after} onclick="event.preventDefault();window.__downloadAsset('${escapedUrl}')">`;
     }
   );
 

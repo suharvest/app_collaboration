@@ -448,27 +448,23 @@ fn main() {
             let handle = app.handle().clone();
             let port = backend_port;
 
-            // Spawn sidecar, then navigate window to backend URL once ready
+            // Spawn sidecar in background — frontend will poll health endpoint
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = start_sidecar(&handle, port).await {
                     log::error!("Failed to start sidecar: {}", e);
+                    if let Some(win) = handle.get_webview_window("main") {
+                        let _ = win.eval("document.getElementById('splash-status').textContent='Failed to start backend. Please restart.'");
+                    }
                     return;
                 }
-                // Backend is ready — navigate the window to the real URL
-                let backend_url = format!("http://127.0.0.1:{}", port);
-                if let Some(win) = handle.get_webview_window("main") {
-                    log::info!("Navigating to backend URL: {}", backend_url);
-                    let _ = win.navigate(backend_url.parse().unwrap());
-                }
+                log::info!("Sidecar ready on port {}", port);
             });
 
-            // Create main window with the frontend dist (Tauri default).
-            // After sidecar is ready, navigate to the backend-served URL.
+            // Load bundled frontend (has built-in splash + waitForBackendReady health polling)
             let nav_handle = app.handle().clone();
             let download_handle = app.handle().clone();
 
-            let backend_url = format!("http://127.0.0.1:{}", backend_port);
-            let _main_window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(backend_url.parse().unwrap()))
+            let _main_window = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("SenseCraft Solution")
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(800.0, 600.0)
