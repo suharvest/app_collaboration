@@ -130,7 +130,7 @@ export async function waitForBackendReady() {
   // Always perform health check - backendReady only means port is known,
   // not that the sidecar has actually started
   const healthUrl = `http://127.0.0.1:${getBackendPort()}/api/health`;
-  for (let i = 0; i < 50; i++) {  // Up to 10 seconds
+  for (let i = 0; i < 150; i++) {  // Up to 30 seconds (first launch may be slow)
     try {
       const response = await fetch(healthUrl, { method: 'GET' });
       if (response.ok) {

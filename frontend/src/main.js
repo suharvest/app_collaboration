@@ -117,7 +117,10 @@ async function initApp() {
     }
   } catch (error) {
     console.error('Application initialization failed:', error);
-    updateStatus('Failed to start. Please restart the application.');
+    // In Tauri mode, Rust handles navigation to backend once ready — don't show failure
+    if (!window.__TAURI__) {
+      updateStatus('Failed to start. Please restart the application.');
+    }
   }
 }
 
