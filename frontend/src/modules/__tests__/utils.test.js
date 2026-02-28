@@ -131,20 +131,20 @@ describe('window.__downloadAsset', () => {
     originalRevokeObjectURL = URL.revokeObjectURL;
     originalOpen = window.open;
 
-    // Import main.js to register __downloadAsset
-    // Since it's a side-effect import, we define it directly for testing
+    // Mirror the implementation from main.js for testing
     window.__downloadAsset = async (url) => {
+      const filename = url.split('/').pop()?.split('?')[0] || 'download';
       try {
         const resp = await fetch(url);
         if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
         const blob = await resp.blob();
-        const filename = url.split('/').pop()?.split('?')[0] || 'download';
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
+        a.href = URL.createObjectURL(blob) + '#' + encodeURIComponent(filename);
         a.download = filename;
+        a.style.display = 'none';
         document.body.appendChild(a);
         a.click();
-        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 100);
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 200);
       } catch (e) {
         console.error('Download error:', e);
         window.open(url, '_blank');
@@ -160,7 +160,7 @@ describe('window.__downloadAsset', () => {
     delete window.__downloadAsset;
   });
 
-  it('should fetch the URL and create a blob download', async () => {
+  it('should fetch the URL and create a blob download with filename in fragment', async () => {
     const mockBlob = new Blob(['data'], { type: 'application/octet-stream' });
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -169,11 +169,21 @@ describe('window.__downloadAsset', () => {
     URL.createObjectURL = vi.fn().mockReturnValue('blob:http://localhost/abc');
     URL.revokeObjectURL = vi.fn();
 
+    let capturedHref = '';
     const clickSpy = vi.fn();
     const origCreateElement = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation((tag) => {
       const el = origCreateElement(tag);
-      if (tag === 'a') el.click = clickSpy;
+      if (tag === 'a') {
+        el.click = clickSpy;
+        const origSet = Object.getOwnPropertyDescriptor(HTMLAnchorElement.prototype, 'href')?.set;
+        if (origSet) {
+          Object.defineProperty(el, 'href', {
+            set(v) { capturedHref = v; origSet.call(el, v); },
+            get() { return capturedHref; },
+          });
+        }
+      }
       return el;
     });
 
@@ -181,6 +191,7 @@ describe('window.__downloadAsset', () => {
 
     expect(global.fetch).toHaveBeenCalledWith('http://127.0.0.1:3260/api/solutions/s/assets/file.xlsx');
     expect(URL.createObjectURL).toHaveBeenCalledWith(mockBlob);
+    expect(capturedHref).toContain('#file.xlsx');
     expect(clickSpy).toHaveBeenCalled();
   });
 

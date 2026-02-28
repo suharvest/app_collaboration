@@ -20,20 +20,37 @@ import { renderSettingsPage } from './pages/settings.js';
 
 // Global asset download handler (works across all platforms including Tauri WebView2 on Windows)
 window.__downloadAsset = async (url) => {
+  const filename = url.split('/').pop()?.split('?')[0] || 'download';
   try {
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
     const blob = await resp.blob();
-    const filename = url.split('/').pop()?.split('?')[0] || 'download';
+
+    // Tauri: use native save dialog via invoke
+    if (window.__TAURI__) {
+      const buf = await blob.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const data = btoa(binary);
+      try {
+        await window.__TAURI__.core.invoke('save_file_dialog', { filename, data });
+      } catch (e) {
+        if (e !== 'cancelled') console.error('Save dialog error:', e);
+      }
+      return;
+    }
+
+    // Browser: blob URL download
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;
+    a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 100);
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 200);
   } catch (e) {
     console.error('Download error:', e);
-    // Fallback: open URL directly
     window.open(url, '_blank');
   }
 };

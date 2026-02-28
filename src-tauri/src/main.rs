@@ -421,6 +421,28 @@ fn get_backend_port() -> u16 {
     BACKEND_PORT.load(Ordering::SeqCst)
 }
 
+/// Tauri command: show native save dialog and write file data
+#[tauri::command]
+async fn save_file_dialog(filename: String, data: String) -> Result<String, String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&data)
+        .map_err(|e| format!("base64 decode error: {}", e))?;
+
+    let mut dialog = rfd::AsyncFileDialog::new().set_file_name(&filename);
+    if let Some(dl) = dirs::download_dir() {
+        dialog = dialog.set_directory(dl);
+    }
+
+    if let Some(handle) = dialog.save_file().await {
+        let path = handle.path().to_path_buf();
+        std::fs::write(&path, &bytes).map_err(|e| format!("write error: {}", e))?;
+        Ok(path.to_string_lossy().to_string())
+    } else {
+        Err("cancelled".to_string())
+    }
+}
+
 /// Main entry point
 fn main() {
     // Initialize logger (for both debug and release builds)
@@ -443,7 +465,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![get_backend_port])
+        .invoke_handler(tauri::generate_handler![get_backend_port, save_file_dialog])
         .setup(move |app| {
             let handle = app.handle().clone();
             let port = backend_port;
@@ -475,14 +497,21 @@ fn main() {
                     match event {
                         DownloadEvent::Requested { url, destination } => {
                             log::info!("Download requested: {}", url);
-                            // Allow the download and set default destination
                             if let Some(downloads_dir) = dirs::download_dir() {
-                                // Extract filename from URL
                                 let url_str = url.as_str();
-                                let filename = url_str.split('/').last()
-                                    .and_then(|s| s.split('?').next())
-                                    .unwrap_or("download");
-                                let dest_path = downloads_dir.join(filename);
+                                // For blob URLs, extract filename from fragment (#filename)
+                                // For regular URLs, extract from path
+                                let filename = if url_str.starts_with("blob:") {
+                                    url_str.split('#').nth(1)
+                                        .map(|f| f.replace("%20", " ").replace("%28", "(").replace("%29", ")"))
+                                        .unwrap_or_else(|| "download".to_string())
+                                } else {
+                                    url_str.split('/').last()
+                                        .and_then(|s| s.split('?').next())
+                                        .unwrap_or("download")
+                                        .to_string()
+                                };
+                                let dest_path = downloads_dir.join(&filename);
                                 *destination = dest_path.clone();
                                 log::info!("Download destination: {:?}", dest_path);
                             }
