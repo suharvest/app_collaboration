@@ -470,7 +470,12 @@ fn main() {
             let handle = app.handle().clone();
             let port = backend_port;
 
-            // Spawn sidecar in background — frontend will poll health endpoint
+            // Spawn sidecar in background, then navigate to backend-served frontend.
+            // Window starts with bundled frontend (splash screen) via WebviewUrl::default().
+            // Once backend is ready, we navigate to http://127.0.0.1:{port}/ which serves
+            // the same frontend from the backend. This avoids:
+            //   - White screen on macOS first launch (splash shows immediately)
+            //   - Custom protocol issues on Windows (final page served via normal HTTP)
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = start_sidecar(&handle, port).await {
                     log::error!("Failed to start sidecar: {}", e);
@@ -480,9 +485,16 @@ fn main() {
                     return;
                 }
                 log::info!("Sidecar ready on port {}", port);
+
+                // Navigate to backend-served frontend
+                if let Some(win) = handle.get_webview_window("main") {
+                    let backend_url = format!("http://127.0.0.1:{}", port);
+                    log::info!("Navigating to backend: {}", backend_url);
+                    let _ = win.navigate(backend_url.parse().unwrap());
+                }
             });
 
-            // Load bundled frontend (has built-in splash + waitForBackendReady health polling)
+            // Create window with bundled frontend (splash screen while backend starts)
             let nav_handle = app.handle().clone();
             let download_handle = app.handle().clone();
 
@@ -538,12 +550,14 @@ fn main() {
                     log::info!("Navigation: {}", url_str);
 
                     // Check if this is an external link
-                    // Note: Tauri uses different URL schemes per platform:
+                    // Internal origins:
                     //   macOS/Linux: tauri://localhost/
-                    //   Windows:     https://tauri.localhost/
+                    //   Windows:     http://tauri.localhost/ (Tauri v2 default)
+                    //   Backend:     http://127.0.0.1:{port}/
                     let is_external = !url_str.starts_with("http://localhost")
                         && !url_str.starts_with("http://127.0.0.1")
                         && !url_str.starts_with("tauri://")
+                        && !url_str.starts_with("http://tauri.localhost")
                         && !url_str.starts_with("https://tauri.localhost")
                         && (url_str.starts_with("http://") || url_str.starts_with("https://"));
 
