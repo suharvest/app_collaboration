@@ -47,6 +47,7 @@ from .recamera_nodered_deployer import ReCameraNodeRedDeployer
 from .script_deployer import ScriptDeployer
 from .serial_camera_deployer import SerialCameraDeployer
 from .ssh_deployer import SSHDeployer
+from .ssh_mixin import SSHMixin
 
 __all__ = [
     # Registry
@@ -54,6 +55,7 @@ __all__ = [
     # Base classes
     "BaseDeployer",
     "NodeRedDeployer",
+    "SSHMixin",
     # Concrete deployers
     "ESP32Deployer",
     "DockerDeployer",

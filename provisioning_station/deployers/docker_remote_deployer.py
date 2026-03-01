@@ -17,6 +17,7 @@ from ..services.remote_pre_check import remote_pre_check
 from ..utils.compose_labels import create_labels, inject_labels_to_compose
 from .action_executor import SSHActionExecutor
 from .base import BaseDeployer
+from .ssh_mixin import SSHMixin
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class RemoteDockerNotInstalled(Exception):
         self.fix_action = fix_action
 
 
-class DockerRemoteDeployer(BaseDeployer):
+class DockerRemoteDeployer(SSHMixin, BaseDeployer):
     """Deploy Docker Compose applications to remote devices via SSH"""
 
     device_type = "docker_remote"
@@ -549,65 +550,6 @@ class DockerRemoteDeployer(BaseDeployer):
             logger.error(f"File upload failed: {e}")
             return False
 
-    def _create_ssh_connection(
-        self,
-        host: str,
-        port: int,
-        username: str,
-        password: Optional[str],
-        key_file: Optional[str],
-        timeout: int,
-    ):
-        """Create SSH connection (blocking, run in thread)"""
-        import paramiko
-
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-        try:
-            if key_file:
-                client.connect(
-                    hostname=host,
-                    port=port,
-                    username=username,
-                    key_filename=key_file,
-                    timeout=timeout,
-                )
-            else:
-                client.connect(
-                    hostname=host,
-                    port=port,
-                    username=username,
-                    password=password,
-                    timeout=timeout,
-                )
-            return client
-        except paramiko.AuthenticationException:
-            logger.error(f"SSH authentication failed for {username}@{host}")
-            return None
-        except paramiko.SSHException as e:
-            logger.error(f"SSH error connecting to {host}: {e}")
-            return None
-        except OSError as e:
-            # Network errors (connection refused, timeout, etc.)
-            logger.error(f"Network error connecting to {host}: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"SSH connection failed: {e}")
-            return None
-
-    def _transfer_file(self, client, local_path: str, remote_path: str) -> bool:
-        """Transfer file via SCP (blocking, run in thread)"""
-        try:
-            from scp import SCPClient
-
-            with SCPClient(client.get_transport()) as scp:
-                scp.put(local_path, remote_path)
-            return True
-        except Exception as e:
-            logger.error(f"File transfer failed: {e}")
-            return False
-
     def _transfer_directory(self, client, local_dir: str, remote_dir: str) -> bool:
         """Transfer entire directory via SCP (blocking, run in thread)"""
         try:
@@ -819,30 +761,6 @@ class DockerRemoteDeployer(BaseDeployer):
                 can_auto_fix=True,
                 fix_action="replace_containers",
             )
-
-    def _exec_with_timeout(
-        self,
-        client,
-        cmd: str,
-        timeout: int = 300,
-    ) -> tuple:
-        """Execute command with timeout (blocking, run in thread)"""
-        try:
-            stdin, stdout, stderr = client.exec_command(cmd, timeout=timeout)
-
-            # Set channel timeout for read operations
-            stdout.channel.settimeout(timeout)
-            stderr.channel.settimeout(timeout)
-
-            exit_code = stdout.channel.recv_exit_status()
-            stdout_data = stdout.read().decode()
-            stderr_data = stderr.read().decode()
-
-            return exit_code, stdout_data, stderr_data
-
-        except Exception as e:
-            logger.error(f"Command execution failed: {e}")
-            return -1, "", str(e)
 
     async def _check_remote_service_health(
         self,
