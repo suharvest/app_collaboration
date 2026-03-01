@@ -278,6 +278,23 @@ class DeploymentEngine:
                     device_deployment.error = "Device config not found"
                     continue
 
+                # Resolve remote assets (download URLs to local cache)
+                from .resource_resolver import resource_resolver
+
+                try:
+                    await config.resolve_remote_assets(resource_resolver)
+                except Exception as e:
+                    device_deployment.status = DeploymentStatus.FAILED
+                    device_deployment.error = f"Failed to resolve remote assets: {e}"
+                    await self._broadcast_log(
+                        deployment_id,
+                        f"Failed to resolve remote assets: {e}",
+                        level="error",
+                        device_id=device_deployment.device_id,
+                    )
+                    deployment.status = DeploymentStatus.FAILED
+                    continue
+
                 # Resolve mDNS .local hostnames to IP addresses
                 # This is needed because Docker containers on Windows cannot resolve .local
                 connection = device_deployment.connection or {}

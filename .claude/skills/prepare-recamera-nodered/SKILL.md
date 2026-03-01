@@ -120,6 +120,8 @@ post_deployment:
   open_browser: false
 ```
 
+> **Cloud materials**: `nodered.flow_file` accepts URLs. The flow file is automatically downloaded and cached before deployment.
+
 ## Flow.json Structure
 
 Create `devices/flow.json`:

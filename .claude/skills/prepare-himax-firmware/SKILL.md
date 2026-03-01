@@ -77,8 +77,7 @@ detection:
 
 firmware:
   source:
-    type: local
-    path: assets/watcher_firmware/firmware.img
+    path: assets/watcher_firmware/firmware.img  # Local path or URL
 
   flash_config:
     baudrate: 921600
@@ -145,6 +144,8 @@ post_deployment:
   reset_device: false
   wait_for_ready: 5
 ```
+
+> **Cloud materials**: All `path` fields (firmware, models) accept URLs. Remote files are automatically downloaded and cached before deployment.
 
 ## Xmodem Protocol
 

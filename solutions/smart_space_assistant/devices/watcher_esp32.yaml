@@ -20,7 +20,6 @@ detection:
 
 firmware:
   source:
-    type: local
     path: assets/watcher_firmware/merged-binary.bin
   flash_config:
     chip: esp32s3

@@ -607,8 +607,7 @@ detection:
 
 firmware:
   source:
-    type: local
-    path: assets/firmware/firmware.bin
+    path: assets/firmware/firmware.bin  # Local path or URL
   flash_config:
     chip: esp32s3
     baud_rate: 921600
@@ -640,8 +639,7 @@ detection:
 
 firmware:
   source:
-    type: local
-    path: assets/firmware/himax_firmware.bin
+    path: assets/firmware/himax_firmware.bin  # Local path or URL
   flash_config:
     baudrate: 921600
     protocol: xmodem
@@ -926,6 +924,7 @@ actions:
       name_zh: "操作名称"
       run: |                          # shell 命令（多行）
         mkdir -p /data/models
+      script: path/to/script.sh      # 或脚本文件路径/URL（与 run 互斥）
       copy:                           # 或复制文件（与 run 二选一）
         src: "config/app.conf"        # 相对于 solution 目录
         dest: "/etc/app.conf"
@@ -943,6 +942,8 @@ actions:
     - name: "Post action"
       # 同上
 ```
+
+> **Cloud materials**: All `path`/`file` fields in device YAML accept URLs (e.g., `https://cdn.example.com/firmware.bin`). Remote files are automatically downloaded and cached. `script:` field also accepts URLs to script files hosted online.
 
 #### 变量替换
 

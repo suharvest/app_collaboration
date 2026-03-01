@@ -58,8 +58,7 @@ detection:
 
 firmware:
   source:
-    type: local
-    path: assets/watcher_firmware/firmware.bin
+    path: assets/watcher_firmware/firmware.bin  # Local path or URL
 
   flash_config:
     chip: esp32s3              # esp32/esp32s2/esp32s3/esp32c3
@@ -101,6 +100,8 @@ post_deployment:
   reset_device: true
   wait_for_ready: 5
 ```
+
+> **Cloud materials**: All `path` and `file` fields accept URLs (e.g., `https://cdn.example.com/firmware.bin`). Remote files are automatically downloaded and cached before deployment.
 
 ## Common Chip Configurations
 

@@ -34,8 +34,7 @@ class HimaxModelConfig(BaseModel):
     id: str  # Unique identifier, e.g., "face_detection"
     name: str  # Display name
     name_zh: Optional[str] = None  # Chinese display name
-    path: str  # Local path (relative to assets)
-    url: Optional[str] = None  # Remote download URL (optional)
+    path: str  # Local path or URL
     flash_address: str  # Flash address, e.g., "0xB7B000"
     offset: str = "0x0"  # Offset, usually "0x0"
     required: bool = False  # Whether required
@@ -69,9 +68,7 @@ class FlashConfig(BaseModel):
 class FirmwareSource(BaseModel):
     """Firmware source configuration"""
 
-    type: str = "local"  # local | url | github_release
-    path: Optional[str] = None
-    url: Optional[str] = None
+    path: str  # Local path or URL
     checksum: Optional[Dict[str, str]] = None
 
 
@@ -144,9 +141,7 @@ class ServiceConfig(BaseModel):
 class PackageSource(BaseModel):
     """Package source configuration"""
 
-    type: str = "local"  # local | url
-    path: Optional[str] = None
-    url: Optional[str] = None
+    path: str  # Local path or URL
     checksum: Optional[Dict[str, str]] = None
 
 
@@ -257,17 +252,19 @@ class NodeRedConfig(BaseModel):
 class DebPackageConfig(BaseModel):
     """Debian package configuration"""
 
-    path: str  # Path to .deb file (relative to solution assets)
+    path: str  # Path to .deb file (local path or URL)
     name: Optional[str] = None  # Package name (for opkg remove)
     includes_init_script: bool = True  # Whether deb package includes init script
+    checksum: Optional[Dict[str, str]] = None  # Checksum for URL verification
 
 
 class ModelFileConfig(BaseModel):
     """Model file configuration"""
 
-    path: str  # Path to model file (relative to solution assets)
+    path: str  # Path to model file (local path or URL)
     target_path: str = "/userdata/local/models"  # Target directory on device
     filename: Optional[str] = None  # Target filename (default: same as source)
+    checksum: Optional[Dict[str, str]] = None  # Checksum for URL verification
 
 
 class InitScriptConfig(BaseModel):
@@ -316,7 +313,8 @@ class ActionConfig(BaseModel):
 
     name: str
     name_zh: Optional[str] = None
-    run: Optional[str] = None  # Shell command or script
+    run: Optional[str] = None  # Inline shell command or script
+    script: Optional[str] = None  # Script file path or URL (read into run)
     copy_files: Optional[ActionCopy] = Field(None, alias="copy")  # File copy
     sudo: bool = False  # Whether to run with sudo (SSH deployers)
     when: Optional[ActionWhen] = None  # Conditional execution
@@ -550,3 +548,82 @@ class DeviceConfig(BaseModel):
             if step.id == step_id:
                 return step.default
         return default
+
+    async def resolve_remote_assets(self, resolver) -> None:
+        """Pre-resolve all URL references to local cached paths.
+
+        Called by deployment_engine before deployer.deploy() so that
+        deployers always work with local files.
+        """
+        base = self.base_path
+
+        # --- firmware ---
+        if self.firmware:
+            src = self.firmware.source
+            src.path = await resolver.resolve(
+                src.path, base, src.checksum
+            )
+            for part in self.firmware.flash_config.partitions:
+                if resolver.is_url(part.file):
+                    part.file = await resolver.resolve(part.file, base)
+            for model in self.firmware.flash_config.models:
+                model.path = await resolver.resolve(
+                    model.path, base, model.checksum
+                )
+
+        # --- package (ssh_deb) ---
+        if self.package:
+            src = self.package.source
+            src.path = await resolver.resolve(
+                src.path, base, src.checksum
+            )
+
+        # --- binary (recamera_cpp) ---
+        if self.binary:
+            if self.binary.deb_package:
+                dp = self.binary.deb_package
+                dp.path = await resolver.resolve(
+                    dp.path, base, dp.checksum
+                )
+            for model in self.binary.models:
+                model.path = await resolver.resolve(
+                    model.path, base, model.checksum
+                )
+
+        # --- docker ---
+        if self.docker and resolver.is_url(self.docker.compose_file):
+            self.docker.compose_file = await resolver.resolve(
+                self.docker.compose_file, base
+            )
+        if self.docker_remote and resolver.is_url(self.docker_remote.compose_file):
+            self.docker_remote.compose_file = await resolver.resolve(
+                self.docker_remote.compose_file, base
+            )
+
+        # --- nodered ---
+        if self.nodered and resolver.is_url(self.nodered.flow_file):
+            self.nodered.flow_file = await resolver.resolve(
+                self.nodered.flow_file, base
+            )
+
+        # --- actions ---
+        if self.actions:
+            for action in self.actions.before + self.actions.after:
+                await self._resolve_action(action, resolver, base)
+
+    @staticmethod
+    async def _resolve_action(action: "ActionConfig", resolver, base: str) -> None:
+        """Resolve remote references inside a single action."""
+        # script field: download script file and read content into run
+        if action.script:
+            script_path = await resolver.resolve(action.script, base)
+            from pathlib import Path as _Path
+
+            action.run = _Path(script_path).read_text(encoding="utf-8")
+            action.script = None  # consumed
+
+        # copy source
+        if action.copy_files and resolver.is_url(action.copy_files.src):
+            action.copy_files.src = await resolver.resolve(
+                action.copy_files.src, base
+            )

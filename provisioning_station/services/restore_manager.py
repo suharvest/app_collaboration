@@ -251,7 +251,7 @@ class RestoreManager:
                     name="Factory Restore",
                     type="himax_usb",
                     firmware=FirmwareConfig(
-                        source=FirmwareSource(type="local", path=str(fw_path)),
+                        source=FirmwareSource(path=str(fw_path)),
                         flash_config=FlashConfig(
                             baudrate=flash_config.get("baudrate", 921600),
                             timeout=flash_config.get("timeout", 60),
@@ -370,7 +370,7 @@ class RestoreManager:
                 name="Factory Restore ESP32",
                 type="esp32_usb",
                 firmware=FirmwareConfig(
-                    source=FirmwareSource(type="local", path=str(esp32_path)),
+                    source=FirmwareSource(path=str(esp32_path)),
                     flash_config=FlashConfig(
                         chip=esp32_flash_config.get("chip", "esp32s3"),
                         baud_rate=esp32_flash_config.get("baud_rate", 921600),
@@ -441,7 +441,7 @@ class RestoreManager:
                 name="Factory Restore Himax",
                 type="himax_usb",
                 firmware=FirmwareConfig(
-                    source=FirmwareSource(type="local", path=str(himax_path)),
+                    source=FirmwareSource(path=str(himax_path)),
                     flash_config=FlashConfig(
                         baudrate=himax_flash_config.get("baudrate", 921600),
                         timeout=himax_flash_config.get("timeout", 60),
