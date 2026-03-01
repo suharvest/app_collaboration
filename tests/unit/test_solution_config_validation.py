@@ -298,10 +298,14 @@ def _collect_asset_paths(
         firmware_dir = None
         firmware_rel = ""
         if config.firmware.source and config.firmware.source.path:
-            firmware_rel = str(Path(config.firmware.source.path).parent)
-            firmware_dir = (base_path / config.firmware.source.path).parent
+            src_path = config.firmware.source.path
+            if not src_path.startswith(("http://", "https://")):
+                firmware_rel = str(Path(src_path).parent)
+                firmware_dir = (base_path / src_path).parent
         for part in config.firmware.flash_config.partitions:
-            if firmware_dir and part.file:
+            if part.file and part.file.startswith(("http://", "https://")):
+                result.append((f"partition '{part.name}'", part.file, base_path / "dummy"))
+            elif firmware_dir and part.file:
                 rel = str(Path(firmware_rel) / part.file)
                 result.append((f"partition '{part.name}'", rel, firmware_dir / part.file))
 
@@ -344,6 +348,9 @@ class TestReferencedAssetsExist:
 
         missing = []
         for desc, raw_rel, path in assets:
+            # Cloud assets (URLs) are not local files — skip existence check
+            if raw_rel.startswith(("http://", "https://")):
+                continue
             # Try base_path resolution first (how SolutionManager resolves)
             if path.resolve().exists():
                 continue

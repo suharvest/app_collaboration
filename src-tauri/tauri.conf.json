@@ -25,7 +25,22 @@
       "binaries/provisioning-station"
     ],
     "resources": [
-      "../solutions/**/*",
+      "../solutions/**/*.yaml",
+      "../solutions/**/*.yml",
+      "../solutions/**/*.md",
+      "../solutions/**/*.json",
+      "../solutions/**/*.js",
+      "../solutions/**/*.py",
+      "../solutions/**/*.sh",
+      "../solutions/**/*.conf",
+      "../solutions/**/*.html",
+      "../solutions/**/*.txt",
+      "../solutions/**/*.png",
+      "../solutions/**/*.jpg",
+      "../solutions/**/*.svg",
+      "../solutions/**/*.gif",
+      "../solutions/**/*.webp",
+      "../solutions/**/*.xlsx",
       "../devices/**/*",
       "binaries/_internal/**/*",
       "../frontend/dist/**/*"
