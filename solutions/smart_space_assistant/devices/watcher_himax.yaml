@@ -18,7 +18,6 @@ detection:
 
 firmware:
   source:
-    type: local
     path: assets/watcher_firmware/face_recognition.img
   flash_config:
     baudrate: 921600

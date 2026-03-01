@@ -102,86 +102,34 @@ class SSHDeployer(BaseDeployer):
                 )
 
                 package_source = config.package.source
-                if package_source.type == "local":
-                    local_path = config.get_asset_path(package_source.path)
-                    if not local_path or not Path(local_path).exists():
-                        await self._report_progress(
-                            progress_callback,
-                            "transfer",
-                            0,
-                            f"Package not found: {package_source.path}",
-                        )
-                        return False
-
-                    package_name = Path(local_path).name
-                    remote_path = f"/tmp/{package_name}"
-
-                    # Transfer file with async wrapper
-                    success = await asyncio.to_thread(
-                        self._transfer_file, client, local_path, remote_path
-                    )
-
-                    if not success:
-                        await self._report_progress(
-                            progress_callback, "transfer", 0, "File transfer failed"
-                        )
-                        return False
-
-                    # Verify checksum if specified
-                    if package_source.checksum:
-                        await self._report_progress(
-                            progress_callback, "transfer", 75, "Verifying checksum..."
-                        )
-
-                        checksum_valid = await asyncio.to_thread(
-                            self._verify_remote_checksum,
-                            client,
-                            remote_path,
-                            local_path,
-                            package_source.checksum,
-                        )
-
-                        if not checksum_valid:
-                            await self._report_progress(
-                                progress_callback,
-                                "transfer",
-                                0,
-                                "Checksum verification failed",
-                            )
-                            return False
-
+                # path is already resolved to a local file by resolve_remote_assets
+                local_path = config.get_asset_path(package_source.path)
+                if not local_path or not Path(local_path).exists():
                     await self._report_progress(
-                        progress_callback, "transfer", 100, "Package transferred"
+                        progress_callback,
+                        "transfer",
+                        0,
+                        f"Package not found: {package_source.path}",
                     )
+                    return False
 
-                else:
-                    # Download from URL on remote device
+                package_name = Path(local_path).name
+                remote_path = f"/tmp/{package_name}"
+
+                # Transfer file with async wrapper
+                success = await asyncio.to_thread(
+                    self._transfer_file, client, local_path, remote_path
+                )
+
+                if not success:
                     await self._report_progress(
-                        progress_callback, "transfer", 0, "Downloading package..."
+                        progress_callback, "transfer", 0, "File transfer failed"
                     )
-                    url = package_source.url
-                    package_name = url.split("/")[-1]
-                    remote_path = f"/tmp/{package_name}"
+                    return False
 
-                    exit_code, _, stderr = await asyncio.to_thread(
-                        self._exec_with_timeout,
-                        client,
-                        f"wget -O {remote_path} {url}",
-                        config.ssh.command_timeout,
-                    )
-
-                    if exit_code != 0:
-                        await self._report_progress(
-                            progress_callback,
-                            "transfer",
-                            0,
-                            f"Download failed: {stderr[:200]}",
-                        )
-                        return False
-
-                    await self._report_progress(
-                        progress_callback, "transfer", 100, "Package downloaded"
-                    )
+                await self._report_progress(
+                    progress_callback, "transfer", 100, "Package transferred"
+                )
 
                 # Step 3: Install package
                 await self._report_progress(

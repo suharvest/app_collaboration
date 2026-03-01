@@ -91,6 +91,8 @@ binary:
 
   auto_start: true
 
+> **Cloud materials**: `deb_package.path` and `models[].path` accept URLs (e.g., `https://cdn.example.com/package.deb`). Files are automatically downloaded and cached before deployment.
+
 # User inputs
 user_inputs:
   - id: host

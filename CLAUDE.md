@@ -16,7 +16,7 @@ IoT 解决方案一键部署平台。用户在 Web/桌面端选方案 → 选预
                 ↓
 后端解析 markdown_parser → 提取 Step/Target 定义
        → step_registry → 根据 device_type 生成部署步骤
-       → deployment_engine → 调度 DEPLOYER_REGISTRY 中的 deployer 执行
+       → deployment_engine → resource_resolver 解析云端素材 URL → 调度 DEPLOYER_REGISTRY 中的 deployer 执行
                 ↓
 前端 deploy/ 模块 → WebSocket 实时显示进度
 ```
@@ -230,6 +230,7 @@ app_collaboration/
 | 全局设备目录 | `devices/catalog.yaml` |
 | 共享常量 | `shared/constants.py` |
 | 设计系统样式 | `frontend/design-system/components.css` |
+| 云端素材下载/缓存 | `provisioning_station/services/resource_resolver.py` |
 
 ---
 
