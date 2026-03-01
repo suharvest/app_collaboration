@@ -1,8 +1,12 @@
 """
 Home Assistant integration deployer
 
-Deploys reCamera custom component to an existing Home Assistant instance.
+Deploys a custom component to an existing Home Assistant instance.
 Supports both HA OS (auto-installs SSH addon) and Docker Core (uses direct SSH).
+
+The integration domain, component files path, and config flow data are all
+configured in the device YAML's `ha_integration` section, making this deployer
+reusable for any HA custom integration.
 
 Flow:
 1. Authenticate to HA via login flow API
@@ -13,17 +17,18 @@ Flow:
 4. Copy custom_components files via tar+base64 over SSH
 5. Restart HA via REST API
 6. Wait for HA to come back, re-authenticate
-7. Add reCamera integration via config flow API
+7. Add integration via config flow API
 """
 
 import asyncio
 import base64
+import fnmatch
 import io
 import json
 import logging
 import tarfile
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 from uuid import uuid4
 
 from ..models.device import DeviceConfig
@@ -39,9 +44,11 @@ HAOS_SSH_INSTALL_SLUG = "core_ssh"
 # so we scan by name instead of hardcoding all slugs.
 CORE_SSH_USERNAME = "root"
 
+DEFAULT_INCLUDE_PATTERNS = ["*.py", "manifest.json", "strings.json"]
+
 
 class HAIntegrationDeployer(BaseDeployer):
-    """Deploys reCamera custom component to an existing Home Assistant instance."""
+    """Deploys a custom component to an existing Home Assistant instance."""
 
     device_type = "ha_integration"
     ui_traits = {
@@ -62,6 +69,86 @@ class HAIntegrationDeployer(BaseDeployer):
         {"id": "integrate", "name": "Add Integration", "name_zh": "添加集成"},
     ]
 
+    # -------------------------------------------------------------------------
+    # Config Helpers
+    # -------------------------------------------------------------------------
+
+    def _get_domain(self, config: DeviceConfig) -> str:
+        """Get the HA integration domain from config."""
+        if not config.ha_integration:
+            raise RuntimeError(
+                "Device YAML must have an 'ha_integration' section "
+                "with at least 'domain' and 'components_dir'"
+            )
+        return config.ha_integration.domain
+
+    def _get_include_patterns(self, config: DeviceConfig) -> List[str]:
+        """Get file include patterns for tar packing."""
+        if config.ha_integration and config.ha_integration.include_patterns:
+            return config.ha_integration.include_patterns
+        return DEFAULT_INCLUDE_PATTERNS
+
+    def _build_config_flow_data(
+        self, config: DeviceConfig, connection: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Build the config flow submission data from ha_integration config."""
+        if not config.ha_integration or not config.ha_integration.config_flow_data:
+            return {}
+
+        data = {}
+        for field in config.ha_integration.config_flow_data:
+            if field.value_from:
+                raw = connection.get(field.value_from, "")
+            else:
+                raw = field.value or ""
+
+            if field.type == "int":
+                data[field.name] = int(raw)
+            elif field.type == "float":
+                data[field.name] = float(raw)
+            elif field.type == "bool":
+                data[field.name] = str(raw).lower() in ("true", "1", "yes")
+            else:
+                data[field.name] = str(raw)
+        return data
+
+    def _get_components_path(self, config: DeviceConfig) -> Optional[str]:
+        """Get the path to custom_components directory in solution assets."""
+        if not config.ha_integration:
+            return None
+
+        resolved = config.get_asset_path(config.ha_integration.components_dir)
+        if resolved and Path(resolved).is_dir():
+            return resolved
+
+        return None
+
+    def _build_tar(
+        self, components_dir: str, include_patterns: List[str]
+    ) -> tuple[bytes, List[str]]:
+        """Build a tar archive of component files matching include_patterns."""
+        tar_buffer = io.BytesIO()
+        src_path = Path(components_dir)
+        files_added = []
+        with tarfile.open(fileobj=tar_buffer, mode="w") as tar:
+            for f in sorted(src_path.rglob("*")):
+                if f.is_file() and any(
+                    fnmatch.fnmatch(f.name, p) for p in include_patterns
+                ):
+                    arcname = str(f.relative_to(src_path))
+                    tar.add(str(f), arcname=arcname)
+                    files_added.append(arcname)
+
+        if not files_added:
+            raise RuntimeError(f"No component files found in {components_dir}")
+
+        logger.info(f"Packed {len(files_added)} files: {files_added}")
+        return base64.b64encode(tar_buffer.getvalue()), files_added
+
+    # -------------------------------------------------------------------------
+    # Deploy
+    # -------------------------------------------------------------------------
+
     async def deploy(
         self,
         config: DeviceConfig,
@@ -72,8 +159,6 @@ class HAIntegrationDeployer(BaseDeployer):
         ha_port = int(connection.get("ha_port", 8123))
         ha_username = connection["username"]
         ha_password = connection["password"]
-        recamera_ip = connection.get("recamera_ip", "192.168.42.1")
-        recamera_port = int(connection.get("recamera_port", 1880))
 
         # Optional: SSH credentials for Docker-on-Linux
         ssh_username = connection.get("ssh_username")
@@ -81,12 +166,14 @@ class HAIntegrationDeployer(BaseDeployer):
         config_dir = connection.get("config_dir", "/config")
 
         ha_url = f"http://{ha_host}:{ha_port}"
+        domain = self._get_domain(config)
 
         # Resolve custom_components source path
         components_dir = self._get_components_path(config)
         if not components_dir:
             raise RuntimeError(
-                "Cannot find custom_components directory in solution assets"
+                "Cannot find custom_components directory in solution assets. "
+                "Check ha_integration.components_dir in device YAML."
             )
 
         # --- Step 1: Authenticate to HA ---
@@ -140,14 +227,14 @@ class HAIntegrationDeployer(BaseDeployer):
 
         # --- Step 4: Copy custom_components via SSH ---
         await self._report_progress(
-            progress_callback, "copy", 0, "Copying reCamera integration files..."
+            progress_callback, "copy", 0, f"Copying {domain} integration files..."
         )
         if is_haos:
             await self._copy_components_ssh(
-                ssh_conn, config_dir, components_dir, use_sudo=True
+                ssh_conn, config_dir, components_dir, config, use_sudo=True
             )
         else:
-            await self._copy_via_docker(ssh_conn, components_dir)
+            await self._copy_via_docker(ssh_conn, components_dir, config)
         await self._report_progress(
             progress_callback, "copy", 100, "Integration files copied"
         )
@@ -173,16 +260,16 @@ class HAIntegrationDeployer(BaseDeployer):
             progress_callback, "restart", 100, "Re-authenticated after restart"
         )
 
-        # --- Step 7: Add reCamera integration ---
+        # --- Step 7: Add integration ---
         await self._report_progress(
-            progress_callback, "integrate", 0, "Adding reCamera integration..."
+            progress_callback, "integrate", 0, f"Adding {domain} integration..."
         )
-        await self._add_recamera_integration(ha_url, token, recamera_ip, recamera_port)
+        await self._add_integration(ha_url, token, config, connection)
         await self._report_progress(
             progress_callback,
             "integrate",
             100,
-            "reCamera integration added successfully!",
+            f"{domain} integration added successfully!",
         )
 
         return True
@@ -345,7 +432,7 @@ class HAIntegrationDeployer(BaseDeployer):
             logger.info(f"Installed SSH addon: {slug}")
 
             # Configure with temporary password
-            temp_password = f"recamera-{uuid4().hex[:8]}"
+            temp_password = f"sensecraft-{uuid4().hex[:8]}"
             await self._supervisor_api(
                 ha_url,
                 token,
@@ -411,7 +498,7 @@ class HAIntegrationDeployer(BaseDeployer):
         if not password:
             # No password set — configure a temporary one
             logger.info(f"SSH addon {slug} has no password, setting temporary password")
-            temp_password = f"recamera-{uuid4().hex[:8]}"
+            temp_password = f"sensecraft-{uuid4().hex[:8]}"
 
             if slug == "core_ssh":
                 new_options = {**options, "password": temp_password}
@@ -449,31 +536,15 @@ class HAIntegrationDeployer(BaseDeployer):
         ssh_conn: Dict[str, Any],
         config_dir: str,
         components_dir: str,
+        config: DeviceConfig,
         use_sudo: bool,
     ):
-        """Copy custom_components/recamera/ files to HA via SSH using tar+base64."""
+        """Copy custom_components files to HA via SSH using tar+base64."""
         import paramiko
 
-        # Build tar archive in memory
-        tar_buffer = io.BytesIO()
-        src_path = Path(components_dir)
-        files_added = []
-        with tarfile.open(fileobj=tar_buffer, mode="w") as tar:
-            for f in sorted(src_path.iterdir()):
-                if f.is_file() and (
-                    f.suffix == ".py"
-                    or f.name == "manifest.json"
-                    or f.name == "strings.json"
-                ):
-                    tar.add(str(f), arcname=f.name)
-                    files_added.append(f.name)
-
-        if not files_added:
-            raise RuntimeError(f"No component files found in {components_dir}")
-
-        logger.info(f"Packed {len(files_added)} files: {files_added}")
-        tar_data = tar_buffer.getvalue()
-        b64_data = base64.b64encode(tar_data)
+        domain = self._get_domain(config)
+        include_patterns = self._get_include_patterns(config)
+        b64_data, _ = self._build_tar(components_dir, include_patterns)
 
         # SSH connect and copy
         client = paramiko.SSHClient()
@@ -489,7 +560,7 @@ class HAIntegrationDeployer(BaseDeployer):
                 timeout=15,
             )
 
-            dest = f"{config_dir}/custom_components/recamera"
+            dest = f"{config_dir}/custom_components/{domain}"
             sudo = "sudo " if use_sudo else ""
 
             # Create directory
@@ -587,14 +658,21 @@ class HAIntegrationDeployer(BaseDeployer):
         )
 
     # -------------------------------------------------------------------------
-    # Add reCamera Integration
+    # Add Integration
     # -------------------------------------------------------------------------
 
-    async def _add_recamera_integration(
-        self, ha_url: str, token: str, recamera_ip: str, recamera_port: int = 1880
+    async def _add_integration(
+        self,
+        ha_url: str,
+        token: str,
+        config: DeviceConfig,
+        connection: Dict[str, Any],
     ):
-        """Add reCamera integration via HA config flow API."""
+        """Add custom integration via HA config flow API."""
         import httpx
+
+        domain = self._get_domain(config)
+        flow_data = self._build_config_flow_data(config, connection)
 
         headers = {
             "Authorization": f"Bearer {token}",
@@ -610,35 +688,37 @@ class HAIntegrationDeployer(BaseDeployer):
             if resp.status_code == 200:
                 entries = resp.json()
                 for entry in entries:
-                    if entry.get("domain") == "recamera":
-                        logger.info("reCamera integration already configured, skipping")
+                    if entry.get("domain") == domain:
+                        logger.info(
+                            f"{domain} integration already configured, skipping"
+                        )
                         return
 
             # Start config flow
             resp = await client.post(
                 f"{ha_url}/api/config/config_entries/flow",
                 headers=headers,
-                json={"handler": "recamera", "show_advanced_options": False},
+                json={"handler": domain, "show_advanced_options": False},
             )
             resp.raise_for_status()
             flow = resp.json()
             flow_id = flow["flow_id"]
 
-            # Submit form with reCamera IP
+            # Submit form
             resp = await client.post(
                 f"{ha_url}/api/config/config_entries/flow/{flow_id}",
                 headers=headers,
-                json={"host": recamera_ip, "port": recamera_port},
+                json=flow_data,
             )
             resp.raise_for_status()
             result = resp.json()
 
             if result.get("type") == "create_entry":
-                logger.info(f"reCamera integration created: {result.get('title', '')}")
+                logger.info(f"{domain} integration created: {result.get('title', '')}")
             else:
                 errors = result.get("errors", {})
                 if errors:
-                    raise RuntimeError(f"Failed to add reCamera integration: {errors}")
+                    raise RuntimeError(f"Failed to add {domain} integration: {errors}")
                 logger.warning(f"Unexpected config flow result: {result}")
 
     # -------------------------------------------------------------------------
@@ -647,9 +727,7 @@ class HAIntegrationDeployer(BaseDeployer):
 
     async def _find_ha_container(self, client) -> str:
         """Find the Home Assistant container name on the Docker host."""
-        # Try our known container name first
         for search in [
-            "docker ps --format '{{.Names}}' --filter name=recamera-homeassistant",
             "docker ps --format '{{.Names}}' --filter name=homeassistant",
         ]:
             result = await self._ssh_exec(client, search, ignore_error=True)
@@ -671,30 +749,18 @@ class HAIntegrationDeployer(BaseDeployer):
             "Cannot find Home Assistant Docker container. Is it running?"
         )
 
-    async def _copy_via_docker(self, ssh_conn: Dict[str, Any], components_dir: str):
+    async def _copy_via_docker(
+        self,
+        ssh_conn: Dict[str, Any],
+        components_dir: str,
+        config: DeviceConfig,
+    ):
         """Copy custom_components into HA Docker container via docker exec."""
         import paramiko
 
-        # Build tar archive in memory
-        tar_buffer = io.BytesIO()
-        src_path = Path(components_dir)
-        files_added = []
-        with tarfile.open(fileobj=tar_buffer, mode="w") as tar:
-            for f in sorted(src_path.iterdir()):
-                if f.is_file() and (
-                    f.suffix == ".py"
-                    or f.name == "manifest.json"
-                    or f.name == "strings.json"
-                ):
-                    tar.add(str(f), arcname=f.name)
-                    files_added.append(f.name)
-
-        if not files_added:
-            raise RuntimeError(f"No component files found in {components_dir}")
-
-        logger.info(f"Packed {len(files_added)} files: {files_added}")
-        tar_data = tar_buffer.getvalue()
-        b64_data = base64.b64encode(tar_data)
+        domain = self._get_domain(config)
+        include_patterns = self._get_include_patterns(config)
+        b64_data, _ = self._build_tar(components_dir, include_patterns)
 
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -713,7 +779,7 @@ class HAIntegrationDeployer(BaseDeployer):
             container = await self._find_ha_container(client)
             logger.info(f"Found HA container: {container}")
 
-            dest = "/config/custom_components/recamera"
+            dest = f"/config/custom_components/{domain}"
 
             # Create directory and extract files inside the container
             await self._ssh_exec(
@@ -738,32 +804,3 @@ class HAIntegrationDeployer(BaseDeployer):
 
         finally:
             client.close()
-
-    # -------------------------------------------------------------------------
-    # Helpers
-    # -------------------------------------------------------------------------
-
-    def _get_components_path(self, config: DeviceConfig) -> Optional[str]:
-        """Get the path to custom_components/recamera/ in solution assets."""
-        if not config.base_path:
-            return None
-
-        # Try the standard path (base_path points to solution root)
-        components_dir = (
-            Path(config.base_path)
-            / "assets"
-            / "docker"
-            / "custom_components"
-            / "recamera"
-        ).resolve()
-
-        if components_dir.is_dir():
-            return str(components_dir)
-
-        # Try relative to ha_integration config
-        if hasattr(config, "ha_integration") and config.ha_integration:
-            custom_path = config.get_asset_path(config.ha_integration.components_dir)
-            if custom_path and Path(custom_path).is_dir():
-                return custom_path
-
-        return None

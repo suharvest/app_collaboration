@@ -4,6 +4,16 @@ name: Existing Home Assistant
 name_zh: 已有 Home Assistant
 type: ha_integration
 
+ha_integration:
+  domain: recamera
+  components_dir: assets/docker/custom_components/recamera
+  config_flow_data:
+    - name: host
+      value_from: recamera_ip
+    - name: port
+      value_from: recamera_port
+      type: int
+
 user_inputs:
   - id: host
     name: HA Address
@@ -42,6 +52,16 @@ user_inputs:
     placeholder: "192.168.42.1"
     description: "reCamera IP (USB: 192.168.42.1, or WiFi IP)"
     description_zh: "reCamera IP 地址（USB 连接用 192.168.42.1，或 WiFi IP）"
+    row: 3
+
+  - id: recamera_port
+    name: reCamera Port
+    name_zh: reCamera 端口
+    type: text
+    required: false
+    default: "1880"
+    description: "reCamera Node-RED port (default 1880)"
+    description_zh: "reCamera Node-RED 端口（默认 1880）"
     row: 3
 
   - id: ssh_username

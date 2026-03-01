@@ -449,6 +449,7 @@ ls -lh solutions/<id>/gallery/step3-grafana-config.gif
 | `recamera_cpp` | reCamera C++ 应用 | 输入 IP + 点击 | .deb + .cvimodel |
 | `recamera_nodered` | reCamera Node-RED 流 | 输入 IP + 点击 | flow.json |
 | `ssh_deb` | 远程 Linux 设备 DEB 安装 | 输入 IP/密码 + 点击 | .deb + config |
+| `ha_integration` | HA 自定义集成部署 | 输入 HA 地址/密码 + 点击 | custom_components/ 目录 |
 | `script` | 本地脚本/服务启动 | 填配置 + 点击 | shell script |
 | `manual` | 纯人工操作步骤 | 按说明操作 + 点完成 | 无 |
 | `preview` | 视频流/MQTT 预览 | 输入地址 + 查看 | 无 |
@@ -756,6 +757,60 @@ user_inputs:
 
 **所需产物**：flow.json 流文件
 
+### ha_integration
+
+适用于 Home Assistant 自定义集成部署。自动处理 HA 认证、SSH 配置、文件复制、重启和集成注册。支持 HA OS（自动安装 SSH addon）和 Docker Core。
+
+**设备配置示例**：
+```yaml
+version: "1.0"
+id: homeassistant_integration
+name: Home Assistant Integration
+type: ha_integration
+
+ha_integration:
+  domain: recamera                                    # HA integration domain
+  components_dir: assets/docker/custom_components/recamera  # 组件文件目录
+  config_flow_data:                                   # config flow 提交的数据
+    - name: host
+      value_from: device_ip                           # 从 user_inputs 取值
+    - name: port
+      value_from: device_port
+      type: int                                       # 类型转换
+    - name: mode
+      value: auto                                     # 静态值
+
+user_inputs:
+  - id: host
+    name: HA Address
+    type: text
+    required: true
+  - id: username
+    name: HA Username
+    type: text
+    required: true
+  - id: password
+    name: HA Password
+    type: password
+    required: true
+  - id: device_ip
+    name: Device IP
+    type: text
+    required: true
+  - id: ssh_username
+    name: SSH Username (Docker only)
+    type: text
+    required: false
+  - id: ssh_password
+    name: SSH Password (Docker only)
+    type: password
+    required: false
+```
+
+**所需产物**：`custom_components/<domain>/` 目录（含 `__init__.py`、`manifest.json` 等）
+
+**自动步骤序列**：auth → detect → ssh → copy → restart → integrate
+
 ### script
 
 适用于本地脚本执行，可配合用户输入进行参数化。
@@ -923,25 +978,25 @@ load_device_config() → config.steps 为空？
 | | health_check | |
 | | *actions_after | |
 
-| himax_usb | recamera_cpp | script |
-|---|---|---|
-| detect | connect | validate |
-| prepare | precheck | *actions_before |
-| *actions_before | prepare | setup |
-| flash | transfer | configure |
-| verify | install | start |
-| *actions_after | models | health_check |
-| | configure | *actions_after |
-| | *actions_after | |
-| | start | |
-| | verify | |
+| himax_usb | recamera_cpp | ha_integration | script |
+|---|---|---|---|
+| detect | connect | auth | validate |
+| prepare | precheck | detect | *actions_before |
+| *actions_before | prepare | ssh | setup |
+| flash | transfer | copy | configure |
+| verify | install | restart | start |
+| *actions_after | models | integrate | health_check |
+| | configure | | *actions_after |
+| | *actions_after | | |
+| | start | | |
+| | verify | | |
 
 #### 执行器类型
 
 | 部署类型 | 执行器 | 说明 |
 |----------|--------|------|
 | docker_local, esp32_usb, himax_usb, script, recamera_nodered | LocalActionExecutor | 本机 shell |
-| docker_remote, ssh_deb, recamera_cpp | SSHActionExecutor | 远程 SSH（支持 sudo） |
+| docker_remote, ssh_deb, recamera_cpp, ha_integration | SSHActionExecutor | 远程 SSH（支持 sudo） |
 
 #### 实战示例
 
@@ -1070,6 +1125,9 @@ actions:
 │
 ├─ Linux 设备 DEB 包 → ssh_deb
 │   └─ 打包 .deb + systemd service
+│
+├─ Home Assistant 自定义集成 → ha_integration
+│   └─ 准备 custom_components/<domain>/ 目录
 │
 ├─ 本地脚本/服务 → script
 │   └─ 写启动脚本 + 配置模板

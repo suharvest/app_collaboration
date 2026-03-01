@@ -548,6 +548,7 @@ Use [SenseCraft](https://sensecraft.seeed.cc/ai/) cloud services for AI capabili
 | `preview` | 预览功能 |
 | `recamera_cpp` | reCamera C++ 应用 |
 | `recamera_nodered` | reCamera Node-RED |
+| `ha_integration` | Home Assistant 集成部署 |
 | `ssh_deb` | SSH + Debian 包部署 |
 
 #### 步骤描述（自动提取为副标题）

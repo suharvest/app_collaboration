@@ -466,6 +466,24 @@ class SerialCameraConfig(BaseModel):
     panels: List[SerialCameraPanelConfig] = []
 
 
+class ConfigFlowField(BaseModel):
+    """A field to submit in the HA config flow form"""
+
+    name: str  # HA config flow field name (e.g., "host")
+    value_from: Optional[str] = None  # user_input id to pull value from
+    value: Optional[str] = None  # Static value (used if value_from is not set)
+    type: str = "str"  # Value type cast: str | int | float | bool
+
+
+class HAIntegrationConfig(BaseModel):
+    """Home Assistant custom integration deployment configuration"""
+
+    domain: str  # HA integration domain (e.g., "recamera")
+    components_dir: str  # Component files location (relative to solution base_path)
+    config_flow_data: List[ConfigFlowField] = []
+    include_patterns: List[str] = ["*.py", "manifest.json", "strings.json"]
+
+
 # Main Device Configuration
 class DeviceConfig(BaseModel):
     """Complete device configuration"""
@@ -491,6 +509,7 @@ class DeviceConfig(BaseModel):
     binary: Optional[BinaryConfig] = (
         None  # For recamera_cpp and other SSH binary deployments
     )
+    ha_integration: Optional[HAIntegrationConfig] = None  # For ha_integration
 
     # Preview type configurations
     video: Optional[PreviewVideoConfig] = None  # For preview type
