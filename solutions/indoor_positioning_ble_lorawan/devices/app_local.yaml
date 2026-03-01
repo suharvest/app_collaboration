@@ -11,15 +11,7 @@ detection:
     - docker_running
 
 docker:
-  image: seeedcloud/sensecraft-indoor-positioning
-  container_name: indoor-positioning
-  ports:
-    - "5173:5173"
-  volumes:
-    - ./db:/app/db/
-    - ./config:/app/server/config/json
-    - ./uploads:/app/uploads
-  restart: unless-stopped
+  compose_file: assets/docker/docker-compose.yml
 
   services:
     - name: indoor-positioning
@@ -35,6 +27,3 @@ pre_checks:
 post_deployment:
   open_browser: true
   url: "http://localhost:5173"
-  credentials:
-    username: admin
-    password: 83EtWJUbGrPnQjdCqyKq

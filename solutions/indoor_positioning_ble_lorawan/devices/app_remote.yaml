@@ -21,17 +21,9 @@ ssh:
   command_timeout: 600
 
 docker_remote:
-  image: seeedcloud/sensecraft-indoor-positioning
-  container_name: indoor-positioning
+  compose_file: assets/docker/docker-compose.yml
+  compose_dir: assets/docker
   remote_path: /home/{{username}}/indoor-positioning
-
-  ports:
-    - "5173:5173"
-  volumes:
-    - ./db:/app/db/
-    - ./config:/app/server/config/json
-    - ./uploads:/app/uploads
-  restart: unless-stopped
 
   services:
     - name: indoor-positioning
@@ -77,6 +69,3 @@ pre_checks:
 post_deployment:
   open_browser: true
   url: "http://{{host}}:5173"
-  credentials:
-    username: admin
-    password: 83EtWJUbGrPnQjdCqyKq
