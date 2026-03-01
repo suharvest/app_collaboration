@@ -90,4 +90,5 @@ markers = [
     "device_r1100: Tests requiring R1100 at 192.168.10.76",
     "device_local_docker: Tests requiring local Docker",
     "slow: Tests that take longer than 60 seconds",
+    "solution_validation: On-demand solution config validation (not run in CI)",
 ]

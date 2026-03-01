@@ -452,6 +452,7 @@ pre-release-tests → build-sidecar (3 平台并行) → build-tauri (3 平台�
 | `frontend/src/pages/deploy/` | 前端测试（test_params） |
 | `shared/constants.py` | 契约测试（test_port_configuration） |
 | `solutions/` 目录 | 后端单元测试（test_solution_format）— 验证 guide.md 格式 |
+| `solutions/` 目录（方案录入验证） | 按需验证（`pytest tests/unit/test_solution_config_validation.py -v`） |
 | 任何不确定的修改 | **全量**：后端单元 + 前端 + 集成测试 |
 
 ### 快速全量回归（推荐）
@@ -485,6 +486,7 @@ CI (`.github/workflows/test.yml`) 在 PR 和 push 时自动运行：
 | `test_port_configuration.py` | 前后端端口配置一致 |
 | `test_bilingual_loading.py` | 中英文 guide.md 结构匹配 |
 | `test_deployment_params.py` | 部署参数传递正确 |
+| `test_solution_config_validation.py` | 方案设备配置合法性（按需，非 CI） |
 
 ---
 
