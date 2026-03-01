@@ -60,8 +60,9 @@ REQUIRED_CONFIG: dict[str, list[str]] = {
     "recamera_nodered": ["nodered", "nodered.flow_file"],
     "script": ["script"],
     "manual": ["steps[]"],
+    "ha_integration": ["ha_integration", "ha_integration.domain", "ha_integration.components_dir"],
     # These types have no strict config requirements:
-    # preview, ha_integration, serial_camera
+    # preview, serial_camera
 }
 
 
@@ -273,6 +274,9 @@ ASSET_CHECKS: dict[str, list[tuple[str, str]]] = {
     ],
     "recamera_nodered": [
         ("nodered.flow_file", "Node-RED flow file"),
+    ],
+    "ha_integration": [
+        ("ha_integration.components_dir", "HA custom components directory"),
     ],
 }
 

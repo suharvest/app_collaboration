@@ -44,7 +44,8 @@ app_collaboration/
 │       └── devices/            # 设备部署配置
 ├── tests/                       # 测试
 │   ├── unit/                   # 单元测试
-│   └── integration/            # 集成测试
+│   ├── integration/            # 集成测试
+│   └── simulation/             # 部署仿真框架（无需真实设备）
 ├── src-tauri/                  # Tauri 桌面应用
 │   ├── src/main.rs
 │   ├── tauri.conf.json
@@ -127,11 +128,25 @@ cargo tauri build
 输出位置:
 - macOS: `src-tauri/target/release/bundle/dmg/SenseCraft Solution_*.dmg`
 - Linux: `src-tauri/target/release/bundle/deb/*.deb`
-- Windows: `src-tauri/target/release/bundle/msi/*.msi`
+- Windows: `src-tauri/target/release/bundle/nsis/*.exe`
+
+**一键构建（推荐）**
+
+```bash
+# 构建完整桌面应用（含 sidecar）
+./scripts/build-desktop.sh --build
+
+# 跳过 sidecar 重建（已有时）
+./scripts/build-desktop.sh --build --skip-sidecar
+```
 
 #### 开发模式
 
 ```bash
+# 推荐
+./scripts/build-desktop.sh --dev
+
+# 或手动
 cd src-tauri
 cargo tauri dev
 ```
@@ -231,6 +246,8 @@ deployment:
 | `recamera_cpp` | reCamera C++ 部署 | `config=devices/xxx.yaml` |
 | `recamera_nodered` | reCamera Node-RED 部署 | `config=devices/xxx.yaml` |
 | `ssh_deb` | SSH + DEB 包安装 | `config=devices/xxx.yaml` |
+| `ha_integration` | Home Assistant 自定义集成部署 | `config=devices/xxx.yaml` |
+| `serial_camera` | 串口摄像头预览 | `config=devices/xxx.yaml` |
 | `manual` | 手动步骤 | 无需 config |
 | `script` | 脚本执行 | `config=devices/xxx.yaml` |
 | `preview` | 预览步骤（无部署） | 无需 config |
@@ -278,11 +295,61 @@ deployment:
 | `/api/solutions/{id}?lang=zh` | GET | 获取方案详情 |
 | `/api/solutions/{id}/deployment?lang=zh` | GET | 获取部署信息 |
 | `/api/solutions/{id}/assets/{path}` | GET | 获取静态资源 |
+| `/api/devices/detect/{solution_id}` | GET | USB/串口设备检测 |
 | `/api/devices/scan-mdns` | GET | mDNS 局域网设备扫描 |
 | `/api/docker-devices/local/check` | GET | 检查本地 Docker 状态 |
 | `/api/docker-devices/local/managed-apps` | GET | 获取已部署应用 |
 | `/api/deployments/start` | POST | 开始部署 |
+| `/api/deployments/{id}/cancel` | POST | 取消部署 |
 | `/ws/deployments/{id}` | WS | 部署日志 WebSocket |
+| `/api/serial-camera/{port}/ws` | WS | 串口摄像头 WebSocket |
+| `/api/preview/stream/{stream_id}` | WS | 视频流代理 |
+| `/api/restore/{device_type}` | POST | 设备恢复出厂 |
+| `/api/versions` | GET | 版本/更新检查 |
+
+---
+
+## 云端资源支持
+
+设备 YAML 配置中的 `path` 字段（固件、deb 包、模型、Docker Compose 文件等）支持本地路径和 HTTP(S) URL。部署引擎会在调用 deployer 前自动下载并缓存远程资源。
+
+```yaml
+# 本地路径（相对方案根目录）
+path: assets/firmware/app.bin
+
+# 远程 URL（自动下载到本地缓存）
+path: https://cdn.example.com/firmware/app.bin
+```
+
+支持 `checksum` 字段进行 sha256/md5 校验：
+
+```yaml
+deb_package:
+  path: https://cdn.example.com/packages/detector.deb
+  checksum:
+    sha256: "abc123..."
+```
+
+---
+
+## 测试
+
+```bash
+# 后端单元测试（不需要后端运行，推荐日常使用）
+uv run --group test pytest tests/unit/ -v
+
+# 前端单元测试
+cd frontend && npm test
+
+# 方案配置验证（检查所有 solution 的 YAML/资产完整性）
+uv run --group test pytest tests/unit/test_solution_config_validation.py -v
+
+# 集成测试（需先启动后端 ./dev.sh）
+uv run --group test pytest tests/integration/ -v
+
+# 全量回归
+uv run --group test pytest tests/ --ignore=tests/e2e -v
+```
 
 ---
 

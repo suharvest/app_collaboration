@@ -3,9 +3,8 @@ Tests for the ResourceResolver service.
 """
 
 import hashlib
-import os
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -478,3 +477,253 @@ class TestModelSimplification:
             checksum={"sha256": "abc123"},
         )
         assert model.checksum == {"sha256": "abc123"}
+
+
+# ------------------------------------------------------------------
+# resolve_remote_assets — additional branch coverage
+# ------------------------------------------------------------------
+
+
+class TestResolveRemoteAssetsBranches:
+    """Cover resolve_remote_assets branches not tested above."""
+
+    @pytest.mark.asyncio
+    async def test_package_source_url_resolved(self, resolver, tmp_cache):
+        """URL in package.source.path (ssh_deb) should be downloaded."""
+        from provisioning_station.models.device import (
+            DeviceConfig,
+            PackageConfig,
+            PackageSource,
+        )
+
+        url = "https://cdn.example.com/packages/app.deb"
+        config = DeviceConfig(
+            id="test",
+            name="Test",
+            type="ssh_deb",
+            package=PackageConfig(
+                source=PackageSource(path=url),
+            ),
+        )
+
+        with patch.object(resolver, "_stream_download", new_callable=AsyncMock) as mock_dl:
+            async def fake_download(u, dest, cb=None):
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(b"deb content")
+
+            mock_dl.side_effect = fake_download
+            await config.resolve_remote_assets(resolver)
+
+            assert not resolver.is_url(config.package.source.path)
+            assert Path(config.package.source.path).name == "app.deb"
+            mock_dl.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_docker_compose_url_resolved(self, resolver, tmp_cache):
+        """URL in docker.compose_file should be downloaded."""
+        from provisioning_station.models.device import (
+            DeviceConfig,
+            DockerConfig,
+        )
+
+        url = "https://cdn.example.com/compose/docker-compose.yml"
+        config = DeviceConfig(
+            id="test",
+            name="Test",
+            type="docker_local",
+            docker=DockerConfig(compose_file=url),
+        )
+
+        with patch.object(resolver, "_stream_download", new_callable=AsyncMock) as mock_dl:
+            async def fake_download(u, dest, cb=None):
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text("version: '3'\nservices: {}")
+
+            mock_dl.side_effect = fake_download
+            await config.resolve_remote_assets(resolver)
+
+            assert not resolver.is_url(config.docker.compose_file)
+            assert Path(config.docker.compose_file).name == "docker-compose.yml"
+
+    @pytest.mark.asyncio
+    async def test_docker_remote_compose_url_resolved(self, resolver, tmp_cache):
+        """URL in docker_remote.compose_file should be downloaded."""
+        from provisioning_station.models.device import (
+            DeviceConfig,
+            DockerRemoteConfig,
+        )
+
+        url = "https://cdn.example.com/compose/remote-compose.yml"
+        config = DeviceConfig(
+            id="test",
+            name="Test",
+            type="docker_remote",
+            docker_remote=DockerRemoteConfig(compose_file=url),
+        )
+
+        with patch.object(resolver, "_stream_download", new_callable=AsyncMock) as mock_dl:
+            async def fake_download(u, dest, cb=None):
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text("version: '3'\nservices: {}")
+
+            mock_dl.side_effect = fake_download
+            await config.resolve_remote_assets(resolver)
+
+            assert not resolver.is_url(config.docker_remote.compose_file)
+            assert Path(config.docker_remote.compose_file).name == "remote-compose.yml"
+
+    @pytest.mark.asyncio
+    async def test_nodered_flow_url_resolved(self, resolver, tmp_cache):
+        """URL in nodered.flow_file should be downloaded."""
+        from provisioning_station.models.device import (
+            DeviceConfig,
+            NodeRedConfig,
+        )
+
+        url = "https://cdn.example.com/flows/flow.json"
+        config = DeviceConfig(
+            id="test",
+            name="Test",
+            type="recamera_nodered",
+            nodered=NodeRedConfig(flow_file=url),
+        )
+
+        with patch.object(resolver, "_stream_download", new_callable=AsyncMock) as mock_dl:
+            async def fake_download(u, dest, cb=None):
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text('[{"id":"node1"}]')
+
+            mock_dl.side_effect = fake_download
+            await config.resolve_remote_assets(resolver)
+
+            assert not resolver.is_url(config.nodered.flow_file)
+            assert Path(config.nodered.flow_file).name == "flow.json"
+
+    @pytest.mark.asyncio
+    async def test_partition_file_url_resolved(self, resolver, tmp_cache):
+        """URL in firmware.flash_config.partitions[].file should be downloaded."""
+        from provisioning_station.models.device import (
+            DeviceConfig,
+            FirmwareConfig,
+            FirmwareSource,
+            FlashConfig,
+            PartitionConfig,
+        )
+
+        part_url = "https://cdn.example.com/partitions/bootloader.bin"
+        config = DeviceConfig(
+            id="test",
+            name="Test",
+            type="esp32_usb",
+            firmware=FirmwareConfig(
+                source=FirmwareSource(path="assets/fw.bin"),
+                flash_config=FlashConfig(
+                    partitions=[
+                        PartitionConfig(
+                            name="bootloader",
+                            offset="0x0",
+                            file=part_url,
+                        ),
+                    ],
+                ),
+            ),
+            base_path="/opt/solutions/test",
+        )
+
+        with patch.object(resolver, "_stream_download", new_callable=AsyncMock) as mock_dl:
+            async def fake_download(u, dest, cb=None):
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(b"bootloader binary")
+
+            mock_dl.side_effect = fake_download
+            await config.resolve_remote_assets(resolver)
+
+            assert not resolver.is_url(config.firmware.flash_config.partitions[0].file)
+            assert Path(config.firmware.flash_config.partitions[0].file).name == "bootloader.bin"
+
+    @pytest.mark.asyncio
+    async def test_action_copy_src_url_resolved(self, resolver, tmp_cache):
+        """URL in action.copy_files.src should be downloaded."""
+        from provisioning_station.models.device import (
+            ActionConfig,
+            ActionCopy,
+            ActionsConfig,
+            DeviceConfig,
+        )
+
+        copy_url = "https://cdn.example.com/configs/settings.json"
+        config = DeviceConfig(
+            id="test",
+            name="Test",
+            type="recamera_cpp",
+            actions=ActionsConfig(
+                after=[
+                    ActionConfig(
+                        name="Copy config",
+                        copy_files=ActionCopy(
+                            src=copy_url,
+                            dest="/etc/app/settings.json",
+                        ),
+                    )
+                ]
+            ),
+        )
+
+        with patch.object(resolver, "_stream_download", new_callable=AsyncMock) as mock_dl:
+            async def fake_download(u, dest, cb=None):
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text('{"key": "value"}')
+
+            mock_dl.side_effect = fake_download
+            await config.resolve_remote_assets(resolver)
+
+            assert not resolver.is_url(config.actions.after[0].copy_files.src)
+
+
+# ------------------------------------------------------------------
+# ResourceResolver error paths
+# ------------------------------------------------------------------
+
+
+class TestResourceResolverErrorPaths:
+    @pytest.mark.asyncio
+    async def test_download_failure_cleans_up_partial_file(self, resolver, tmp_cache):
+        """Failed download should remove any partial file."""
+        url = "https://cdn.example.com/large.bin"
+
+        with patch.object(resolver, "_stream_download", new_callable=AsyncMock) as mock_dl:
+            async def failing_download(u, dest, cb=None):
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(b"partial data")
+                raise ConnectionError("Connection lost")
+
+            mock_dl.side_effect = failing_download
+
+            with pytest.raises(RuntimeError, match="Download failed"):
+                await resolver.resolve(url)
+
+            # Verify partial file was cleaned up
+            url_hash = hashlib.sha256(url.encode()).hexdigest()[:16]
+            cache_dir = tmp_cache / "downloads" / url_hash
+            assert not (cache_dir / "large.bin").exists()
+
+    @pytest.mark.asyncio
+    async def test_post_download_checksum_failure_deletes_file(self, resolver, tmp_cache):
+        """File that fails checksum after download should be deleted."""
+        url = "https://cdn.example.com/firmware.bin"
+        content = b"downloaded content"
+
+        with patch.object(resolver, "_stream_download", new_callable=AsyncMock) as mock_dl:
+            async def fake_download(u, dest, cb=None):
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(content)
+
+            mock_dl.side_effect = fake_download
+
+            with pytest.raises(RuntimeError, match="Checksum verification failed"):
+                await resolver.resolve(url, checksum={"sha256": "wrong_hash"})
+
+            # File should be deleted after checksum failure
+            url_hash = hashlib.sha256(url.encode()).hexdigest()[:16]
+            cache_dir = tmp_cache / "downloads" / url_hash
+            assert not (cache_dir / "firmware.bin").exists()
