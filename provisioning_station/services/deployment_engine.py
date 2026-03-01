@@ -589,6 +589,9 @@ class DeploymentEngine:
             if deployment_id in self._running_tasks:
                 del self._running_tasks[deployment_id]
 
+            # Remove from active now that it's in completed_deployments
+            self.active_deployments.pop(deployment_id, None)
+
             await self._broadcast_update(
                 deployment_id,
                 {
