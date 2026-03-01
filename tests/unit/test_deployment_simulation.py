@@ -392,16 +392,20 @@ class TestDeploymentEngineSimulated:
 
     @pytest.mark.asyncio
     async def test_deployment_records_to_completed_list(self):
-        """Completed deployments are added to the completed list."""
+        """Completed deployments move from active to completed list."""
         engine = DeploymentEngine()
         deployment_id = await _run_simulated_deployment(
             engine, device_type="docker_local", scenario=FAST_SUCCESS
         )
 
-        # NOTE: The engine currently keeps the deployment in active_deployments
-        # even after completion (it only removes _running_tasks). This is a
-        # known behavior — get_deployment() checks both dicts.
+        # Should be in completed list, not active
+        assert deployment_id not in engine.active_deployments
         assert any(d.id == deployment_id for d in engine.completed_deployments)
+
+        # Should still be retrievable via get_deployment
+        deployment = engine.get_deployment(deployment_id)
+        assert deployment is not None
+        assert deployment.status == DeploymentStatus.COMPLETED
 
     @pytest.mark.asyncio
     async def test_websocket_broadcast_on_success(self):
