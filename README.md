@@ -194,7 +194,8 @@ intro:
   description_file_zh: description_zh.md
   cover_image: gallery/cover.png
 
-  category: voice_ai  # voice_ai | sensing | automation
+  category: voice_ai  # voice_ai | sensing | automation | vision | smart_building | industrial_iot | security
+  solution_type: solution  # solution (完整方案) | technical (技术演示)
   tags: [iot, watcher]
 
   # 设备目录（介绍页显示的设备信息）
@@ -276,13 +277,47 @@ deployment:
 部署到远程服务器。
 ```
 
+### 使用 Claude Code 自动化
+
+项目内置了多个 Claude Code Skills（slash commands），可自动化方案创建和优化的大部分工作：
+
+**方案创建与优化**
+
+| 命令 | 用途 |
+|------|------|
+| `/solution-validation <url> [solution_id]` | 从 Wiki/GitHub 文档创建新方案 —— 自动复现部署流程、提炼最简路径、生成 guide.md 和 description.md |
+| `/solution-copywriting <solution_id>` | 优化方案文案 —— 检查术语、确保非技术用户能理解、修正格式问题 |
+
+**设备资源准备**
+
+| 命令 | 用途 |
+|------|------|
+| `/prepare-docker-images` | 准备 Docker Compose 文件和容器镜像 |
+| `/prepare-esp32-firmware` | 准备 ESP32 固件二进制文件和烧录配置 |
+| `/prepare-himax-firmware` | 准备 Himax WE2 固件和 AI 模型 |
+| `/prepare-deb-package` | 准备 reCamera C++ 部署用的 .deb 包 |
+| `/prepare-recamera-nodered` | 准备 reCamera Node-RED 流配置 |
+
+**典型新增方案流程**
+
+```bash
+# 1. 从 Wiki 页面自动生成方案骨架（含 solution.yaml、guide.md、description.md）
+/solution-validation https://wiki.seeedstudio.com/your-project my_solution
+
+# 2. 优化文案（检查术语、可读性）
+/solution-copywriting my_solution
+
+# 3. 验证方案格式
+uv run --group test pytest tests/unit/test_solution_format.py -v
+```
+
 ### 相关文档
 
 | 文档 | 说明 |
 |------|------|
 | [配置指南](docs/solution-configuration-guide.md) | solution.yaml 完整配置说明 |
-| [从 Wiki 创建](.claude/skills/add-solution-from-wiki.md) | 从 Wiki 页面生成方案 |
 | [文案规范](.claude/skills/solution-copywriting/SKILL.md) | 介绍页/部署页文案标准 |
+| [方案验证](.claude/skills/solution-validation/SKILL.md) | 从原始资料创建方案的完整流程 |
 
 ---
 
