@@ -396,4 +396,3 @@ class SSHBinaryDeployer(SSHMixin, BaseDeployer):
         Subclasses can override to perform post-deployment tasks.
         """
         pass
-

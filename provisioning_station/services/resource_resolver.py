@@ -80,9 +80,7 @@ class ResourceResolver:
         # Check cache – if file exists and checksum matches, skip download
         if cache_path.exists():
             if checksum and not self._verify_checksum(cache_path, checksum):
-                logger.info(
-                    "Cached file checksum mismatch, re-downloading: %s", url
-                )
+                logger.info("Cached file checksum mismatch, re-downloading: %s", url)
             else:
                 logger.info("Using cached file: %s", cache_path)
                 return str(cache_path)
@@ -105,9 +103,7 @@ class ResourceResolver:
         # Verify checksum after download
         if checksum and not self._verify_checksum(cache_path, checksum):
             cache_path.unlink()
-            raise RuntimeError(
-                f"Checksum verification failed after downloading {url}"
-            )
+            raise RuntimeError(f"Checksum verification failed after downloading {url}")
 
         if progress_callback:
             await self._report(progress_callback, f"Downloaded {filename}")
@@ -197,6 +193,7 @@ class ResourceResolver:
 # ---------------------------------------------------------------------------
 # Module-level singleton
 # ---------------------------------------------------------------------------
+
 
 def _create_resolver() -> ResourceResolver:
     from ..config import settings

@@ -280,4 +280,3 @@ class SSHDeployer(SSHMixin, BaseDeployer):
                 progress_callback, "install", 0, f"Deployment failed: {str(e)}"
             )
             return False
-
