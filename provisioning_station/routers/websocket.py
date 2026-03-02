@@ -7,6 +7,9 @@ from typing import Dict, Set
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from ..config import settings
+from ..middleware.auth import ws_auth_check
+from ..services.api_key_manager import get_api_key_manager
 from ..services.deployment_engine import deployment_engine
 
 router = APIRouter()
@@ -63,6 +66,8 @@ deployment_engine.set_websocket_manager(manager)
 @router.websocket("/ws/logs/{deployment_id}")
 async def websocket_logs(websocket: WebSocket, deployment_id: str):
     """WebSocket endpoint for real-time deployment logs"""
+    if not await ws_auth_check(websocket, get_api_key_manager(), settings.api_enabled):
+        return
     await manager.connect(websocket, deployment_id)
 
     try:
@@ -116,6 +121,8 @@ async def websocket_logs(websocket: WebSocket, deployment_id: str):
 @router.websocket("/ws/all")
 async def websocket_all_logs(websocket: WebSocket):
     """WebSocket endpoint for all deployment logs (admin view)"""
+    if not await ws_auth_check(websocket, get_api_key_manager(), settings.api_enabled):
+        return
     await websocket.accept()
 
     # Track which deployments we're subscribed to

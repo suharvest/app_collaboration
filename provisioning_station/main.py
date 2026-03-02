@@ -26,7 +26,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
+from .middleware.auth import ApiKeyAuthMiddleware
 from .routers import (
+    api_keys,
     deployments,
     device_management,
     devices,
@@ -38,6 +40,7 @@ from .routers import (
     versions,
     websocket,
 )
+from .services.api_key_manager import get_api_key_manager
 from .services.mqtt_bridge import get_mqtt_bridge, is_mqtt_available
 from .services.serial_camera_service import get_serial_camera_manager
 from .services.solution_manager import solution_manager
@@ -127,6 +130,23 @@ async def lifespan(app: FastAPI):
     await solution_manager.load_solutions()
     print(f"Loaded {len(solution_manager.solutions)} solutions")
 
+    # Auto-create default API key if api_enabled and no keys exist
+    if settings.api_enabled:
+        logger.info("API access enabled — external clients can connect")
+        key = get_api_key_manager().ensure_default_key()
+        if key:
+            masked = f"{key[:5]}...{key[-4:]}"
+            logger.warning("Auto-generated default API key (masked): %s", masked)
+            # Write plaintext to file with restricted permissions
+            key_file = settings.data_dir / "default_api_key.txt"
+            settings.data_dir.mkdir(parents=True, exist_ok=True)
+            key_file.write_text(key)
+            key_file.chmod(0o600)
+            logger.info(
+                "Plaintext key saved to %s — read it once, then delete the file.",
+                key_file,
+            )
+
     yield
 
     # Shutdown - this runs when uvicorn receives SIGTERM/SIGINT
@@ -139,7 +159,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="IoT Solution Provisioning Platform for Seeed Studio products",
+    description=(
+        "IoT Solution Provisioning Platform for Seeed Studio products.\n\n"
+        "**Authentication:** Localhost requests are always allowed. "
+        "Remote requests require an API key via `X-API-Key` header "
+        "or `Authorization: Bearer <key>`."
+    ),
     lifespan=lifespan,
 )
 
@@ -150,6 +175,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# API key auth middleware (after CORS so preflight OPTIONS are not blocked)
+app.add_middleware(
+    ApiKeyAuthMiddleware,
+    api_enabled=settings.api_enabled,
+    key_manager=get_api_key_manager(),
 )
 
 # Include routers
@@ -163,6 +195,7 @@ app.include_router(preview.router)
 app.include_router(docker_devices.router)
 app.include_router(restore.router)
 app.include_router(serial_camera.router)
+app.include_router(api_keys.router)
 
 # Serve static frontend files
 _frontend_dir = settings.frontend_dir or (
@@ -201,6 +234,21 @@ def main():
     parser = argparse.ArgumentParser(
         description="SenseCraft Solution Provisioning Station"
     )
+
+    subparsers = parser.add_subparsers(dest="command")
+
+    # Subcommand: create-key
+    create_key_parser = subparsers.add_parser("create-key", help="Create an API key")
+    create_key_parser.add_argument("name", help="Name for the API key")
+
+    # Subcommand: list-keys
+    subparsers.add_parser("list-keys", help="List all API keys")
+
+    # Subcommand: delete-key
+    delete_key_parser = subparsers.add_parser("delete-key", help="Delete an API key")
+    delete_key_parser.add_argument("name", help="Name of the key to delete")
+
+    # Server arguments
     parser.add_argument(
         "--port",
         type=int,
@@ -226,12 +274,49 @@ def main():
         help="Path to frontend dist directory",
     )
     parser.add_argument(
+        "--api-enabled",
+        action="store_true",
+        default=settings.api_enabled,
+        help="Enable external API access (binds to 0.0.0.0)",
+    )
+    parser.add_argument(
         "--reload",
         action="store_true",
         default=settings.debug,
         help="Enable auto-reload (for development)",
     )
     args = parser.parse_args()
+
+    # Handle key management subcommands
+    if args.command == "create-key":
+        manager = get_api_key_manager()
+        key = manager.create_key(args.name)
+        print(f"API key created: {key}")
+        print("Save this key — it will not be shown again.")
+        return
+    elif args.command == "list-keys":
+        manager = get_api_key_manager()
+        keys = manager.list_keys()
+        if not keys:
+            print("No API keys found.")
+        else:
+            for k in keys:
+                print(
+                    f"  {k['name']}  created={k['created_at']}  last_used={k['last_used_at']}"
+                )
+        return
+    elif args.command == "delete-key":
+        manager = get_api_key_manager()
+        if manager.delete_key(args.name):
+            print(f"Deleted key '{args.name}'")
+        else:
+            print(f"Key '{args.name}' not found")
+        return
+
+    # Sync --api-enabled flag to settings so middleware sees it
+    if args.api_enabled and not settings.api_enabled:
+        os.environ["PS_API_ENABLED"] = "true"
+        settings.api_enabled = True
 
     # Set solutions dir via environment variable if provided
     # This will be picked up when uvicorn imports the app
@@ -241,13 +326,18 @@ def main():
     if args.frontend_dir:
         os.environ["PS_FRONTEND_DIR"] = args.frontend_dir
 
+    # When API is enabled, default host to api_host (0.0.0.0) unless explicitly set
+    host = args.host
+    if args.api_enabled and host == settings.host and host == "127.0.0.1":
+        host = settings.api_host
+
     if is_frozen:
         # For frozen executables, pass the app object directly to avoid
         # module reimport issues where sys.frozen might not be preserved
         # Also disable reload since it doesn't work with frozen apps
         uvicorn.run(
             app,
-            host=args.host,
+            host=host,
             port=args.port,
             reload=False,
         )
@@ -255,7 +345,7 @@ def main():
         # For development, use string reference to enable hot reload
         uvicorn.run(
             "provisioning_station.main:app",
-            host=args.host,
+            host=host,
             port=args.port,
             reload=args.reload,
         )
