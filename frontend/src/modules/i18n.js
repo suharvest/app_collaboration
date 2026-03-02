@@ -494,6 +494,7 @@ const translations = {
         vision: 'Vision',
         smart_building: 'Smart Building',
         industrial_iot: 'Industrial IoT',
+        security: 'Security',
       },
       validation: {
         title: 'Guide Structure Validation',
@@ -1103,6 +1104,7 @@ const translations = {
         vision: '视觉',
         smart_building: '智慧楼宇',
         industrial_iot: '工业物联网',
+        security: '安防',
       },
       validation: {
         title: 'Guide 结构校验',

@@ -92,23 +92,28 @@ function renderSolutionCard(solution) {
   // Use getAssetUrl to handle Tauri mode (converts relative /api/... paths to full URLs)
   const coverImage = solution.cover_image ? getAssetUrl(solution.id, solution.cover_image) : PLACEHOLDER_IMAGE;
 
+  const categoryLabel = t('management.categories.' + (solution.category || 'general'));
+
   return `
     <div class="solution-card" data-solution-id="${solution.id}">
-      <img
-        class="solution-card-image"
-        src="${coverImage}"
-        alt="${escapeHtml(name)}"
-        onerror="if(!this.dataset.err){this.dataset.err='1';this.src='${PLACEHOLDER_IMAGE}';}"
-      />
+      <div class="solution-card-image-wrapper">
+        <img
+          class="solution-card-image"
+          src="${coverImage}"
+          alt="${escapeHtml(name)}"
+          onerror="if(!this.dataset.err){this.dataset.err='1';this.src='${PLACEHOLDER_IMAGE}';}"
+        />
+        <div class="solution-card-overlays">
+          ${solution.solution_type === 'technical' ? `
+            <span class="solution-overlay-tag overlay-type">${t('solutions.type.technical')}</span>
+          ` : ''}
+          <span class="solution-overlay-tag overlay-category">${escapeHtml(categoryLabel)}</span>
+        </div>
+      </div>
       <div class="solution-card-content">
         <h3 class="solution-card-title">${escapeHtml(name)}</h3>
         <p class="solution-card-description">${escapeHtml(summary)}</p>
         <div class="solution-card-meta">
-          ${solution.solution_type === 'technical' ? `
-            <span class="solution-type-badge type-technical">
-              ${t('solutions.type.technical')}
-            </span>
-          ` : ''}
           ${solution.difficulty ? `
             <span class="solution-card-tag">
               ${t('solutions.difficulty.' + solution.difficulty)}
