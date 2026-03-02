@@ -21,6 +21,9 @@ static SIDECAR_PID: AtomicU32 = AtomicU32::new(0);
 /// Global flag to track if shutdown is in progress (prevent re-entry)
 static SHUTDOWN_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
 
+/// Global flag to track if external API access is enabled
+static API_ENABLED: AtomicBool = AtomicBool::new(false);
+
 /// Global sidecar child handle for graceful shutdown
 static SIDECAR_CHILD: Mutex<Option<CommandChild>> = Mutex::new(None);
 
@@ -473,6 +476,45 @@ fn get_backend_port() -> u16 {
     BACKEND_PORT.load(Ordering::SeqCst)
 }
 
+/// Tauri command: get API enabled status
+#[tauri::command]
+fn get_api_status() -> bool {
+    API_ENABLED.load(Ordering::SeqCst)
+}
+
+/// Tauri command: enable/disable API access (requires sidecar restart to take effect)
+#[tauri::command]
+fn enable_api(enabled: bool) {
+    API_ENABLED.store(enabled, Ordering::SeqCst);
+    log::info!("API access set to: {}", enabled);
+}
+
+/// Tauri command: restart sidecar with current settings
+#[tauri::command]
+async fn restart_sidecar(app: tauri::AppHandle) -> Result<String, String> {
+    log::info!("Restarting sidecar...");
+
+    // Shutdown current sidecar
+    shutdown_sidecar_graceful();
+
+    // Wait for port to be released
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    // Restart with current port
+    let port = BACKEND_PORT.load(Ordering::SeqCst);
+    start_sidecar(&app, port)
+        .await
+        .map_err(|e| format!("Failed to restart sidecar: {}", e))?;
+
+    // Navigate to backend
+    if let Some(win) = app.get_webview_window("main") {
+        let backend_url = format!("http://127.0.0.1:{}", port);
+        let _ = win.navigate(backend_url.parse().unwrap());
+    }
+
+    Ok("Sidecar restarted".to_string())
+}
+
 /// Tauri command: show native save dialog and write file data
 #[tauri::command]
 async fn save_file_dialog(filename: String, data: String) -> Result<String, String> {
@@ -531,7 +573,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![get_backend_port, save_file_dialog])
+        .invoke_handler(tauri::generate_handler![get_backend_port, save_file_dialog, get_api_status, enable_api, restart_sidecar])
         .setup(move |app| {
             let handle = app.handle().clone();
             let port = backend_port;
@@ -883,12 +925,19 @@ async fn start_sidecar(
 
     log::info!("Solutions directory: {:?}", solutions_dir);
 
+    let api_enabled = API_ENABLED.load(Ordering::SeqCst);
+    let bind_host = if api_enabled { "0.0.0.0" } else { "127.0.0.1" };
+
     let mut args = vec![
         "--port".to_string(),
         port.to_string(),
         "--host".to_string(),
-        "127.0.0.1".to_string(),
+        bind_host.to_string(),
     ];
+
+    if api_enabled {
+        args.push("--api-enabled".to_string());
+    }
 
     // Only pass solutions-dir if it exists (bundled app)
     if solutions_dir.exists() {

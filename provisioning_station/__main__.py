@@ -26,6 +26,10 @@ if "--solutions-dir" in sys.argv:
     except (ValueError, IndexError):
         pass
 
+# Parse --api-enabled early (flag, no value)
+if "--api-enabled" in sys.argv:
+    os.environ["PS_API_ENABLED"] = "true"
+
 # Parse --frontend-dir early (same pattern)
 if "--frontend-dir" in sys.argv:
     try:

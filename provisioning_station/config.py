@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     logs_dir: Path = data_dir / "logs"
     cache_dir: Path = data_dir / "cache"
 
+    # External API access
+    api_enabled: bool = False  # PS_API_ENABLED — enable LAN API access
+    api_host: str = "0.0.0.0"  # PS_API_HOST — bind address when api_enabled
+
     # Language
     default_language: str = "zh"  # zh | en
 

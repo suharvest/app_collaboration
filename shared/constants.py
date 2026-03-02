@@ -76,3 +76,6 @@ DIFFICULTY_LEVELS: list[str] = [
     "intermediate",
     "advanced",
 ]
+
+# API Key authentication header name
+API_KEY_HEADER: str = "X-API-Key"

@@ -72,6 +72,10 @@ export function connectLogsWebSocket(deploymentId, deviceId) {
   });
 
   ws.on('close', (event) => {
+    // If this WebSocket has been replaced by a new one (e.g. after "replace containers"),
+    // ignore the close event — the new deployment is already running.
+    if (getLogsWs(deviceId) !== ws) return;
+
     const state = getDeviceState(deviceId);
     // If deployment was still running when WebSocket closed, mark as failed
     if (state && state.deploymentStatus === 'running') {
