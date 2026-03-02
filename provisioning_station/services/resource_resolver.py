@@ -122,7 +122,15 @@ class ResourceResolver:
         dest: Path,
         progress_callback: Optional[Callable] = None,
     ) -> None:
-        """Stream-download *url* to *dest* with retry on failure."""
+        """Stream-download *url* to *dest* with retry on failure.
+
+        Tries up to MAX_RETRIES times using the system proxy settings.
+        If all attempts fail, makes one final attempt bypassing the proxy
+        (common fix for Windows machines with Clash/V2Ray proxies that
+        interfere with CDN downloads).
+        """
+        import asyncio
+
         last_error: Optional[Exception] = None
 
         for attempt in range(1, self.MAX_RETRIES + 1):
@@ -146,12 +154,28 @@ class ResourceResolver:
                             progress_callback,
                             f"Download interrupted, retrying ({attempt}/{self.MAX_RETRIES})...",
                         )
-                    import asyncio
-
                     await asyncio.sleep(wait)
                     # Clean up partial file
                     if dest.exists():
                         dest.unlink()
+
+        # All proxy-aware attempts failed — try once more bypassing proxy
+        logger.info("All proxy attempts failed, trying direct connection for %s", url)
+        if progress_callback:
+            await self._report(
+                progress_callback,
+                "Retrying with direct connection (bypassing proxy)...",
+            )
+        if dest.exists():
+            dest.unlink()
+        try:
+            await self._stream_download_once(
+                url, dest, progress_callback, trust_env=False
+            )
+            return
+        except Exception as exc:
+            logger.warning("Direct connection also failed for %s: %s", url, exc)
+            # Raise the original error (more informative)
 
         raise last_error  # type: ignore[misc]
 
@@ -160,12 +184,18 @@ class ResourceResolver:
         url: str,
         dest: Path,
         progress_callback: Optional[Callable] = None,
+        trust_env: bool = True,
     ) -> None:
-        """Single attempt to stream-download *url* to *dest*."""
+        """Single attempt to stream-download *url* to *dest*.
+
+        Set *trust_env=False* to ignore system proxy settings.
+        """
         import httpx
 
         timeout = httpx.Timeout(30.0, read=120.0)
-        async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
+        async with httpx.AsyncClient(
+            follow_redirects=True, timeout=timeout, trust_env=trust_env
+        ) as client:
             async with client.stream("GET", url) as response:
                 response.raise_for_status()
 
