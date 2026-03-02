@@ -18,6 +18,7 @@ intro:
     caption: Display System Architecture
     caption_zh: 投屏系统架构
   category: voice_ai
+  solution_type: technical
   tags:
   - watcher
   - face_recognition

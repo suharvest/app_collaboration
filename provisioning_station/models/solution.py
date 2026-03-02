@@ -152,6 +152,7 @@ class SolutionIntro(BaseModel):
     cover_image: Optional[str] = None
     gallery: List[MediaItem] = []
     category: str = "general"
+    solution_type: str = "solution"  # "solution" | "technical"
     tags: List[str] = []
     required_devices: List[RequiredDevice] = []  # Legacy field
     # New device configuration system

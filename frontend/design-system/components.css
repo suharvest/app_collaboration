@@ -143,6 +143,38 @@
     @apply py-0.5 px-2 bg-primary-light text-primary rounded text-xs;
   }
 
+  /* Solution Type Filter Tabs */
+  .filter-tabs {
+    @apply flex items-center gap-2 mb-6;
+  }
+
+  .filter-tab {
+    @apply py-1.5 px-4 rounded-full text-sm font-medium cursor-pointer
+           border border-border text-text-secondary bg-transparent
+           transition-all duration-200;
+  }
+
+  .filter-tab:hover {
+    @apply border-primary text-primary;
+  }
+
+  .filter-tab.active {
+    @apply bg-primary text-white border-primary;
+  }
+
+  /* Solution Type Badge */
+  .solution-type-badge {
+    @apply py-0.5 px-2 rounded text-xs font-medium;
+  }
+
+  .solution-type-badge.type-solution {
+    @apply bg-[#effce8] text-success;
+  }
+
+  .solution-type-badge.type-technical {
+    @apply bg-blue-50 text-blue-600;
+  }
+
   /* ============================================
      5. DEVICE CARDS
      ============================================ */

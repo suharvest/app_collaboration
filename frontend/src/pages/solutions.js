@@ -9,6 +9,7 @@ import { toast } from '../modules/toast.js';
 import { PLACEHOLDER_IMAGE, escapeHtml } from '../modules/utils.js';
 
 let solutions = [];
+let activeTypeFilter = 'all'; // 'all' | 'solution' | 'technical'
 
 export async function renderSolutionsPage() {
   const container = document.getElementById('content-area');
@@ -31,27 +32,57 @@ export async function renderSolutionsPage() {
       return;
     }
 
-    container.innerHTML = `
-      <div class="page-header">
-        <h1 class="page-title" data-i18n="solutions.title">${t('solutions.title')}</h1>
-      </div>
-      <div class="solutions-grid">
-        ${solutions.map(renderSolutionCard).join('')}
-      </div>
-    `;
-
-    // Add click handlers
-    container.querySelectorAll('.solution-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const solutionId = card.dataset.solutionId;
-        router.navigate('solution', { id: solutionId });
-      });
-    });
+    renderFilteredView(container);
   } catch (error) {
     console.error('Failed to load solutions:', error);
     toast.error(t('common.error') + ': ' + error.message);
     container.innerHTML = renderErrorState(error.message);
   }
+}
+
+function renderFilteredView(container) {
+  const filtered = activeTypeFilter === 'all'
+    ? solutions
+    : solutions.filter(s => (s.solution_type || 'solution') === activeTypeFilter);
+
+  container.innerHTML = `
+    <div class="page-header">
+      <h1 class="page-title" data-i18n="solutions.title">${t('solutions.title')}</h1>
+    </div>
+    ${renderFilterTabs()}
+    <div class="solutions-grid">
+      ${filtered.length > 0 ? filtered.map(renderSolutionCard).join('') : `<p class="text-text-muted">${t('solutions.empty')}</p>`}
+    </div>
+  `;
+
+  // Add filter tab handlers
+  container.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      activeTypeFilter = tab.dataset.type;
+      renderFilteredView(container);
+    });
+  });
+
+  // Add card click handlers
+  container.querySelectorAll('.solution-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const solutionId = card.dataset.solutionId;
+      router.navigate('solution', { id: solutionId });
+    });
+  });
+}
+
+function renderFilterTabs() {
+  const types = ['all', 'solution', 'technical'];
+  return `
+    <div class="filter-tabs">
+      ${types.map(type => `
+        <button class="filter-tab ${activeTypeFilter === type ? 'active' : ''}" data-type="${type}">
+          ${t('solutions.type.' + type)}
+        </button>
+      `).join('')}
+    </div>
+  `;
 }
 
 function renderSolutionCard(solution) {
@@ -73,6 +104,11 @@ function renderSolutionCard(solution) {
         <h3 class="solution-card-title">${escapeHtml(name)}</h3>
         <p class="solution-card-description">${escapeHtml(summary)}</p>
         <div class="solution-card-meta">
+          ${solution.solution_type === 'technical' ? `
+            <span class="solution-type-badge type-technical">
+              ${t('solutions.type.technical')}
+            </span>
+          ` : ''}
           ${solution.difficulty ? `
             <span class="solution-card-tag">
               ${t('solutions.difficulty.' + solution.difficulty)}

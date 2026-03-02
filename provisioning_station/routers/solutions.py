@@ -158,6 +158,7 @@ async def load_preset_section(
 @router.get("/", response_model=List[SolutionSummary])
 async def list_solutions(
     category: Optional[str] = None,
+    solution_type: Optional[str] = None,
     lang: str = Query("en", pattern="^(en|zh)$"),
     include_disabled: bool = Query(
         False, description="Include disabled solutions (for management UI)"
@@ -173,6 +174,9 @@ async def list_solutions(
             continue
 
         if category and solution.intro.category != category:
+            continue
+
+        if solution_type and solution.intro.solution_type != solution_type:
             continue
 
         # Check file existence for management UI
@@ -205,6 +209,7 @@ async def list_solutions(
             summary=solution.intro.summary,  # Always return original values
             summary_zh=solution.intro.summary_zh,
             category=solution.intro.category,
+            solution_type=solution.intro.solution_type,
             tags=solution.intro.tags,
             cover_image=(
                 f"/api/solutions/{solution.id}/assets/{solution.intro.cover_image}"

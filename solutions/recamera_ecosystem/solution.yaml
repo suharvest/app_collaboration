@@ -9,6 +9,7 @@ intro:
   description_file_zh: description_zh.md
   cover_image: gallery/recamera.svg
   category: automation
+  solution_type: technical
   tags:
   - recamera
   - home-assistant

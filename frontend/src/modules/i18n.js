@@ -24,6 +24,11 @@ const translations = {
         intermediate: 'Intermediate',
         advanced: 'Advanced',
       },
+      type: {
+        all: 'All',
+        solution: 'Solutions',
+        technical: 'Technical',
+      },
       estimatedTime: 'Est. time',
       deployedCount: 'Deployed',
       viewDetails: 'View Details',
@@ -627,6 +632,11 @@ const translations = {
         beginner: '入门',
         intermediate: '中级',
         advanced: '高级',
+      },
+      type: {
+        all: '全部',
+        solution: '完整方案',
+        technical: '技术演示',
       },
       estimatedTime: '预计时间',
       deployedCount: '已部署',

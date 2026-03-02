@@ -19,6 +19,7 @@ class SolutionSummary(BaseModel):
     summary: str
     summary_zh: Optional[str] = None
     category: str
+    solution_type: str = "solution"  # "solution" | "technical"
     tags: List[str] = []
     cover_image: Optional[str] = None
     difficulty: str = "beginner"
