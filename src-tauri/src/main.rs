@@ -1025,17 +1025,22 @@ async fn start_sidecar(
     let health_url = format!("http://127.0.0.1:{}/api/health", port);
     let client = reqwest::Client::new();
 
-    for attempt in 1..=30 {
+    // First cold start (fresh install) can be slow due to:
+    //   - Sidecar extraction (~55MB _internal directory)
+    //   - PyInstaller first-run module loading
+    //   - macOS Gatekeeper scanning new binaries
+    // Use generous timeout: 60 attempts × 500ms = 30 seconds
+    for attempt in 1..=60 {
         match client.get(&health_url).send().await {
             Ok(response) if response.status().is_success() => {
                 log::info!("Backend is ready (attempt {})", attempt);
                 return Ok(());
             }
             _ => {
-                if attempt % 5 == 0 {
-                    log::info!("Waiting for backend to start... (attempt {})", attempt);
+                if attempt % 10 == 0 {
+                    log::info!("Waiting for backend to start... (attempt {}/60)", attempt);
                 }
-                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
         }
     }

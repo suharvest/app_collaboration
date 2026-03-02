@@ -114,16 +114,58 @@ class ResourceResolver:
     # Internals
     # ------------------------------------------------------------------
 
+    MAX_RETRIES = 3
+
     async def _stream_download(
         self,
         url: str,
         dest: Path,
         progress_callback: Optional[Callable] = None,
     ) -> None:
-        """Stream-download *url* to *dest* using httpx."""
+        """Stream-download *url* to *dest* with retry on failure."""
+        last_error: Optional[Exception] = None
+
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            try:
+                await self._stream_download_once(url, dest, progress_callback)
+                return  # success
+            except Exception as exc:
+                last_error = exc
+                if attempt < self.MAX_RETRIES:
+                    wait = attempt * 2  # 2s, 4s
+                    logger.warning(
+                        "Download attempt %d/%d failed for %s: %s  (retry in %ds)",
+                        attempt,
+                        self.MAX_RETRIES,
+                        Path(url).name,
+                        exc,
+                        wait,
+                    )
+                    if progress_callback:
+                        await self._report(
+                            progress_callback,
+                            f"Download interrupted, retrying ({attempt}/{self.MAX_RETRIES})...",
+                        )
+                    import asyncio
+
+                    await asyncio.sleep(wait)
+                    # Clean up partial file
+                    if dest.exists():
+                        dest.unlink()
+
+        raise last_error  # type: ignore[misc]
+
+    async def _stream_download_once(
+        self,
+        url: str,
+        dest: Path,
+        progress_callback: Optional[Callable] = None,
+    ) -> None:
+        """Single attempt to stream-download *url* to *dest*."""
         import httpx
 
-        async with httpx.AsyncClient(follow_redirects=True, timeout=300) as client:
+        timeout = httpx.Timeout(30.0, read=120.0)
+        async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
             async with client.stream("GET", url) as response:
                 response.raise_for_status()
 

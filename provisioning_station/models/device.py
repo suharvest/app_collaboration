@@ -559,7 +559,7 @@ class DeviceConfig(BaseModel):
                 return step.default
         return default
 
-    async def resolve_remote_assets(self, resolver) -> None:
+    async def resolve_remote_assets(self, resolver, progress_callback=None) -> None:
         """Pre-resolve all URL references to local cached paths.
 
         Called by deployment_engine before deployer.deploy() so that
@@ -570,40 +570,54 @@ class DeviceConfig(BaseModel):
         # --- firmware ---
         if self.firmware:
             src = self.firmware.source
-            src.path = await resolver.resolve(src.path, base, src.checksum)
+            src.path = await resolver.resolve(
+                src.path, base, src.checksum, progress_callback
+            )
             for part in self.firmware.flash_config.partitions:
                 if resolver.is_url(part.file):
-                    part.file = await resolver.resolve(part.file, base)
+                    part.file = await resolver.resolve(
+                        part.file, base, progress_callback=progress_callback
+                    )
             for model in self.firmware.flash_config.models:
-                model.path = await resolver.resolve(model.path, base, model.checksum)
+                model.path = await resolver.resolve(
+                    model.path, base, model.checksum, progress_callback
+                )
 
         # --- package (ssh_deb) ---
         if self.package:
             src = self.package.source
-            src.path = await resolver.resolve(src.path, base, src.checksum)
+            src.path = await resolver.resolve(
+                src.path, base, src.checksum, progress_callback
+            )
 
         # --- binary (recamera_cpp) ---
         if self.binary:
             if self.binary.deb_package:
                 dp = self.binary.deb_package
-                dp.path = await resolver.resolve(dp.path, base, dp.checksum)
+                dp.path = await resolver.resolve(
+                    dp.path, base, dp.checksum, progress_callback
+                )
             for model in self.binary.models:
-                model.path = await resolver.resolve(model.path, base, model.checksum)
+                model.path = await resolver.resolve(
+                    model.path, base, model.checksum, progress_callback
+                )
 
         # --- docker ---
         if self.docker and resolver.is_url(self.docker.compose_file):
             self.docker.compose_file = await resolver.resolve(
-                self.docker.compose_file, base
+                self.docker.compose_file, base, progress_callback=progress_callback
             )
         if self.docker_remote and resolver.is_url(self.docker_remote.compose_file):
             self.docker_remote.compose_file = await resolver.resolve(
-                self.docker_remote.compose_file, base
+                self.docker_remote.compose_file,
+                base,
+                progress_callback=progress_callback,
             )
 
         # --- nodered ---
         if self.nodered and resolver.is_url(self.nodered.flow_file):
             self.nodered.flow_file = await resolver.resolve(
-                self.nodered.flow_file, base
+                self.nodered.flow_file, base, progress_callback=progress_callback
             )
 
         # --- actions ---

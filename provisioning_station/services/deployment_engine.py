@@ -281,8 +281,17 @@ class DeploymentEngine:
                 # Resolve remote assets (download URLs to local cache)
                 from .resource_resolver import resource_resolver
 
+                async def _asset_progress(step_id, progress, message):
+                    await self._broadcast_log(
+                        deployment_id,
+                        message,
+                        device_id=device_deployment.device_id,
+                    )
+
                 try:
-                    await config.resolve_remote_assets(resource_resolver)
+                    await config.resolve_remote_assets(
+                        resource_resolver, progress_callback=_asset_progress
+                    )
                 except Exception as e:
                     device_deployment.status = DeploymentStatus.FAILED
                     device_deployment.error = f"Failed to resolve remote assets: {e}"
