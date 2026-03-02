@@ -535,8 +535,18 @@ class DeviceConfig(BaseModel):
     base_path: Optional[str] = None
 
     def get_asset_path(self, relative_path: str) -> Optional[str]:
-        """Get absolute path to a device asset"""
-        if self.base_path and relative_path:
+        """Get absolute path to a device asset.
+
+        If the path is already absolute (e.g. resolved by resource_resolver
+        from a cloud URL to a local cache path), return it as-is.
+        """
+        if not relative_path:
+            return None
+        import os
+
+        if os.path.isabs(relative_path):
+            return relative_path
+        if self.base_path:
             from pathlib import Path
 
             return str(Path(self.base_path) / relative_path)
@@ -560,35 +570,25 @@ class DeviceConfig(BaseModel):
         # --- firmware ---
         if self.firmware:
             src = self.firmware.source
-            src.path = await resolver.resolve(
-                src.path, base, src.checksum
-            )
+            src.path = await resolver.resolve(src.path, base, src.checksum)
             for part in self.firmware.flash_config.partitions:
                 if resolver.is_url(part.file):
                     part.file = await resolver.resolve(part.file, base)
             for model in self.firmware.flash_config.models:
-                model.path = await resolver.resolve(
-                    model.path, base, model.checksum
-                )
+                model.path = await resolver.resolve(model.path, base, model.checksum)
 
         # --- package (ssh_deb) ---
         if self.package:
             src = self.package.source
-            src.path = await resolver.resolve(
-                src.path, base, src.checksum
-            )
+            src.path = await resolver.resolve(src.path, base, src.checksum)
 
         # --- binary (recamera_cpp) ---
         if self.binary:
             if self.binary.deb_package:
                 dp = self.binary.deb_package
-                dp.path = await resolver.resolve(
-                    dp.path, base, dp.checksum
-                )
+                dp.path = await resolver.resolve(dp.path, base, dp.checksum)
             for model in self.binary.models:
-                model.path = await resolver.resolve(
-                    model.path, base, model.checksum
-                )
+                model.path = await resolver.resolve(model.path, base, model.checksum)
 
         # --- docker ---
         if self.docker and resolver.is_url(self.docker.compose_file):
@@ -624,6 +624,4 @@ class DeviceConfig(BaseModel):
 
         # copy source
         if action.copy_files and resolver.is_url(action.copy_files.src):
-            action.copy_files.src = await resolver.resolve(
-                action.copy_files.src, base
-            )
+            action.copy_files.src = await resolver.resolve(action.copy_files.src, base)
