@@ -5,7 +5,7 @@
 import { getApiBase } from '../modules/api.js';
 import { t, i18n } from '../modules/i18n.js';
 import { router } from '../modules/router.js';
-import { showToast } from '../modules/toast.js';
+import { toast } from '../modules/toast.js';
 
 const isTauri = window.__TAURI__ !== undefined;
 
@@ -126,30 +126,19 @@ function renderApiSection(area, statusData) {
 
   let html = '';
 
-  // Toggle (Tauri only)
-  if (isTauri) {
-    html += `
-      <div class="flex items-center gap-3 mb-4">
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" id="api-toggle" ${api_enabled ? 'checked' : ''}
-            class="w-4 h-4 rounded">
-          <span class="text-sm font-medium">${t('settings.apiAccess.enable')}</span>
-        </label>
-        <span class="text-xs px-2 py-0.5 rounded ${api_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">
-          ${api_enabled ? t('settings.apiAccess.enabled') : t('settings.apiAccess.disabled')}
-        </span>
-      </div>
-    `;
-  } else {
-    html += `
-      <div class="flex items-center gap-3 mb-4">
-        <span class="text-xs px-2 py-0.5 rounded ${api_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">
-          ${api_enabled ? t('settings.apiAccess.enabled') : t('settings.apiAccess.disabled')}
-        </span>
-        ${!api_enabled ? `<span class="text-xs text-text-muted">${t('settings.apiAccess.webModeHint')}</span>` : ''}
-      </div>
-    `;
-  }
+  // Toggle
+  html += `
+    <div class="flex items-center gap-3 mb-4">
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" id="api-toggle" ${api_enabled ? 'checked' : ''}
+          class="w-4 h-4 rounded">
+        <span class="text-sm font-medium">${t('settings.apiAccess.enable')}</span>
+      </label>
+      <span class="text-xs px-2 py-0.5 rounded ${api_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">
+        ${api_enabled ? t('settings.apiAccess.enabled') : t('settings.apiAccess.disabled')}
+      </span>
+    </div>
+  `;
 
   // New key display (outside api-keys-section so loadApiKeys() doesn't destroy it)
   html += `<div id="new-key-display" class="hidden mb-3 mt-4"></div>`;
@@ -160,9 +149,7 @@ function renderApiSection(area, statusData) {
   area.innerHTML = html;
 
   // Attach toggle handler
-  if (isTauri) {
-    area.querySelector('#api-toggle')?.addEventListener('change', handleApiToggle);
-  }
+  area.querySelector('#api-toggle')?.addEventListener('change', handleApiToggle);
 
   // Load keys
   loadApiKeys();
@@ -171,19 +158,24 @@ function renderApiSection(area, statusData) {
 async function handleApiToggle(e) {
   const enabled = e.target.checked;
   try {
-    const invoke = window.__TAURI__?.core?.invoke;
-    if (!invoke) return;
-
-    await invoke('enable_api', { enabled });
-
-    // Show restart message and restart
-    showToast(t('settings.apiAccess.restarting'), 'info');
-    await invoke('restart_sidecar');
-
-    // Reload status after restart
-    setTimeout(() => loadApiStatus(), 2000);
+    if (isTauri) {
+      const invoke = window.__TAURI__?.core?.invoke;
+      if (!invoke) return;
+      await invoke('enable_api', { enabled });
+      toast.show(t('settings.apiAccess.restarting'), 'info');
+      await invoke('restart_sidecar');
+      setTimeout(() => loadApiStatus(), 2000);
+    } else {
+      const res = await fetch(`${getApiBase()}/keys/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      loadApiStatus();
+    }
   } catch (err) {
-    showToast(`Error: ${err}`, 'error');
+    toast.show(`Error: ${err}`, 'error');
     e.target.checked = !enabled; // revert
   }
 }
@@ -262,7 +254,10 @@ function renderApiKeys(section, keys) {
 async function handleCreateKey() {
   const input = document.getElementById('new-key-name');
   const name = input?.value?.trim();
-  if (!name) return;
+  if (!name) {
+    input?.focus();
+    return;
+  }
 
   const btn = document.getElementById('create-key-btn');
   btn.disabled = true;
@@ -293,14 +288,14 @@ async function handleCreateKey() {
       `;
       display.querySelector('#copy-key-btn')?.addEventListener('click', () => {
         navigator.clipboard.writeText(data.api_key);
-        showToast(t('settings.apiAccess.keys.copied'), 'success');
+        toast.show(t('settings.apiAccess.keys.copied'), 'success');
       });
     }
 
     input.value = '';
     loadApiKeys();
   } catch (err) {
-    showToast(`Error: ${err.message}`, 'error');
+    toast.show(`Error: ${err.message}`, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = t('settings.apiAccess.keys.create');
@@ -319,7 +314,7 @@ async function handleDeleteKey(id, name) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     loadApiKeys();
   } catch (err) {
-    showToast(`Error: ${err.message}`, 'error');
+    toast.show(`Error: ${err.message}`, 'error');
   }
 }
 

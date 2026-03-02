@@ -66,3 +66,14 @@ async def api_status():
         "api_enabled": settings.api_enabled,
         "key_count": len(manager.list_keys()),
     }
+
+
+class ToggleRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/toggle")
+async def toggle_api(body: ToggleRequest):
+    """Toggle API access at runtime (localhost only, enforced by middleware)."""
+    settings.api_enabled = body.enabled
+    return {"api_enabled": settings.api_enabled}
