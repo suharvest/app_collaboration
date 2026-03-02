@@ -11,16 +11,19 @@ detection:
   usb_product_id: "0x55d2"
   # Fallback patterns for different platforms
   fallback_ports:
-    - "/dev/tty.wchusbserial*"
-    - "/dev/cu.wchusbserial*"
-    - "/dev/tty.usbserial-*"
-    - "/dev/cu.usbserial-*"
-    - "/dev/ttyUSB*"
-    - "/dev/ttyACM*"
+  - "/dev/tty.wchusbserial*"
+  - "/dev/cu.wchusbserial*"
+  - "/dev/tty.usbserial-*"
+  - "/dev/cu.usbserial-*"
+  - "/dev/ttyUSB*"
+  - "/dev/ttyACM*"
 
 firmware:
   source:
-    path: assets/watcher_firmware/merged-binary.bin
+    path:
+      https://sensecraft-statics.seeed.cc/solution-app/smart_space_assistant/assets/watcher_firmware/merged-binary.bin
+    checksum:
+      sha256: c4a54f9604a525039d4d92b01fc669ca544c42a70dd4a33c80053629080cba13
   flash_config:
     chip: esp32s3
     baud_rate: 921600
@@ -28,25 +31,26 @@ firmware:
     flash_freq: 80m
     flash_size: 16MB
     partitions:
-      - name: merged_firmware
-        offset: "0x0"
-        file: merged-binary.bin
+    - name: merged_firmware
+      offset: "0x0"
+      file:
+        https://sensecraft-statics.seeed.cc/solution-app/smart_space_assistant/assets/watcher_firmware/merged-binary.bin
 
 user_inputs:
-  - id: serial_port
-    name: Serial Port
-    name_zh: 串口
-    type: serial_port
-    required: true
-    description: Select the USB serial port connected to Watcher
-    description_zh: 选择连接到 Watcher 的 USB 串口
-    auto_detect: true
+- id: serial_port
+  name: Serial Port
+  name_zh: 串口
+  type: serial_port
+  required: true
+  description: Select the USB serial port connected to Watcher
+  description_zh: 选择连接到 Watcher 的 USB 串口
+  auto_detect: true
 
 pre_checks:
-  - type: serial_port_available
-    description: Check if serial port is accessible
-  - type: esptool_available
-    description: Check if esptool is installed
+- type: serial_port_available
+  description: Check if serial port is accessible
+- type: esptool_available
+  description: Check if esptool is installed
 
 post_deployment:
   reset_device: true

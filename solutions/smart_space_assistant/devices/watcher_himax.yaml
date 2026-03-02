@@ -12,13 +12,16 @@ detection:
   usb_product_id: "0x55d2"
   # Fallback port patterns
   fallback_ports:
-    - "/dev/cu.usbmodem*"
-    - "/dev/tty.usbmodem*"
-    - "/dev/ttyACM*"
+  - "/dev/cu.usbmodem*"
+  - "/dev/tty.usbmodem*"
+  - "/dev/ttyACM*"
 
 firmware:
   source:
-    path: assets/watcher_firmware/face_recognition.img
+    path:
+      https://sensecraft-statics.seeed.cc/solution-app/smart_space_assistant/assets/watcher_firmware/face_recognition.img
+    checksum:
+      sha256: 7b57beca0c4198ba59fc1f5da8ea202de7b2bc4a865f1f8b9b99daea8f8856c7
   flash_config:
     baudrate: 921600
     requires_reset: false  # No manual reset needed - ESP32 hold triggers Himax bootloader
@@ -31,72 +34,85 @@ firmware:
     # Multi-model configuration
     # These AI models are flashed after the base firmware at specified flash addresses
     models:
-      - id: face_detection
-        name: Face Detection (SCRFD)
-        name_zh: 人脸检测模型 (SCRFD)
-        path: assets/models/scrfd_500m_kps_int8_vela.tflite
-        flash_address: "0x400000"
-        offset: "0x0"
-        required: true
-        default: true
-        description: Core face detection model for identifying faces in video stream
-        description_zh: 核心人脸检测模型，用于识别视频流中的人脸
-        size_hint: "512KB"
+    - id: face_detection
+      name: Face Detection (SCRFD)
+      name_zh: 人脸检测模型 (SCRFD)
+      path:
+        https://sensecraft-statics.seeed.cc/solution-app/smart_space_assistant/assets/models/scrfd_500m_kps_int8_vela.tflite
+      flash_address: "0x400000"
+      offset: "0x0"
+      required: true
+      default: true
+      description: Core face detection model for identifying faces in video
+        stream
+      description_zh: 核心人脸检测模型，用于识别视频流中的人脸
+      size_hint: "512KB"
 
-      - id: face_embedding
-        name: Face Embedding (GhostFaceNet)
-        name_zh: 人脸特征模型 (GhostFaceNet)
-        path: assets/models/ghostfacenet_0.5_112_int8_vela.tflite
-        flash_address: "0x510000"
-        offset: "0x0"
-        required: true
-        default: true
-        description: Face recognition embedding model for person identification
-        description_zh: 人脸识别特征提取模型，用于身份识别
-        size_hint: "800KB"
+      checksum:
+        sha256: c1ec6da7b0883be14c0b9ffa9cc5bd6fcb8331ddb431b03fe71f883b421409c6
+    - id: face_embedding
+      name: Face Embedding (GhostFaceNet)
+      name_zh: 人脸特征模型 (GhostFaceNet)
+      path:
+        https://sensecraft-statics.seeed.cc/solution-app/smart_space_assistant/assets/models/ghostfacenet_0.5_112_int8_vela.tflite
+      flash_address: "0x510000"
+      offset: "0x0"
+      required: true
+      default: true
+      description: Face recognition embedding model for person identification
+      description_zh: 人脸识别特征提取模型，用于身份识别
+      size_hint: "800KB"
 
-      - id: face_detection_2
-        name: Face Detection 2 (SCRFD)
-        name_zh: 人脸检测模型 2 (SCRFD)
-        path: assets/models/scrfd_500m_kps_int8_vela.tflite
-        flash_address: "0x600000"
-        offset: "0x0"
-        required: true
-        default: true
-        description: Secondary face detection model instance
-        description_zh: 人脸检测模型第二实例
-        size_hint: "512KB"
+      checksum:
+        sha256: d669ee04826a05701232bcb89239bd0fcf157cecd2cfda465e9a86794c724aad
+    - id: face_detection_2
+      name: Face Detection 2 (SCRFD)
+      name_zh: 人脸检测模型 2 (SCRFD)
+      path:
+        https://sensecraft-statics.seeed.cc/solution-app/smart_space_assistant/assets/models/scrfd_500m_kps_int8_vela.tflite
+      flash_address: "0x600000"
+      offset: "0x0"
+      required: true
+      default: true
+      description: Secondary face detection model instance
+      description_zh: 人脸检测模型第二实例
+      size_hint: "512KB"
 
-      - id: person_detection
-        name: Person Detection (Swift YOLO)
-        name_zh: 人体检测模型 (Swift YOLO)
-        path: assets/models/swift_yolo_nano_person_192_int8_vela.tflite
-        flash_address: "0x700000"
-        offset: "0x0"
-        required: true
-        default: true
-        description: Person detection model for identifying human presence
-        description_zh: 人体检测模型，用于识别人体存在
-        size_hint: "1.6MB"
+      checksum:
+        sha256: c1ec6da7b0883be14c0b9ffa9cc5bd6fcb8331ddb431b03fe71f883b421409c6
+    - id: person_detection
+      name: Person Detection (Swift YOLO)
+      name_zh: 人体检测模型 (Swift YOLO)
+      path:
+        https://sensecraft-statics.seeed.cc/solution-app/smart_space_assistant/assets/models/swift_yolo_nano_person_192_int8_vela.tflite
+      flash_address: "0x700000"
+      offset: "0x0"
+      required: true
+      default: true
+      description: Person detection model for identifying human presence
+      description_zh: 人体检测模型，用于识别人体存在
+      size_hint: "1.6MB"
 
 # User inputs (supports auto-detection, can also be manually selected)
+      checksum:
+        sha256: 67621369cae06a0b661d4491111b2b5eec90fc4c397da9230554b003038c1049
 user_inputs:
-  - id: serial_port
-    name: Serial Port
-    name_zh: 串口
-    type: serial_port
-    required: true
-    description: Select the USB port for Himax WE2 (usbmodem)
-    description_zh: 选择 Himax WE2 的串口（usbmodem 开头）
-    auto_detect: true
+- id: serial_port
+  name: Serial Port
+  name_zh: 串口
+  type: serial_port
+  required: true
+  description: Select the USB port for Himax WE2 (usbmodem)
+  description_zh: 选择 Himax WE2 的串口（usbmodem 开头）
+  auto_detect: true
 
-  - id: model_selection
-    name: Models to Flash
-    name_zh: 选择要烧录的模型
-    type: model_select
-    required: false
-    description: Select AI models to flash with the base firmware
-    description_zh: 选择要与基础固件一起烧录的 AI 模型
+- id: model_selection
+  name: Models to Flash
+  name_zh: 选择要烧录的模型
+  type: model_select
+  required: false
+  description: Select AI models to flash with the base firmware
+  description_zh: 选择要与基础固件一起烧录的 AI 模型
 
 post_deployment:
   reset_device: false
