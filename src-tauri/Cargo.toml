@@ -1,6 +1,6 @@
 [package]
 name = "sensecraft-solution"
-version = "0.2.7"
+version = "0.2.8"
 description = "IoT Solution Provisioning Platform for Seeed Studio products"
 authors = ["Seeed Studio"]
 license = "MIT"
