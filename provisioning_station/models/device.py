@@ -258,6 +258,14 @@ class DebPackageConfig(BaseModel):
     checksum: Optional[Dict[str, str]] = None  # Checksum for URL verification
 
 
+class ActionWhen(BaseModel):
+    """Conditional execution for an action or model deployment"""
+
+    field: str  # user_input field id
+    value: Optional[str] = None  # Execute when field equals this value
+    not_value: Optional[str] = None  # Execute when field does NOT equal this value
+
+
 class ModelFileConfig(BaseModel):
     """Model file configuration"""
 
@@ -265,6 +273,7 @@ class ModelFileConfig(BaseModel):
     target_path: str = "/userdata/local/models"  # Target directory on device
     filename: Optional[str] = None  # Target filename (default: same as source)
     checksum: Optional[Dict[str, str]] = None  # Checksum for URL verification
+    when: Optional[ActionWhen] = None  # Conditional: only deploy when condition met
 
 
 class InitScriptConfig(BaseModel):
@@ -288,14 +297,6 @@ class ConflictServiceConfig(BaseModel):
     """Conflicting services to stop"""
 
     stop: List[str] = []  # Services to stop (e.g., ["S03node-red", "S91sscma-node"])
-
-
-class ActionWhen(BaseModel):
-    """Conditional execution for an action"""
-
-    field: str  # user_input field id
-    value: Optional[str] = None  # Execute when field equals this value
-    not_value: Optional[str] = None  # Execute when field does NOT equal this value
 
 
 class ActionCopy(BaseModel):
@@ -559,12 +560,51 @@ class DeviceConfig(BaseModel):
                 return step.default
         return default
 
-    async def resolve_remote_assets(self, resolver, progress_callback=None) -> None:
+    def _build_when_context(
+        self, connection: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Build context dict for evaluating ``when`` conditions.
+
+        Populates user_input defaults first, then overrides with
+        actual connection values.
+        """
+        ctx: Dict[str, Any] = {}
+        for ui in self.user_inputs:
+            if ui.default is not None:
+                ctx[ui.id] = ui.default
+        if connection:
+            ctx.update(connection)
+        return ctx
+
+    @staticmethod
+    def _check_when(when: Optional["ActionWhen"], context: Dict[str, Any]) -> bool:
+        """Check if a ``when`` condition is satisfied.
+
+        Returns *True* when the item should be included (condition met or
+        no condition set).
+        """
+        if when is None:
+            return True
+        field_val = context.get(when.field)
+        if when.value is not None and str(field_val) != when.value:
+            return False
+        if when.not_value is not None and str(field_val) == when.not_value:
+            return False
+        return True
+
+    async def resolve_remote_assets(
+        self, resolver, progress_callback=None, connection=None
+    ) -> None:
         """Pre-resolve all URL references to local cached paths.
 
         Called by deployment_engine before deployer.deploy() so that
         deployers always work with local files.
+
+        *connection* is the user-provided params dict used to evaluate
+        ``when`` conditions on model files — models whose condition is
+        not met are skipped (not downloaded).
         """
+        ctx = self._build_when_context(connection)
         base = self.base_path
 
         # --- firmware ---
@@ -598,6 +638,8 @@ class DeviceConfig(BaseModel):
                     dp.path, base, dp.checksum, progress_callback
                 )
             for model in self.binary.models:
+                if not self._check_when(model.when, ctx):
+                    continue
                 model.path = await resolver.resolve(
                     model.path, base, model.checksum, progress_callback
                 )

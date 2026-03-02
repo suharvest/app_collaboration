@@ -290,7 +290,9 @@ class DeploymentEngine:
 
                 try:
                     await config.resolve_remote_assets(
-                        resource_resolver, progress_callback=_asset_progress
+                        resource_resolver,
+                        progress_callback=_asset_progress,
+                        connection=device_deployment.connection,
                     )
                 except Exception as e:
                     device_deployment.status = DeploymentStatus.FAILED

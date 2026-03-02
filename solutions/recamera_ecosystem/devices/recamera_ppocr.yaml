@@ -30,43 +30,55 @@ binary:
     checksum:
       sha256: fa5197729c7da186cd08e92e818ee07167ffde8737fcf0d826e76f9b1aa4a1fd
   models:
-    # Detection model (shared)
+    # Detection model (shared, always needed)
   - path:
       https://sensecraft-statics.seeed.cc/solution-app/recamera_ecosystem/packages/ppocr_det_cv181x_mix.cvimodel
     target_path: /userdata/local/models
     filename: ppocr_det_cv181x_mix.cvimodel
-    # Chinese recognition model
     checksum:
       sha256: 99bf6d7ea16b9ce98f7c2babb8e0ff73bf7f4c96e0a4919612e762f66451026b
+    # Chinese recognition model
   - path:
       https://sensecraft-statics.seeed.cc/solution-app/recamera_ecosystem/packages/ppocr_rec_cv181x_bf16.cvimodel
     target_path: /userdata/local/models
     filename: ppocr_rec_cv181x_bf16.cvimodel
-    # Chinese dictionary
+    when:
+      field: language
+      value: chinese
     checksum:
       sha256: 38be839889d0dbf1cf436dad551b97f4281181cdef67c2bb9ee59f5736d22261
+    # Chinese dictionary
   - path:
       https://sensecraft-statics.seeed.cc/solution-app/recamera_ecosystem/packages/ppocr_keys_v1.txt
     target_path: /userdata/local/dict
     filename: ppocr_keys_v1.txt
-    # English recognition model
+    when:
+      field: language
+      value: chinese
     checksum:
       sha256: a1c84d9bdb9ab29043c58896224d32941783eb821629618416dcb08f12886492
+    # English recognition model
   - path:
       https://sensecraft-statics.seeed.cc/solution-app/recamera_ecosystem/packages/ppocr_rec_en_cv181x_bf16.cvimodel
     target_path: /userdata/local/models
     filename: ppocr_rec_en_cv181x_bf16.cvimodel
-    # English dictionary
+    when:
+      field: language
+      value: english
     checksum:
       sha256: 92ac0064a8361ae6085b4368bd7a4874b7f2cab86f98f162cc18dcb1d8715393
+    # English dictionary
   - path:
       https://sensecraft-statics.seeed.cc/solution-app/recamera_ecosystem/packages/en_dict.txt
     target_path: /userdata/local/dict
     filename: en_dict.txt
-
-  # 服务配置（deb 包已含 init 脚本）
+    when:
+      field: language
+      value: english
     checksum:
       sha256: 23d40abd395f6f95309602e038d7a5c7e8c5ff2fb06b48b21783cce1b983abf0
+
+  # 服务配置（deb 包已含 init 脚本）
   service_name: ppocr-reader
   service_priority: 92
 

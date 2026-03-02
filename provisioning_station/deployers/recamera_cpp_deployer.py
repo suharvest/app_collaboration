@@ -269,7 +269,9 @@ class ReCameraCppDeployer(BaseDeployer):
                     progress_callback, "transfer", 0, "Transferring files..."
                 )
 
-                files_to_transfer = await self._prepare_files(config, binary_config)
+                files_to_transfer = await self._prepare_files(
+                    config, binary_config, connection
+                )
 
                 with SCPClient(client.get_transport()) as scp:
                     total_files = len(files_to_transfer)
@@ -329,7 +331,9 @@ class ReCameraCppDeployer(BaseDeployer):
                         progress_callback, "models", 0, "Deploying model files..."
                     )
 
-                    await self._deploy_models(client, binary_config, password)
+                    await self._deploy_models(
+                        client, binary_config, password, connection, config
+                    )
 
                     await self._report_progress(
                         progress_callback, "models", 100, "Models deployed"
@@ -661,9 +665,11 @@ done"""
         self,
         config: DeviceConfig,
         binary_config,
+        connection: Optional[Dict[str, Any]] = None,
     ) -> List[tuple]:
         """Prepare list of files to transfer."""
         files = []
+        ctx = config._build_when_context(connection)
 
         # Deb package
         if binary_config.deb_package:
@@ -671,8 +677,10 @@ done"""
             if local_path and Path(local_path).exists():
                 files.append((local_path, "/tmp/"))
 
-        # Model files
+        # Model files (skip models whose 'when' condition is not met)
         for model in binary_config.models:
+            if not config._check_when(model.when, ctx):
+                continue
             local_path = config.get_asset_path(model.path)
             if local_path and Path(local_path).exists():
                 files.append((local_path, "/tmp/"))
@@ -697,9 +705,14 @@ done"""
         client,
         binary_config,
         password: str,
+        connection: Optional[Dict[str, Any]] = None,
+        config: Optional[DeviceConfig] = None,
     ) -> None:
         """Deploy model files to target directories."""
+        ctx = config._build_when_context(connection) if config else {}
         for model in binary_config.models:
+            if not DeviceConfig._check_when(model.when, ctx):
+                continue
             target_dir = model.target_path
             filename = model.filename or Path(model.path).name
 
