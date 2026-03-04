@@ -307,23 +307,34 @@ class DockerRemoteDeployer(SSHMixin, BaseDeployer):
                 )
 
                 # Step 4: Docker compose pull
+                # Use --quiet to suppress progress bars that flood SSH
+                # channel buffer and cause deadlocks for large images.
+                # Use a longer timeout (30 min) for multi-GB image pulls.
                 await self._report_progress(
                     progress_callback, "pull_images", 0, "Pulling images..."
                 )
 
+                pull_timeout = max(ssh_config.command_timeout, 1800)
                 exit_code, stdout, stderr = await asyncio.to_thread(
                     self._exec_with_timeout,
                     client,
-                    f"cd {remote_dir_escaped} && {docker_sudo}docker compose pull",
-                    ssh_config.command_timeout,
+                    f"cd {remote_dir_escaped} && {docker_sudo}docker compose pull --quiet",
+                    pull_timeout,
                 )
 
                 if exit_code != 0:
+                    # Filter out the obsolete "version" warning from error message
+                    error_lines = [
+                        line
+                        for line in stderr.strip().splitlines()
+                        if "the attribute `version` is obsolete" not in line
+                    ]
+                    error_msg = "\n".join(error_lines).strip() or stderr.strip()
                     await self._report_progress(
                         progress_callback,
                         "pull_images",
                         0,
-                        f"Pull failed: {stderr[:200]}",
+                        f"Pull failed: {error_msg[:300]}",
                     )
                     return False
 

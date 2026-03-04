@@ -1,0 +1,182 @@
+﻿version: "1.0"
+id: jetson
+name: NVIDIA Jetson
+name_zh: NVIDIA Jetson
+type: docker_remote
+
+detection:
+  method: network_scan
+  manual_entry: true
+
+ssh:
+  port: 22
+  default_user: recomputer
+  auth_methods:
+    - password
+
+docker_remote:
+  compose_file: assets/jetson/docker-compose.yml
+  compose_dir: assets/jetson
+  remote_path: /home/{{username}}/depth-anything-v3
+
+  environment:
+    DISPLAY: "{{display}}"
+    TZ: Asia/Shanghai
+    ENCODER: "{{encoder}}"
+    STREAM_FPS: "{{stream_fps}}"
+    BITRATE_KBPS: "{{bitrate_kbps}}"
+    PANEL_WIDTH: "{{panel_width}}"
+    PANEL_HEIGHT: "{{panel_height}}"
+    MAX_POINTS: "{{max_points}}"
+    POINT_RADIUS: "{{point_radius}}"
+
+  options:
+    project_name: depth_anything_v3
+    remove_orphans: true
+
+  services:
+    - name: depth-anything-v3
+      required: true
+
+user_inputs:
+  - id: host
+    name: Host / IP
+    name_zh: 主机 / IP
+    type: text
+    required: true
+    placeholder: "192.168.1.100"
+  - id: username
+    name: SSH Username
+    name_zh: SSH 用户名
+    type: text
+    default: recomputer
+    required: true
+  - id: password
+    name: SSH Password
+    name_zh: SSH 密码
+    type: password
+    required: true
+  - id: display
+    name: X11 DISPLAY
+    name_zh: X11 DISPLAY
+    type: text
+    default: ":0"
+    required: false
+  - id: encoder
+    name: Encoder
+    name_zh: 编码器
+    type: text
+    default: x264enc
+    required: false
+    description: GStreamer encoder used by RTSP pipeline
+    description_zh: RTSP 推流使用的 GStreamer 编码器
+  - id: stream_fps
+    name: Stream FPS
+    name_zh: 推流帧率
+    type: text
+    default: "6"
+    required: false
+  - id: bitrate_kbps
+    name: Bitrate (kbps)
+    name_zh: 码率 (kbps)
+    type: text
+    default: "1500"
+    required: false
+  - id: panel_width
+    name: Panel Width
+    name_zh: 画面宽度
+    type: text
+    default: "480"
+    required: false
+  - id: panel_height
+    name: Panel Height
+    name_zh: 画面高度
+    type: text
+    default: "360"
+    required: false
+  - id: max_points
+    name: Max Points
+    name_zh: 最大点数
+    type: text
+    default: "8000"
+    required: false
+  - id: point_radius
+    name: Point Radius
+    name_zh: 点半径
+    type: text
+    default: "1"
+    required: false
+
+actions:
+  before:
+    - name: Validate Jetson runtime
+      name_zh: 校验 Jetson 运行环境
+      run: |
+        set -e
+
+        [ -f /etc/nv_tegra_release ] || {
+          echo "Not a Jetson device: /etc/nv_tegra_release is missing"
+          exit 1
+        }
+
+        docker info >/dev/null 2>&1 || {
+          echo "Docker is not available"
+          exit 1
+        }
+
+        docker info | grep -Eq "Runtimes:.*nvidia| nvidia" || {
+          echo "NVIDIA docker runtime is not detected"
+          exit 1
+        }
+
+        L4T=$(sed -n 's/^# R\([0-9]\+\) (release), REVISION: \([0-9]\+\)\.\([0-9]\+\).*/\1.\2.\3/p' /etc/nv_tegra_release)
+        case "$L4T" in
+          36.4.0|36.4.3|36.4.4|"")
+            ;;
+          *)
+            echo "Unsupported L4T version: $L4T (expected 36.4.0/36.4.3/36.4.4)"
+            exit 1
+            ;;
+        esac
+
+        FREE_GB=$(df -BG / | awk 'NR==2{gsub(/G/,"",$4); print $4}')
+        [ "${FREE_GB:-0}" -ge 12 ] || {
+          echo "Need at least 12GB free disk, current: ${FREE_GB:-0}GB"
+          exit 1
+        }
+    - name: Ensure docker compose command
+      name_zh: 确保 docker compose 可用
+      sudo: true
+      run: |
+        set -e
+
+        if docker compose version >/dev/null 2>&1; then
+          exit 0
+        fi
+
+        if command -v docker-compose >/dev/null 2>&1; then
+          COMPOSE_BIN="$(command -v docker-compose)"
+          for d in \
+            /usr/local/lib/docker/cli-plugins \
+            /usr/lib/docker/cli-plugins \
+            /usr/libexec/docker/cli-plugins
+          do
+            mkdir -p "$d"
+            ln -sf "$COMPOSE_BIN" "$d/docker-compose" || true
+          done
+        fi
+
+        if ! docker compose version >/dev/null 2>&1; then
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y docker-compose-plugin
+          fi
+        fi
+
+        docker compose version >/dev/null 2>&1 || {
+          echo "docker compose is still unavailable after compatibility setup"
+          exit 1
+        }
+
+post_deployment:
+  open_browser: false

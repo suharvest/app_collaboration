@@ -1,0 +1,25 @@
+﻿version: "1.0"
+id: preview_depth
+name: Depth Stream Preview
+name_zh: 深度视频预览
+type: preview
+
+video:
+  type: rtsp_proxy
+
+display:
+  aspect_ratio: "16:9"
+  auto_start: false
+  show_stats: true
+
+user_inputs:
+  - id: rtsp_url
+    name: RTSP URL
+    name_zh: RTSP 地址
+    type: text
+    required: true
+    default_template: "rtsp://{{host}}:8554/depth"
+    default: "rtsp://192.168.1.100:8554/depth"
+    placeholder: "rtsp://<jetson-ip>:8554/depth"
+    description: RTSP output URL from the Jetson inference pipeline
+    description_zh: Jetson 端推理管线输出的 RTSP 地址

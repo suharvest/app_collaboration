@@ -187,9 +187,15 @@ class DeploymentEngine:
 
             # Check if we have connection info for this device
             is_required = device_ref.get("required", True)
-            if device_id not in device_connections and is_required:
-                # Skip if required device has no connection
-                logger.warning(f"No connection info for required device: {device_id}")
+            if device_id not in device_connections:
+                if is_required:
+                    logger.warning(
+                        f"No connection info for required device: {device_id}"
+                    )
+                else:
+                    logger.info(
+                        f"Skipping optional device {device_id} (no connection info)"
+                    )
                 continue
 
             device_name = device_ref.get("name", device_id)

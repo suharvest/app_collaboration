@@ -1,0 +1,58 @@
+version: "1.0"
+id: depth_anything_v3
+name: Depth Anything V3 on Jetson
+name_zh: Jetson 一键部署 Depth Anything V3
+
+intro:
+  summary: One-click SSH deployment of Depth Anything V3 on NVIDIA Jetson with a prebuilt Docker image.
+  summary_zh: 基于预构建 Docker 镜像，通过 SSH 一键部署 Depth Anything V3 到 NVIDIA Jetson。
+  description_file: description.md
+  description_file_zh: description_zh.md
+  cover_image: gallery/da3.png
+  gallery:
+    - type: image
+      src: gallery/da3.png
+      caption: Depth Anything V3 demo view
+      caption_zh: Depth Anything V3 演示画面
+    - type: image
+      src: gallery/engine.png
+      caption: TensorRT engine generation
+      caption_zh: TensorRT 引擎生成过程
+  category: vision
+  tags: [jetson, depth-estimation, docker, edge-ai]
+
+  device_catalog:
+    recomputer_j4012:
+      name: reComputer J4012
+      name_zh: reComputer J4012
+      product_url: https://www.seeedstudio.com/reComputer-J4012-p-5586.html
+      description: NVIDIA Jetson edge AI computer for real-time depth estimation
+      description_zh: 用于实时深度估计的 NVIDIA Jetson 边缘 AI 计算机
+
+  presets:
+    - id: jetson_depth
+      name: Jetson One-Click Depth Demo
+      name_zh: Jetson 一键深度估计演示
+      description: Deploy Depth Anything V3 to Jetson via SSH without manual command input.
+      description_zh: 通过 SSH 一键部署 Depth Anything V3，无需用户手动输入命令。
+      device_groups:
+        - id: edge_device
+          name: Edge Device
+          name_zh: 边缘设备
+          type: single
+          required: true
+          options:
+            - device_ref: recomputer_j4012
+          default: recomputer_j4012
+
+  stats:
+    difficulty: beginner
+    estimated_time: 10min
+
+  links:
+    github: https://github.com/Seeed-Projects/jetson-examples
+
+deployment:
+  guide_file: guide.md
+  guide_file_zh: guide_zh.md
+  selection_mode: sequential
