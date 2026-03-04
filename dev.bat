@@ -41,7 +41,7 @@ echo [3/5] Checking frontend dependencies...
 cd /d "%PROJECT_DIR%frontend"
 if not exist "node_modules" (
     echo Installing npm packages...
-    npm install --silent
+    call npm install --silent
 )
 
 :: Cleanup leftover processes on port
@@ -57,7 +57,7 @@ if %ERRORLEVEL% neq 0 (
 :: Build frontend
 echo [5/5] Building frontend...
 cd /d "%PROJECT_DIR%frontend"
-npm run build
+call npm run build
 if %ERRORLEVEL% neq 0 (
     echo Error: Frontend build failed
     exit /b 1
