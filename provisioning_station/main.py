@@ -224,8 +224,7 @@ _frontend_dir = next(
 
 if _configured_frontend_dir and _frontend_dir != _configured_frontend_dir:
     logger.warning(
-        "Configured frontend dir is invalid or incomplete: %s. "
-        "Falling back to: %s",
+        "Configured frontend dir is invalid or incomplete: %s. " "Falling back to: %s",
         _configured_frontend_dir,
         _frontend_dir or _default_frontend_dir,
     )
@@ -240,6 +239,7 @@ if _frontend_dir:
     @app.get("/")
     async def serve_frontend():
         return FileResponse(_frontend_dir / "index.html")
+
 else:
     logger.warning(
         "Frontend dist not found; UI route disabled. Checked: %s",

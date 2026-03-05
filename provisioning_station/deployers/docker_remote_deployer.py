@@ -277,7 +277,9 @@ class DockerRemoteDeployer(SSHMixin, BaseDeployer):
                     return False
 
                 # Resolve compose command across v2 plugin and v1 standalone.
-                compose_command = await self._resolve_compose_command(client, docker_sudo)
+                compose_command = await self._resolve_compose_command(
+                    client, docker_sudo
+                )
                 if not compose_command:
                     await self._report_progress(
                         progress_callback,
