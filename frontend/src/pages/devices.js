@@ -370,6 +370,7 @@ function setupDeviceModeToggle() {
         remoteSection.style.display = 'block';
         deployedAppsSection.style.display = 'block';
         restoreSection.style.display = 'none';
+        currentConnection = null;
         // Show connect prompt for deployed apps
         loadDeployedApps();
       } else if (deviceMode === 'embedded') {
