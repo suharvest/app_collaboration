@@ -23,7 +23,7 @@ import {
 } from './deploy/state.js';
 
 // Import rendering functions
-import { renderDeployContent } from './deploy/renderers.js';
+import { renderDeployContent, initAllShowWhenListeners } from './deploy/renderers.js';
 
 // Import event handlers
 import { setupEventHandlers } from './deploy/handlers.js';
@@ -112,6 +112,7 @@ export async function renderDeployPage(params) {
     // Render content and setup handlers
     renderDeployContent(container);
     setupEventHandlers(container);
+    initAllShowWhenListeners();
 
     // Auto-detect devices
     await detectDevices();

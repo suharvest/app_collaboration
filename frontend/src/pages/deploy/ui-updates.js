@@ -27,6 +27,7 @@ import {
   renderContentArea,
   renderDeployControls,
   renderPostDeploymentSection,
+  initAllShowWhenListeners,
 } from './renderers.js';
 import { getSelectedTarget } from './utils.js';
 
@@ -295,5 +296,8 @@ export function updateDockerTargetUI(deviceId, container, testSSHHandler = null,
         });
       }
     }
+
+    // Re-initialize show_when listeners after re-rendering
+    initAllShowWhenListeners();
   }
 }

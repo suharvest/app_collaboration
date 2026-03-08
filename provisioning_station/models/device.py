@@ -376,7 +376,13 @@ class UserInputConfig(BaseModel):
     required: bool = False
     validation: Optional[Dict[str, str]] = None
     options: List[Dict[str, str]] = []  # For select type
+    show_when: Optional[ActionWhen] = (
+        None  # Conditional visibility based on another input
+    )
     row: Optional[int] = None  # Group inputs with same row number on same line
+    row_direction: Optional[str] = (
+        None  # Layout direction for row group: "horizontal" (default) or "vertical"
+    )
     reconfigurable: bool = False  # Can be updated post-deploy from Devices page
 
 

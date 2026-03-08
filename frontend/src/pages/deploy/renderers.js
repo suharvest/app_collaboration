@@ -967,11 +967,17 @@ export function renderUserInputs(device, inputs, excludeIds = [], noWrapper = fa
   const filteredInputs = inputs.filter(input => !excludeIds.includes(input.id));
   if (!filteredInputs.length) return '';
 
+  const showWhenAttrs = (input) => {
+    if (!input.show_when) return '';
+    const sw = input.show_when;
+    return ` data-show-when-field="${sw.field}" data-show-when-value="${sw.value || ''}" data-device-id="${device.id}" style="display: none;"`;
+  };
+
   const renderSingleInput = (input, inRow = false) => {
     if (input.type === 'checkbox') {
       const isChecked = input.default === 'true' || input.default === true;
       return `
-        <div class="form-group form-group-checkbox"${inRow ? ' style="min-width: 160px;"' : ''}>
+        <div class="form-group form-group-checkbox"${inRow ? ' style="min-width: 160px;"' : ''}${showWhenAttrs(input)}>
           <label class="checkbox-label">
             <input
               type="checkbox"
@@ -991,7 +997,7 @@ export function renderUserInputs(device, inputs, excludeIds = [], noWrapper = fa
         return `<option value="${opt.value}"${selected}>${label}</option>`;
       }).join('');
       return `
-        <div class="form-group${inRow ? ' flex-1' : ''}">
+        <div class="form-group${inRow ? ' flex-1' : ''}"${showWhenAttrs(input)}>
           <label>${getLocalizedField(input, 'name')}</label>
           ${input.description ? `<p class="text-xs text-text-muted mb-1">${getLocalizedField(input, 'description')}</p>` : ''}
           <select
@@ -1002,7 +1008,7 @@ export function renderUserInputs(device, inputs, excludeIds = [], noWrapper = fa
       `;
     }
     return `
-      <div class="form-group${inRow ? ' flex-1' : ''}">
+      <div class="form-group${inRow ? ' flex-1' : ''}"${showWhenAttrs(input)}>
         <label>${getLocalizedField(input, 'name')}</label>
         ${input.description ? `<p class="text-xs text-text-muted mb-1">${getLocalizedField(input, 'description')}</p>` : ''}
         <input
@@ -1042,7 +1048,11 @@ export function renderUserInputs(device, inputs, excludeIds = [], noWrapper = fa
     if (item.type === 'row') {
       const rowInputs = rows.get(item.row);
       if (rowInputs.length > 1) {
-        content += `<div class="flex gap-4 items-start">${rowInputs.map(input => renderSingleInput(input, true)).join('')}</div>`;
+        // Use row_direction from first input in group (default: horizontal)
+        const direction = rowInputs[0].row_direction || 'horizontal';
+        const isHorizontal = direction === 'horizontal';
+        const containerClass = isHorizontal ? 'flex gap-4 items-start' : 'flex flex-col gap-2';
+        content += `<div class="${containerClass}">${rowInputs.map(input => renderSingleInput(input, isHorizontal)).join('')}</div>`;
       } else {
         content += renderSingleInput(rowInputs[0], false);
       }
@@ -1446,4 +1456,37 @@ export function getDeviceTypeIcon(type) {
         <path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
       </svg>`;
   }
+}
+
+// ============================================
+// show_when Conditional Visibility
+// ============================================
+
+/**
+ * Initialize show_when listeners for all user inputs with data-show-when-field.
+ * Call after rendering user inputs to wire up conditional visibility.
+ */
+export function initAllShowWhenListeners() {
+  document.querySelectorAll('[data-show-when-field]').forEach(el => {
+    const field = el.dataset.showWhenField;
+    const expectedValue = el.dataset.showWhenValue;
+    const deviceId = el.dataset.deviceId;
+    if (!deviceId) return;
+    const controlInput = document.getElementById(`input-${deviceId}-${field}`);
+    if (!controlInput) return;
+    const update = () => {
+      const val = controlInput.type === 'checkbox'
+        ? (controlInput.checked ? 'true' : 'false')
+        : controlInput.value;
+      const visible = val === expectedValue;
+      el.style.display = visible ? '' : 'none';
+      const reqInput = el.querySelector('[required]');
+      if (reqInput) {
+        if (!visible) reqInput.removeAttribute('required');
+        else reqInput.setAttribute('required', '');
+      }
+    };
+    update();
+    controlInput.addEventListener('change', update);
+  });
 }
