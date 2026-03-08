@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 class ActionExecutor(ABC):
     """Abstract base for action execution."""
 
+    last_stdout: str = ""  # Captured stdout from last execute_run
+
     @abstractmethod
     async def execute_run(
         self,
@@ -92,6 +94,8 @@ class LocalActionExecutor(ActionExecutor):
             stdout, stderr = await asyncio.wait_for(
                 process.communicate(), timeout=action.timeout
             )
+
+            self.last_stdout = stdout.decode("utf-8", errors="replace").strip()
 
             if process.returncode != 0:
                 logger.error(
@@ -177,6 +181,8 @@ class SSHActionExecutor(ActionExecutor):
             exit_code, stdout, stderr = await asyncio.to_thread(
                 self._exec_with_timeout, full_cmd, action.timeout
             )
+
+            self.last_stdout = stdout.strip()
 
             if exit_code != 0:
                 logger.error(

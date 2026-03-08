@@ -150,6 +150,13 @@ class BaseDeployer(ABC):
                 success = await executor.execute_run(
                     action, context, cwd=config.base_path
                 )
+                # Forward action stdout to progress log
+                if success and executor.last_stdout:
+                    for line in executor.last_stdout.splitlines():
+                        if line.strip():
+                            await self._report_progress(
+                                progress_callback, step_id, progress, line
+                            )
             elif action.copy_files:
                 success = await executor.execute_copy(
                     action.copy_files, context, base_path=config.base_path
