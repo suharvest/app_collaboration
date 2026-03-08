@@ -11,7 +11,7 @@ detection:
     - docker
 
 docker:
-  compose_file: ../assets/docker/docker-compose.yml
+  compose_file: assets/docker/docker-compose.yml
   options:
     project_name: recamera-homeassistant
     remove_orphans: true

@@ -21,8 +21,8 @@ ssh:
   command_timeout: 600
 
 docker_remote:
-  compose_file: ../assets/docker/docker-compose.yml
-  compose_dir: ../assets/docker
+  compose_file: assets/docker/docker-compose.yml
+  compose_dir: assets/docker
   remote_path: /home/{{username}}/recamera-ha
   options:
     project_name: recamera-homeassistant
