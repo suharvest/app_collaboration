@@ -977,7 +977,7 @@ export function renderUserInputs(device, inputs, excludeIds = [], noWrapper = fa
     if (input.type === 'checkbox') {
       const isChecked = input.default === 'true' || input.default === true;
       return `
-        <div class="form-group form-group-checkbox"${inRow ? ' style="min-width: 160px;"' : ''}${showWhenAttrs(input)}>
+        <div class="form-group form-group-checkbox${inRow ? ' flex-1' : ''}"${inRow ? ' style="min-width: 160px;"' : ''}${showWhenAttrs(input)}>
           <label class="checkbox-label">
             <input
               type="checkbox"
@@ -999,7 +999,7 @@ export function renderUserInputs(device, inputs, excludeIds = [], noWrapper = fa
       return `
         <div class="form-group${inRow ? ' flex-1' : ''}"${showWhenAttrs(input)}>
           <label>${getLocalizedField(input, 'name')}</label>
-          ${input.description ? `<p class="text-xs text-text-muted mb-1">${getLocalizedField(input, 'description')}</p>` : ''}
+          ${!inRow && input.description ? `<p class="text-xs text-text-muted mb-1">${getLocalizedField(input, 'description')}</p>` : ''}
           <select
             id="input-${device.id}-${input.id}"
             ${input.required ? 'required' : ''}

@@ -29,10 +29,11 @@ Deploy on your reComputer R series device.
 
 ### Deployment Complete
 
-1. Open **http://localhost:18789** in your browser
-2. Follow the on-screen setup wizard to create your account
-3. Connect your first messaging channel (WeChat, Telegram, Discord, etc.)
-4. If local AI model is enabled, it's already configured — select it when creating an agent
+1. Copy the **Gateway Token** shown in the deployment log
+2. Open **http://localhost:18789** in your browser
+3. Enter the token to log in
+4. Connect your first messaging channel (WeChat, Telegram, Discord, etc.)
+5. If local AI model is enabled, it's already configured — select it when creating an agent
 
 ### Troubleshooting
 
@@ -56,10 +57,11 @@ Deploy to a reComputer Jetson device over SSH, with GPU-accelerated local AI mod
 
 ### Deployment Complete
 
-1. Open **http://\<jetson-ip\>:18789** in your browser
-2. Follow the on-screen setup wizard to create your account
-3. Connect your first messaging channel
-4. If local AI model is enabled, it's already configured with GPU acceleration — select it when creating an agent
+1. Copy the **Gateway Token** shown in the deployment log
+2. Open **http://\<jetson-ip\>:18789** in your browser
+3. Enter the token to log in
+4. Connect your first messaging channel
+5. If local AI model is enabled, it's already configured with GPU acceleration — select it when creating an agent
 
 ### Troubleshooting
 
@@ -78,8 +80,8 @@ OpenClaw AI gateway is ready to use.
 
 ## Initial Setup
 
-1. Open the OpenClaw web UI in your browser
-2. Create your account through the setup wizard
+1. Copy the **Gateway Token** from the deployment log
+2. Open the OpenClaw web UI in your browser and enter the token to log in
 3. Connect your first messaging channel (WeChat, Telegram, Discord, etc.)
 
 ## Quick Verification

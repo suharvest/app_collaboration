@@ -109,6 +109,36 @@ actions:
         '
       timeout: 30
 
+    - name: Display gateway access token
+      name_zh: 显示网关访问令牌
+      run: |
+        set -e
+        TOKEN=$(docker exec openclaw-gateway node -e '
+          const fs = require("fs");
+          const p = "/home/node/.openclaw/openclaw.json";
+          const cfg = JSON.parse(fs.readFileSync(p, "utf8"));
+          const token = cfg.gateway && cfg.gateway.auth && cfg.gateway.auth.token;
+          if (token) process.stdout.write(token);
+          else process.stdout.write("NOT_FOUND");
+        ')
+        if [ "$TOKEN" = "NOT_FOUND" ]; then
+          echo "WARNING: Could not read gateway token from config"
+        else
+          echo ""
+          echo "=========================================="
+          echo "  OpenClaw Gateway Token"
+          echo "=========================================="
+          echo ""
+          echo "  $TOKEN"
+          echo ""
+          echo "=========================================="
+          echo ""
+          echo "Open http://localhost:18789 in your browser"
+          echo "and enter this token to log in."
+          echo ""
+        fi
+      timeout: 30
+
 post_deployment:
   open_browser: true
   browser_url: "http://localhost:18789"
