@@ -1,0 +1,57 @@
+version: "1.0"
+id: openclaw_deploy
+name: OpenClaw AI Gateway
+name_zh: OpenClaw（龙虾机器人）AI 网关
+
+intro:
+  summary: Deploy OpenClaw AI messaging gateway on reComputer, with optional local AI model for privacy-first conversations.
+  summary_zh: 在 reComputer 上一键部署 OpenClaw（龙虾机器人）AI 消息网关，可选搭配本地模型，对话数据不出设备。
+  description_file: description.md
+  description_file_zh: description_zh.md
+  cover_image: gallery/cover.png
+  category: llm
+  solution_type: technical
+  tags: [docker, llm, ai-gateway, edge-ai, jetson]
+
+  device_catalog:
+    recomputer_r:
+      name: reComputer R1100 / R2000
+      name_zh: reComputer R1100 / R2000
+      product_url: https://www.seeedstudio.com/reComputer-R1100-p-5900.html
+      description: Runs OpenClaw gateway services
+      description_zh: 运行 OpenClaw 网关服务
+    recomputer_jetson:
+      name: reComputer Jetson Series
+      name_zh: reComputer Jetson 系列
+      product_url: https://www.seeedstudio.com/reComputer-J4012-p-5586.html
+      description: GPU-accelerated local AI model
+      description_zh: GPU 加速本地模型
+
+  presets:
+    - id: openclaw_basic
+      name: OpenClaw + Optional Local AI
+      name_zh: OpenClaw + 可选本地模型
+      description: Deploy OpenClaw gateway, optionally leverage device GPU to run local AI models — no data leaves your device.
+      description_zh: 部署 OpenClaw 网关，可选利用设备算力运行本地模型，对话数据不出设备。
+      device_groups:
+        - id: deploy_target
+          name: Deployment Target
+          name_zh: 部署目标
+          type: single
+          required: true
+          options:
+            - device_ref: recomputer_r
+            - device_ref: recomputer_jetson
+          default: recomputer_r
+
+  stats:
+    difficulty: beginner
+    estimated_time: 15min
+
+  links:
+    github: https://github.com/nicepkg/openclaw
+
+deployment:
+  guide_file: guide.md
+  guide_file_zh: guide_zh.md
+  selection_mode: sequential

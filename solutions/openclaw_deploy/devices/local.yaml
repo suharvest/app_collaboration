@@ -1,0 +1,114 @@
+version: "1.0"
+id: local
+name: Local Docker
+name_zh: 本机 Docker
+type: docker_local
+
+docker:
+  compose_file: assets/local/docker-compose.yml
+  options:
+    project_name: openclaw
+    remove_orphans: true
+  services:
+    - name: openclaw-gateway
+      port: 18789
+      health_check_endpoint: /healthz
+      health_check_timeout: 120
+      required: true
+
+user_inputs:
+  - id: enable_ollama
+    name: Enable Ollama (Local LLM)
+    name_zh: 启用 Ollama（本地大模型）
+    type: checkbox
+    default: "false"
+    row: 1
+    description: "Start Ollama alongside OpenClaw for local AI inference"
+    description_zh: "在 OpenClaw 旁启动 Ollama，用于本地 AI 推理"
+  - id: ollama_model
+    name: Ollama Model
+    name_zh: Ollama 模型
+    type: select
+    default: "qwen3.5:2b"
+    row: 1
+    description: "Model to pull and use with Ollama"
+    description_zh: "Ollama 使用的模型"
+    show_when:
+      field: enable_ollama
+      value: "true"
+    options:
+      - value: "qwen3.5:2b"
+        label: "Qwen3.5 2B (lightweight)"
+        label_zh: "Qwen3.5 2B（轻量）"
+      - value: "qwen3.5:4b"
+        label: "Qwen3.5 4B (balanced)"
+        label_zh: "Qwen3.5 4B（均衡）"
+
+actions:
+  after:
+    - name: Start Ollama
+      name_zh: 启动 Ollama
+      when:
+        field: enable_ollama
+        value: "true"
+      run: |
+        set -e
+        # Check if Ollama is already running (native install)
+        if curl -sf http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+          echo "Ollama is already running on port 11434, skipping Docker start"
+          exit 0
+        fi
+        COMPOSE_FILE="{{solution_dir}}/assets/local/docker-compose-ollama.yml"
+        echo "Pulling Ollama image (this may take a few minutes on first run)..."
+        docker compose -f "$COMPOSE_FILE" pull
+        echo "Starting Ollama container..."
+        docker compose -f "$COMPOSE_FILE" -p openclaw up -d
+        echo "Waiting for Ollama to be ready..."
+        for i in $(seq 1 30); do
+          if docker exec ollama ollama list >/dev/null 2>&1; then
+            echo "Ollama is ready"
+            break
+          fi
+          sleep 2
+        done
+      timeout: 600
+
+    - name: Pull Ollama model
+      name_zh: 拉取 Ollama 模型
+      when:
+        field: enable_ollama
+        value: "true"
+      run: |
+        set -e
+        echo "Pulling model {{ollama_model}}..."
+        docker exec ollama ollama pull {{ollama_model}}
+        echo "Model {{ollama_model}} pulled successfully"
+      timeout: 600
+
+    - name: Configure Ollama provider in OpenClaw
+      name_zh: 在 OpenClaw 中配置 Ollama
+      when:
+        field: enable_ollama
+        value: "true"
+      run: |
+        set -e
+        echo "Configuring Ollama provider in OpenClaw..."
+        docker exec openclaw-gateway node -e '
+          const fs = require("fs");
+          const p = "/home/node/.openclaw/openclaw.json";
+          const cfg = JSON.parse(fs.readFileSync(p, "utf8"));
+          if (!cfg.models) cfg.models = {};
+          if (!cfg.models.providers) cfg.models.providers = {};
+          cfg.models.providers.ollama = {
+            baseUrl: "http://localhost:11434/v1",
+            apiKey: "ollama",
+            api: "openai-completions"
+          };
+          fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
+          console.log("Ollama provider injected into openclaw.json");
+        '
+      timeout: 30
+
+post_deployment:
+  open_browser: true
+  browser_url: "http://localhost:18789"
