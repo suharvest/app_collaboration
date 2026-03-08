@@ -126,15 +126,15 @@ actions:
         else
           echo ""
           echo "=========================================="
-          echo "  OpenClaw Gateway Token"
+          echo "  OpenClaw 网关访问令牌"
           echo "=========================================="
           echo ""
           echo "  $TOKEN"
           echo ""
           echo "=========================================="
           echo ""
-          echo "Open http://localhost:18789 in your browser"
-          echo "and enter this token to log in."
+          echo "在浏览器打开 http://localhost:18789"
+          echo "输入此令牌登录"
           echo ""
         fi
       timeout: 30
