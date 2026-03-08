@@ -80,6 +80,29 @@ curl -s -X POST $BASE/api/deployments/start \
 
 The response contains `deployment_id`.
 
+**Important: Target routing for `docker_deploy` steps**
+
+When a step has type `docker_deploy` with multiple targets (e.g., local + remote), you must specify which target to use via the `target` key (NOT `target_id`) in `device_connections`:
+
+```json
+{
+  "device_connections": {
+    "deploy_step": {
+      "target": "jetson_remote",
+      "host": "192.168.1.100",
+      "username": "user",
+      "password": "pass",
+      "auto_replace_containers": true
+    }
+  }
+}
+```
+
+- `target` must match the target's `#id` from `guide.md` (e.g., `local`, `jetson_remote`)
+- Without `target`, it defaults to `docker_local` type
+- For remote targets, include `host`, `username`, `password`
+- Set `auto_replace_containers: true` to automatically replace existing containers
+
 ### Step 5: Check deployment result
 
 ```bash
