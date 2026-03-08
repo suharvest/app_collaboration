@@ -450,6 +450,8 @@ class DockerRemoteDeployer(SSHMixin, BaseDeployer):
                                 service.health_check_endpoint,
                                 timeout=health_timeout,
                                 progress_callback=progress_callback,
+                                ssh_client=client,
+                                container_name=service.name,
                             )
                             if not healthy:
                                 if service.required:
@@ -896,41 +898,92 @@ class DockerRemoteDeployer(SSHMixin, BaseDeployer):
         endpoint: str,
         timeout: int = 30,
         progress_callback=None,
+        ssh_client=None,
+        container_name: str = None,
     ) -> bool:
-        """Check remote service health via HTTP"""
+        """Check remote service health.
+
+        First tries HTTP from the provisioning station. If that times out and
+        an ssh_client is provided, falls back to Docker's own container health
+        status via SSH (same logic as docker_deployer local fallback).
+        """
         try:
             import httpx
+        except ImportError:
+            logger.warning("httpx not installed, skipping HTTP health check")
+            httpx = None
 
-            url = f"http://{host}:{port}{endpoint}"
-            start_time = asyncio.get_event_loop().time()
-            attempt = 0
+        url = f"http://{host}:{port}{endpoint}"
+        start_time = asyncio.get_event_loop().time()
+        attempt = 0
 
-            while asyncio.get_event_loop().time() - start_time < timeout:
-                attempt += 1
+        while asyncio.get_event_loop().time() - start_time < timeout:
+            attempt += 1
+            if httpx:
                 try:
                     async with httpx.AsyncClient() as http_client:
                         response = await http_client.get(url, timeout=5)
                         if response.status_code < 500:
                             return True
                 except Exception as e:
-                    if progress_callback:
-                        elapsed = int(asyncio.get_event_loop().time() - start_time)
-                        await self._report_progress(
-                            progress_callback,
-                            "health_check",
-                            min(50, elapsed * 100 // timeout),
-                            f"Waiting for service at {host}:{port} (attempt {attempt}, {elapsed}s/{timeout}s)...",
-                        )
                     logger.debug(f"Health check attempt {attempt} failed: {e}")
-                await asyncio.sleep(2)
 
-            return False
+            if progress_callback:
+                elapsed = int(asyncio.get_event_loop().time() - start_time)
+                await self._report_progress(
+                    progress_callback,
+                    "health_check",
+                    min(50, elapsed * 100 // timeout),
+                    f"Waiting for service at {host}:{port} (attempt {attempt}, {elapsed}s/{timeout}s)...",
+                )
+            await asyncio.sleep(2)
 
-        except ImportError:
-            logger.warning("httpx not installed, skipping health check")
-            return True
+        # HTTP timed out — fallback to Docker container health via SSH
+        if ssh_client and container_name:
+            healthy = await self._check_remote_container_health(
+                ssh_client, container_name
+            )
+            if healthy:
+                logger.info(
+                    f"HTTP health check timed out but Docker reports "
+                    f"{container_name} as healthy (via SSH)"
+                )
+                return True
+
+        return False
+
+    async def _check_remote_container_health(
+        self, ssh_client, container_name: str
+    ) -> bool:
+        """Check Docker's own container health status via SSH (fallback).
+
+        Mirrors docker_deployer._check_docker_container_health but runs
+        remotely through the SSH client.
+        """
+        try:
+            inspect_cmd = (
+                f"docker inspect --format "
+                f"'{{{{.State.Status}}}}|{{{{if .State.Health}}}}{{{{.State.Health.Status}}}}{{{{else}}}}none{{{{end}}}}' "
+                f"{container_name}"
+            )
+            exit_code, stdout, _ = await asyncio.to_thread(
+                self._exec_with_timeout, ssh_client, inspect_cmd, 10
+            )
+            if exit_code != 0:
+                return False
+
+            output = stdout.strip().strip("'")
+            parts = output.split("|")
+            state_status = parts[0] if parts else ""
+            health_status = parts[1] if len(parts) > 1 else "none"
+
+            if state_status != "running":
+                return False
+            if health_status == "none":
+                return True
+            return health_status == "healthy"
         except Exception as e:
-            logger.error(f"Health check failed: {e}")
+            logger.debug(f"Remote Docker health fallback failed: {e}")
             return False
 
     def _substitute_variables(

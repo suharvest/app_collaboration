@@ -128,23 +128,36 @@ class NodeRedDeployer(BaseDeployer):
             )
 
             async with httpx.AsyncClient(timeout=30.0) as client:
-                # Verify Node-RED is accessible
-                try:
-                    response = await client.get(f"{base_url}/flows")
-                    if response.status_code not in [200, 401]:
+                # Verify Node-RED is accessible (retry up to 90s for slow startup)
+                max_retries = 18
+                retry_interval = 5
+                connected = False
+                for attempt in range(max_retries):
+                    try:
+                        response = await client.get(f"{base_url}/flows")
+                        if response.status_code in [200, 401]:
+                            connected = True
+                            break
+                        last_error = f"HTTP {response.status_code}"
+                    except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+                        last_error = str(e)
+
+                    if attempt < max_retries - 1:
+                        remaining = (max_retries - attempt - 1) * retry_interval
                         await self._report_progress(
                             progress_callback,
                             "connect",
-                            0,
-                            f"Node-RED not accessible: HTTP {response.status_code}",
+                            int((attempt + 1) / max_retries * 80),
+                            f"Waiting for Node-RED to start... (retry {attempt + 1}/{max_retries}, ~{remaining}s remaining)",
                         )
-                        return False
-                except httpx.ConnectError as e:
+                        await asyncio.sleep(retry_interval)
+
+                if not connected:
                     await self._report_progress(
                         progress_callback,
                         "connect",
                         0,
-                        f"Cannot connect to Node-RED: {str(e)}",
+                        f"Cannot connect to Node-RED: {last_error}",
                     )
                     return False
 

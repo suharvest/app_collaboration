@@ -181,7 +181,7 @@ class SSHActionExecutor(ActionExecutor):
             if exit_code != 0:
                 logger.error(
                     f"SSH action '{action.name}' failed (exit {exit_code}): "
-                    f"{stderr[:500]}"
+                    f"stderr={stderr[:500]} stdout={stdout[:500]}"
                 )
                 return False
 
