@@ -13,7 +13,7 @@ docker:
     - name: openclaw-gateway
       port: 18789
       health_check_endpoint: /healthz
-      health_check_timeout: 120
+      health_check_timeout: 600
       required: true
 
 user_inputs:
